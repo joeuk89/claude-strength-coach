@@ -1,0 +1,11 @@
+.env
+.idea/
+.agent/
+.DS_Store
+
+# The Claude files ARE this system — override any global gitignore that
+# excludes them (e.g. ~/.gitignore_global rules meant for work repos).
+!CLAUDE.md
+!.claude/
+.claude/settings.local.json
+!docs/superpowers/
