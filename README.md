@@ -50,6 +50,9 @@ targets. With them, the loop is much tighter.
 - **`/goals`** — run when goals change or a phase decision is due
   ("should I bulk or cut?"). Ends with a recorded plan and, if you use
   MacroFactor, exact setup steps for it.
+- **`/meal-plan`** — plan the week's meals and snacks around what's
+  already covered (meal kit, canteen, eating out), to your targets, and
+  get a shopping list for exactly what the plan needs.
 - **`/hevy-sync`** — run after editing routines in the Hevy app, or when
   the coach proposes routine changes here. Reconciles `routine/` and Hevy
   in either direction, one difference at a time.

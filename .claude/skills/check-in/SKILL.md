@@ -99,6 +99,10 @@ check-ins against the target trend rate in `profile.md`.
 If `profile.md` shows nutrition setup still TBD, just record a scale
 weight and prompt `/goals` to get set up.
 
+If a dated plan in `nutrition/` covers (part of) this window, ask how it
+went — which meals stuck, what got skipped or swapped — and note learnings
+for the next `/meal-plan` run (menu-bank changes belong there, not here).
+
 Record the numbers in the check-in and refresh them in `profile.md`.
 
 ## 5. Interview the athlete

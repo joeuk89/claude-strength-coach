@@ -104,6 +104,11 @@ training stress.)
 
 - **Apps:** Hevy: yes-Pro / yes-free / no · MacroFactor: yes / no
 
+## Food & eating
+
+(Filled by /meal-plan — food preferences and allergies, staples, cooking
+appetite, shopping style, standing meal coverage, plan-style preference.)
+
 ## Recovery
 
 (Sleep quality, stress, anything that gates volume right now.)
