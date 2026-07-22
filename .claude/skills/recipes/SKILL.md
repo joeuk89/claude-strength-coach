@@ -33,7 +33,9 @@ allergies/intolerances; staples always in the house; cooking appetite
 (assemble-only ↔ batch-cook ↔ cook most days); how they shop (weekly
 online order, weekly in person, ad hoc top-ups); standing coverage
 (meal kit, canteen, family dinners, regular meals out); and plan style
-(loose ↔ strict — see `/meal-plan`).
+(loose ↔ strict — see `/meal-plan`). **If Food & eating is already
+complete, don't open an interview at all — confirm it's current and go
+straight to seeding.**
 
 Write/refresh the Food & eating section with the athlete's confirmation.
 

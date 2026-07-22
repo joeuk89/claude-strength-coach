@@ -57,7 +57,10 @@ so and offer a `/recipes` sweep before planning.
 ## 3. Current targets
 
 - **MacroFactor users:** ask for today's kcal and protein targets off
-  the dashboard, and whether calorie shifting is configured.
+  the dashboard, and whether calorie shifting is configured. If MF is
+  still calibrating (a new account, or a fresh phase on-ramp) and shows
+  no target yet, fall back to the profile's Nutrition & goals numbers
+  and say you've done so.
 - **Without MacroFactor:** use the calorie/protein targets in
   `profile.md`.
 - Sanity-check either against Nutrition & goals. A big mismatch (wrong
@@ -71,6 +74,14 @@ covered — which day × meal slots, and what with. Confirm which days are
 training / double / rest days from the routine (don't assume — weeks
 have one-off changes), and ask about anything unusual: travel, meals
 out, guests.
+
+**Covered meals with no card** (a family dinner, a canteen lunch):
+estimate their per-serving macros with the athlete and record the
+assumption in the plan — the day's totals lean on them. Ask which are
+the **low-protein nights** (e.g. a veg-curry dinner) so any protein
+top-up lands on the right day. Protein is the hard anchor; a covered
+block's calories are an estimate, so treat the daily kcal as approximate
+when much of the day is family-cooked.
 
 **Meal-kit boxes:** if any coverage is a recipe box (Gousto etc.), ask
 the athlete to link the provider's recipe pages for the meals in this
@@ -111,6 +122,9 @@ Also:
   days; calorie cycling if the profile opts in (carbs/kcal toward
   higher-output days, protein flat). Timing notes only where they
   matter — around training slots.
+- **Stacking variations:** a pool entry may carry more than one variation
+  when they hit different ingredients (`oats (+banana, +PB)`) — the deltas
+  add. See `reference/recipe-cards.md`.
 - **Batch cooking:** a card with `servings` > 1 covers multiple slots —
   schedule the cook day and the leftover day explicitly, and count the
   recipe once per serving in the pool.
@@ -122,6 +136,10 @@ Also:
 Derive from the pool's **non-covered** entries: per-serving ingredient
 quantities × counts, with variation deltas applied, aggregated across
 the window. Two sections, both exact:
+
+A **staple** is anything on the athlete's staples list in `profile.md`
+(Food & eating) — what they keep in by default; everything else is a
+Buy item, even pantry-ish things not on that list.
 
 1. **Buy** — non-staple ingredients with exact quantities (and pack
    sizes where they help).
@@ -154,11 +172,16 @@ profile) · plan style: loose/strict
 in the plan and the macros but not the shopping list.)
 
 ## The week
-| Day | Type | Covered | Breakfast | Lunch | Snacks |
+| Day | Type | Breakfast | Lunch | Dinner | Snacks |
 | --- | --- | --- | --- | --- | --- |
-| Mon | training | D: family | [Overnight oats](menu/overnight-oats.md) | [Chicken + rice bowl](menu/chicken-rice-bowl.md) 🔒 post-run — quick | … |
-(Strict: assignments are fixed. Loose: suggested — swap within a slot
-except 🔒 day-locked entries. Recipes always linked by full name.)
+| Mon | training | [Overnight oats](menu/overnight-oats.md) | [Chicken + rice bowl](menu/chicken-rice-bowl.md) 🔒 post-run — quick | family: chicken + pasta *(covered)* | … |
+(Every slot the plan touches gets a column, dinner included. Covered
+entries — family dinners, meal-kit boxes, eat-out — sit in their slot's
+cell marked *(covered)*: counted in the day's macros, absent from the
+shopping list. A linked top-up recipe on a low-protein night goes in the
+Dinner cell alongside the covered block. Strict: assignments are fixed.
+Loose: suggested — swap within a slot except 🔒 day-locked entries.
+Recipes always linked by full name.)
 
 ## Notes
 Timing cues, batch-cook schedule, anything decided this run.
