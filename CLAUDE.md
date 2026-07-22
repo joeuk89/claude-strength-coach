@@ -100,6 +100,10 @@ anything. Rules that always apply:
 - **`/framework-sync`** — update this workspace's framework files
   (skills, docs, reference formats) from the shared template repo. One
   direction: template → here; personal files are never touched.
+- **`/one-off-week`** — plan a week that deviates from the program — a
+  deload, or a disrupted/constrained week (travel, limited kit) —
+  without touching `routine/`. Temp sessions go to a standing Hevy
+  folder; the record lands in the check-in history.
 
 ## Hevy
 

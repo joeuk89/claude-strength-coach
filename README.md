@@ -61,6 +61,9 @@ targets. With them, the loop is much tighter.
   in either direction, one difference at a time.
 - **`/framework-sync`** — update your copy to the latest version of the
   framework (skills, docs). Your personal files are never touched.
+- **`/one-off-week`** — plan a deload week, or a disrupted week
+  (travel, limited kit): concrete sessions for the blip, your program
+  untouched.
 
 Anything else — an exercise swap, a question, advice — just ask in plain
 words; no command needed.
