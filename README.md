@@ -59,6 +59,8 @@ targets. With them, the loop is much tighter.
 - **`/hevy-sync`** — run after editing routines in the Hevy app, or when
   the coach proposes routine changes here. Reconciles `routine/` and Hevy
   in either direction, one difference at a time.
+- **`/framework-sync`** — update your copy to the latest version of the
+  framework (skills, docs). Your personal files are never touched.
 
 Anything else — an exercise swap, a question, advice — just ask in plain
 words; no command needed.
@@ -84,15 +86,8 @@ words; no command needed.
 
 ## Updating your copy
 
-Your repo doesn't share git history with this template. To pull framework
-improvements later:
-
-```bash
-git remote add template https://github.com/<template-owner>/claude-strength-coach.git
-git fetch template
-git merge template/main --allow-unrelated-histories
-```
-
-(First merge needs `--allow-unrelated-histories`; later ones don't. Your
-personal files — profile, routine, check-ins — aren't in the template, so
-merges only touch framework files.)
+Run **`/framework-sync`**. It fetches the template's latest `main` and
+updates your framework files (skills, CLAUDE.md, reference docs) in one
+commit. Your personal files — profile, routine, check-ins, nutrition —
+are never touched, and it warns you first if you've edited a framework
+file locally.

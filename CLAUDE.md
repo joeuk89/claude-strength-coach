@@ -97,6 +97,9 @@ anything. Rules that always apply:
 - **`/hevy-sync`** — reconcile `routine/` with the athlete's Hevy routines
   in either direction, one discrepancy at a time. Editing routines in the
   app mid-block is normal, not an error.
+- **`/framework-sync`** — update this workspace's framework files
+  (skills, docs, reference formats) from the shared template repo. One
+  direction: template → here; personal files are never touched.
 
 ## Hevy
 
