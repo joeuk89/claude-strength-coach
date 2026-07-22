@@ -101,7 +101,8 @@ weight and prompt `/goals` to get set up.
 
 If a dated plan in `nutrition/` covers (part of) this window, ask how it
 went — which meals stuck, what got skipped or swapped — and note learnings
-for the next `/meal-plan` run (menu-bank changes belong there, not here).
+for the next `/meal-plan` run (recipe-bank changes belong in `/recipes`,
+not here).
 
 Record the numbers in the check-in and refresh them in `profile.md`.
 

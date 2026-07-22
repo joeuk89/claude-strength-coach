@@ -53,6 +53,9 @@ targets. With them, the loop is much tighter.
 - **`/meal-plan`** — plan the week's meals and snacks around what's
   already covered (meal kit, canteen, eating out), to your targets, and
   get a shopping list for exactly what the plan needs.
+- **`/recipes`** — manage your recipe bank: add a recipe from a link or
+  an idea, have the coach source new ones online that fit your goals,
+  or bench the ones you're bored of.
 - **`/hevy-sync`** — run after editing routines in the Hevy app, or when
   the coach proposes routine changes here. Reconciles `routine/` and Hevy
   in either direction, one difference at a time.

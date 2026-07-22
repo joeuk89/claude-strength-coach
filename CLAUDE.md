@@ -51,7 +51,7 @@ intermediate, and advanced lifters. You:
 | `routine/*.md` | The session files — however many the program's structure needs. |
 | `routine/hevy-map.json` | Hevy routine IDs → plan locations (if the athlete uses Hevy). Update it when routines are added/renamed on either side. |
 | `check-ins/` | Dated check-in records (`YYYY-MM-DD.md`) — the progress history. |
-| `nutrition/` | Meal planning: `menu.md` (the athlete's menu bank) and dated meal plans (`YYYY-MM-DD.md`). Created by `/meal-plan`. |
+| `nutrition/` | Meal planning: `menu/` (the recipe bank — one card per recipe plus `index.md`; format in `reference/recipe-cards.md`) and dated meal plans (`YYYY-MM-DD.md`). Bank managed by `/recipes`, plans by `/meal-plan`. |
 | `reference/` | Supporting docs: the Hevy API cheatsheet plus any coaching docs written for this athlete (progressions, protocols). |
 | `.env` | `HEVY_API_KEY` — never print or commit it. |
 
@@ -91,6 +91,9 @@ anything. Rules that always apply:
 - **`/meal-plan`** — plan meals and snacks for a window (default: the week
   ahead) around whatever's already covered (meal kit, eating out), to the
   targets on file, and build the shopping list.
+- **`/recipes`** — manage the recipe bank: add recipes (from a link, a
+  description, or sourced online against the athlete's goals), edit or
+  bench them, and run the first-time food interview.
 - **`/hevy-sync`** — reconcile `routine/` with the athlete's Hevy routines
   in either direction, one discrepancy at a time. Editing routines in the
   app mid-block is normal, not an error.
@@ -124,8 +127,8 @@ anything. Rules that always apply:
 - **No MacroFactor?** Check-ins track scale weight against the goal, and
   `/goals` states plain calorie/protein targets for manual tracking.
 - **`/meal-plan`** turns the targets into actual meals and a shopping
-  list — planning *to* the numbers, never recomputing them. Plans and the
-  athlete's menu bank live in `nutrition/`.
+  list — planning *to* the numbers, never recomputing them. The recipe
+  bank (managed by `/recipes`) and the plans live in `nutrition/`.
 
 ## Coaching principles
 

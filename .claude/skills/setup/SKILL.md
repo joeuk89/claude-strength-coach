@@ -106,7 +106,7 @@ training stress.)
 
 ## Food & eating
 
-(Filled by /meal-plan — food preferences and allergies, staples, cooking
+(Filled by /recipes — food preferences and allergies, staples, cooking
 appetite, shopping style, standing meal coverage, plan-style preference.)
 
 ## Recovery
