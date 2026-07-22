@@ -146,7 +146,9 @@ shopping list → write dated plan) with these changes:
 - **The exact-pool rule (both modes):** every plan fixes the week's exact
   meal pool — each recipe (or named variation) with its count, e.g.
   "chicken-rice-bowl ×2 · cod-and-potatoes ×2 · omelette (+egg) ×1". This is
-  the plan's contract and the sole input to the shopping list.
+  the plan's contract; its non-covered entries are the sole input to the
+  shopping list (covered entries — e.g. meal-kit box meals — are counted
+  for macros but not shopped).
   - **Strict mode:** each pool item is additionally pinned to a day × slot.
   - **Loose mode:** the day table shows a **suggested assignment** from the
     pool; the athlete swaps freely within a slot **except day-locked
@@ -172,6 +174,26 @@ shopping list → write dated plan) with these changes:
 The dated-plan template in the skill is updated to match: pool table with
 counts, day table (pinned or suggested+locks), linked names, two-section
 shopping list.
+
+## Meal-kit boxes (Gousto etc.)
+
+Athletes with a recipe-box subscription get box meals as first-class plan
+entries, not opaque "covered" blocks:
+
+- In `/meal-plan`'s coverage step, the athlete links the provider's recipe
+  pages for the upcoming box; each is imported as a normal card (the same
+  exact-link flow `/recipes` uses), tagged `meal-kit` plus a provider tag
+  (e.g. `gousto`). If the provider doesn't publish shareable pages, the
+  athlete is prompted for the essentials instead (name, per-serving
+  macros, servings — whatever the app shows).
+- Box meals appear in the plan's pool and day table like any other
+  recipe — linked, visible, counted in the day's macros — but marked
+  **covered**, and the covered marking is what excludes them from
+  shopping-list arithmetic (the ingredients arrive in the box). The tag is
+  provenance, not the exclusion mechanism: a meal-kit card cooked outside
+  a box (its ingredients are on the card) shops normally.
+- Imported cards persist in the bank — providers repeat recipes, so later
+  boxes reuse them.
 
 ## Training-system connection
 
