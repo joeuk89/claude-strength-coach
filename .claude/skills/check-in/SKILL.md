@@ -166,3 +166,7 @@ whether the goals/phase plan in `profile.md` is stale (if so, prompt
   `routine/program.md`.
 - If routine changes were agreed and the athlete uses Hevy, offer
   `/hevy-sync`.
+- On a deload-week check-in, invoke the **one-off-week** skill (deload
+  mode) to build the deload week itself — its schedule and sessions
+  fill this record's "The week ahead" section, and it handles the Hevy
+  writes.

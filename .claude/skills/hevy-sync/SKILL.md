@@ -26,6 +26,10 @@ Requires a Hevy API key in `.env` — if there isn't one, say so and stop
   `fetched_at`), then diff.
 - Anything in the map's `unmapped` list, or newly unmatchable, is a
   discrepancy in itself — raise it.
+- Routines in the map's `temporary` section (the "One-off weeks"
+  folder `/one-off-week` writes deload and disrupted-week sessions
+  into) are disposable by design — exclude them from the diff entirely
+  and never report them as drift.
 - `updated_at` on each routine tells you which side likely moved since the
   last sync. The newest check-in or a previous sync note gives the
   baseline date if one exists.
