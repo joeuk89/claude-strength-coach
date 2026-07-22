@@ -109,7 +109,9 @@ Record the numbers in the check-in and refresh them in `profile.md`.
 ## 5. Interview the athlete
 
 One question at a time, only what the data can't show: sleep, recovery,
-joints/aches, cardio, how any coach-led sessions felt, **anything unusual
+joints/aches (follow up on any `watching` rows in the profile's niggle
+log, even if the athlete doesn't raise them), cardio, how any coach-led
+sessions felt, **anything unusual
 about the coming week** (schedule clashes, travel), and — if the program
 rotates — **where in the rotation the coming week lands**: confirm, don't
 assume.
@@ -162,6 +164,17 @@ whether the goals/phase plan in `profile.md` is stale (if so, prompt
   notes, and `_Last reviewed_` when they move (deep tier refreshes the
   whole file). Add or retire **Coach's notes** as patterns emerge or
   resolve — with the athlete's confirmation.
+- **Maintain the niggle log** in `profile.md` (Injuries / limitations →
+  a `### Niggle log` table: `Area · First noted · Last noted · Mentions
+  · Status · Notes`; statuses `watching` / `easing` / `resolved`;
+  create the subsection on its first entry). New complaint → new row;
+  repeat mention → bump Last noted and Mentions; confirmed gone →
+  `resolved`, but **keep the row** — recurrence is the signal this log
+  exists to catch. Escalate — recommend a qualified professional and
+  program around it meanwhile, never diagnose — when a niggle runs ~3
+  consecutive check-ins, worsens, or interferes with prescribed
+  training. Active niggles inform any routine change proposed today:
+  no added load on an aggravated pattern.
 - If the program tracks a current position in a rotation, update it in
   `routine/program.md`.
 - If routine changes were agreed and the athlete uses Hevy, offer
