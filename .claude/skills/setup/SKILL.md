@@ -8,7 +8,10 @@ description: Use for first-run onboarding of this training workspace — when pr
 Turn a fresh copy of the template into this athlete's training workspace.
 A thin orchestrator: each step checks whether it's already done and skips
 or offers to redo it, so `/setup` is safe to re-run and resumes cleanly
-after a partial run.
+after a partial run. It's also how the athlete **reconfigures** later —
+on a fully set-up workspace, report each area's state and ask what they
+want to change (add an integration like Notion, refresh the profile),
+rather than declaring everything done.
 
 Work conversationally — this is the athlete's first contact with the
 coach. One question at a time.
@@ -16,8 +19,9 @@ coach. One question at a time.
 ## 0. State check
 
 Look at what exists: `profile.md`? `.env` with a key? `routine/program.md`?
-A "Nutrition & goals" section with real content? Report what's already
-done, then continue from the first missing piece.
+A "Nutrition & goals" section with real content? `notion-map.json`?
+Report what's already done, then continue from the first missing piece —
+or, if nothing is missing, ask what the athlete wants to change.
 
 ## 1. Welcome
 
@@ -49,6 +53,14 @@ engine (optional). And the rhythm: train and log, then a weekly
 - Ask whether they use it (or want to — it's paid, and the best-in-class
   option for this loop). No API either way: its numbers are read off the
   dashboard at check-ins. Record yes/no.
+
+**Notion (optional):**
+- Ask whether they want their coaching docs (check-ins, meal plans,
+  recipes, routine) mirrored to Notion for reading on the go. If yes,
+  invoke the **notion-sync** skill's setup flow — it checks for a
+  Notion MCP connection and explains how to connect one if it's
+  missing. Easy to skip and add later: re-running `/setup` or
+  `/notion-sync` sets it up any time.
 
 ## 3. Profile interview
 
