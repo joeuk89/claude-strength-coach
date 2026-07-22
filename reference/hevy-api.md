@@ -29,6 +29,7 @@ Quote URLs with `?` in them — zsh globs them otherwise.
 | `GET /v1/routines?page=&pageSize=` | Routine templates: exercises with `rest_seconds`, `notes`, `supersets_id`, sets with `rep_range {start,end}` / `reps` / `weight_kg` | max 10/page |
 | `POST /v1/routines` · `PUT /v1/routines/{id}` | Create / replace a routine (PUT replaces the whole exercise list) | — |
 | `GET /v1/routine_folders` | Routine folders (id + title) | max 10/page |
+| `POST /v1/routine_folders` | Create a routine folder (body `{"routine_folder": {"title": "…"}}`). `POST /v1/routines` takes a `folder_id` to file the new routine | — |
 | `GET /v1/exercise_templates?page=&pageSize=` | Exercise catalogue — needed to get `exercise_template_id` when adding an exercise to a routine | max 100/page |
 | `POST /v1/exercise_templates` | Create a custom exercise (`title`, `exercise_type` e.g. `duration`/`weight_reps`, `equipment_category`, `muscle_group`). Returns the new template ID as plain text | — |
 | `GET /v1/exercise_history/{exerciseTemplateId}` | All logged sets of one exercise over time — good for progression analysis | — |
@@ -61,3 +62,6 @@ Quote URLs with `?` in them — zsh globs them otherwise.
   (stable) mapped to repo file + heading. Trust IDs, not titles (titles can be
   renamed in the app). If the map and the live routine list disagree, heal the
   map with the athlete before doing anything else.
+  A `temporary` section holds the "One-off weeks" folder ID and its
+  reusable routine IDs (written by `/one-off-week`) — `/hevy-sync`
+  ignores those routines entirely.
