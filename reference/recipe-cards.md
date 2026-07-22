@@ -41,6 +41,27 @@ the athlete's food log is ground truth — but fields are never blank.
 
 ## Card body
 
+### Stats block (the visible summary)
+
+Directly under the recipe's `# Title`, a two-column table that mirrors
+the frontmatter — so the macros and attributes are visible in rendered
+markdown (most viewers hide frontmatter). Rows, in order:
+
+| | |
+| --- | --- |
+| **Per serving** | `<kcal>` kcal · `<P>` g P · `<C>` g C · `<F>` g F |
+| **Slot** | the slot(s) |
+| **Prep** | `<prep>` · `<time>` min · serves `<servings>` |
+| **Nutrition** | estimated / published |
+| **Source** | `[link](<url>)` — **omit this row when `source` is null** |
+| **Tags** | the tags — **omit when there are none** |
+| **Status** | active / benched |
+
+The stats block is a **mirror, not a second source of truth** — the
+frontmatter is what skills parse. Any write that changes a frontmatter
+field updates the stats block in the same operation (same discipline as
+the index same-write rule).
+
 ### Ingredients
 
 Exact quantities for the stated `servings`. **No ranges** — "½–1 pouch"
@@ -135,6 +156,15 @@ status: active
 
 # Chicken + rice bowl
 
+|  |  |
+| --- | --- |
+| **Per serving** | 610 kcal · 50 g P · 55 g C · 18 g F |
+| **Slot** | lunch |
+| **Prep** | assemble · 5 min · serves 1 |
+| **Nutrition** | estimated |
+| **Tags** | post-workout |
+| **Status** | active |
+
 ## Ingredients
 - 170 g pre-cooked chicken breast
 - 1 pouch (250 g) microwave basmati rice
@@ -170,6 +200,14 @@ status: active
 ---
 
 # Greek yoghurt + honey + nuts
+
+|  |  |
+| --- | --- |
+| **Per serving** | 250 kcal · 20 g P · 22 g C · 9 g F |
+| **Slot** | snack |
+| **Prep** | assemble · 2 min · serves 1 |
+| **Nutrition** | estimated |
+| **Status** | active |
 
 ## Ingredients
 - 200 g 0% Greek yoghurt
