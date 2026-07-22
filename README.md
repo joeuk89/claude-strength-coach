@@ -36,49 +36,63 @@ targets. With them, the loop is much tighter.
    it), building your athlete profile, setting your goals, and creating
    your program.
 
-## The commands
-
-- **`/setup`** — first-run onboarding. Re-runnable; picks up where it
-  left off.
-- **`/new-program`** — create your training program: import what you
-  already run in Hevy, or design one from scratch with the coach. Also for
-  block redesigns later.
-- **`/check-in`** — run **weekly** (~10 minutes). Reviews the week's
-  training and weight/nutrition against the plan, asks a few questions,
-  writes a dated record to `check-ins/`, and ends with a plan for the week
-  ahead. Every ~6 weeks it runs as a deeper block-level review.
-- **`/goals`** — run when goals change or a phase decision is due
-  ("should I bulk or cut?"). Ends with a recorded plan and, if you use
-  MacroFactor, exact setup steps for it.
-- **`/meal-plan`** — plan the week's meals and snacks around what's
-  already covered (meal kit, canteen, eating out), to your targets, and
-  get a shopping list for exactly what the plan needs.
-- **`/recipes`** — manage your recipe bank: add a recipe from a link or
-  an idea, have the coach source new ones online that fit your goals,
-  or bench the ones you're bored of.
-- **`/hevy-sync`** — run after editing routines in the Hevy app, or when
-  the coach proposes routine changes here. Reconciles `routine/` and Hevy
-  in either direction, one difference at a time.
-- **`/framework-sync`** — update your copy to the latest version of the
-  framework (skills, docs). Your personal files are never touched.
-- **`/one-off-week`** — plan a deload week, or a disrupted week
-  (travel, limited kit): concrete sessions for the blip, your program
-  untouched.
-- **`/notion-sync`** — optionally mirror your check-ins, meal plans,
-  and recipes to Notion, to read on your phone. Files in this repo stay
-  the source of truth.
-
-Anything else — an exercise swap, a question, advice — just ask in plain
-words; no command needed.
-
 ## The weekly rhythm
 
-1. Train your program and log every workout (in Hevy if you use it —
-   including any PT/class sessions; unlogged sessions skew the check-ins).
-2. If you use MacroFactor: log food daily, weigh in 2–3× a week (morning,
-   before food).
-3. Run `/check-in` once a week. It ends with the week-ahead plan — that's
-   the plan until the next one.
+The heartbeat is one check-in a week. Around it:
+
+1. **Train and log.** Train your program and log every workout in Hevy if
+   you use it — including any PT or class sessions (unlogged sessions skew
+   the review).
+2. **Log food** (MacroFactor users): daily, with 2–3 morning weigh-ins a
+   week.
+3. **`/check-in`** once a week (~10 min). It reviews the week against the
+   plan, asks a few questions, saves a dated record to `check-ins/`, and
+   hands you the plan for the week ahead. Every ~6 weeks it runs deeper,
+   as a block-level review.
+
+That loop is most of it. The flows below are for when something changes.
+
+## The flows
+
+**You never need a command for the small stuff** — an exercise swap, "why
+this rep range?", a form check, "what should I eat post-workout?" Just ask
+in plain words. The commands are for the bigger moves.
+
+### Getting set up
+- **`/setup`** — first-run onboarding: apps, profile, goals, first
+  program. Re-runnable — it's also how you add an integration (like
+  Notion) or refresh your profile later.
+
+### Your training
+- **`/new-program`** — build your program (import from Hevy or design from
+  scratch with the coach), or redesign it at a block boundary.
+- **`/one-off-week`** — a week that breaks the pattern: a deload, or a
+  disrupted one (travel, illness, limited kit). Concrete sessions for the
+  blip; your program stays untouched.
+- **`/hevy-sync`** — reconcile `routine/` with your Hevy app after editing
+  routines in either place, one difference at a time. (Hevy users.)
+
+### Goals & nutrition strategy
+- **`/goals`** — set or revise the big picture: bulk / cut / maintain,
+  target weight, trend rate, protein. Run it when goals change or a phase
+  decision is due ("should I bulk or cut?"). Ends with a recorded plan —
+  and exact MacroFactor setup, if you use it.
+
+### Food & meals
+- **`/recipes`** — build and manage your recipe bank: add from a link or
+  an idea, have the coach source new ones that fit your goals, or bench
+  the ones you're bored of.
+- **`/meal-plan`** — turn your targets into meals and snacks for the week
+  around what's already covered (meal kit, canteen, eating out), with a
+  shopping list for exactly what's needed.
+
+### System & extras
+- **`/framework-sync`** — update your copy to the latest framework
+  (skills, docs); your personal files are never touched (see "Updating
+  your copy" below).
+- **`/notion-sync`** — optionally mirror your check-ins, meal plans, and
+  recipes to Notion, to read on your phone. Files here stay the source of
+  truth.
 
 ## Ground rules the coach follows
 
