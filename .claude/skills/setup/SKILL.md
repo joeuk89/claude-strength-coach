@@ -18,10 +18,16 @@ coach. One question at a time.
 
 ## 0. State check
 
-Look at what exists: `profile.md`? `.env` with a key? `routine/program.md`?
-A "Nutrition & goals" section with real content? `notion-map.json`?
-Report what's already done, then continue from the first missing piece —
-or, if nothing is missing, ask what the athlete wants to change.
+Look at what exists and what's been decided: `profile.md`,
+`routine/program.md`, a "Nutrition & goals" section with real content,
+and — on the profile's `Apps:` line — a recorded yes/no for each
+integration (Hevy, MacroFactor, Notion). A recorded **"no" counts as
+done**, not missing: never re-pitch an integration the athlete already
+declined. The workspace is fully set up when the profile and program
+exist, goals are set, and every integration has an answer. Report each
+area's state, then continue from the first genuinely unfinished piece —
+or, if nothing's left, ask what the athlete wants to change (add an
+integration, refresh the profile).
 
 ## 1. Welcome
 
@@ -34,9 +40,10 @@ engine (optional). And the rhythm: train and log, then a weekly
 ## 2. Integrations
 
 **Hevy:**
-- Ask whether they use Hevy. API access needs **Hevy Pro** — if they use
-  Hevy free, note they can still mirror routines manually but the coach
-  can't read logs; record that and move on.
+- Ask whether they use Hevy. **No Hevy at all** → record `Hevy: no`, skip
+  the key steps below, and move on. API access needs **Hevy Pro** — if
+  they use Hevy free, note they can still mirror routines manually but the
+  coach can't read logs; record that and move on.
 - With Pro: send them to **hevy.com → Settings → Developer → generate API
   key** (or in the app: Profile → Settings → Developer). Have them create
   `.env` (copy `.env.example`) and paste the key as `HEVY_API_KEY=...` —
@@ -56,11 +63,14 @@ engine (optional). And the rhythm: train and log, then a weekly
 
 **Notion (optional):**
 - Ask whether they want their coaching docs (check-ins, meal plans,
-  recipes, routine) mirrored to Notion for reading on the go. If yes,
-  invoke the **notion-sync** skill's setup flow — it checks for a
-  Notion MCP connection and explains how to connect one if it's
-  missing. Easy to skip and add later: re-running `/setup` or
-  `/notion-sync` sets it up any time.
+  recipes, routine) mirrored to Notion for reading on the go. Record
+  yes/no. If yes, invoke the **notion-sync** skill's setup flow — it
+  checks for a Notion MCP connection and explains how to connect one. If
+  no MCP is connected (common mid-setup), note that Notion can be added
+  any time with `/notion-sync` once connected, and carry on with setup —
+  don't stall onboarding on it. There's usually little to mirror this
+  early anyway; the mirror fills in as check-ins, meal plans, and recipes
+  get created. Easy to skip and add later.
 
 ## 3. Profile interview
 
@@ -116,7 +126,7 @@ watching for recurrence; it's created when the first one appears.)
 
 (Filled by /goals — phase sequence, targets, trend rate, app config.)
 
-- **Apps:** Hevy: yes-Pro / yes-free / no · MacroFactor: yes / no
+- **Apps:** Hevy: yes-Pro / yes-free / no · MacroFactor: yes / no · Notion: yes / no
 
 ## Food & eating
 
@@ -154,6 +164,7 @@ trainable until it runs.
 - Recap what was set up and what (if anything) was deferred.
 - State the weekly rhythm: train and log everything (including coach-led
   sessions), weigh-ins 2–3×/week if cutting/bulking, `/check-in` weekly.
-- Remind: `.env` stays uncommitted (already gitignored).
+- If they set up a Hevy key, remind them `.env` stays uncommitted
+  (already gitignored).
 - Offer to commit: `git add -A` and show what's staged; commit with
   message `Initial setup: profile and goals` after they approve.

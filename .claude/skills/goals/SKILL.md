@@ -80,9 +80,14 @@ check-in that observes it fire records the phase change.
 the source of truth — walk it with them and adjust names to what they
 actually see.
 
-**Everyone else:** state the daily calorie target (maintenance estimate ±
-the phase adjustment), the protein target, and how to track them; note the
-number is a starting estimate the weekly trend will correct.
+**Everyone else:** compute the maintenance estimate from a transparent
+method — a quick bodyweight × activity-factor figure, or a standard
+equation like Mifflin–St Jeor from the profile stats — then state the
+daily calorie target (that estimate ± the phase adjustment), the protein
+target, and how to track them. Say plainly it's a rough starting point
+the weekly weigh-in trend will correct. (The "no calculator" rule above
+is a MacroFactor division of labour — with no MacroFactor, a transparent
+estimate here is exactly right.)
 
 ## 5. Flag training implications
 
