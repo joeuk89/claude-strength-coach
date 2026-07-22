@@ -200,3 +200,8 @@ Then close out: apply any remaining card/index status changes agreed
 this run; update Food & eating for any preference the athlete confirmed
 changed; remind the athlete that logging (MacroFactor, if used) stays
 the ground truth — the next `/check-in` reviews how the plan went.
+
+If `notion-map.json` exists and covers meal plans, mirror the plan to
+Notion per `reference/notion-sync.md` — shopping list as to-do blocks,
+recipe links rewritten to their Notion pages. No Notion MCP this
+session → say the sync is pending and move on.

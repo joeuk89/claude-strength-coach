@@ -183,3 +183,7 @@ whether the goals/phase plan in `profile.md` is stale (if so, prompt
   mode) to build the deload week itself — its schedule and sessions
   fill this record's "The week ahead" section, and it handles the Hevy
   writes.
+- If `notion-map.json` exists and covers check-ins, mirror this record
+  to Notion per `reference/notion-sync.md` — local file first, Notion
+  after. No Notion MCP this session → say the sync is pending
+  (`/notion-sync` catches it up) and move on.

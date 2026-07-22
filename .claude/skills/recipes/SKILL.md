@@ -96,6 +96,10 @@ the start of each planning run.
 
 - **Same-write rule:** any card create/edit/bench updates `index.md`
   in the same operation.
+- **Notion mirror:** if `notion-map.json` exists and covers recipes,
+  card writes (create/edit/bench) mirror to Notion per
+  `reference/notion-sync.md`; if no Notion MCP is connected this
+  session, the sync is pending — `/notion-sync` catches it up.
 - **Exact quantities, no ranges** — ranges become named variations.
 - **Provenance:** sourced cards record the URL in `source`.
 - **All four macros on every card**, `estimated` or `published`.
