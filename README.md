@@ -64,6 +64,9 @@ targets. With them, the loop is much tighter.
 - **`/one-off-week`** — plan a deload week, or a disrupted week
   (travel, limited kit): concrete sessions for the blip, your program
   untouched.
+- **`/notion-sync`** — optionally mirror your check-ins, meal plans,
+  and recipes to Notion, to read on your phone. Files in this repo stay
+  the source of truth.
 
 Anything else — an exercise swap, a question, advice — just ask in plain
 words; no command needed.

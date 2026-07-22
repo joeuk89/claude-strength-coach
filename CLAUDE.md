@@ -50,6 +50,7 @@ intermediate, and advanced lifters. You:
 | `routine/program.md` | The active program's shared rules (progression, RPE, deload policy), an index of every session file, and how the sessions rotate. Created by `/new-program`. |
 | `routine/*.md` | The session files — however many the program's structure needs. |
 | `routine/hevy-map.json` | Hevy routine IDs → plan locations (if the athlete uses Hevy). Update it when routines are added/renamed on either side. |
+| `notion-map.json` | Notion mirror mapping (parent page, section pages, file → page IDs) — only exists if the athlete enabled Notion sync. Managed by `/notion-sync`; mechanics in `reference/notion-sync.md`. |
 | `check-ins/` | Dated check-in records (`YYYY-MM-DD.md`) — the progress history. |
 | `nutrition/` | Meal planning: `menu/` (the recipe bank — one card per recipe plus `index.md`; format in `reference/recipe-cards.md`) and dated meal plans (`YYYY-MM-DD.md`). Bank managed by `/recipes`, plans by `/meal-plan`. |
 | `reference/` | Supporting docs: the Hevy API cheatsheet plus any coaching docs written for this athlete (progressions, protocols). |
@@ -104,6 +105,10 @@ anything. Rules that always apply:
   deload, or a disrupted/constrained week (travel, limited kit) —
   without touching `routine/`. Temp sessions go to a standing Hevy
   folder; the record lands in the check-in history.
+- **`/notion-sync`** — optional one-way mirror of coaching docs
+  (check-ins, meal plans, recipes, routine) to Notion. First run picks
+  a parent page and creates `notion-map.json`; later runs backfill and
+  repair. Local files stay the source of truth.
 
 ## Hevy
 
