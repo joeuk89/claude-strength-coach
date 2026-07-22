@@ -96,7 +96,9 @@ training stress.)
 
 ## Injuries / limitations
 
-(Current and historical-but-relevant. "None currently" is an answer.)
+(Current and historical-but-relevant. "None currently" is an answer.
+Check-ins keep a dated "Niggle log" table here — minor aches worth
+watching for recurrence; it's created when the first one appears.)
 
 ## Nutrition & goals
 
