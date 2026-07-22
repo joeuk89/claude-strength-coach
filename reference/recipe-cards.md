@@ -22,7 +22,7 @@ protein: 50               # grams per serving
 carbs: 55                 # grams per serving
 fat: 18                   # grams per serving
 nutrition: estimated      # estimated | published (source site's numbers)
-prep: assemble            # assemble | quick-cook | cook
+prep: assemble            # assemble | quick-cook | cook | eat-out
 time: 5                   # active minutes
 servings: 1               # portions the ingredient quantities make
 source: null              # URL when sourced online; null if not
@@ -33,7 +33,10 @@ status: active            # active | benched
 
 All four macro fields are **required**. Use the source's published
 per-serving numbers when available (`nutrition: published`); otherwise
-estimate from the ingredients (`nutrition: estimated`). Rough is fine —
+estimate from the ingredients (`nutrition: estimated`). Keep `published`
+through unit or portion conversions — the numbers still describe the
+food — but drop to `estimated` the moment you swap, add, or remove an
+ingredient, since the published figures no longer match. Rough is fine —
 the athlete's food log is ground truth — but fields are never blank.
 
 ## Card body
@@ -61,8 +64,11 @@ ingredient changes and macro deltas:
 ```
 
 Plans reference `recipe (variation)`; shopping-list maths applies the
-ingredient delta. A variation with no exact delta is not a variation —
-it's a new card.
+ingredient delta. A plan entry may stack **more than one** variation when
+they touch different ingredients — `recipe (+banana, +PB)` — and the
+deltas simply add; never stack two variations that change the same
+ingredient. A variation with no exact delta is not a variation — it's a
+new card.
 
 ## Special cards
 
@@ -70,8 +76,8 @@ Everything the plan can slot is a card, however small:
 
 - **Tiny snacks** — ingredients + macros, no method.
 - **Eating-out fallbacks** — a **"What to order"** section instead of
-  ingredients, tag `eat-out`. With no ingredient lines they are
-  naturally excluded from shopping lists.
+  ingredients, tag `eat-out` and `prep: eat-out`. With no ingredient
+  lines they are naturally excluded from shopping lists.
 - **Meal-kit recipes** (Gousto and similar) — imported like any other
   card, tagged `meal-kit` plus a provider tag (e.g. `gousto`), with the
   ingredient list included when the provider publishes it. Exclusion

@@ -15,7 +15,9 @@ How `/recipes` finds and imports recipes without any paid API.
    nutrition (`nutrition` → calories, proteinContent, …).
 3. **Normalise** into a draft card per `reference/recipe-cards.md`:
    convert to metric quantities, per-serving amounts, record the URL in
-   `source`, set `nutrition: published` if the site's numbers were used.
+   `source`, and set `nutrition: published` if the site's numbers were
+   used — but per that doc's rule, an ingredient swap drops it back to
+   `estimated` (a pure unit/portion conversion keeps `published`).
 4. If a page has **no structured data**, fall back to reading the page
    text; mark `nutrition: estimated` and sanity-check the estimate
    against the ingredient list.
