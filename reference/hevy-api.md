@@ -74,7 +74,8 @@ Cues: narrow grip · elbows tucked · feet planted
   write.
 - **Routine-level `notes` are silently ignored on PUT** — the schema documents
   the field but writes don't persist it (verified 2026-07-18). Day-level intent
-  has to live in the first exercise's note instead.
+  has to live in the first exercise's note instead: one extra line above its
+  Target line — the only exception to the three-line cap.
 - **Omit `rep_range` when unused** — sending `"rep_range": null` in a set gets
   the whole PUT rejected with "Expected object, received null". Same for other
   null set fields: only send keys that have values.

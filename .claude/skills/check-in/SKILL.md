@@ -162,8 +162,9 @@ whether the goals/phase plan in `profile.md` is stale (if so, prompt
 ## 7. Act on it
 
 - Propose adjustments with rationale and trade-offs. **Only edit
-  `routine/` files after the athlete approves**; re-check the day before
-  and after any edited day and the program's weekly balance.
+  `routine/` files after the athlete approves** — on normal weeks the
+  edit lands via program-week's write step (below); re-check the day
+  before and after any edited day and the program's weekly balance.
 - Update `profile.md`: weight/nutrition numbers every time; e1RMs, watch
   notes, and `_Last reviewed_` when they move (deep tier refreshes the
   whole file). Add or retire **Coach's notes** as patterns emerge or

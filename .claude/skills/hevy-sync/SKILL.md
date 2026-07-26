@@ -37,7 +37,7 @@ Requires a Hevy API key in `.env` — if there isn't one, say so and stop
 ## 2. Diff — structure, not loads
 
 The expected state is **base plan + weekly overlay**: if the newest
-check-in's week-ahead section (or a "Week reprogrammed" addendum)
+check-in's "The week ahead" section (or a "Week reprogrammed" addendum)
 carries per-exercise prescriptions from `/program-week`, judge Hevy
 against those for the current week — coach-set rep targets and
 three-line notes (Target / Focus / Cues, per `reference/hevy-api.md`)
@@ -48,7 +48,7 @@ state:
 
 **Flag these:** exercises added/removed/substituted · order changes ·
 superset groupings (`supersets_id`) · set counts · rep ranges
-(`rep_range` vs. the markdown's `8–10`) · rest times · exercise notes
+(`rep_range` vs. the expected prescription) · rest times · exercise notes
 that contradict the plan's instructions.
 
 **Don't flag working loads.** The markdown's starting loads are
