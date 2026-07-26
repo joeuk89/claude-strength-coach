@@ -90,7 +90,10 @@ in plain words. The commands are for the bigger moves.
   the ones you're bored of.
 - **`/meal-plan`** — turn your targets into meals and snacks for the week
   around what's already covered (meal kit, canteen, eating out), with a
-  shopping list for exactly what's needed.
+  shopping list for exactly what's needed — minus what you already have.
+- **`/pantry`** — keep track of what's in the house so food gets used,
+  not wasted: tell the coach what you bought, used up, or binned, or let
+  it estimate what's left and correct it.
 
 ### System & extras
 - **`/framework-sync`** — update your copy to the latest framework

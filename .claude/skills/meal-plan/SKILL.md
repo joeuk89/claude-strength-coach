@@ -28,6 +28,11 @@ missing or still TBD, run `/setup` or `/goals` first.
   `index.md`. Format: `reference/recipe-cards.md`. Owned by `/recipes`.
 - **`nutrition/YYYY-MM-DD.md`** — one dated plan per run: exact meal
   pool, day-by-day table, and the shopping list.
+- **`nutrition/pantry.md`** — what's actually in the house:
+  perishables, partial packs, staple states. Format and estimation
+  rules: `reference/pantry.md`. Owned by `/pantry`; this skill
+  reconciles it during the plan review and plans around it. Missing →
+  plan as normal and offer `/pantry` at close-out — never block on it.
 - **`profile.md` → "Food & eating"** — what this skill never re-asks:
   preferences, staples, shopping style, standing coverage, and the
   plan-style preference (loose ↔ strict).
@@ -40,15 +45,24 @@ continue. Never plan from an empty bank, and never dead-end the athlete.
 
 Read `profile.md` (Nutrition & goals, Food & eating, the training week),
 `routine/program.md` (training days, double days, rest days — count
-cardio), `nutrition/menu/index.md`, and the newest dated plan in
-`nutrition/`. Spot-check the index against the card filenames; flag
-drift.
+cardio), `nutrition/menu/index.md`, `nutrition/pantry.md` (if it
+exists), and the newest dated plan in `nutrition/`. Spot-check the
+index against the card filenames; flag drift.
 
 ## 2. Review the last plan (feedback loop)
 
 Open with a quick review of the most recent dated plan: what got eaten,
 skipped, swapped, disliked? Agree any card status changes (bench /
-un-bench) and apply them — card + index in the same operation. Then a
+un-bench) and apply them — card + index in the same operation.
+
+**Then reconcile the pantry** (if `nutrition/pantry.md` exists) — the
+eaten/skipped/swapped answers double as depletion data. Predict the
+current state per `reference/pantry.md`, show the predicted table
+**once**, take corrections plus anything bought ad hoc or binned since,
+and write the file (refresh **Last reconciled**, via /meal-plan). No
+pantry file → skip; the close-out offers `/pantry`.
+
+Then a
 **bank-fit check** against the current phase: if `/goals` has changed
 the phase since the bank was last touched and the bank skews wrong for
 it (e.g. entering a deficit with a carb-heavy, low-satiety bank), say
@@ -116,6 +130,12 @@ an unresolved either/or.
 
 Also:
 
+- **Use it up.** Pantry stock under pressure — wilting veg, cooked
+  leftovers, short-dated meat — gets planned into meals **early in the
+  window**, and the pool rationale says so ("cod traybake Monday — the
+  cod needs eating"). Partial packs steer selection toward recipes that
+  finish them. A tiebreaker with teeth, not a straitjacket: macro fit
+  and what the athlete wants to eat still win.
 - **Protein is the anchor.** Spread it across the day (~4 feeds is a
   good default; ~0.4 g/kg per meal is a heuristic, not dogma).
 - **Train-day awareness:** bigger fuelling on double days, leaner rest
@@ -135,19 +155,30 @@ Also:
 
 Derive from the pool's **non-covered** entries: per-serving ingredient
 quantities × counts, with variation deltas applied, aggregated across
-the window. Two sections, both exact:
+the window. **Then subtract the pantry** (if on file): stock recorded
+in `nutrition/pantry.md` comes off the totals before anything lands in
+Buy. Trust confirmed entries; `est.` amounts are guesses — check them
+with the athlete rather than silently shopping (or not shopping) on
+them.
 
 A **staple** is anything on the athlete's staples list in `profile.md`
 (Food & eating) — what they keep in by default; everything else is a
-Buy item, even pantry-ish things not on that list.
+Buy item, even pantry-ish things not on that list. Two sections, both
+exact:
 
 1. **Buy** — non-staple ingredients with exact quantities (and pack
-   sizes where they help).
+   sizes where they help), net of pantry stock — plus any staple whose
+   pantry state (low / out) can't cover what the pool needs.
 2. **Staples — confirm you have enough** — every staple the pool
-   needs, each with the required amount (e.g. "eggs: 14"). Ask which
-   are running short and promote those to Buy.
+   needs, each with the required amount (e.g. "eggs: 14") and its
+   pantry state. With a reconciled pantry, only query the ones marked
+   low / out / `est.` — or where the pool needs unusually much — and
+   promote shortfalls to Buy; the rest are listed as trusted. No
+   pantry file → ask about all of them, as before.
 
-Nothing the pool needs may be missing from both sections. Shape the
+Nothing the pool needs may be missing from both sections. Record which
+pantry stock the list **assumed used** (the subtracted items) in the
+plan — the next reconcile diffs against exactly that. Shape the
 list to the athlete's shopping style (one basket for a weekly online
 shop; grouped by category in person; staples-vs-extras for ad hoc).
 If a grocery integration is connected, offer to push the list.
@@ -192,13 +223,22 @@ Timing cues, batch-cook schedule, anything decided this run.
 | --- | --- | --- |
 
 ### Staples — confirm you have enough
-| Staple | Needed this week |
+| Staple | Needed this week | Pantry state |
+| --- | --- | --- |
+
+### From the pantry — assumed used
+| Item | Amount used |
 | --- | --- |
+(Only with a pantry on file: the stock the list subtracted. The next
+reconcile diffs against this. Omit the section — and the Pantry state
+column — when there's no pantry.)
 ```
 
 Then close out: apply any remaining card/index status changes agreed
 this run; update Food & eating for any preference the athlete confirmed
-changed; remind the athlete that logging (MacroFactor, if used) stays
+changed; if there's no `nutrition/pantry.md` yet, offer `/pantry` to
+set one up (so future plans can subtract stock and cook around
+leftovers); remind the athlete that logging (MacroFactor, if used) stays
 the ground truth — the next `/check-in` reviews how the plan went.
 
 If `notion-map.json` exists and covers meal plans, mirror the plan to
