@@ -36,16 +36,38 @@ Quote URLs with `?` in them — zsh globs them otherwise.
 | `GET /v1/body_measurements` | Bodyweight etc. | max 10/page |
 | `GET /v1/user/info` | Account sanity check | — |
 
+## Routine note format (standard)
+
+Every routine exercise `notes` field this repo writes uses this
+three-line format — hard cap three lines; a note nobody reads between
+sets is wasted:
+
+```
+Target: 3×8 @ RPE 8 — add 2.5 kg from last week
+Focus: pause 1s on the chest this week
+Cues: narrow grip · elbows tucked · feet planted
+```
+
+- **Target** — always. This week's sets × reps @ RPE plus the load
+  instruction. Written weekly by `/program-week`; `/new-program` and
+  `/one-off-week` write their own targets at creation time.
+- **Focus** — only when there's a weekly emphasis. Omit the line
+  otherwise.
+- **Cues** — always. The canonical form cues, copied from the
+  exercise's `Cues:` line in `routine/*.md` (that line is the single
+  source of truth — changing how a lift is performed edits it there
+  first).
+
 ## Facts that bite
 
 - **All weights are kg.** If the athlete programs in lb, convert (1 lb =
   0.45359237 kg) and round display values to the nearest 0.5 lb — raw values
   come back as long floats of exact lb amounts (e.g. `48.988…` kg = 108 lb).
 - **Routine templates cannot store an RPE target** (logged workout sets *do*
-  carry `rpe`). RPE prescriptions live in the `routine/` files — and, as a
-  standing rule, go into each routine exercise's `notes` field (with the key
-  form cue) whenever a routine is written to Hevy, so the athlete sees them
-  mid-session.
+  carry `rpe`). RPE prescriptions live in the `routine/` files and the
+  weekly overlay — and reach the athlete via each routine exercise's
+  `notes` field in the standard three-line format (see "Routine note
+  format" above) whenever a routine is written to Hevy.
 - **Set `type`** is one of `normal`, `warmup`, `dropset`, `failure`.
 - **PUT replaces the entire routine** — to change one exercise, GET the routine,
   edit the JSON, PUT the whole thing back. Confirm with the athlete before any
