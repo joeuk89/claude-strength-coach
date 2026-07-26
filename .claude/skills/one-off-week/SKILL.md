@@ -78,9 +78,10 @@ exercises, sets × reps, load or RPE, rest.
   if this week needs more than exist, and add the new IDs to the map.
   The API has no delete — reuse **is** the cleanup, and leftover
   content in the folder between one-off weeks is harmless.
-- Fill each exercise's `notes` with the RPE target + key cue, as
-  always. Space writes a few seconds apart (rate limit); confirm with
-  the athlete before writing; GET back after to verify.
+- Fill each exercise's `notes` in the standard three-line format
+  (Target / Focus / Cues — see `reference/hevy-api.md`), as always.
+  Space writes a few seconds apart (rate limit); confirm with the
+  athlete before writing; GET back after to verify.
 - Update `temporary` in `hevy-map.json` in the same operation as any
   folder/routine creation.
 
