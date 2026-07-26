@@ -53,8 +53,10 @@ logging habits.
 
 Convert to the athlete's preferred units (in `profile.md`) before showing
 them anything. **Judge against the effective prescription**, not the base
-plan — check `routine/program.md` and the last check-in for an active
-on-ramp, deload, or one-off week shape first.
+plan — the last check-in's week-ahead overlay (per-exercise targets, if
+`/program-week` wrote one) plus any active on-ramp, deload, or one-off
+week shape in `routine/program.md`. With an overlay, adherence is
+concrete: did the athlete hit the prescribed load × reps @ RPE?
 
 **Weekly tier** — keep it light:
 - Adherence: sessions trained vs. planned, including coach-led ones
@@ -146,7 +148,9 @@ What changed and why (or "stay the course"). Anything deferred.
 | Day | Session |
 | --- | --- |
 | Mon | ... |
-One-off changes called out. End with one line: the focus of the week.
+One-off changes called out. On normal weeks `/program-week` expands
+this section with the per-exercise prescription tables — the weekly
+overlay. End with one line: the focus of the week.
 ```
 
 Deep records use the same skeleton titled `(deep)`, with **Training**
@@ -177,8 +181,12 @@ whether the goals/phase plan in `profile.md` is stale (if so, prompt
   no added load on an aggravated pattern.
 - If the program tracks a current position in a rotation, update it in
   `routine/program.md`.
-- If routine changes were agreed and the athlete uses Hevy, offer
-  `/hevy-sync`.
+- On a normal (non-deload) week, once decisions are agreed, invoke the
+  **program-week** skill — it computes per-exercise targets for the
+  coming week, writes them to Hevy (with approval), and fills this
+  record's "The week ahead" section. Structural routine changes agreed
+  today ride along in its write step; `/hevy-sync` stays for
+  reconciliation outside the pass.
 - On a deload-week check-in, invoke the **one-off-week** skill (deload
   mode) to build the deload week itself — its schedule and sessions
   fill this record's "The week ahead" section, and it handles the Hevy
