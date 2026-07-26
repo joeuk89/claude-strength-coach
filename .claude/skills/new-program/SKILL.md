@@ -81,6 +81,12 @@ equipment, training week, time per session, injuries, recovery, cardio).
 
 - Recap the program in one paragraph: structure, rotation, progression,
   deload.
+- **Offer to program the opening week** — invoke the **program-week**
+  skill (`/program-week`) to set concrete starting loads, rep targets,
+  RPE, and notes for week one. It writes the first check-in record to
+  hold the weekly overlay, so the first `/check-in` has a prescription
+  to judge against. Applies to both paths — imported and designed
+  programs.
 - Point at the rhythm: train it, log it, `/check-in` weekly — the first
   check-in after a new program pays extra attention to whether the
   starting loads and volume landed right.

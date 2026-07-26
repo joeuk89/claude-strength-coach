@@ -90,8 +90,9 @@ anything. Rules that always apply:
 - **`/program-week`** — the weekly programming pass: coach-set loads,
   rep targets, RPE, and per-exercise notes for the coming week, written
   to Hevy and recorded as the weekly overlay in the newest check-in.
-  `/check-in` runs it automatically on normal weeks; run it standalone
-  to reprogram mid-week.
+  `/check-in` runs it automatically on normal weeks, and `/new-program`
+  offers it for a new program's opening week; run it standalone to
+  reprogram mid-week.
 - **`/goals`** — set or revise the training/physique goals, phase
   (bulk/cut/maintain), and nutrition strategy.
 - **`/meal-plan`** — plan meals and snacks for a window (default: the week

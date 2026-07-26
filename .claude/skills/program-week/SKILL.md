@@ -1,6 +1,6 @@
 ---
 name: program-week
-description: Use when the coming week (or the rest of this week) needs programming — coach-set loads, rep targets, RPE, and per-exercise notes written to Hevy. Triggers include "/program-week", "program my week", "set my weights for this week", "bump my squat", "reprogram the rest of the week", or /check-in finishing its decisions on a normal (non-deload) week.
+description: Use when the coming week (or the rest of this week) needs programming — coach-set loads, rep targets, RPE, and per-exercise notes written to Hevy. Triggers include "/program-week", "program my week", "set my weights for this week", "bump my squat", "reprogram the rest of the week", /check-in finishing its decisions on a normal (non-deload) week, or /new-program finishing a first-time program (the opening week).
 ---
 
 # Weekly programming pass
@@ -30,6 +30,11 @@ current working weights (`GET /v1/workouts`, newest first — API in
 `reference/hevy-api.md`; no Hevy → ask the athlete for their current
 weights). If the program rotates, confirm which week is next — never
 assume.
+
+**Brand-new program?** An empty `check-ins/` is normal — there's no
+overlay or decisions to read. With no logged workouts yet, working
+weights come from the starting loads agreed during program design (or
+ask the athlete), not from logs.
 
 **Stand down if a one-off week is active.** If `routine/program.md`'s
 header carries a one-off/override pointer covering this span,
@@ -95,6 +100,12 @@ Write the full per-exercise prescription into the newest check-in's
 "The week ahead" section — when `/check-in` invoked this skill, that
 section is being written now; fill it. Standalone runs append to the
 newest check-in instead:
+
+**No check-in record yet** (brand-new program): create
+`check-ins/YYYY-MM-DD.md` with a minimal first record — a header
+noting the program start date and structure, then "The week ahead"
+holding the overlay. The first `/check-in` judges adherence against
+it.
 
 ```markdown
 ## Week reprogrammed — YYYY-MM-DD
