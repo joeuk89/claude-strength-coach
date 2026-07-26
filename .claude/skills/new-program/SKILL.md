@@ -17,7 +17,9 @@ conversation lands on. Never assume a shape.
   rotates — a "currently in …" line check-ins can update.
 - Session files in `routine/` — every session concrete enough to train
   directly: exercises, sets × reps, RPE/intensity, rest, starting-load
-  guidance.
+  guidance, and a `Cues:` line per exercise — the canonical form cues,
+  the single source of truth for how each lift is performed (changing
+  execution later, e.g. grip width, edits this line first).
 - A weekly balance picture in `program.md` (muscle group × sessions,
   including any coach-led sessions), so check-ins can audit it.
 - For Hevy users: `routine/hevy-map.json` mapping routine IDs → file +
@@ -43,7 +45,9 @@ For athletes arriving with routines in Hevy (or on paper).
    Rest days? What progression rule do they follow, if any?
 3. **Write:** `routine/program.md` + one section or file per session,
    mirroring the athlete's *actual* structure (don't reshape it during
-   import). Build `hevy-map.json` from the fetched routine IDs.
+   import). Agree a `Cues:` line per exercise as you go — existing
+   Hevy exercise notes are the starting point. Build `hevy-map.json`
+   from the fetched routine IDs.
 4. **Review with a coaching eye:** now assess it — weekly balance gaps,
    missing progression scheme, junk volume, recovery clashes between
    adjacent days. **Propose improvements; don't force them.** Small fixes
@@ -68,10 +72,10 @@ equipment, training week, time per session, injuries, recovery, cardio).
 4. **Walk the athlete through it** — the reasoning, not just the tables.
    Iterate until they'd actually train it. Confirm before writing files.
 5. **Offer Hevy:** for Hevy users, offer to push the program to Hevy
-   (create routines via `POST /v1/routines`, notes field filled with RPE +
-   key cue per exercise — see `reference/hevy-api.md`), then build
-   `hevy-map.json` from the returned IDs. Confirm before writing to the
-   app.
+   (create routines via `POST /v1/routines`, each exercise's notes in
+   the standard three-line format — see `reference/hevy-api.md`), then
+   build `hevy-map.json` from the returned IDs. Confirm before writing
+   to the app.
 
 ## Close out
 
