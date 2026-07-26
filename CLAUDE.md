@@ -51,7 +51,7 @@ intermediate, and advanced lifters. You:
 | `routine/*.md` | The session files — however many the program's structure needs. |
 | `routine/hevy-map.json` | Hevy routine IDs → plan locations (if the athlete uses Hevy). Update it when routines are added/renamed on either side. |
 | `notion-map.json` | Notion mirror mapping (parent page, section pages, file → page IDs) — only exists if the athlete enabled Notion sync. Managed by `/notion-sync`; mechanics in `reference/notion-sync.md`. |
-| `check-ins/` | Dated check-in records (`YYYY-MM-DD.md`) — the progress history. |
+| `check-ins/` | Dated check-in records (`YYYY-MM-DD.md`) — the progress history. The newest record's week-ahead section carries the **weekly overlay**: the per-exercise prescription `/program-week` wrote for the current week. |
 | `nutrition/` | Meal planning: `menu/` (the recipe bank — one card per recipe plus `index.md`; format in `reference/recipe-cards.md`) and dated meal plans (`YYYY-MM-DD.md`). Bank managed by `/recipes`, plans by `/meal-plan`. |
 | `reference/` | Supporting docs: the Hevy API cheatsheet plus any coaching docs written for this athlete (progressions, protocols). |
 | `.env` | `HEVY_API_KEY` — never print or commit it. |
@@ -87,6 +87,11 @@ anything. Rules that always apply:
   review on deload weeks or when one is 6+ weeks overdue. Suggest one if
   it's been over a week since the last entry in `check-ins/` and the
   conversation is heading that way anyway.
+- **`/program-week`** — the weekly programming pass: coach-set loads,
+  rep targets, RPE, and per-exercise notes for the coming week, written
+  to Hevy and recorded as the weekly overlay in the newest check-in.
+  `/check-in` runs it automatically on normal weeks; run it standalone
+  to reprogram mid-week.
 - **`/goals`** — set or revise the training/physique goals, phase
   (bulk/cut/maintain), and nutrition strategy.
 - **`/meal-plan`** — plan meals and snacks for a window (default: the week
@@ -119,10 +124,10 @@ anything. Rules that always apply:
   convert to the athlete's preferred units (in `profile.md`).
 - Routine changes agreed here should be offered to Hevy (via `/hevy-sync`)
   so the app and the plan don't drift apart silently.
-- **When writing any routine to Hevy, fill each exercise's `notes` field**
-  with its RPE target and the key cue from the plan — that's how
-  prescriptions the app can't store structurally reach the athlete
-  mid-session.
+- **When writing any routine to Hevy, fill each exercise's `notes`
+  field** in the standard three-line format (Target / Focus / Cues —
+  see `reference/hevy-api.md`) — that's how prescriptions the app can't
+  store structurally reach the athlete mid-session.
 - **No Hevy?** The athlete describes their training at check-ins instead,
   and `/hevy-sync` doesn't apply.
 

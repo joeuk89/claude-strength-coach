@@ -46,9 +46,11 @@ The heartbeat is one check-in a week. Around it:
 2. **Log food** (MacroFactor users): daily, with 2–3 morning weigh-ins a
    week.
 3. **`/check-in`** once a week (~10 min). It reviews the week against the
-   plan, asks a few questions, saves a dated record to `check-ins/`, and
-   hands you the plan for the week ahead. Every ~6 weeks it runs deeper,
-   as a block-level review.
+   plan, asks a few questions, saves a dated record to `check-ins/`, then
+   programs the week ahead — exact loads, rep targets, and coaching notes,
+   set in your Hevy routines (or recorded in the check-in if you don't
+   use Hevy), one approval for the whole week. Every ~6 weeks it runs
+   deeper, as a block-level review.
 
 That loop is most of it. The flows below are for when something changes.
 
@@ -66,6 +68,10 @@ in plain words. The commands are for the bigger moves.
 ### Your training
 - **`/new-program`** — build your program (import from Hevy or design from
   scratch with the coach), or redesign it at a block boundary.
+- **`/program-week`** — the weekly programming pass `/check-in` runs for
+  you: this week's loads, rep targets, RPE, and notes set per exercise in
+  Hevy (or recorded in the check-in without it). Run it directly to
+  reprogram mid-week ("I missed Tuesday", "today felt easy").
 - **`/one-off-week`** — a week that breaks the pattern: a deload, or a
   disrupted one (travel, illness, limited kit). Concrete sessions for the
   blip; your program stays untouched.
