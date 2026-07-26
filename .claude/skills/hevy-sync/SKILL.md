@@ -36,7 +36,15 @@ Requires a Hevy API key in `.env` — if there isn't one, say so and stop
 
 ## 2. Diff — structure, not loads
 
-Compare per session, Hevy (kg → the athlete's units) vs. the markdown:
+The expected state is **base plan + weekly overlay**: if the newest
+check-in's week-ahead section (or a "Week reprogrammed" addendum)
+carries per-exercise prescriptions from `/program-week`, judge Hevy
+against those for the current week — coach-set rep targets and
+three-line notes (Target / Focus / Cues, per `reference/hevy-api.md`)
+are prescriptions, not drift.
+
+Compare per session, Hevy (kg → the athlete's units) vs. that expected
+state:
 
 **Flag these:** exercises added/removed/substituted · order changes ·
 superset groupings (`supersets_id`) · set counts · rep ranges
@@ -44,8 +52,9 @@ superset groupings (`supersets_id`) · set counts · rep ranges
 that contradict the plan's instructions.
 
 **Don't flag working loads.** The markdown's starting loads are
-estimates; Hevy carries the live weights, which drift upward by design as
-the progression scheme does its job. Only mention a load if it breaks a
+estimates, and coach-set weekly loads are recomputed by the next
+`/program-week` pass anyway — in-app load edits between passes are the
+athlete autoregulating, not drift. Only mention a load if it breaks a
 stated constraint in `profile.md` — e.g. a barbell lift at/over an
 equipment load cap.
 
@@ -79,12 +88,11 @@ must stay clash-free) and the program's weekly balance.
   one.
 - **Always populate each exercise's `notes` field** when creating or
   updating a routine — the athlete reads these mid-session, so they carry
-  what the app can't hold in structured fields. Compose from the markdown
-  plan, in this order of priority: the RPE target, the progression cue if
-  it deviates from the program's default scheme, and the one form or
-  execution cue that matters most for that lift. Keep it to 1–2 short
-  lines — a note nobody reads between sets is wasted. Don't blank an
-  existing Hevy note that has content the plan lacks; fold it in or ask.
+  what the app can't hold in structured fields. Use the standard
+  three-line format (Target / Focus / Cues — see `reference/hevy-api.md`),
+  composed from the markdown plan and the current weekly overlay if one
+  is active. Don't blank an existing Hevy note that has content the plan
+  lacks; fold it in or ask.
 - **Confirm with the athlete before every PUT/POST** — writes overwrite
   what's in their app. After writing, GET the routine back and verify the
   change landed.
