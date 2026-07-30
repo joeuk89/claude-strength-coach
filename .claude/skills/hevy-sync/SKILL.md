@@ -58,6 +58,17 @@ athlete autoregulating, not drift. Only mention a load if it breaks a
 stated constraint in `profile.md` — e.g. a barbell lift at/over an
 equipment load cap.
 
+**One load exception: dumbbell convention errors.** Hevy stores dumbbell
+weight as the combined total across both arms, so when comparing a
+dumbbell load to the plan, compare like with like — the plan's per-hand
+figure doubled, on two-arm work. A dumbbell load sitting at almost
+exactly **2× or ½ ×** the expected Hevy value is a convention error, not
+autoregulation, and it *is* worth raising: left alone it corrupts the
+history that later e1RMs and progressions are computed from. Single-arm
+and alternating work is the exception where per hand and the Hevy value
+are the same number — check how the lift is performed before calling it.
+See `reference/hevy-api.md` → "Dumbbell loads".
+
 RPE targets exist only in the markdown (the API can't store them on
 routines) — never report their absence in Hevy as drift.
 

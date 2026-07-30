@@ -44,7 +44,7 @@ Quote URLs with `?` in them — zsh globs them otherwise.
 | `GET /v1/workouts?page=&pageSize=` | Logged workouts, newest first: exercises → sets with `weight_kg`, `reps`, `rpe`, `type` | max 10/page |
 | `GET /v1/workouts/count` | Total workout count | — |
 | `GET /v1/workouts/events?since=<ISO8601>&page=&pageSize=` | Workout updates/deletes since a date — use for "what's new since last check-in" | max 10/page |
-| `GET /v1/workouts/{id}` | One workout | — |
+| `GET /v1/workouts/{id}` · `PUT /v1/workouts/{id}` | One workout — GET, or replace it. PUT is how a mis-logged past session gets repaired; it replaces the whole workout, so GET first, edit the JSON, PUT it back. Confirm with the athlete before any write | — |
 | `GET /v1/routines?page=&pageSize=` | Routine templates: exercises with `rest_seconds`, `notes`, `supersets_id`, sets with `rep_range {start,end}` / `reps` / `weight_kg` | max 10/page |
 | `POST /v1/routines` · `PUT /v1/routines/{id}` | Create / replace a routine (PUT replaces the whole exercise list) | — |
 | `GET /v1/routine_folders` | Routine folders (id + title) | max 10/page |
@@ -54,6 +54,48 @@ Quote URLs with `?` in them — zsh globs them otherwise.
 | `GET /v1/exercise_history/{exerciseTemplateId}` | All logged sets of one exercise over time — good for progression analysis | — |
 | `GET /v1/body_measurements` | Bodyweight etc. | max 10/page |
 | `GET /v1/user/info` | Account sanity check | — |
+
+## Dumbbell loads — two numbers, never one
+
+Hevy stores a dumbbell set's weight as the **combined total lifted per rep**,
+not the weight of one dumbbell. So there are always two numbers, and every
+skill that writes or reads a load must keep them straight:
+
+| | What it means | Example |
+|---|---|---|
+| **Per hand** | What the athlete physically sets each dumbbell to — the coaching number | `25/hand` |
+| **Hevy value** | What goes in the app / the API's `weight_kg` | `50` |
+
+**Two-arm exercises** (both dumbbells moving each rep — DB bench/incline press,
+shoulder press, lateral raise, rear-delt fly, flye, simultaneous curls, DB
+squats/lunges/split squats, DB RDL, seated calf raise): **Hevy value = 2 ×
+per hand**.
+
+**Single-implement exercises** (only one dumbbell moves per rep — single-arm
+row, single-arm press, one-DB overhead triceps extension held in both hands,
+single-arm/single-leg work loaded on one side, *and* any two-arm movement
+performed **alternating** so one arm works per rep): **Hevy value = per hand**.
+
+Rules that follow:
+
+- **Never state a dumbbell load as a bare number** anywhere the athlete reads
+  it — `routine/` load columns, weekly overlays, `Target:` notes, check-in
+  tables. Carry both: `25/hand (Hevy: 50)`. A bare `50` is ambiguous mid-set
+  and that ambiguity is what corrupts the log.
+- **Decide from how the lift is actually performed**, not from the exercise
+  name. Hevy's catalogue mixes them — some one-arm variants are separate
+  templates, some aren't. If the athlete alternates a curl, that set is
+  single-implement. Ask when unclear rather than assuming.
+- **Reading history: an exact-2× jump in one exercise at unchanged reps *and*
+  unchanged RPE is a convention slip, not progress.** Check sibling exercises
+  on the same dates before treating it as a strength change, and never let it
+  set an e1RM, a PR, or a next-week load.
+- **A doubled single-implement entry inflates prescriptions downstream.** If a
+  starting load was derived from contaminated history, fix the load *and* say
+  which sessions were misread.
+- The athlete's own logging may be inconsistent across exercises and dates.
+  When an audit turns up both conventions in one log, confirm the actual
+  per-hand weights with the athlete before rewriting anything.
 
 ## Routine note format (standard)
 
@@ -69,7 +111,9 @@ Cues: narrow grip · elbows tucked · feet planted
 
 - **Target** — always. This week's sets × reps @ RPE plus the load
   instruction. Written weekly by `/program-week`; `/new-program` and
-  `/one-off-week` write their own targets at creation time.
+  `/one-off-week` write their own targets at creation time. **On a
+  dumbbell exercise, give both numbers** — `3×8 @ 25/hand (Hevy: 50) @
+  RPE 8` — since the athlete reads this note while entering the set.
 - **Focus** — only when there's a weekly emphasis. Omit the line
   otherwise.
 - **Cues** — always. The canonical form cues, copied from the
@@ -82,6 +126,11 @@ Cues: narrow grip · elbows tucked · feet planted
 - **All weights are kg.** If the athlete programs in lb, convert (1 lb =
   0.45359237 kg) and round display values to the nearest 0.5 lb — raw values
   come back as long floats of exact lb amounts (e.g. `48.988…` kg = 108 lb).
+- **Dumbbell weights are the COMBINED total across both arms**, per Hevy's own
+  in-app guidance: *"When logging dumbbell exercises, you should log the total
+  weight lifted per rep. For example, if each arm is lifting 10lbs, your weight
+  logged should be 20lbs."* See "Dumbbell loads" below — this is the single
+  easiest way to corrupt an athlete's log, and it is silent when it happens.
 - **Routine templates cannot store an RPE target** (logged workout sets *do*
   carry `rpe`). RPE prescriptions live in the `routine/` files and the
   weekly overlay — and reach the athlete via each routine exercise's

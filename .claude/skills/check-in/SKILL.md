@@ -72,6 +72,16 @@ concrete: did the athlete hit the prescribed load × reps @ RPE?
 - Per main lift: loads/reps across the window, Epley e1RM trend
   (`weight × (1 + reps/30)`) — trend, not gospel. Flag stalls (same
   load+reps 3+ sessions) and progression-scheme violations.
+- **Sanity-check dumbbell loads before reading anything into them.** An
+  exact-2× (or ½ ×) step in a dumbbell exercise at unchanged reps *and*
+  unchanged RPE is a logging-convention slip, not a strength change —
+  Hevy stores the combined total across both arms, and single-arm work is
+  the exception. Cross-check sibling exercises on the same dates: a slip
+  usually shows up in more than one lift at once. Never let one set an
+  e1RM or a PR. When history looks contaminated, confirm the actual
+  per-hand weights with the athlete, correct the record, and say which
+  prescriptions were derived from the bad data.
+  See `reference/hevy-api.md` → "Dumbbell loads".
 - Exercise drift vs. the plan — structural drift means `/hevy-sync` is
   due; offer it (Hevy users only).
 - Intensity honesty (logged vs. prescribed RPE), session durations vs. the

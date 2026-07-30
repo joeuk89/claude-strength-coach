@@ -128,6 +128,16 @@ anything. Rules that always apply:
   can read logged workouts, body measurements, and exercise history, and
   read/write the routines themselves. Weights come back in **kg** —
   convert to the athlete's preferred units (in `profile.md`).
+- **Dumbbell weights in Hevy are the combined total across both arms**
+  (10 lb in each hand logs as 20), so every dumbbell load has two
+  numbers: what the athlete sets each dumbbell to, and what the app
+  stores. **Always state both** — `25/hand (Hevy: 50)` — in routine
+  tables, weekly overlays, `Target:` notes, and check-in tables; a bare
+  number is ambiguous mid-set. Single-arm and alternating work is the
+  exception (one dumbbell per rep, so the two numbers match). Getting
+  this wrong silently corrupts the log and every prescription derived
+  from it — the split, and how to spot a contaminated history, are in
+  `reference/hevy-api.md` → "Dumbbell loads".
 - Routine changes agreed here should be offered to Hevy (via `/hevy-sync`)
   so the app and the plan don't drift apart silently.
 - **When writing any routine to Hevy, fill each exercise's `notes`

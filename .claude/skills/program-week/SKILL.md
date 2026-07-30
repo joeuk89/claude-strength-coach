@@ -58,6 +58,14 @@ Work through every session in the span, every exercise in each:
   increment); reps missed → hold; logged RPE drifting over prescription
   → hold or back off. Reason per lift — a formula applied blindly is
   not coaching. Display in the athlete's units.
+  **Dumbbell exercises carry two numbers** — per hand and the Hevy value
+  (`25/hand (Hevy: 50)`) — because Hevy stores the combined total across
+  both arms. Get the per-hand figure out of the logged value *before*
+  applying a progression rule, or the increment lands on the wrong
+  number. Rules and the two-arm/single-implement split:
+  `reference/hevy-api.md` → "Dumbbell loads". If the log shows an exact
+  2× jump at unchanged reps and RPE, that's a convention slip, not
+  progress — don't progress off it, raise it with the athlete.
 - **Rep target / RPE** — move them where the block's scheme calls for
   it.
 - **Focus** — one per-exercise emphasis where warranted, drawn from
@@ -74,6 +82,8 @@ pattern.
 
 One table per session: exercise · sets × reps @ load @ RPE · what
 changed vs. last week · a one-line rationale where it isn't obvious.
+Dumbbell loads show both numbers (`25/hand (Hevy: 50)`) — never a bare
+one, here or in the recorded overlay.
 Structural changes get their own short section with before/after and
 trade-offs. The athlete approves the week **once**; iterate until they
 would train it.
@@ -90,6 +100,10 @@ would train it.
    three-line format — Target / Focus / Cues, see
    `reference/hevy-api.md` — then PUT the whole routine back and GET to
    verify. Space writes a few seconds apart; back off ~30 s on a 429.
+   **For dumbbell exercises `weight_kg` is the Hevy value** (the
+   combined total — double the per-hand figure on two-arm work), and the
+   `Target:` line states both numbers so the athlete enters the right
+   one.
 
 **No Hevy?** Skip the writes — the recorded overlay below is the
 deliverable, and the athlete trains from it.

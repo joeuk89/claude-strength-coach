@@ -20,6 +20,14 @@ conversation lands on. Never assume a shape.
   guidance, and a `Cues:` line per exercise — the canonical form cues,
   the single source of truth for how each lift is performed (changing
   execution later, e.g. grip width, edits this line first).
+  **Dumbbell loads carry two numbers** — per hand and the value the app
+  stores (`25/hand (Hevy: 50)`) — because Hevy logs the combined total
+  across both arms. State both in the load column and explain the
+  convention once in `program.md` so the tables need no decoding. When
+  importing existing routines, the loads you read back are Hevy values:
+  halve them for two-arm work to recover the per-hand figure, and check
+  the result against the athlete's actual dumbbells before trusting it.
+  See `reference/hevy-api.md` → "Dumbbell loads".
 - A weekly balance picture in `program.md` (muscle group × sessions,
   including any coach-led sessions), so check-ins can audit it.
 - For Hevy users: `routine/hevy-map.json` mapping routine IDs → file +

@@ -64,7 +64,11 @@ program PR attempts on hotel dumbbells. The failure mode to design
 against is no plan at all: sporadic maximal improvised sessions.
 
 Every temp session must be concrete enough to train directly:
-exercises, sets × reps, load or RPE, rest.
+exercises, sets × reps, load or RPE, rest. Dumbbell loads carry both
+numbers — per hand and the Hevy value (`25/hand (Hevy: 50)`), see
+`reference/hevy-api.md` → "Dumbbell loads". This matters most on a
+constrained week: unfamiliar dumbbells (a hotel rack, a different
+increment) are exactly when a doubled entry slips in unnoticed.
 
 ## 3. Write to Hevy (temp tier, Hevy users)
 
