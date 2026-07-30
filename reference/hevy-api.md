@@ -9,12 +9,31 @@ JS-rendered, so fetch that file if you need schema detail).
 
 - Requires Hevy Pro. Key lives in `.env` at the repo root as
   `HEVY_API_KEY` — never print it, never commit it (`.gitignore` covers it).
+- In a **Claude Code cloud session** there is no `.env` (it isn't in the
+  clone). The key comes from the cloud environment's environment variables
+  instead — see [Cloud sessions](#cloud-sessions) below.
 - Every call: header `api-key: $HEVY_API_KEY`, base URL `https://api.hevyapp.com`.
 
 ```bash
-set -a && source .env && set +a
+# Loads .env when it exists (local); otherwise the var is already set (cloud).
+[ -f .env ] && { set -a; . ./.env; set +a; }
 curl -s -H "api-key: $HEVY_API_KEY" "https://api.hevyapp.com/v1/workouts/count"
 ```
+
+### Cloud sessions
+
+To use Hevy from Claude Code on the web, configure the cloud environment at
+[claude.ai/code](https://claude.ai/code) — the cloud icon in the row above
+the message box, then the settings gear on the environment:
+
+- **Environment variables**: add `HEVY_API_KEY=<key>`. Values are readable by
+  anyone using that environment, so keep it a personal environment.
+- **Network access**: set to **Custom**, add `api.hevyapp.com`, and tick
+  *"Also include default list of common package managers"*. The default
+  **Trusted** level does not allow `api.hevyapp.com`, so every call fails
+  without this.
+
+Changes apply to sessions started afterwards, not ones already running.
 
 Quote URLs with `?` in them — zsh globs them otherwise.
 

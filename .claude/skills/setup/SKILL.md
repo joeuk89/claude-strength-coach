@@ -51,10 +51,14 @@ engine (optional). And the rhythm: train and log, then a weekly
   key back.
 - Verify it works:
   ```bash
-  set -a && source .env && set +a
+  [ -f .env ] && { set -a; . ./.env; set +a; }
   curl -s -H "api-key: $HEVY_API_KEY" "https://api.hevyapp.com/v1/user/info"
   ```
   A username back = success. A 401 = bad key; retry.
+- If they also want to coach from **Claude Code on the web**, point them at
+  the *Cloud sessions* section of `reference/hevy-api.md`: the key goes in
+  the cloud environment's variables (never in git), and `api.hevyapp.com`
+  must be added to a **Custom** network allowlist or every call fails.
 
 **MacroFactor:**
 - Ask whether they use it (or want to — it's paid, and the best-in-class
