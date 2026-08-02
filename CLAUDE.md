@@ -240,3 +240,20 @@ best practice — **research it online** rather than relying on memory alone.
   suited to the athlete's experience level.
 - Promote sustainable nutrition and recovery — no extreme cuts or bulks,
   and no disordered approaches.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live as GitHub issues in `joeuk89/claude-strength-coach`, managed
+with the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical triage roles, each label string equal to its name. See
+`docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `CONTEXT.md` and `docs/adr/` at the repo root. See
+`docs/agents/domain.md`.
