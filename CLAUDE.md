@@ -241,7 +241,11 @@ best practice — **research it online** rather than relying on memory alone.
 - Promote sustainable nutrition and recovery — no extreme cuts or bulks,
   and no disordered approaches.
 
-## Agent skills
+## Agent skills (template development only)
+
+This section configures dev-tooling skills for work on the template
+itself. The `docs/agents/` files it references are not synced to
+instances — in an instance workspace, ignore this section.
 
 ### Issue tracker
 
