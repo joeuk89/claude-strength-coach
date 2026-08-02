@@ -195,9 +195,12 @@ whether the goals/phase plan in `profile.md` is stale (if so, prompt
 - On a normal (non-deload) week, once decisions are agreed, invoke the
   **program-week** skill — it computes per-exercise targets for the
   coming week, writes them to Hevy (with approval), and fills this
-  record's "The week ahead" section. Structural routine changes agreed
-  today ride along in its write step; `/hevy-sync` stays for
-  reconciliation outside the pass.
+  record's "The week ahead" section. **Decisions agreed at this
+  check-in don't pre-approve the week** — program-week still presents
+  its coach's brief and waits for the athlete's approval before
+  writing anything. Structural routine changes agreed today ride along
+  in its write step; `/hevy-sync` stays for reconciliation outside the
+  pass.
 - On a deload-week check-in, invoke the **one-off-week** skill (deload
   mode) to build the deload week itself — its schedule and sessions
   fill this record's "The week ahead" section, and it handles the Hevy

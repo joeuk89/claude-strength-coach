@@ -42,8 +42,7 @@ session, recovery state).
 
 **Reshuffle tier** — reorder using the program's own rules: recovery
 windows between adjacent sessions, no same-pattern back-to-back days,
-weekly balance including coach-led sessions and cardio. Show
-before/after, iterate until the athlete would train it.
+weekly balance including coach-led sessions and cardio.
 
 **Deload** — apply the deload policy in `routine/program.md`. If the
 program has none, propose a standard one (~2/3 the sets, ~10% off
@@ -70,7 +69,31 @@ numbers — per hand and the Hevy value (`25/hand (Hevy: 50)`), see
 constrained week: unfamiliar dumbbells (a hotel rack, a different
 increment) are exactly when a doubled entry slips in unnoticed.
 
-## 3. Write to Hevy (temp tier, Hevy users)
+## 3. Present the week's brief — and stop
+
+Talk the athlete through the span the way a coach would, narrative
+first:
+
+1. **Why this week deviates** — 1–2 sentences: the reason, what's
+   being protected (the program's priority work), what's deliberately
+   dropped, and when the normal program resumes.
+2. **The schedule** — the Day / Session table for the span, with
+   before/after where days moved.
+3. **Temp sessions in full** (temp tier) — the per-session
+   prescriptions, concrete enough to train directly.
+4. End with an open question ("Does this week work for you?"). Don't
+   mention Hevy yet.
+
+Then **stop and wait for the athlete's reply. Never present and write
+in the same turn** — the brief is a proposal, not a notification.
+Tweaks loop back into a revised brief; iterate until the athlete would
+train it.
+
+## 4. Write to Hevy (temp tier, Hevy users)
+
+**Only enter this step after the athlete has approved the brief
+above** — if no brief has been presented and approved this session, go
+back to step 3.
 
 - Find the standing **"One-off weeks"** folder in
   `GET /v1/routine_folders`. Absent → create it
@@ -84,15 +107,15 @@ increment) are exactly when a doubled entry slips in unnoticed.
   content in the folder between one-off weeks is harmless.
 - Fill each exercise's `notes` in the standard three-line format
   (Target / Focus / Cues — see `reference/hevy-api.md`), as always.
-  Space writes a few seconds apart (rate limit); confirm with the
-  athlete before writing; GET back after to verify.
+  Space writes a few seconds apart (rate limit); GET back after to
+  verify.
 - Update `temporary` in `hevy-map.json` in the same operation as any
   folder/routine creation.
 
 **No Hevy?** Skip this — the record below is the deliverable, and the
 athlete trains the temp sessions from it.
 
-## 4. Record it
+## 5. Record it
 
 - Append to the newest check-in record:
 
@@ -120,7 +143,7 @@ athlete trains the temp sessions from it.
   (per the program's deload cadence) and update that line in
   `program.md` too.
 
-## 5. Close out
+## 6. Close out
 
 Recap in plain words: what the span looks like, what was written to
 Hevy (if anything), when normal service resumes. If recovery drove

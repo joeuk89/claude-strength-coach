@@ -78,17 +78,40 @@ Work through every session in the span, every exercise in each:
 Active niggles constrain everything: no added load on an aggravated
 pattern.
 
-## 3. Present — one approval for the whole week
+## 3. Present the coach's brief — and stop
 
-One table per session: exercise · sets × reps @ load @ RPE · what
-changed vs. last week · a one-line rationale where it isn't obvious.
-Dumbbell loads show both numbers (`25/hand (Hevy: 50)`) — never a bare
-one, here or in the recorded overlay.
-Structural changes get their own short section with before/after and
-trade-offs. The athlete approves the week **once**; iterate until they
-would train it.
+Talk the athlete through the week the way a coach would: narrative
+first, tables second.
+
+1. **Week focus** — 1–2 sentences: what this week is doing and why,
+   tied to the current phase and goal.
+2. **What's changing** — plain-word bullets, changes only, each with
+   its reason ("Squat 80 → 82.5 kg — you hit 5×5 @ RPE 7.5 last week,
+   room to move"). Never restate every exercise here. If nothing
+   changes, say so and why — that's still a decision worth explaining.
+3. **Per-session tables** — one per session: exercise · sets × reps @
+   load @ RPE · what changed vs. last week. A one-line session focus
+   above a table only where there's something to say — most sessions
+   most weeks won't have one. Dumbbell loads show both numbers
+   (`25/hand (Hevy: 50)`) — never a bare one, here or in the recorded
+   overlay.
+4. **Structural changes** (if any) — their own short section with
+   before/after and trade-offs.
+5. End with an open question ("Happy to train this, or want anything
+   tweaked?"). Don't mention Hevy yet.
+
+Then **stop and wait for the athlete's reply. Never present and write
+in the same turn** — the brief is a proposal, not a notification, and
+that holds even on a hold-steady week. Tweaks loop back into a revised
+brief presented the same way. The athlete approves the week **once**;
+iterate until they would train it.
 
 ## 4. Write
+
+**Only enter this step after the athlete has approved the brief
+above.** "OK to write to Hevy?" is not a substitute for presenting the
+week — if no brief has been presented and approved this session, go
+back to step 3.
 
 1. **Structural changes first** — edit the affected `routine/*.md`
    files (an execution change like grip width edits that exercise's
