@@ -18,6 +18,19 @@ is judged against.
 _Avoid_: weekly plan, week's targets
 
 **Approval gate**:
-The rule that presenting a coach's brief and writing it (to Hevy or repo
-files) never happen in the same turn — the athlete must reply first.
+The rule that presenting proposed content (a coach's brief, a recipe
+card) and writing it (to Hevy, repo files, or Notion) never happen in
+the same turn — the athlete must reply first.
 _Avoid_: confirmation step, sign-off
+
+**Recipe bank**:
+The athlete's set of approved recipe cards in `nutrition/menu/`, plus
+its index — what `/meal-plan` selects from.
+_Avoid_: food bank, menu (ambiguous with the directory name)
+
+**Pantry**:
+What's actually in the house — perishables, partial packs, staple
+states — recorded in `nutrition/pantry.md`. Distinct from the recipe
+bank: the bank is what the athlete can make; the pantry is what they
+have.
+_Avoid_: food bank, stock

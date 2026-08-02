@@ -2,6 +2,12 @@
 
 How `/recipes` finds and imports recipes without any paid API.
 
+Research here is **compulsory whenever the agent invents or shapes a
+recipe** (the design, improve, and sweep modes) — memory-drafted
+recipes come out bland with sparse instructions. Only link imports,
+transcriptions of meals the athlete already eats, and trivial
+no-method cards skip it.
+
 ## The mechanism
 
 1. **WebSearch**, scoped to reputable recipe sites (below), with a query
