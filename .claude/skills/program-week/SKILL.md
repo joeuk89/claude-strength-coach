@@ -28,8 +28,11 @@ its session files, the newest check-in (decisions, window, any overlay
 already written), `routine/hevy-map.json`, and recent Hevy logs for
 current working weights (`GET /v1/workouts`, newest first — API in
 `reference/hevy-api.md`; no Hevy → ask the athlete for their current
-weights). If the program rotates, confirm which week is next — never
-assume.
+weights). Read each logged workout's `description` and per-exercise
+`notes` too — the athlete's own account of how the sets felt ("target
+too high, did back-off sets", "wiped out after yesterday's run") should
+temper the next week's loads as much as the numbers do. If the program
+rotates, confirm which week is next — never assume.
 
 **Brand-new program?** An empty `check-ins/` is normal — there's no
 overlay or decisions to read. With no logged workouts yet, working

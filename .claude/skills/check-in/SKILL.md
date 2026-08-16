@@ -39,7 +39,12 @@ week can't show a trend.
 
 **With Hevy** (key in `.env`): API details in `reference/hevy-api.md`.
 Page through `GET /v1/workouts` (`pageSize=10`, newest first) past the
-window start. `GET /v1/body_measurements` is a fallback weight source only.
+window start. **Read every workout's `description` and each exercise's
+`notes`** — these are the athlete's own words on how the session went
+(fatigue, sleep, a target that was too high, a niggle, why sets were
+dropped). They're the readiness signal the numbers can't show, so quote
+them in the analysis and let them shape the decisions. `GET
+/v1/body_measurements` is a fallback weight source only.
 
 **Without Hevy:** ask the athlete to describe the week — which sessions
 happened, notable sets, anything skipped or changed.

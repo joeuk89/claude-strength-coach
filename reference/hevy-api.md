@@ -41,7 +41,7 @@ Quote URLs with `?` in them — zsh globs them otherwise.
 
 | Endpoint | What it returns | Paging |
 |---|---|---|
-| `GET /v1/workouts?page=&pageSize=` | Logged workouts, newest first: exercises → sets with `weight_kg`, `reps`, `rpe`, `type` | max 10/page |
+| `GET /v1/workouts?page=&pageSize=` | Logged workouts, newest first: workout-level `description` (the athlete's end-of-workout notes), exercises with `notes` (per-exercise notes typed mid-session) → sets with `weight_kg`, `reps`, `rpe`, `type` | max 10/page |
 | `GET /v1/workouts/count` | Total workout count | — |
 | `GET /v1/workouts/events?since=<ISO8601>&page=&pageSize=` | Workout updates/deletes since a date — use for "what's new since last check-in" | max 10/page |
 | `GET /v1/workouts/{id}` · `PUT /v1/workouts/{id}` | One workout — GET, or replace it. PUT is how a mis-logged past session gets repaired; it replaces the whole workout, so GET first, edit the JSON, PUT it back. Confirm with the athlete before any write | — |
