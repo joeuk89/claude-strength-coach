@@ -106,6 +106,38 @@ class MinimumReferenceTest(MinimumCase):
         self.assertFalse(report["passed"])
         self.assertTrue(any("position names" in r for r in report["reasons"]))
 
+    def test_rotation_mismatch_keeps_session_count_duration_and_priority_failures(self):
+        self.edit_json("data/program.json", lambda doc: doc["priority"][0]["floor"].update(sets=5))
+        with (self.root / "config.toml").open("a") as handle:
+            handle.write("\n[sessions.cap_minutes]\nmin-a = 5\n")
+        for names in (("x", "y"), ("a", "y")):
+            with self.subTest(names=names):
+                self.rotation(names)
+                def overbook(doc):
+                    for week in doc["minimum_week"]["schedule"]["params"]["weeks"]:
+                        week["days"] = {"mon": "min-a", "wed": "min-a", "fri": "min-a"}
+                self.edit_json("data/program.json", overbook)
+                report = self.balance(expect=1)["data"]
+                self.assertFalse(report["passed"])
+                self.assertTrue(any("position names" in reason for reason in report["reasons"]))
+                self.assertEqual([row["position"] for row in report["positions"]], list(names))
+                for row in report["positions"]:
+                    position = row["position"]
+                    for failure in ("schedule plans 3 sessions", "priority floor", "over its 5 min cap"):
+                        self.assertTrue(any(reason.startswith(position + ":") and failure in reason
+                                            for reason in report["reasons"]), report["reasons"])
+                    self.assertTrue(all(not session["within_cap"] for session in row["sessions"]))
+                    self.assertFalse(row["priority"][0]["met"])
+                    if position == "a":
+                        self.assertEqual(row["reference_position"], "a")
+                        self.assertEqual(row["muscles"]["chest"]["ordinary"], 3)
+                    else:
+                        self.assertIsNone(row["reference_position"])
+                        self.assertIsNone(row["reference_sessions"])
+                        self.assertIsNone(row["reference_external"])
+                        self.assertEqual(row["muscles"]["chest"], {
+                            "ordinary": None, "third": None, "planned": 12, "met": None})
+
     def test_retained_coach_session_is_in_the_written_plan(self):
         self.external(retained=True)
         report = structure.minimum(self.root, "2026-10-12", write=True, today="2026-10-11")

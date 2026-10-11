@@ -4737,8 +4737,12 @@ null`:
 - A fixed minimum is checked against each ordinary rotation position; a
   fixed ordinary schedule supplies the reference for each minimum position.
   Two rotating schedules compare matching position names. Different name
-  sets fail with guidance to configure matching names or a fixed minimum;
-  the check never silently pairs unrelated positions or averages them away.
+  sets fail with guidance to configure matching names or a fixed minimum.
+  Every minimum position still reports session-count, duration and priority
+  checks. Matching positions retain dose comparisons; an unmatched position
+  reports its planned dose but sets `reference_position`, `reference_sessions`,
+  `reference_external`, and each muscle's `ordinary`, `third`, `met` to null.
+  The check never silently pairs unrelated positions or averages them away.
 - The two-session limit and R-24 time caps apply to self-programmed minimum
   sessions; retained coach-led work is reported separately. Session minutes
   use `coach.validity.estimate_minutes`. A priority floor needs one minimum

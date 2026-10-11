@@ -976,13 +976,15 @@ def _minimum_position(inst, program_doc, position, planned, ordinary, external, 
             reasons.append(f"{prefix}no session carries the priority floor of {needed} working sets of "
                            f"{_name(inst, lift['exercise_id'])}{held}")
     muscles = {}
-    for muscle in sorted(set(ordinary) | set(dose)):
-        third = ordinary.get(muscle, 0.0) * MINIMUM_SHARE
+    for muscle in sorted(set(ordinary or {}) | set(dose)):
+        ordinary_sets = ordinary.get(muscle, 0.0) if ordinary is not None else None
+        third = ordinary_sets * MINIMUM_SHARE if ordinary_sets is not None else None
         planned_sets = dose.get(muscle, 0.0)
-        met = planned_sets >= third - 1e-9
-        muscles[muscle] = {"ordinary": _round(ordinary.get(muscle, 0.0)), "third": _round(third),
+        met = planned_sets >= third - 1e-9 if third is not None else None
+        muscles[muscle] = {"ordinary": _round(ordinary_sets) if ordinary_sets is not None else None,
+                           "third": _round(third) if third is not None else None,
                            "planned": _round(planned_sets), "met": met}
-        if not met:
+        if met is False:
             reasons.append(f"{prefix}{muscle}: {_round(planned_sets)} fractional sets planned, below a third of its "
                            f"ordinary dose of {_round(ordinary[muscle])} ({_round(third)})")
     return {"position": position, "reference_position": reference_position, "sessions": rows,
@@ -1005,16 +1007,16 @@ def _minimum_balance(inst, program_doc, reference=None):
     if None not in ordinary_cycle and None not in minimum_cycle and ordinary_cycle.keys() != minimum_cycle.keys():
         reasons.append("ordinary and minimum rotating schedules must use the same position names; "
                        "use matching names or a fixed minimum schedule")
-    else:
-        pairs = [(position, reference_position)
-                 for position in minimum_cycle for reference_position in ordinary_cycle
-                 if position is None or reference_position is None or position == reference_position]
-        for position, reference_position in pairs:
-            ordinary, reference_sessions = _minimum_reference(
-                inst, program_doc, ordinary_cycle[reference_position], reference_external)
-            row, found = _minimum_position(inst, program_doc, position, minimum_cycle[position], ordinary,
-                                           external, reference_position)
-            row.update(reference_sessions=reference_sessions, reference_external=reference_external)
+    for position, planned in minimum_cycle.items():
+        references = [ref for ref in ordinary_cycle if position is None or ref is None or position == ref]
+        for reference_position in references or [None]:
+            ordinary, reference_sessions, paired_external = None, None, None
+            if reference_position in ordinary_cycle:
+                paired_external = reference_external
+                ordinary, reference_sessions = _minimum_reference(
+                    inst, program_doc, ordinary_cycle[reference_position], paired_external)
+            row, found = _minimum_position(inst, program_doc, position, planned, ordinary, external, reference_position)
+            row.update(reference_sessions=reference_sessions, reference_external=paired_external)
             positions.append(row)
             reasons += [reason for reason in found if reason not in reasons]
     return {"variant": "minimum", "reference_week": reference.label(), "sessions": list(minimum["sessions"]),

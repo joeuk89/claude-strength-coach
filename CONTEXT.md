@@ -183,9 +183,13 @@ _Avoid_: minimum sets, maintenance sets
 **Minimum week**:
 The program's fallback week for when the full week cannot happen: at
 most two standby sessions, each within its time cap, carrying every
-priority lift's floor dose and at least a third of each muscle's dose
-target. Its overlay is a weekly overlay, but the week is not an ordinary
-week, and it neither adds to the block's count nor ends the block.
+priority lift's floor dose and at least a third of each muscle's dose in
+the corresponding ordinary programmed week. Scheduled coach-led estimates
+contribute to that reference; only coach-led sessions explicitly retained
+in the minimum contribute to its planned dose. The fractional-set check is
+application policy, not a maintenance guarantee. Its overlay is a weekly
+overlay, but the week is not an ordinary week, and it neither adds to the
+block's count nor ends the block.
 _Avoid_: minimum-viable week (the roadmap's phrase), fallback week, deload
 
 **Progression scheme**:
