@@ -820,6 +820,7 @@ files to it; nobody edits another item's files.
 | readings (R-33a) | 2026-09-28 (avg protein 104), 2026-10-04 (112), 2026-10-11 (115), app target protein 110 |
 | cards (R-33b) | `chicken-rice-bowl` lunch 610/50/55/18 with `light` variation; `overnight-oats` breakfast; `whey-shake` snack |
 | meal plan (R-33c) | `2026-10-12`, span 2026-10-12 to 2026-10-18 |
+| research (R-32a) | template note `research/fixture-dose.md` (area `volume`, claims 1 and 2 current, `review_by` 2028-03-01); local note `research/local/local-fixture-knee.md` (area `rehab`, `updates = ["rn:fixture-dose.2"]`); `reference/fixture-guide.md` citing claim 1 of `fixture-dose`; record `check-ins/2026-08-30.md` (weekly) citing claim 1 of `local-fixture-knee` |
 
 Logged workouts in the valid instance (R-20 adds them as synthetic Hevy
 workouts; ids `10000000-0000-4000-8000-00000000000N`):
@@ -846,6 +847,7 @@ Unless stated, each is a copy of `valid/` plus what is listed.
 | `nohevy/` | R-40c | the valid program and overlay; `[hevy] enabled = false`; no Hevy cache; `data/log/workouts.jsonl` holding the two Session A workouts of the logged-workouts table, logged by hand (squat 3×5 @ 95 RPE 7, DB bench 3×10 @ 22.5/hand RPE 8; the same on 2026-10-05 at 97.5) |
 | `empty/` | R-41a | `config.toml` and an instance library only: no program, no state. Not a copy of `valid/` |
 | `cardio/` | R-43 | see C50 |
+| `research-bad/` | R-32a | not a copy of `valid/`: the valid config; `fixture-dose` with a hand-edited claims table; `fixture-broken` with two claims numbered 1; `fixture-old` expired 2026-10-01 (area `sleep`); `reference/fixture-guide.md` citing a missing claim |
 | `interference/` | R-44a | a planned quality run on 2026-10-11 and Session A (squat at RPE 7) on 2026-10-12 |
 
 `dose/` weeks:
@@ -1854,7 +1856,12 @@ status = "current"              # current | retired
 - Validation: the block, with dates as ISO strings, passes
   `coach/schemas/research_note.schema.json`; `written <= review_by <=
   written + 24 months`; claim and source ids unique; every claim source id
-  exists in the note; id rules by kind; the rehab line when required.
+  exists in the note; id rules by kind; the rehab line when required; a
+  retired claim has `retired_on`, and a current claim has neither
+  `retired_on` nor `superseded_by`; every `updates` entry names a
+  template claim. `applies_to`, `tags`, `updates` and `sources` may be
+  left out and default to empty. A local note whose `updates` names a
+  claim that is missing or retired is valid but warns.
 
 **Claim reference.** `rn:<note-id>.<n>`, matched by
 `\brn:([a-z0-9]+(?:-[a-z0-9]+)*)\.([0-9]+)\b`. Prose writes it in brackets
@@ -1874,7 +1881,10 @@ and `status = "current"`.
 
 **Note status** on date D: `expired` when `review_by < D`; `due_soon` when
 `review_by - 60 days <= D`; otherwise `current`. A template claim listed
-in the `updates` of a current local note is `superseded_locally`.
+in the `updates` of a current local note is `superseded_locally`. In this
+rule and the area rule below, a *current* local note is one whose status
+is `current` or `due_soon`: a local note supersedes and covers until it
+expires.
 
 **Area status.** An area is `expired` when a template or local note
 covering it is expired and no current local note covers it, either by
@@ -1886,7 +1896,7 @@ notes.
 
 ```json
 {"today": "2026-10-11",
- "notes": [{"id": "deloads", "kind": "template", "topic": "Deloads",
+ "notes": [{"id": "deloads", "kind": "template", "topic": "Deloads", "path": "research/deloads.md",
             "written": "2026-10-20", "review_by": "2028-04-20",
             "status": "current", "days_to_review": 557, "confidence": "moderate",
             "applies_to": ["deload", "autoregulation"], "tags": [],
@@ -1896,8 +1906,10 @@ notes.
  "summary": {"current": 10, "due_soon": 0, "expired": 1}}
 ```
 
-`--area`, `--kind` and `--expired` filter `notes`. Exit 0; exit 1 only if
-a note fails validation.
+`--area`, `--kind` and `--expired` filter `notes`; `summary` and `areas`
+always cover every note. `claims` counts current claims; `cited_by` counts
+the files, other than the note itself, that cite any of its claims. Exit
+0; exit 1 only if a note fails validation.
 
 **`research show REF`**: REF is a note id (data block, status, path) or a
 claim ref (claim, its sources in full, its note's status, and the local
@@ -1906,8 +1918,24 @@ note superseding it, if any). Unknown REF exits 1.
 **`research cites [--unresolved]`**: every reference found by the scan as
 `{ref, path, line, scope, resolved, retired}`.
 
+**`research validate`**: `{valid, notes: [{id, kind, path}]}`; exit 1 with
+one detail per problem when any note is invalid.
+
+**Checks** (`coach/checks/research.py`; all four `skip` when there is no
+`research/` directory): `research_notes` (fail per invalid note, warn per
+`updates` entry that no longer resolves), `research_citations` (the
+citation scan table above; a ref into a note that fails validation is left
+to `research_notes`), `research_render_fresh` (fail per valid note whose
+region is missing, malformed or stale), `research_expiry` (warn per
+`expired` area).
+
 **`research render [ID] [--dry-run]`**: renders one note's region, or all
-notes' regions with no ID. Writes nothing else.
+notes' regions with no ID. Writes nothing else. A note with no region
+gets one inserted directly after the data block. `data`: `{dry_run,
+notes: [{id, path, changed}]}`. The region holds no date-dependent text
+(the status line names kind, dates, confidence, areas, tags and
+`updates`, not `current` or `expired`), so it goes stale only when the
+data block changes.
 
 **Python interface** (`coach/research.py`):
 
@@ -1916,12 +1944,16 @@ notes' regions with no ID. Writes nothing else.
 - `resolve(ref, notes) -> Claim | None` (None when missing or retired)
 - `note_status(note, today) -> "current" | "due_soon" | "expired"`
 - `expired_by_area(root, today) -> dict[str, list[str]]`: each `expired`
-  area (area status above) to the ids of its expired notes; other areas
-  are absent.
+  area (area status above) to the ids of the expired notes no current
+  local note covers; other areas are absent.
 - `local_updates(root, today) -> dict[str, str]`: template claim ref to the
   id of the current local note superseding it.
+- Both read only the notes that pass validation, so one broken note never
+  stops a proposal; `coach check` reports the broken one.
 - `scan_citations(root) -> list[Citation]`
-- `render_research(id) -> str` (C11)
+- `render_research(root, id) -> str` (C11; the region with its markers
+  and no trailing newline). It takes the root like every other function
+  here, because the note's path depends on it.
 
 **Proposals and expired notes (for R-23a).** A proposal decision is
 evidence-backed only when every claim it cites resolves and its area is
