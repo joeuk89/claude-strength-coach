@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from coach import dates, nutrition, paths
+from coach import dates, nutrition, paths, protein, units
 from coach.commands import arg, command
 from coach.errors import ConfigError, ValidationError
 
@@ -27,6 +27,84 @@ def _date(text):
               "also the brief line and the food questions")
 def status(args, ctx):
     return nutrition.status(ctx.root, ctx.today())
+
+
+def _positive(name, value):
+    if value is not None and value <= 0:
+        raise ValidationError(f"{name} must be more than 0, found {value:g}")
+
+
+def _fresh(series, today, field, unit=None):
+    """The newest reading from the last STALE_AFTER_DAYS that sets `field`, as (value, where from), or None."""
+    for reading in reversed(series):
+        if (today - dates.parse_date(reading["date"])).days > nutrition.STALE_AFTER_DAYS:
+            return None
+        value = reading[field] if unit is None or reading["weight_unit"] == unit else None
+        if value is not None:
+            return value, f"reading {reading['date']}"
+    return None
+
+
+def _given(value, fallback, **extra):
+    if value is not None:
+        return {"value": units.json_number(value), **extra, "from": "flag"}
+    if fallback is None:
+        return None
+    return {"value": units.json_number(fallback[0]), **extra, "from": fallback[1]}
+
+
+def _value(given):
+    return None if given is None else given["value"]
+
+
+@command(
+    "nutrition targets",
+    help="The protein reference mass and the floor, target and stretch set from it; names any input still missing",
+    args=(
+        arg("--bodyweight", type=float, metavar="X", help="bodyweight in [athlete] bodyweight_units (default: the "
+            "newest reading's weight from the last 14 days)"),
+        arg("--goal-weight", type=float, metavar="X", help="goal weight (default: [nutrition] goal_weight)"),
+        arg("--body-fat", type=float, metavar="PCT", help="a body-fat reading, in %%; needs --body-fat-source"),
+        arg("--body-fat-source", choices=("credible", "rough"), help="credible: DEXA, a BodPod, underwater "
+            "weighing or skinfolds by an experienced tester, from the last ~3 months; rough: anything else, such "
+            "as a smart scale or a tape method"),
+        arg("--sex", choices=tuple(protein.HIGH_BODY_FAT_PCT), help="judges a rough body-fat reading"),
+        arg("--height", type=float, metavar="N", help="for BMI when there is no body-fat reading"),
+        arg("--height-unit", choices=units.HEIGHT_UNITS, help="default: cm with kg bodyweight, in with lb"),
+        arg("--recent-intake", type=float, metavar="G", help="recent average protein a day, g (default: the newest "
+            "reading's 7-day average from the last 14 days)"),
+    ),
+)
+def targets(args, ctx):
+    if (args.body_fat is None) != (args.body_fat_source is None):
+        raise ValidationError("--body-fat and --body-fat-source go together: give both or neither")
+    if args.body_fat is not None and not 0 < args.body_fat < 100:
+        raise ValidationError(f"--body-fat is a percentage between 0 and 100, found {args.body_fat:g}")
+    for name, value in (("--bodyweight", args.bodyweight), ("--goal-weight", args.goal_weight),
+                        ("--height", args.height), ("--recent-intake", args.recent_intake)):
+        _positive(name, value)
+
+    unit = ctx.config["athlete"]["bodyweight_units"]
+    goal_on_file = (ctx.config.get("nutrition") or {}).get("goal_weight")
+    series = nutrition.readings(ctx.root)
+    today = ctx.today()
+    weight = _fresh(series, today, "trend_weight", unit) or _fresh(series, today, "scale_weight", unit)
+    inputs = {
+        "bodyweight": _given(args.bodyweight, weight, unit=unit),
+        "goal_weight": _given(args.goal_weight, None if goal_on_file is None else (goal_on_file, "config"),
+                              unit=unit),
+        "body_fat": None if args.body_fat is None else {"pct": units.json_number(args.body_fat),
+                                                        "source": args.body_fat_source},
+        "sex": args.sex,
+        "height_m": None if args.height is None else units.height_m(
+            args.height, args.height_unit or ("cm" if unit == "kg" else "in")),
+        "recent_intake_g": _given(args.recent_intake, _fresh(series, today, "avg_protein_g")),
+    }
+    result = protein.targets(unit=unit, bodyweight=_value(inputs["bodyweight"]),
+                             goal_weight=_value(inputs["goal_weight"]), body_fat_pct=args.body_fat,
+                             body_fat_source=args.body_fat_source, sex=args.sex, height_m=inputs["height_m"],
+                             recent_intake_g=_value(inputs["recent_intake_g"]))
+    return {"inputs": inputs, **result}
 
 
 @command("nutrition readings", help="The nutrition readings series, oldest first",

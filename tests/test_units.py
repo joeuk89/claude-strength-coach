@@ -204,9 +204,13 @@ class MassAndEnergyTest(unittest.TestCase):
         self.assertEqual(units.energy_kcal(350, "kcal"), 350)
         self.assertEqual(units.energy_kcal(4184, "kJ"), 1000)
 
+    def test_height_m(self):
+        self.assertEqual(units.height_m(180, "cm"), 1.8)
+        self.assertEqual(units.height_m(71, "in"), 1.803)
+
     def test_rejects_unknown_units(self):
         for call in (lambda: units.mass_kg(12, "st"), lambda: units.energy_kcal(5, "Cal"),
-                     lambda: units.mass_kg(-1, "kg")):
+                     lambda: units.mass_kg(-1, "kg"), lambda: units.height_m(6, "ft")):
             with self.subTest(call=call), self.assertRaises(ValueError):
                 call()
 

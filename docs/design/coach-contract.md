@@ -77,6 +77,7 @@ coach/                       # framework: synced to instances
   structure.py               # dose targets, structure accounting, priority, minimum week (R-30a, R-30b)
   block.py                   # block ledger, light weeks, status line                    (R-31)
   nutrition.py               # nutrition config, readings, status                        (R-33a)
+  protein.py                 # protein reference mass, floor, target, stretch            (R-33a)
   recipes.py                 # recipe cards, index, import                               (R-33b)
   meals.py                   # meal plans, shopping list                                 (R-33c)
   log.py, sheets.py          # manual log and session sheets                             (R-40c)
@@ -217,6 +218,7 @@ Phase 2 to 4 command inventory. No command here writes to Hevy.
 | `block status` | R-31 | |
 | `block close --week W [--readiness poor\|ok] [--sleep poor\|ok] [--deep]`, `block decide --outcome adopted\|declined [--type deload\|light\|return] [--week W] [--reason T]`, `block init --hard-weeks N [--through W] [--started D] [--reason T]` | R-31 | W |
 | `nutrition status`, `nutrition readings [--last N]` | R-33a | |
+| `nutrition targets [--bodyweight X] [--goal-weight X] [--body-fat PCT --body-fat-source credible\|rough] [--sex male\|female] [--height N [--height-unit cm\|in]] [--recent-intake G]` | R-33a | |
 | `nutrition record`, `nutrition import --input FILE` | R-33a | W |
 | `recipes list`, `recipes show`, `recipes validate`, `recipes import --html FILE`, `recipes draft --input FILE` | R-33b | |
 | `recipes render [SLUG]`, `recipes convert (--parse \| --apply --input FILE)` | R-33b | W (`--parse` writes nothing; one command, so it carries `writes`) |
@@ -3633,6 +3635,41 @@ dates unique:
   until D | what, from D | expired D>`; with no reading it says "no
   reading yet", with no protein figure "last week not tracked". With a
   `plan`, the line ends ` · plan: <path>` (R-33c).
+- `nutrition targets` (`coach/protein.py`) computes the protein numbers
+  `/goals` quotes; it reads, never writes, and runs with nutrition off. Inputs: each flag, else bodyweight from the newest reading of the
+  last 14 days in `bodyweight_units` (`trend_weight`, else
+  `scale_weight`), recent intake from the newest such reading's
+  `avg_protein_g`, and goal weight from `[nutrition] goal_weight`.
+  `--height-unit` defaults to cm with kg bodyweight and in with lb.
+  `--body-fat` and `--body-fat-source` come together; a bad value exits 1.
+  Data: `inputs` (`bodyweight` and `goal_weight` as `{value, unit,
+  from}`, `recent_intake_g` as `{value, from}`, `from` being `flag`,
+  `config` or `reading D`; `body_fat` `{pct, source}`; `sex`;
+  `height_m`; each null when absent), `reference`, `protein` and
+  `missing`.
+  - `reference`: `{basis, mass, unit, mass_kg, reason, refs, bmi}`. The
+    first rule that applies: a credible reading gives `fat_free_mass`
+    (bodyweight × (1 − body fat)); high body fat gives `goal_weight`;
+    otherwise `bodyweight`. Body fat is high on a rough reading above 25 %
+    for `male` or 35 % for `female`; with no reading, when the goal weight
+    is 10 % or more below bodyweight or BMI (to 0.1) is 30 or more. `bmi`
+    is null without a height. `basis` takes the `reference_basis` values.
+  - `protein`: `target` `{g, g_per_kg, refs}`, `stretch` `{g, g_high,
+    g_per_kg, g_per_kg_high, refs}` and `floor` `{g, g_min, g_per_kg_min,
+    from_intake_g, clamped, refs}`, computed from `mass` as shown.
+    Target 1.6 g/kg and stretch 2.2, or with fat-free mass target 2.0
+    and stretch 2.6 to 2.8 (`g` and `g_high`), each rounded to the nearest
+    5 g. `g_min` is 1.2 g/kg (1.5 of fat-free mass) rounded up to 5 g.
+    The floor is the first 5 g step at or above recent intake + 15 g,
+    raised to `g_min` (`clamped: "min"`) or cut to the target (`clamped:
+    "target"`); `g` and `from_intake_g` are null with no intake. Null
+    when `reference` is.
+  - `missing`: `{input, flag, why}` for each input the rules still need,
+    in order: `bodyweight`, then the one the basis needs next (`sex`,
+    `height` or `goal_weight`), then `recent_intake`. Nothing is guessed.
+  - `refs` are `rn:protein-energy-deficit` claims: 3 with 4 (a rough
+    reading) or 5 (no reading) for the basis; 1, 2 and 6 (fat-free mass)
+    for target and stretch; 8 and 7 for the floor.
 - Readers: R-25 reads C4 `phase` and may read C35 weights for
   `progress.md`'s bodyweight trend; R-40a reads `[nutrition] enabled` and
   writes the table at setup.
