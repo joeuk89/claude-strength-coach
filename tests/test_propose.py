@@ -274,6 +274,17 @@ class LayoffCase(ProposeCase):
     base = INSTANCES / "layoff"
     synced = False
 
+    def log_pull_up_loads(self, mode, loads):
+        """Every logged pull-up's working sets at `loads`, in order, as `mode` loads."""
+        def edit(doc):
+            for workout in doc["workouts"]:
+                for exercise in workout["exercises"]:
+                    if exercise["exercise_id"] == "pull_up":
+                        exercise["load_mode"] = mode
+                        for set_, value in zip(exercise["sets"], loads):
+                            set_.update(weight_kg=float(value), load=units.make_load(value, mode, "kg"))
+        self.edit_json("data/history/2026-09.json", edit)
+
 
 class LayoffTest(LayoffCase):
     def test_hold_applies_the_22_42_band_and_raises_return_week(self):
@@ -286,8 +297,13 @@ class LayoffTest(LayoffCase):
         self.assertIn("return_week", codes(doc, "bb_back_squat"))
         message = next(f["message"] for f in doc["flags"] if f["code"] == "return_week"
                        and f["exercise_id"] == "bb_back_squat")
-        self.assertIn("28 days off", message)
-        self.assertIn("22-42", message)
+        self.assertIn("28 days off: return band 22-42 (loads × 0.9, set change -1)", message)
+
+    def test_mixed_added_loads_round_down_below_the_derived_from_load(self):
+        self.log_pull_up_loads("bodyweight", (20, 18.75, 18.75))
+        self.set_scheme("session-b", "pull_up", "double_progression")
+        line = find_line(self.propose("--dry-run")["overlay"], "pull_up")
+        self.assertEqual([coaching(s["load"]) for s in working(line)], [17.5, 17.5])
 
     def test_every_proposal_passes_the_prescription_check(self):
         data = self.propose()
@@ -332,6 +348,27 @@ class AssistedLayoffCase(LayoffCase):
 
 
 class AssistedReturnTest(AssistedLayoffCase):
+    def test_mixed_assistance_rounds_up_to_keep_the_least_logged_assistance(self):
+        self.log_pull_up_loads("assisted", (20, 18.75, 18.75))
+        self.set_scheme("session-b", "pull_up", "double_progression")
+        data = self.propose()
+        line = find_line(data["overlay"], "pull_up")
+        self.assertEqual([coaching(s["load"]) for s in working(line)], [20, 20])
+        self.assertEqual(self.pull_up_check(data), [])
+
+    def test_a_cap_still_wins_over_rounding_assistance_up(self):
+        self.log_pull_up_loads("assisted", (20, 18.75, 18.75))
+        self.set_scheme("session-b", "pull_up", "double_progression")
+        self.set_config("[caps]", "[caps]\npull_up = 19")
+        line = find_line(self.propose("--dry-run")["overlay"], "pull_up")
+        self.assertEqual([coaching(s["load"]) for s in working(line)], [17.5, 17.5])
+
+    def test_the_return_week_flag_says_the_assistance_is_held(self):
+        self.set_scheme("session-b", "pull_up", "double_progression")
+        doc = self.propose("--dry-run")["overlay"]
+        [message] = [f["message"] for f in doc["flags"] if f["code"] == "return_week" and f["exercise_id"] == "pull_up"]
+        self.assertEqual(message, "31 days off: return band 22-42 (assistance held, set change -1)")
+
     def test_a_double_progression_line_in_the_22_42_band_keeps_its_assistance(self):
         self.set_scheme("session-b", "pull_up", "double_progression")
         data = self.propose()
