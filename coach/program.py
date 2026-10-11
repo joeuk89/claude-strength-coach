@@ -57,8 +57,8 @@ def normalised(doc):
     """A copy of a schema-valid program with absent optional keys filled.
 
     Session `location` null, `dose_targets` {}, `priority` [] with each KPI's
-    `target` and `by` null and each floor 2 sets at the prescribed RPE, and
-    `minimum_week` null.
+    `target` and `by` null and each floor 2 sets at the prescribed RPE
+    (rn:minimum-effective-dose.4), and `minimum_week` null.
     """
     doc = copy.deepcopy(doc)
     doc.setdefault("dose_targets", {})

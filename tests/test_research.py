@@ -4,7 +4,7 @@ import unittest
 from datetime import date
 from pathlib import Path
 
-from coach import jsonio, missed, research, stats, structure
+from coach import jsonio, missed, program, research, stats, structure
 from coach.validate import check_schema
 from tests.support import INSTANCES, MINIMAL_CONFIG, REPO_ROOT, VALID, TempInstance, run_cli, run_module
 
@@ -315,10 +315,19 @@ class TemplateRepoTest(unittest.TestCase):
         c37 = contract.split("## C37.", 1)[1].split("\n## C38.", 1)[0]
         self.assertIn("rn:minimum-effective-dose.5", c37)
 
+    def test_the_priority_floor_default_cites_its_claim(self):
+        self.assertIn("rn:minimum-effective-dose.4", program.normalised.__doc__)
+        contract = (REPO_ROOT / "docs/design/coach-contract.md").read_text(encoding="utf-8")
+        c40 = contract.split("## C40.", 1)[1].split("\n## C41.", 1)[0]
+        self.assertIn("`floor.sets` default 2 (rn:minimum-effective-dose.4)", c40)
+        cited = {c.ref for c in research.scan_citations(REPO_ROOT) if c.path == "coach/program.py"}
+        self.assertIn("rn:minimum-effective-dose.4", cited)
+
     def test_dose_default_values_are_unchanged(self):
         self.assertEqual((structure.DEFAULT_TARGET, structure.SESSION_CEILING), (10, 11.0))
         self.assertEqual(stats.SECONDARY_WEIGHT, 0.5)
         self.assertEqual(missed.DEFAULT_FOLD_SETS, 2)
+        self.assertEqual(program._FLOOR_DEFAULTS, {"sets": 2, "rpe": None})
 
 
 class NoteValidationTest(InstanceCase):

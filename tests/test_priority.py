@@ -269,11 +269,91 @@ class RuleOrderTest(FloorCase):
         self.assertTrue(data["record_lines"][1].startswith(f"- Rules miss-a and {FLOOR_ID}: Bench Press (Dumbbell) 1×8–10"))
         self.data("overlay", "validate", data["overlay_id"])
 
-    def test_a_fold_carrying_the_lift_needs_no_floor(self):
-        self.set_rule({"kind": "fold", "into": "next", "exercises": [{"exercise_id": SQUAT, "sets": 3}]})
+    def test_a_fold_carrying_the_lift_at_the_floor_or_more_needs_no_floor(self):
+        for sets in (2, 3):
+            with self.subTest(sets=sets):
+                self.set_rule({"kind": "fold", "into": "next", "exercises": [{"exercise_id": SQUAT, "sets": sets}]})
+                data = self.plan()
+                self.assertEqual((data["rule"]["id"], data["floor_rule"]), ("miss-a", None))
+                self.assertEqual(self.folds(data["draft"]), [("2026-10-15", SQUAT, "miss-a")])
+                self.assertEqual(len(self.working(data["draft"], SQUAT)), sets)
+                self.assertEqual(data["flags"], [])
+
+    def working(self, draft, exercise_id):
+        return [(s.get("reps"), s["load"]["hevy_total"], s["rpe"]) for session in draft["sessions"]
+                for line in session["exercises"] if line.get("fold") and line["exercise_id"] == exercise_id
+                for s in line["sets"] if overlay.is_working(s)]
+
+    def test_a_fold_carrying_the_lift_short_is_topped_up_to_the_floor(self):
+        self.set_rule({"kind": "fold", "into": "next", "exercises": [{"exercise_id": SQUAT, "sets": 1},
+                                                                       {"exercise_id": "db_bench_press", "sets": 1}]})
+        data = self.plan()
+        self.assertEqual((data["matched"], data["rule"]["id"], data["floor_rule"]["id"]), (True, "miss-a", FLOOR_ID))
+        self.assertEqual(self.folds(data["draft"]),
+                         [("2026-10-15", SQUAT, "miss-a"), ("2026-10-15", "db_bench_press", "miss-a")])
+        self.assertEqual(self.working(data["draft"], SQUAT), [(5, 100, 7)] * 2)
+        self.assertEqual(len(self.working(data["draft"], "db_bench_press")), 1)
+        self.assertEqual(data["summary"][0],
+                         f"Missed Mon 12 Oct Session A; rule miss-a applies (fold), with the priority floor {FLOOR_ID}.")
+        self.assertTrue(data["summary"][1].startswith("Back Squat (Barbell) 2×5"), data["summary"][1])
+        floor_flags = [f["message"] for f in data["draft"]["flags"]
+                       if f["code"] == "missed_day_rule" and f["message"].startswith(f"Rule {FLOOR_ID}")]
+        self.assertEqual(floor_flags, [f"Rule {FLOOR_ID}: Back Squat (Barbell) from Mon 12 Oct Session A topped up "
+                                       f"to 2 sets, this week only."])
+        self.assertEqual(data["flags"], [])
+
+    def test_a_short_fold_topped_up_writes_one_record_line_naming_both_rules(self):
+        self.set_rule({"kind": "fold", "into": "session-b", "exercises": [{"exercise_id": SQUAT, "sets": 1}]})
+        data = self.data("missed", "apply", "--session", "session-a", "--date", "2026-10-12")
+        self.assertTrue(data["record_lines"][1].startswith(f"- Rules miss-a and {FLOOR_ID}: Back Squat (Barbell) 2×5"),
+                        data["record_lines"][1])
+        doc = overlay.load(self.root, data["overlay_id"])
+        self.assertEqual(len(self.working(doc, SQUAT)), 2)
+        self.data("overlay", "validate", data["overlay_id"])
+
+    def test_a_short_fold_that_carries_every_prescribed_set_needs_no_floor(self):
+        def one_working_set(doc):
+            squat = next(line for line in doc["sessions"][0]["exercises"] if line["exercise_id"] == SQUAT)
+            squat["sets"] = squat["sets"][:2]
+        self.edit_overlay(one_working_set)
+        self.set_rule({"kind": "fold", "into": "next", "exercises": [{"exercise_id": SQUAT, "sets": 1}]})
         data = self.plan()
         self.assertEqual((data["rule"]["id"], data["floor_rule"]), ("miss-a", None))
-        self.assertEqual(self.folds(data["draft"]), [("2026-10-15", SQUAT, "miss-a")])
+        self.assertEqual(self.working(data["draft"], SQUAT), [(5, 100, 7)])
+        self.assertEqual(data["flags"], [])
+
+    def test_a_top_up_that_cannot_be_placed_leaves_the_fold_and_raises_the_flag(self):
+        self.set_priority(priority_entry(), priority_entry("db_bench_press"))
+        self.set_rule({"kind": "fold", "into": "next", "exercises": [{"exercise_id": SQUAT, "sets": 1}]})
+
+        def bench_warm_ups_only(doc):
+            bench = next(line for line in doc["sessions"][0]["exercises"] if line["exercise_id"] == "db_bench_press")
+            for set_ in bench["sets"]:
+                set_["type"] = "warmup"
+        self.edit_overlay(bench_warm_ups_only)
+        data = self.plan()
+        self.assertEqual((data["matched"], data["rule"]["id"], data["floor_rule"]), (True, "miss-a", None))
+        self.assertEqual(self.working(data["draft"], SQUAT), [(5, 100, 7)])
+        self.assertEqual(codes(data["flags"]), ["priority_exposures_missed"] * 2)
+        self.assertEqual(data["flags"][0]["exercise_id"], SQUAT)
+
+    def test_a_short_lift_and_a_left_out_lift_share_one_floor_rule(self):
+        self.set_priority(priority_entry(), priority_entry("db_bench_press"))
+        self.set_rule({"kind": "fold", "into": "next", "exercises": [{"exercise_id": SQUAT, "sets": 1}]})
+        data = self.plan()
+        both = "priority:bb_back_squat+db_bench_press"
+        self.assertEqual(data["floor_rule"]["id"], both)
+        self.assertEqual(self.folds(data["draft"]),
+                         [("2026-10-15", SQUAT, "miss-a"), ("2026-10-15", "db_bench_press", both)])
+        self.assertEqual(len(self.working(data["draft"], SQUAT)), 2)
+        self.assertEqual(len(self.working(data["draft"], "db_bench_press")), 2)
+        self.assertEqual(data["flags"], [])
+
+    def test_the_top_up_takes_the_floor_rpe_not_the_folds_cap(self):
+        self.set_rule({"kind": "fold", "into": "next", "exercises": [{"exercise_id": SQUAT, "sets": 1, "rpe": 6}]})
+        self.assertEqual(self.working(self.plan()["draft"], SQUAT), [(5, 100, 6), (5, 100, 7)])
+        self.set_priority(priority_entry(floor={"sets": 3, "rpe": 5}))
+        self.assertEqual(self.working(self.plan()["draft"], SQUAT), [(5, 100, 6), (5, 100, 5), (5, 100, 5)])
 
     def test_only_the_lifts_the_fold_leaves_out_get_the_floor(self):
         self.set_priority(priority_entry(), priority_entry("db_bench_press"))

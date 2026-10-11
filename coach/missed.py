@@ -151,7 +151,10 @@ def _later_sessions(doc, day):
 
 
 def _fold(doc, missed, day, rule, names, today):
-    """(sessions after the miss with the fold applied, flags) for a `fold` rule."""
+    """(sessions after the miss with the fold applied, flags) for a `fold` rule.
+
+    A lift an earlier rule already folded from this miss is topped up in its line, up to the item's sets.
+    """
     action = rule["action"]
     later = copy.deepcopy(_later_sessions(doc, day))
     targets = [s for s in later
@@ -168,11 +171,17 @@ def _fold(doc, missed, day, rule, names, today):
         working = [s for s in line["sets"] if overlay.is_working(s)]
         if not working:
             raise Unmatched(f"{names.exercise(item['exercise_id'])} has no working sets to fold")
-        sets = copy.deepcopy(working[:min(item.get("sets", DEFAULT_FOLD_SETS), len(working))])
-        cap = item.get("rpe")
-        if cap is not None:
-            for set_ in sets:
-                set_["rpe"] = cap if set_.get("rpe") is None else min(set_["rpe"], cap)
+        wanted = min(item.get("sets", DEFAULT_FOLD_SETS), len(working))
+        earlier = _folded_line(later, missed, line["exercise_id"])
+        if earlier is not None:
+            session, folded = earlier
+            folded["sets"] += _capped(working[len(folded["sets"]):wanted], item.get("rpe"))
+            found_flags.append(flags.make("missed_day_rule", session_id=session["session_id"],
+                                          exercise_id=line["exercise_id"], message=(
+                f"Rule {rule['id']}: {names.exercise(line['exercise_id'])} from {render.day_label(missed['date'])} "
+                f"{missed['title']} topped up to {_sets_words(len(folded['sets']))}, this week only.")))
+            continue
+        sets = _capped(working[:wanted], item.get("rpe"))
         folded = dict(copy.deepcopy(line), sets=sets, superset_id=None, override=None, change=None, fold={
             "rule_id": rule["id"], "from_session_id": missed["session_id"], "from_date": missed["date"],
             "scope": SCOPE})
@@ -184,6 +193,25 @@ def _fold(doc, missed, day, rule, names, today):
             f"Rule {rule['id']}: {_sets_words(len(sets))} of {names.exercise(line['exercise_id'])} from "
             f"{render.day_label(missed['date'])} {missed['title']}, this week only.")))
     return later, found_flags
+
+
+def _capped(sets, cap):
+    sets = copy.deepcopy(sets)
+    if cap is not None:
+        for set_ in sets:
+            set_["rpe"] = cap if set_.get("rpe") is None else min(set_["rpe"], cap)
+    return sets
+
+
+def _folded_line(sessions, missed, exercise_id):
+    """(session, line) where an earlier rule already folded `exercise_id` from this miss, or None."""
+    for session in sessions:
+        for line in session["exercises"]:
+            fold = line.get("fold")
+            if (fold and line["exercise_id"] == exercise_id and fold["from_session_id"] == missed["session_id"]
+                    and fold["from_date"] == missed["date"]):
+                return session, line
+    return None
 
 
 def _shift(doc, missed, day, rule, config, today):
@@ -279,10 +307,11 @@ def _build(root, doc, session_id, day, rules, now, config, library):
     return built
 
 
-def _left_out(floor_rule, rule, applied):
-    """The part of the priority floor rule the program's rule leaves out of the week, or None.
+def _left_out(floor_rule, rule, applied, missed):
+    """The part of the priority floor rule the program's rule leaves out of the week or short, or None.
 
-    A shift that applied takes every lift with the session; a fold that applied covers the lifts it lists.
+    A shift that applied takes every lift with the session. A fold that applied covers a lift it carries at the
+    floor's sets or more, or at every working set prescribed; a lift it carries at fewer is short.
     """
     if floor_rule is None:
         return None
@@ -290,8 +319,16 @@ def _left_out(floor_rule, rule, applied):
         return floor_rule
     if rule["action"]["kind"] == "shift":
         return None
-    folded = {item["exercise_id"] for item in rule["action"]["exercises"]}
-    left = [item for item in floor_rule["action"]["exercises"] if item["exercise_id"] not in folded]
+    folded = {item["exercise_id"]: item.get("sets", DEFAULT_FOLD_SETS) for item in rule["action"]["exercises"]}
+
+    def covered(item):
+        if item["exercise_id"] not in folded:
+            return False
+        line = next(e for e in missed["exercises"] if e["exercise_id"] == item["exercise_id"])
+        prescribed = sum(1 for s in line["sets"] if overlay.is_working(s))
+        return folded[item["exercise_id"]] >= min(item["sets"], prescribed)
+
+    left = [item for item in floor_rule["action"]["exercises"] if not covered(item)]
     if not left:
         return None
     return dict(floor_rule, id=structure.floor_rule_id([item["exercise_id"] for item in left]),
@@ -395,7 +432,8 @@ def plan(root, session_id, day, now=None):
     except Unmatched as why:
         reason = why
 
-    floor_rule = _left_out(structure.priority_floor(root, session_id, day, doc, program_doc), rule, reason is None)
+    floor_rule = _left_out(structure.priority_floor(root, session_id, day, doc, program_doc), rule, reason is None,
+                           missed)
     floor_flags, added = [], None
     if floor_rule is not None:
         try:
