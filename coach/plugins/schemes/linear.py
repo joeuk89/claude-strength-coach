@@ -1,4 +1,11 @@
-"""Linear: add the increment after every exposure that hits its prescribed reps; reset after repeated misses."""
+"""Linear: add the increment after every exposure that hits its prescribed reps; reset after repeated misses.
+
+State `misses` counts the missed exposures running through `through`. A
+count at the reset threshold is kept, so the reset is proposed again until
+an exposure after `through` is judged; that exposure starts a new count. An
+`incomplete` exposure holds the load and leaves the count alone: a set that
+was never logged is not a failed attempt.
+"""
 
 from datetime import date
 
@@ -46,12 +53,18 @@ def propose(ctx):
 
     through = ctx.state.get("through")
     misses = ctx.state.get("misses", 0)
-    for exposure in base.usable_oldest_first(ctx.exposures, date.fromisoformat(through) if through else None):
+    limit = ctx.params["misses_before_reset"]
+    judged = base.usable_oldest_first(ctx.exposures, date.fromisoformat(through) if through else None)
+    if judged and misses >= limit:
+        misses = 0
+    for exposure in judged:
         missed = base.missed(exposure)
-        misses = misses + 1 if missed is True else 0
+        if missed:
+            misses += 1
+        elif not base.incomplete(exposure):
+            misses = 0
     state = {"misses": misses, "through": source.date.isoformat()}
     load = source.top_load
-    limit = ctx.params["misses_before_reset"]
     if load is None:
         return base.Proposal(sets=base.with_load(sets, load), rationale="Linear: the last exposure logged no load",
                              derived_from=source, state=state)
@@ -62,7 +75,6 @@ def propose(ctx):
     if misses >= limit:
         factor = ctx.params["reset_factor"]
         new_load = load * factor
-        state["misses"] = 0
         review = ()
         if (ctx.slot.start_load is not None
                 and (new_load - ctx.slot.start_load) * ctx.exercise.load_direction < 0):
@@ -75,6 +87,8 @@ def propose(ctx):
                        f"{base.number(factor * 100)} % of {base.load_words(ctx, load)}"),
             derived_from=source, state=state, round_down=True, flags=review,
         )
+    if base.incomplete(source) and not base.missed(source):
+        return _incomplete(ctx, sets, source, load, misses, limit, state)
     if misses:
         return base.Proposal(
             sets=base.with_load(sets, load),
@@ -88,6 +102,21 @@ def propose(ctx):
         rationale=(f"Linear: every prescribed rep was hit on {source.date.isoformat()}, so "
                    f"{base.load_words(ctx, load)} goes to {base.load_words(ctx, new_load)}"),
         derived_from=source, state=state,
+    )
+
+
+def _incomplete(ctx, sets, source, load, misses, limit, state):
+    logged, wanted = len(base.working(source.sets)), len(base.working(source.prescribed))
+    when = source.date.isoformat()
+    standing = f"; miss {misses} of {limit} stands" if misses else ""
+    flag = base.flag(ctx, "incomplete_exposure", (
+        f"{ctx.exercise.name}: {logged} of {wanted} prescribed working sets logged on {when}, so the load holds and "
+        "no miss is counted (a coaching heuristic); confirm whether the missing sets were skipped or failed"))
+    return base.Proposal(
+        sets=base.with_load(sets, load),
+        rationale=(f"Linear: {logged} of {wanted} prescribed working sets logged on {when} and none fell short, so "
+                   f"{base.load_words(ctx, load)} holds{standing}"),
+        derived_from=source, state=state, flags=(flag,),
     )
 
 

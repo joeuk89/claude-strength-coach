@@ -91,6 +91,10 @@ and the rotation position, and settle its flags:
   --reason "<why>"`, which resolves the flag. At warn, a core conditioning
   session stayed: agree whether to ease or move it, then resolve the
   flag (step 4).
+- `incomplete_exposure` (fewer sets logged than prescribed, none short):
+  the load holds and no miss counts. Ask whether the missing sets were
+  skipped or failed. A failed set is a miss: when it reaches the line's
+  `misses_before_reset`, override the line to the reset load (step 3).
 - `no_data` (set the first load with the athlete), `stalled`,
   `constraint_applied`, `override_standing`, `scheme_reset`,
   `rotation_unconfirmed` (state the position for confirmation, as
@@ -106,7 +110,9 @@ default) when the change should hold in later weeks — a niggle, an
 agreed hold — so the scheme stops proposing it away. A per-exercise
 **focus** drawn from check-in findings ("slow the eccentric") may go
 into the draft line, with an `override` reason saying why; any line
-changed without a reason is refused.
+changed without a reason is refused. An override onto another rung of
+an assistance ladder moves the ladder to that rung once the week is
+approved.
 
 Niggle limits are already in the proposal: `propose week` applies each
 active niggle's constraints to every matching line and names the niggle
@@ -136,7 +142,8 @@ override goes in the next check-in's adherence decision line.
 
 `python3 -m coach propose finalize --proposal <id>` writes
 `data/overlays/<id>.json`. Exit 1 names each line changed without an
-override reason; exit 3 names each unresolved `block` flag. Then go to
+override reason; exit 3 names each unresolved `block` flag. A refused
+finalize writes nothing: fix what it names and run it again. Then go to
 build.md with that id, starting at "Where it renders". A tweak to the
 coach's brief later means: override or resolve in the draft, finalize
 again, then check and render again.

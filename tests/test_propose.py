@@ -282,11 +282,11 @@ class LinearTest(ProposeCase):
         self.assertLessEqual(87.5, 97.5 * 0.9)
         meta = read_json(self.root / ".coach" / "proposals" / f"{FIRST_ID}.meta.json")
         self.assertEqual(meta["scheme_state"]["session-a/bb_back_squat"],
-                         {"scheme": "linear", "data": {"misses": 0, "through": "2026-10-05"}})
+                         {"scheme": "linear", "data": {"misses": 2, "through": "2026-10-05"}})
         self.coach("propose", "finalize", "--proposal", FIRST_ID)
         state = read_json(self.root / "data" / "state.json")
         self.assertEqual(state["scheme_state"]["session-a/bb_back_squat"]["pending"],
-                         {"overlay_id": FIRST_ID, "data": {"misses": 0, "through": "2026-10-05"}})
+                         {"overlay_id": FIRST_ID, "data": {"misses": 2, "through": "2026-10-05"}})
 
 
 class LinearOneMissTest(ProposeCase):

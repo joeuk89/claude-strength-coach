@@ -2354,6 +2354,7 @@ Reserved codes:
 | `no_data` | warn | R-23a | | No usable exposure and no start load; load left empty for the coach. |
 | `stalled` | warn | R-23a | | No metric or matched-work effort gain over three comparable slot exposures; a coaching heuristic, not a diagnosis. Suppressed when the final proposal advances load. |
 | `prescription_unknown` | warn | R-23a | | Historical prescription unknown; no prescribed hit or miss inferred. Prescription validation still runs. |
+| `incomplete_exposure` | warn | R-23a | | Fewer working sets logged than prescribed and none fell short: linear holds the load and counts no miss (a coaching heuristic); confirm whether the sets were skipped or failed. |
 | `linear_below_start` | info | R-23a | | Linear reset fell below the starting load; review progression without automatic adjustment. |
 | `rpe_drift` | warn | R-23a | | Compound or recovery-capped exercise: logged RPE at least 1 over target on two or more working sets of the last exposure. |
 | `range_effort_mismatch` | warn | R-23a | | Double progression held a load whose derived-from exposure had a working set below its set group's rep range or 2 or more RPE over target; review a lighter load or a different rep range. |
@@ -2583,6 +2584,7 @@ CITES = ()                           # template research claim refs, e.g. ("rn:d
 def propose(ctx: SchemeContext) -> Proposal                          # schemes
 def decay(ctx: SchemeContext, proposal: Proposal, days_off: int) -> Proposal   # schemes; may return base.default_decay(...)
 def deload(ctx: SchemeContext, proposal: Proposal) -> Proposal       # schemes, optional (used by the `scheme` transform)
+def override_state(params: dict, state: dict, sets: tuple[SetSpec, ...]) -> dict  # schemes, optional (used by finalize)
 def plan(ctx: ScheduleContext) -> SchedulePlan                       # schedules
 def apply(ctx: SchemeContext, proposal: Proposal) -> Proposal        # transforms
 ```
@@ -2712,7 +2714,11 @@ and `plugins test` runs them. Loaded with
   `pending`; the next `propose week` promotes `pending` to `data` when
   that overlay is approved with a matching hash, and drops it otherwise.
   A deload run writes no pending state: a deload never advances a
-  scheme.
+  scheme. When the slot's latest line in the overlay carries an
+  `override` and its scheme defines `override_state`, finalize stores
+  `override_state(params, state, working sets)` as pending instead, so
+  an approved override can move the scheme's state (only
+  `assistance_ladder` defines it).
 
 **Built with R-23a** (additions to the shapes above):
 
@@ -2731,7 +2737,11 @@ and `plugins test` runs them. Loaded with
   are never filled from today's program: linear and ladder hold, double
   progression holds load, and `prescription_unknown` makes the uncertainty
   explicit.
-  `base.missed` returns None for unknown prescriptions. Progression history
+  `base.missed` is True when a logged working set fell short of its
+  prescribed reps, and None for unknown prescriptions and for
+  `base.incomplete` exposures, those logging fewer working sets than a
+  known prescription asked for: a set never logged is not a failed
+  attempt. Progression history
   matches the session, exercise and load mode; e1RM and layoff evidence
   remain exercise-wide. The three-exposure stall heuristic compares equal
   working-set counts with known metrics: more load (less assistance), more
@@ -2741,6 +2751,14 @@ and `plugins test` runs them. Loaded with
   `base.baseline(exposures)` is the exposure loads derive from: the
   newest neither excluded, `suspect` nor trained in a `deload` week. The
   core refuses a proposal derived from an excluded or suspect exposure.
+- `linear` state `{misses, through}`: `misses` counts the missed
+  exposures running through `through`. A count at `misses_before_reset`
+  proposes the reset and is kept, so the reset is proposed again (in a
+  later run, or for the slot's later session in the same run) until an
+  exposure after `through` is judged; that exposure starts a new count.
+  An incomplete exposure with no short set holds the load, leaves the
+  count alone and raises `incomplete_exposure`, a coaching heuristic;
+  an attempted short set is a miss.
 - `last_prescription` is `{overlay_id, session_id, date, exercise_id,
   load_mode, sets, override}` with `sets` as `base.SetSpec`s.
 - A scheme may define `LOAD_MODES`, a tuple of the load modes it can
@@ -2883,8 +2901,11 @@ and `plugins test` runs them. Loaded with
   the rung. `decay` steps back `bands_back(days_off)` rungs from the
   lower of the stored and the proposed rung (never below the first),
   so a climb never reaches a return week, with the band's set cut and
-  RPE cap and no load cut. `LOAD_MODES` is `bodyweight`, `assisted`
-  and `band`.
+  RPE cap and no load cut. `override_state` moves `rung` to the rung
+  whose load every overridden working set carries (exactly one rung,
+  loads compared numerically), keeping `through`; an override off the
+  rungs or with mixed loads leaves the state as proposed. `LOAD_MODES`
+  is `bodyweight`, `assisted` and `band`.
 - `maintenance` repeats the newest valid exposure's top load with the
   fewest reps logged at that load, at the program's working set count
   and RPE targets; with none, the start load. State is empty.
@@ -2954,7 +2975,11 @@ id follows C10. `data.lines_digest` (R-21b) is the C7 canonical hash of
 - `propose finalize --proposal ID [--dry-run]` re-runs step 5. It exits
   1 if any line differs from `.proposed.json` without `override.reason`,
   and exits 3 if a `block` flag is unresolved. Otherwise it writes the
-  overlay, decisions and pending scheme state.
+  overlay, decisions and pending scheme state. It builds and checks all
+  three first, the updated state against the program included (C16), so
+  a refusal or `--dry-run` writes nothing. It writes the state, then the
+  decisions, then the overlay, so an interrupted write leaves nothing to
+  approve; running it again is safe.
 
 A hand edit of the draft is allowed; finalize catches unexplained
 changes. One-off weeks for travel or limited kit (`program-week`'s

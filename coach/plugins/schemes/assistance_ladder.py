@@ -118,6 +118,18 @@ def propose(ctx):
                          derived_from=source, state=state, target_note=_note(ctx, rung))
 
 
+def override_state(params, state, sets):
+    """The state after an approved override: on the rung whose load every overridden working set carries, so the
+    coach's switch to that rung stands; an override off the rungs leaves the state as proposed."""
+    loads = {s.load for s in base.working(sets)}
+    if len(loads) != 1 or None in loads:
+        return dict(state)
+    [load] = loads
+    found = [i for i, rung in enumerate(params["rungs"]) if rung.get("load") is not None
+             and abs(rung["load"] - load) < 1e-9]
+    return dict(state, rung=found[0]) if len(found) == 1 else dict(state)
+
+
 def decay(ctx, proposal, days_off):
     """Back one rung per return band past `0-10` from the lower of the stored and the proposed rung, so a climb
     never reaches a return week; the band's set cut and RPE cap still apply."""
