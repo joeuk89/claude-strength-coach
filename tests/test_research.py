@@ -171,6 +171,11 @@ class ShowCommandTest(InstanceCase):
         self.assertEqual(data["sources"][0]["url"], "https://doi.org/10.0000/fixture-rct-2025")
         self.assertEqual(data["note"]["status"], "current")
 
+    def test_claim_ref_without_the_rn_prefix(self):
+        code, envelope, _ = self.coach("research", "show", "fixture-dose.2")
+        self.assertEqual(code, 0, envelope)
+        self.assertEqual(envelope["data"]["ref"], "rn:fixture-dose.2")
+
     def test_unknown_claim_exits_1(self):
         code, envelope, _ = self.coach("research", "show", "rn:fixture-dose.9")
         self.assertEqual(code, 1)

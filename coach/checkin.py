@@ -6,7 +6,8 @@ and Hevy routine state, then the numbered fields the data cannot answer.
 `card_text` turns it into the message text. A check-in record is
 `check-ins/<date>.md`; its week-review region is the card's data rendered
 as of the record date from committed history only, so the freshness sweep
-gives the same answer on every machine.
+gives the same answer on every machine. A deep check-in falls due
+`DEEP_AFTER_DAYS` after the last one, a coaching heuristic (rn:deloads.12).
 """
 
 import copy
@@ -19,7 +20,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
 from coach import checkin_catchup, checkin_parts, dates, flags, history, overlay, paths, program, render, routines
-from coach import state, stats, units
+from coach import state, stats, units, validity
 from coach import config as config_module
 from coach.config_tables import coaching
 from coach.config_tables.sessions import cap_minutes
@@ -27,8 +28,7 @@ from coach.errors import ValidationError
 from coach.hevy.cache import HevyCache
 from coach.library import Library
 
-CATCH_UP_AFTER_DAYS = 10    # R-02's first return band ends at 10 days
-DEEP_AFTER_DAYS = 42        # R-02's "6+ weeks" since the last deep check-in
+DEEP_AFTER_DAYS = 42
 E1RM_ROW_LIMIT = 8          # a heuristic: as many lifts as a message reads at a glance
 WORD_CEILINGS = {"weekly": 600, "deep": 1000, "catch-up": 600}    # heuristics, prose words outside regions
 CARD_VERSION = 2
@@ -181,6 +181,11 @@ def deferred_reason(found):
     return None
 
 
+def catch_up_after_days():
+    """Days without a check-in before the card switches to catch-up: the longest layoff with no return week."""
+    return validity.RETURN_BANDS[0].upper
+
+
 def mode_for(found, day):
     """(mode, deep reasons) for a check-in on `day` after the records `found`: catch-up after a long gap, which
     never runs deep, else deep when one is due or a catch-up deferred one, else weekly."""
@@ -188,7 +193,7 @@ def mode_for(found, day):
     deferred = deferred_reason(found)
     if deferred:
         reasons = [deferred] + reasons
-    if found and (day - found[-1].date).days > CATCH_UP_AFTER_DAYS:
+    if found and (day - found[-1].date).days > catch_up_after_days():
         return CATCH_UP, reasons
     return ("deep" if reasons else "weekly"), reasons
 
@@ -556,7 +561,7 @@ def misses(root, since, until, now=None, include_unsynced=True):
 
 
 def _catch_up_reasons(found, end, deep):
-    gap = [f"{(end - found[-1].date).days} days since the last check-in, over {CATCH_UP_AFTER_DAYS}"] if found else []
+    gap = [f"{(end - found[-1].date).days} days since the last check-in, over {catch_up_after_days()}"] if found else []
     return gap + ([f"deep review deferred ({'; '.join(deep)})"] if deep else [])
 
 

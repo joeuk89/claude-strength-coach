@@ -165,9 +165,11 @@ formula applied blindly is not coaching.
      matching return band sets this week's loads, set counts and any RPE
      cap instead of the progression scheme, measured from the pre-layoff
      working loads; with illness, the first session back carries the
-     illness cap. Name the band in the week focus; with illness, confirm
-     48 hours symptom-free. The next pass progresses from what the return
-     week logged.
+     illness cap. Name the band in the week focus; with illness, ask
+     whether the symptoms stayed above the neck and confirm 48 hours
+     symptom-free (rn:detraining-return.4); whole-body symptoms mean a
+     qualified professional first. The next pass progresses from what
+     the return week logged.
    - `collision` (an interference rule: a quality activity on a lifting
      day, or in the 24 hours before a heavy squat or hinge session; the
      message names the rule, both bouts and the gap): the script never

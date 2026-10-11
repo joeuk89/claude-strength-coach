@@ -1,5 +1,6 @@
 """Prescription validity: return bands, the validity window and the overlay checks (contract C21, C22)."""
 
+import ast
 import re
 import shutil
 import tempfile
@@ -48,6 +49,46 @@ class BandsTest(unittest.TestCase):
         self.assertEqual(rows, [("0-10", 1.00, 0, None, False), ("11-21", 0.95, -1, None, False),
                                 ("22-42", 0.90, -1, None, False), ("43+", 0.85, -1, 7, True)])
         self.assertEqual(validity.GRACE_DAYS, 10)
+
+    def test_illness_numbers(self):
+        self.assertEqual((validity.SYMPTOM_FREE_HOURS, validity.ILLNESS_RPE_CAP), (48, 7))
+
+
+def _docstring_nodes(tree):
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)) and node.body:
+            first = node.body[0]
+            if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant):
+                yield first.value
+
+
+class IllnessNumbersLiveInValidityTest(unittest.TestCase):
+    """Text the athlete reads takes 48 hours and RPE 7 from validity, so the numbers change in one place."""
+
+    ILLNESS_LITERAL = re.compile(r"\b48 ?h(ours?)?\b|\bRPE 7\b")
+    LOGGING_EXAMPLE = "Put your session RPE in the workout description, e.g. 'RPE 7'."
+
+    def test_no_string_outside_validity_hardcodes_them(self):
+        found = []
+        for path in sorted((REPO_ROOT / "coach").rglob("*.py")):
+            if path == REPO_ROOT / "coach" / "validity.py":
+                continue
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            docstrings = {id(node) for node in _docstring_nodes(tree)}
+            for node in ast.walk(tree):
+                if (isinstance(node, ast.Constant) and isinstance(node.value, str) and id(node) not in docstrings
+                        and node.value != self.LOGGING_EXAMPLE and self.ILLNESS_LITERAL.search(node.value)):
+                    found.append(f"{path.relative_to(REPO_ROOT)}:{node.lineno}: {node.value!r}")
+        self.assertEqual(found, [])
+
+    def test_flag_summaries_carry_the_validity_numbers(self):
+        summary = flags.registry()["return_after_illness"].summary
+        self.assertIn(f"{validity.SYMPTOM_FREE_HOURS} hours symptom-free", summary)
+        self.assertIn(f"RPE {validity.ILLNESS_RPE_CAP}", summary)
+        self.assertIn(f"RPE {validity.ILLNESS_RPE_CAP}", flags.registry()["stale_prescription"].summary)
+        for code in ("return_after_illness", "stale_prescription"):
+            with self.subTest(code=code):
+                self.assertNotRegex(flags.registry()[code].summary, r"\bR-\d")
 
 
 class ClaudeMdBandsTest(unittest.TestCase):

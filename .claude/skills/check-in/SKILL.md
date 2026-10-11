@@ -38,8 +38,8 @@ newest is weekly).
 
 Run a **deep** check-in when any of these is true, otherwise run **weekly**:
 
-- **6+ weeks** since the last deep check-in. Records without a tier marker
-  count as deep; the first check-in ever runs deep.
+- **6+ weeks** since the last deep check-in (rn:deloads.12). Records
+  without a tier marker count as deep; the first check-in ever runs deep.
 - **A light week is being proposed** (step 4: the hard-week count
   reached the ceiling, or two fatigue triggers fired).
 - **The adherence trigger fires** (step 4: under 70 %).
@@ -143,8 +143,9 @@ prescription; e1RM changes; flags (`convention_slip`,
 (`edited_in_app` routines end the card with a keep-or-replace field,
 settled in program-week). The card picks the tier (`mode`, with
 `tier_reasons`: no record yet, or the last deep record 42 or more days
-old). When step 1 picks deep for a reason the card can't see, run it
-with `--tier deep`; `--tier weekly` overrides a due deep review. Mode
+old, rn:deloads.12). When step 1 picks deep for a reason the card can't
+see, run it with `--tier deep`; `--tier weekly` overrides a due deep
+review. Mode
 `catch_up` means more than 10 days since the last check-in: send the
 catch-up card instead (**Catch-up card** below).
 

@@ -45,6 +45,27 @@ type = "consensus"
 year = 2022
 
 [[sources]]
+id = "mujika-padilla-2000"
+citation = "Mujika I, Padilla S. Detraining: loss of training-induced physiological and performance adaptations. Part II: long term insufficient training stimulus. Sports Med. 2000;30(3):145-154."
+url = "https://doi.org/10.2165/00007256-200030030-00001"
+type = "narrative-review"
+year = 2000
+
+[[sources]]
+id = "snyders-2022"
+citation = "Snyders C, Pyne DB, Sewry N, Hull JH, Kaulback K, Schwellnus M. Acute respiratory illness and return to sport: a systematic review and meta-analysis by a subgroup of the IOC consensus on 'acute respiratory illness in the athlete'. Br J Sports Med. 2022;56(4):223-232."
+url = "https://doi.org/10.1136/bjsports-2021-104719"
+type = "meta-analysis"
+year = 2022
+
+[[sources]]
+id = "elliott-2020"
+citation = "Elliott N, Martin R, Heron N, Elliott J, Grimstead D, Biswas A. Infographic. Graduated return to play guidance following COVID-19 infection. Br J Sports Med. 2020;54(19):1174-1175."
+url = "https://doi.org/10.1136/bjsports-2020-102637"
+type = "consensus"
+year = 2020
+
+[[sources]]
 id = "nuckols-2022"
 citation = "Nuckols G. A Guide to Detraining: What to Expect, How to Mitigate Losses, and How to Get Back to Full Strength. Stronger By Science. 2022."
 url = "https://www.strongerbyscience.com/detraining/"
@@ -70,15 +91,15 @@ status = "current"
 n = 3
 text = "The return week after a layoff goes by days off: up to 10 no change; 11–21 loads −5 % and one working set fewer per exercise; 22–42 loads −10 % and one working set fewer; 43+ a re-test with every load −15 % from its pre-layoff working load, one working set fewer and every set at RPE 7 or below."
 basis = "heuristic"
-sources = ["bosquet-2013"]
+sources = ["bosquet-2013", "mujika-padilla-2000"]
 status = "current"
 confidence = "low"
 
 [[claims]]
 n = 4
-text = "After an illness, training restarts only once the athlete has been 48 hours symptom-free, and every exercise in the first session back is capped at RPE 7, whatever the gap."
+text = "After a mild illness with symptoms above the neck only, training restarts once the athlete has been 48 hours symptom-free, with every exercise in the first session back capped at RPE 7, whatever the gap; fever, chest symptoms or other whole-body symptoms mean checking with a qualified professional before training again."
 basis = "heuristic"
-sources = ["schwellnus-2022"]
+sources = ["schwellnus-2022", "snyders-2022"]
 status = "current"
 confidence = "low"
 
@@ -97,8 +118,8 @@ status = "current"
 | --- | --- | --- | --- | --- |
 | 1 | Maximal strength changes little in the first 2 weeks without training, and the loss becomes significant between the third and fourth week and keeps growing with time off. | evidence | bosquet-2013, nuckols-2022 | current |
 | 2 | Muscle size holds through a 1-week break and is partly lost over longer ones, such as 10 weeks without training. | evidence | coleman-2024, halonen-2024 | current |
-| 3 | The return week after a layoff goes by days off: up to 10 no change; 11–21 loads −5 % and one working set fewer per exercise; 22–42 loads −10 % and one working set fewer; 43+ a re-test with every load −15 % from its pre-layoff working load, one working set fewer and every set at RPE 7 or below. | heuristic (low confidence) | bosquet-2013 | current |
-| 4 | After an illness, training restarts only once the athlete has been 48 hours symptom-free, and every exercise in the first session back is capped at RPE 7, whatever the gap. | heuristic (low confidence) | schwellnus-2022 | current |
+| 3 | The return week after a layoff goes by days off: up to 10 no change; 11–21 loads −5 % and one working set fewer per exercise; 22–42 loads −10 % and one working set fewer; 43+ a re-test with every load −15 % from its pre-layoff working load, one working set fewer and every set at RPE 7 or below. | heuristic (low confidence) | bosquet-2013, mujika-padilla-2000 | current |
+| 4 | After a mild illness with symptoms above the neck only, training restarts once the athlete has been 48 hours symptom-free, with every exercise in the first session back capped at RPE 7, whatever the gap; fever, chest symptoms or other whole-body symptoms mean checking with a qualified professional before training again. | heuristic (low confidence) | schwellnus-2022, snyders-2022 | current |
 | 5 | Strength and size lost during a layoff come back faster than they were first gained. | evidence | halonen-2024, ogasawara-2013, nuckols-2022 | current |
 
 | Source | Citation | Type | Year |
@@ -108,6 +129,9 @@ status = "current"
 | halonen-2024 | [Halonen EJ, Gabriel I, Kelahaara MM, Ahtiainen JP, Hulmi JJ. Does Taking a Break Matter: Adaptations in Muscle Strength and Size Between Continuous and Periodic Resistance Training. Scand J Med Sci Sports. 2024;34(10):e14739.](<https://doi.org/10.1111/sms.14739>) | rct | 2024 |
 | ogasawara-2013 | [Ogasawara R, Yasuda T, Ishii N, Abe T. Comparison of muscle hypertrophy following 6-month of continuous and periodic strength training. Eur J Appl Physiol. 2013;113(4):975-985.](<https://doi.org/10.1007/s00421-012-2511-9>) | rct | 2013 |
 | schwellnus-2022 | [Schwellnus M, Adami PE, Bougault V, Budgett R, Clemm HH, Derman W, et al. International Olympic Committee (IOC) consensus statement on acute respiratory illness in athletes part 1: acute respiratory infections. Br J Sports Med. 2022;56(19):1066-1088.](<https://doi.org/10.1136/bjsports-2022-105759>) | consensus | 2022 |
+| mujika-padilla-2000 | [Mujika I, Padilla S. Detraining: loss of training-induced physiological and performance adaptations. Part II: long term insufficient training stimulus. Sports Med. 2000;30(3):145-154.](<https://doi.org/10.2165/00007256-200030030-00001>) | narrative-review | 2000 |
+| snyders-2022 | [Snyders C, Pyne DB, Sewry N, Hull JH, Kaulback K, Schwellnus M. Acute respiratory illness and return to sport: a systematic review and meta-analysis by a subgroup of the IOC consensus on 'acute respiratory illness in the athlete'. Br J Sports Med. 2022;56(4):223-232.](<https://doi.org/10.1136/bjsports-2021-104719>) | meta-analysis | 2022 |
+| elliott-2020 | [Elliott N, Martin R, Heron N, Elliott J, Grimstead D, Biswas A. Infographic. Graduated return to play guidance following COVID-19 infection. Br J Sports Med. 2020;54(19):1174-1175.](<https://doi.org/10.1136/bjsports-2020-102637>) | consensus | 2020 |
 | nuckols-2022 | [Nuckols G. A Guide to Detraining: What to Expect, How to Mitigate Losses, and How to Get Back to Full Strength. Stronger By Science. 2022.](<https://www.strongerbyscience.com/detraining/>) | educator, accessed 2026-10-11 | 2022 |
 
 <!-- coach:end research detraining-return -->
@@ -118,8 +142,8 @@ A layoff of up to about two weeks costs almost no strength, losses become
 measurable from the third or fourth week, and muscle size falls over
 longer breaks. What is lost comes back faster than it was first built, so
 the return week only needs to step back a little, more for longer gaps. The
-exact band edges and percentages, and the illness rules, are coaching
-heuristics fitted to that evidence.
+band edges and percentages, and the illness rule, are coaching heuristics:
+the load cuts are larger than the measured strength loss, on purpose.
 
 ## Evidence
 
@@ -137,21 +161,40 @@ calf muscle thickness as those who trained on. In halonen-2024, previously
 untrained adults lost measurable muscle cross-sectional area (and 1RM)
 over a 10-week break.
 
-**Claim 3.** No study tests return bands. They are fitted to claim 1's
-time course: no change while losses are trivial (up to 10 days, a margin
-inside bosquet-2013's first two weeks), then larger steps back as losses
-grow. One set fewer limits soreness in the first week back. The 43+ band
-re-tests because after six weeks the pre-layoff working loads are no
-longer a reliable guide. The figures match `CLAUDE.md` "Coaching
-principles" → Return after a layoff.
+**Claim 3.** No study tests return bands, so they are coaching
+heuristics. The edges follow claim 1's time course: no change while
+losses are trivial (up to 10 days, a margin inside bosquet-2013's first
+two weeks), then larger steps back as the gap grows. The −5 % cut for
+11–21 days and the −10 % cut for 22–42 days are larger than the strength
+loss bosquet-2013 measured over those gaps, which is small before the
+third or fourth week. They stay because a lighter first week back, with
+one set fewer, limits soreness and lets the athlete get used to training
+again. The cost is small: the next week's progression starts from the
+loads and RPE the return week logged, so a cut that was too deep is
+corrected within a week. For the 43+ band, mujika-padilla-2000 reports
+that strength-trained athletes lose only 7 to 12 % of their force over 8
+to 12 weeks without training. The −15 % re-test starts below that loss,
+so the re-test stays submaximal and the logged RPE sets the next week's
+loads. The figures match `CLAUDE.md` "Coaching principles" → Return
+after a layoff.
 
 **Claim 4.** schwellnus-2022 sets out a staged, criteria-based return
-after a respiratory infection: an athlete with mild symptoms runs a
-symptom checklist and then a test session at 60–70 % of normal intensity
-for 10 to 20 minutes, and moderate or severe illness (for example fever
-or other whole-body symptoms) returns under a physician's care. It gives
-no fixed symptom-free period. The 48 hours and the RPE 7 cap are this
-framework's simpler version of "wait until well, then start easy".
+after a respiratory infection. An athlete with mild symptoms, mostly in
+the nose and throat with no whole-body symptoms, runs a daily symptom
+checklist and then a test session at 60–70 % of normal intensity for 10
+to 20 minutes. Moderate or severe illness, for example fever, chest
+symptoms or other whole-body symptoms, returns under a physician's care.
+Neither schwellnus-2022 nor the systematic review commissioned for it,
+snyders-2022, sets an evidence-based fixed symptom-free period.
+snyders-2022 found that only four studies reported days until return to
+sport (0 to 8.5 days), that symptoms lasted 7 days on average, and
+that about 80 % of respiratory illnesses cost athletes no training days.
+The 48 hours and the RPE 7 cap are this framework's simpler version of
+"wait until well, then start easy", so the claim is a heuristic and is
+limited to mild illness above the neck. elliott-2020's graduated return
+(at least 10 days' rest and 7 days symptom-free before a staged return)
+is not adopted: it was written for COVID-19, where the concern is the
+heart, and the IOC consensus applies to all respiratory infections.
 
 **Claim 5.** In ogasawara-2013, young men who trained in three 6-week
 blocks separated by 3-week breaks ended 24 weeks with the same muscle size
@@ -169,10 +212,11 @@ takes about half as long as the break.
   3 on every run and `/check-in` announces the return week.
 - After the return week, the progression scheme resumes from the loads
   the return week logged.
-- For illness, apply claim 4 whatever the gap, and send the athlete to a
-  qualified professional before training if they had fever, chest
-  symptoms or a slow recovery. The coach does not judge whether an
-  illness was mild.
+- For illness, apply claim 4 whatever the gap. Ask the athlete whether
+  their symptoms stayed above the neck. If they had fever, chest
+  symptoms, other whole-body symptoms or a slow recovery, send them to a
+  qualified professional before training. The coach does not diagnose
+  the illness.
 - Reassure the athlete: a short break costs little, and what is lost
   returns quickly.
 

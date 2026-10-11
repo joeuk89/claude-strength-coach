@@ -106,6 +106,13 @@ text = "A trained session counts as trained as prescribed when at least two thir
 basis = "heuristic"
 sources = []
 status = "current"
+
+[[claims]]
+n = 12
+text = "A deep check-in runs when the last deep check-in is 42 days old or more, which matches the default ceiling of 6 completed hard weeks (rn:deloads.3)."
+basis = "heuristic"
+sources = []
+status = "current"
 -->
 <!-- coach:begin research deloads -->
 
@@ -124,6 +131,7 @@ status = "current"
 | 9 | The standard deload keeps two thirds of the working sets, takes 10 % off loads and puts every set at RPE 6. | heuristic | rogerson-2024 | current |
 | 10 | A light week for poor readiness or sleep keeps two thirds of the working sets and the loads, with no set above RPE 8. | heuristic | none | current |
 | 11 | A trained session counts as trained as prescribed when at least two thirds of its prescribed working sets were logged and its mean logged RPE was no more than 1.5 below target; a coach-led session counts when it happened. | heuristic | none | current |
+| 12 | A deep check-in runs when the last deep check-in is 42 days old or more, which matches the default ceiling of 6 completed hard weeks (rn:deloads.3). | heuristic | none | current |
 
 | Source | Citation | Type | Year |
 | --- | --- | --- | --- |
@@ -192,6 +200,12 @@ and the same training frequency.
 are this framework's defaults. They sit inside the reductions athletes in
 rogerson-2024 report, but no study compares them with other sizes.
 
+**Claim 12.** No source sets how often a lifter's training should be
+reviewed in depth. 42 days is six calendar weeks, the same number as
+claim 3's default ceiling, so a block that runs to its ceiling with no
+missed weeks gets one deep review. A block that counts fewer hard weeks
+than calendar weeks still gets one every six weeks.
+
 ## Applying it
 
 - `/check-in` keeps the hard-week count, checks the four triggers and
@@ -203,7 +217,8 @@ rogerson-2024 report, but no study compares them with other sizes.
 - Claim 10 is the lighter option when the triggers are readiness and sleep
   rather than RPE drift or a niggle: the loads stay, so strength is kept,
   and the reduced sets and RPE ceiling let recovery catch up.
-- Treat claims 2, 4 to 7 and 11 as rules of thumb. If the athlete's history
+- `/check-in` schedules a deep review by claim 12.
+- Treat claims 2, 4 to 7, 11 and 12 as rules of thumb. If the athlete's history
   shows they do not fit, write a local note that supersedes them.
 
 ## Open questions

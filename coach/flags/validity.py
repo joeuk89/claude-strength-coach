@@ -1,10 +1,11 @@
 """Flag codes raised by the prescription checks (contract C20, C22)."""
 
+from coach import validity
 from coach.flags import register
 
 register("stale_prescription", owner="R-24", severities=("block",),
          summary="Line derived from an exposure outside the validity window and not decayed to its band, or above "
-                 "the RPE 7 cap on the first session after an illness.")
+                 f"the RPE {validity.ILLNESS_RPE_CAP} cap on the first session after an illness.")
 register("unearned_load", owner="R-24", severities=("block",),
          summary="Load predicted beyond failure for the prescribed reps, or, with no e1RM, more than two "
                  "increments above the last exposure.")

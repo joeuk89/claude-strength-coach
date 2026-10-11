@@ -4,7 +4,7 @@ import re
 import subprocess
 import unittest
 
-from coach import research
+from coach import checkin, research
 from tests.support import REPO_ROOT
 
 DISCLAIMER = "This note does not replace assessment by a qualified professional."
@@ -70,6 +70,46 @@ class CoachingPrinciplesTest(unittest.TestCase):
                 self.assertIn(lead, self.text)
                 bullet = self.text.split(lead, 1)[1].split(" - **", 1)[0]
                 self.assertIn(phrase, bullet)
+
+
+class HeuristicLabelsTest(unittest.TestCase):
+    def setUp(self):
+        self.notes = research.load_notes(REPO_ROOT)
+
+    def claim(self, ref):
+        return research.resolve(ref, self.notes)
+
+    def test_return_bands_and_illness_rule_are_labelled_heuristics(self):
+        bullet = text_of_bullet(flat(claude_section("Coaching principles")), "**Return after a layoff**")
+        bands, illness = bullet.split("**Illness adds:**", 1)
+        for part, ref in ((bands, "rn:detraining-return.3"), (illness, "rn:detraining-return.4")):
+            with self.subTest(ref=ref):
+                self.assertIn("coaching heuristic", part)
+                self.assertIn(ref, part)
+                self.assertEqual(self.claim(ref).basis, "heuristic")
+
+    def test_return_bands_cite_the_long_layoff_source(self):
+        self.assertIn("mujika-padilla-2000", self.claim("rn:detraining-return.3").sources)
+
+    def test_illness_rule_is_for_mild_illness(self):
+        claim = self.claim("rn:detraining-return.4")
+        self.assertIn("mild", claim.text)
+        self.assertIn("snyders-2022", claim.sources)
+
+    def test_deep_review_threshold_cites_its_claim(self):
+        claim = self.claim("rn:deloads.12")
+        self.assertEqual(claim.basis, "heuristic")
+        self.assertIn("42 days", claim.text)
+        check_in = text_of_bullet(flat(_read("CLAUDE.md").splitlines()), "**`/check-in`**")
+        self.assertIn("rn:deloads.12", check_in)
+        self.assertIn("rn:deloads.12", _read(".claude/skills/check-in/SKILL.md"))
+        self.assertEqual(checkin.DEEP_AFTER_DAYS, 42)
+        self.assertIn("`DEEP_AFTER_DAYS` after the last one, a coaching heuristic (rn:deloads.12)",
+                      flat(checkin.__doc__.splitlines()))
+
+
+def text_of_bullet(text, lead):
+    return text.split(lead, 1)[1].split(" - **", 1)[0]
 
 
 class ResearchPracticeTest(unittest.TestCase):

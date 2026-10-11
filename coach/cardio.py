@@ -11,7 +11,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 from coach import config as config_module
-from coach import dates, flags, history, niggles, render, stats, statusdays, units, weekflags
+from coach import dates, flags, history, niggles, render, stats, statusdays, units, validity, weekflags
 from coach import program as program_module
 from coach.activity.store import ActivityStore
 
@@ -459,8 +459,8 @@ def _status_flags(ctx):
                 f"{message}: train around it, and check with a qualified professional before loading it.")))
         else:
             found.append(flags.make("status_active", "warn", message=(
-                f"{message}: confirm 48 hours symptom-free before training; the first session back is capped "
-                "at RPE 7.")))
+                f"{message}: confirm {validity.SYMPTOM_FREE_HOURS} hours symptom-free before training; the first "
+                f"session back is capped at RPE {validity.ILLNESS_RPE_CAP}.")))
     return found
 
 

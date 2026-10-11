@@ -1,5 +1,6 @@
 """Flag codes raised by the proposal pipeline (contract C20, C24)."""
 
+from coach import validity
 from coach.flags import register
 
 OWNER = "R-23a"
@@ -10,12 +11,12 @@ register("stalled", owner=OWNER, severities=("warn",),
          summary="No load or rep gain over three exposures running.")
 register("rpe_drift", owner=OWNER, severities=("warn",),
          summary="Compound or recovery-capped exercise: logged RPE at least 1 over target on two or more working "
-                 "sets of the last exposure (R-05).")
+                 "sets of the last exposure.")
 register("return_week", owner=OWNER, severities=("info",),
          summary="Decay applied; names the band and days off.")
 register("return_after_illness", owner=OWNER, severities=("warn",),
-         summary="An ill miss or status day in the gap: confirm 48 hours symptom-free; first session capped at "
-                 "RPE 7 (R-02).")
+         summary=f"An ill miss or status day in the gap: confirm {validity.SYMPTOM_FREE_HOURS} hours symptom-free; "
+                 f"first session capped at RPE {validity.ILLNESS_RPE_CAP}.")
 register("constraint_applied", owner=OWNER, severities=("info",),
          summary="A cap, a slot constraint or a niggle constraint changed the proposal.")
 register("override_standing", owner=OWNER, severities=("info",),
