@@ -89,6 +89,65 @@ class MaintenanceTest(unittest.TestCase):
         self.assertEqual(loads_and_reps(decayed), [(90, 5)] * 2)
 
 
+class AssistedReturnAndDeloadTest(unittest.TestCase):
+    """More assistance is a lighter lift, so return bands and deloads keep the assistance and cut sets instead."""
+
+    SOURCE = exposure(date(2026, 9, 14), [(20, 5, 7)] * 3, exercise=PULL_UP)
+
+    def assisted(self, name, days_off=0, week_kind="weekly", sets=THREE_FIVES):
+        return context(name, exposures=(self.SOURCE,), exercise=PULL_UP, sets=sets, start_load=20,
+                       days_off=days_off, week_kind=week_kind)
+
+    def test_a_return_band_keeps_the_derived_from_assistance_and_cuts_a_set(self):
+        for name in ("linear", "double_progression", "maintenance"):
+            for days_off in (15, 28):
+                with self.subTest(scheme=name, days_off=days_off):
+                    ctx = self.assisted(name, days_off=days_off)
+                    decayed = scheme(name).module.decay(ctx, run(ctx), days_off)
+                    self.assertEqual({load for load, _ in loads_and_reps(decayed)}, {20})
+                    self.assertEqual(len(loads_and_reps(decayed)), 2)
+
+    def test_a_return_band_never_cuts_assistance_the_proposal_raised(self):
+        ctx = self.assisted("linear", days_off=28)
+        proposal = run(ctx)
+        raised = replace(proposal, sets=base.with_load(proposal.sets, 30))
+        decayed = scheme("linear").module.decay(ctx, raised, 28)
+        self.assertEqual({load for load, _ in loads_and_reps(decayed)}, {30})
+
+    def test_the_43_plus_band_caps_rpe_and_keeps_the_assistance(self):
+        ctx = self.assisted("linear", days_off=60, sets=({"count": 3, "type": "normal", "reps": 5, "rpe": 9},))
+        decayed = scheme("linear").module.decay(ctx, run(ctx), 60)
+        self.assertEqual(loads_and_reps(decayed), [(20, 5)] * 2)
+        self.assertEqual({s.rpe for s in decayed.sets if s.working}, {7})
+
+    def test_the_standard_deload_of_an_assisted_linear_line_keeps_its_assistance(self):
+        for name in ("standard", "scheme"):
+            with self.subTest(transform=name):
+                ctx = self.assisted("linear", week_kind="deload")
+                proposal = run(ctx)
+                self.assertEqual({load for load, _ in loads_and_reps(proposal)}, {15})
+                transform = plugins.load().get("transform", name)
+                params, _ = plugins.merged_params(transform, {})
+                deloaded = transform.module.apply(replace(ctx, params=params), proposal)
+                self.assertEqual(loads_and_reps(deloaded), [(20, 5)] * 2)
+                self.assertEqual({s.rpe for s in deloaded.sets if s.working}, {6})
+
+    def test_light_and_return_weeks_hold_the_derived_from_assistance(self):
+        for name in ("light", "return"):
+            with self.subTest(transform=name):
+                ctx = self.assisted("linear")
+                transform = plugins.load().get("transform", name)
+                params, _ = plugins.merged_params(transform, {})
+                lightened = transform.module.apply(replace(ctx, params=params), run(ctx))
+                self.assertEqual(loads_and_reps(lightened), [(20, 5)] * 2)
+
+    def test_other_load_modes_still_scale(self):
+        source = exposure(date(2026, 9, 14), [(100, 5, 7)] * 3)
+        ctx = context("linear", exposures=(source,), days_off=28)
+        self.assertEqual(loads_and_reps(base.default_decay(ctx, run(ctx), 28)), [(90, 5)] * 2)
+        self.assertEqual(loads_and_reps(base.standard_deload(run(ctx), **base.STANDARD_DELOAD)), [(90, 5)] * 2)
+
+
 class RpeAnchoredTest(unittest.TestCase):
     PARAMS = {"top_reps": 3, "top_rpe": 8, "backoff_sets": 3}
 

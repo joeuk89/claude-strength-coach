@@ -25,8 +25,7 @@ CITES = ("rn:deloads.8", "rn:deloads.10")
 
 
 def apply(ctx, proposal):
-    source = proposal.derived_from
     count = len(base.working(proposal.sets))
     sets = base.keep_working(proposal.sets, max(1, round(count * ctx.params["set_factor"])))
-    sets = base.scaled(sets, ctx.params["load_factor"], source.top_load if source else None)
+    sets = base.lightened(sets, ctx.params["load_factor"], proposal.derived_from, ctx.exercise.load_direction)
     return replace(proposal, sets=base.rpe_capped(sets, ctx.params["rpe_cap"]), round_down=True)

@@ -492,6 +492,20 @@ def scaled(sets, factor, ceiling=None):
     return tuple(found)
 
 
+def lightened(sets, factor, source, load_direction=1):
+    """Working-set loads times `factor` from the lower of each and the derived-from top load.
+
+    More assistance is a lighter lift, so assistance (`load_direction` −1)
+    is never cut: each set keeps at least the derived-from least assistance.
+    """
+    if load_direction > 0:
+        return scaled(sets, factor, source.top_load if source else None)
+    loads = [s.load for s in working(source.sets) if s.load is not None] if source else []
+    if not loads:
+        return sets
+    return tuple(replace(s, load=max(s.load, min(loads))) if s.working and s.load is not None else s for s in sets)
+
+
 def keep_working(sets, count):
     """The sets with only the first `count` working sets kept (warm-ups stay)."""
     found, kept = [], 0
@@ -531,14 +545,14 @@ def default_decay(ctx, proposal, days_off):
     """C22's return band: load × its factor from the pre-layoff load, one working set fewer, RPE capped for 43+.
 
     The load is cut from the lower of the proposal and the derived-from
-    exposure, so a return week never carries a progression.
+    exposure, so a return week never carries a progression. Assistance is
+    never cut (see `lightened`).
     """
     band = _validity.band_for(days_off)
     sets = proposal.sets
-    source = proposal.derived_from
-    ceiling = source.top_load if source else None
-    if band.load_factor != 1:
-        sets = scaled(sets, band.load_factor, ceiling)
+    direction = ctx.exercise.load_direction
+    if band.load_factor != 1 or direction < 0:
+        sets = lightened(sets, band.load_factor, proposal.derived_from, direction)
     if band.set_delta:
         sets = keep_working(sets, return_set_count(proposal, band.set_delta))
     if band.rpe_cap is not None:
@@ -546,11 +560,13 @@ def default_decay(ctx, proposal, days_off):
     return replace(proposal, sets=sets, round_down=True)
 
 
-def standard_deload(proposal, set_factor, load_factor, rpe):
-    """Fewer working sets (at least one), each load times `load_factor` from the derived-from load, all at `rpe`."""
-    source = proposal.derived_from
+def standard_deload(proposal, set_factor, load_factor, rpe, load_direction=1):
+    """Fewer working sets (at least one), each load times `load_factor` from the derived-from load, all at `rpe`.
+
+    Assistance is never cut (see `lightened`).
+    """
     count = len(working(proposal.sets))
     sets = keep_working(proposal.sets, max(1, round(count * set_factor)))
-    sets = scaled(sets, load_factor, source.top_load if source else None)
+    sets = lightened(sets, load_factor, proposal.derived_from, load_direction)
     sets = tuple(replace(s, rpe=rpe) if s.working else s for s in sets)
     return replace(proposal, sets=sets, round_down=True)

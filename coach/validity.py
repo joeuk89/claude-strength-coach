@@ -216,11 +216,20 @@ def _reps(set_):
     return None
 
 
-def _top_load(sets):
+def _loads(sets):
     numbers = [history.coaching_number(s["load"]) for s in sets
                if s.get("load") and not s.get("discounted")]
-    numbers = [n for n in numbers if n is not None]
+    return [n for n in numbers if n is not None]
+
+
+def _top_load(sets):
+    numbers = _loads(sets)
     return max(numbers) if numbers else None
+
+
+def _least_load(sets):
+    numbers = _loads(sets)
+    return min(numbers) if numbers else None
 
 
 class _Checker:
@@ -344,10 +353,17 @@ class _Checker:
         source, unchecked = self.decay_source(line["exercise_id"], derived)
         if unchecked:
             problems.append(f"{lead}, but its load and sets cannot be checked against the decay: {unchecked}")
-        top = _top_load([s for s in working if self.sound(line, s.get("load"))])
-        if source is not None and top is not None:
-            before = _top_load(source["sets"])
-            if before is not None:
+        sound = [s for s in working if self.sound(line, s.get("load"))]
+        if source is not None and line["load_mode"] == "assisted":
+            least, before = _least_load(sound), _least_load(source["sets"])
+            if least is not None and before is not None:
+                allowed = before - self.increment(line, session)
+                if least < allowed - 1e-9:
+                    problems.append(f"{lead}: assistance {_number(least)} is below the pre-layoff assistance of "
+                                    f"{_number(before)} minus one increment ({_number(allowed)})")
+        elif source is not None:
+            top, before = _top_load(sound), _top_load(source["sets"])
+            if top is not None and before is not None:
                 allowed = before * band.load_factor + self.increment(line, session)
                 if top > allowed + 1e-9:
                     problems.append(f"{lead}: load {_number(top)} is above {_number(before)} × {band.load_factor} "

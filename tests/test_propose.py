@@ -306,6 +306,73 @@ class LayoffTest(LayoffCase):
         self.assertNotIn("stalled", codes(doc, "bb_back_squat"))
 
 
+class AssistedLayoffCase(LayoffCase):
+    """The layoff instance with the pull-up logged and programmed as an assisted lift at 20 kg of assistance."""
+
+    ASSISTANCE = 20
+
+    def setUp(self):
+        super().setUp()
+        load = units.make_load(self.ASSISTANCE, "assisted", "kg")
+        self.edit_json("data/exercises.json", lambda doc: doc["exercises"]["pull_up"].update(
+            load_mode="assisted", load_mode_proposed="assisted"))
+        self.edit_program(lambda doc: self.slot(doc, "session-b", "pull_up").update(
+            load_mode="assisted", start_load=self.ASSISTANCE))
+        for month in ("2026-08", "2026-09"):
+            self.edit_json(f"data/history/{month}.json", lambda doc: [
+                (exercise.update(load_mode="assisted"),
+                 [s.update(weight_kg=float(self.ASSISTANCE), load=dict(load)) for s in exercise["sets"]])
+                for workout in doc["workouts"] for exercise in workout["exercises"]
+                if exercise["exercise_id"] == "pull_up"])
+
+    def pull_up_check(self, data):
+        checked = self.coach("prescription", "check", "--file", str(self.draft_path(data["id"])))["data"]
+        return [f for f in checked["flags"] if f["exercise_id"] == "pull_up"]
+
+
+class AssistedReturnTest(AssistedLayoffCase):
+    def test_a_double_progression_line_in_the_22_42_band_keeps_its_assistance(self):
+        self.set_scheme("session-b", "pull_up", "double_progression")
+        data = self.propose()
+        line = find_line(data["overlay"], "pull_up")
+        self.assertEqual(line["provenance"]["decay"]["band"], "22-42")
+        self.assertEqual([coaching(s["load"]) for s in working(line)], [self.ASSISTANCE] * 2)
+        self.assertEqual(self.pull_up_check(data), [])
+
+    def test_a_ladder_line_in_the_11_21_band_steps_back_a_rung_and_passes(self):
+        def logged_on_the_24th(doc):
+            pulls = next(w for w in doc["workouts"] if w["date"] == "2026-09-10")
+            later = json.loads(json.dumps(pulls))
+            later.update(workout_id="10000000-0000-4000-8000-000000000090", date="2026-09-24",
+                         start_time="2026-09-24T18:00:00Z", end_time="2026-09-24T19:00:00Z",
+                         exercises=[e for e in later["exercises"] if e["exercise_id"] == "pull_up"])
+            doc["workouts"].append(later)
+            doc["workouts"].sort(key=lambda w: w["date"])
+        self.edit_json("data/history/2026-09.json", logged_on_the_24th)
+        self.set_scheme("session-b", "pull_up", "assistance_ladder", {"rungs": [
+            {"name": "heavy band", "load": 40}, {"name": "medium band", "load": 30},
+            {"name": "light band", "load": 20}]})
+        self.edit_json("data/state.json", lambda doc: doc["scheme_state"].update({"session-b/pull_up": {
+            "scheme": "assistance_ladder", "data": {"rung": 2, "through": "2026-09-24"}, "pending": None}}))
+        data = self.propose()
+        line = find_line(data["overlay"], "pull_up")
+        self.assertEqual(line["provenance"]["decay"]["band"], "11-21")
+        self.assertEqual({coaching(s["load"]) for s in working(line)}, {30})
+        self.assertEqual(self.pull_up_check(data), [])
+
+    def test_a_hand_built_line_with_less_assistance_than_before_the_layoff_is_stale(self):
+        self.set_scheme("session-b", "pull_up", "double_progression")
+        data = self.propose()
+
+        def less_assistance(doc):
+            line = find_line(doc, "pull_up")
+            line["sets"] = [dict(s, load=10) if s["type"] in WORKING else s for s in line["sets"]]
+        self.edit_json(f".coach/proposals/{data['id']}.json", less_assistance)
+        [flag] = self.pull_up_check(data)
+        self.assertEqual((flag["code"], flag["severity"]), ("stale_prescription", "block"))
+        self.assertIn("assistance 10 is below the pre-layoff assistance of 20", flag["message"])
+
+
 class IllnessTest(ProposeCase):
     def test_an_ill_miss_caps_the_first_session_at_rpe_7(self):
         self.coach("history", "annotate", "--kind", "miss", "--date", "2026-10-10", "--session", "session-a",
