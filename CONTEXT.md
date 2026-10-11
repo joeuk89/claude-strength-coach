@@ -125,8 +125,27 @@ _Avoid_: workout (reserved for logged lifting), cardio session
 
 **Research note**:
 A dated, cited answer to one coaching question, with a confidence and a
-review-by date, that the coach consults before deciding in that area.
+review-by date (`review_by`), that the coach consults before deciding in
+that area. Comes in two kinds with one format: a **template note**
+(`research/<id>.md`), shipped and refreshed in the template, and a
+**local note**. A note past its review-by date is expired; its area stays
+current only while a local note covers it.
 _Avoid_: reference, evidence doc, wiki page
+
+**Claim**:
+One numbered, one-sentence statement inside a research note, with its
+basis (evidence, consensus or heuristic), its sources and a status
+(current or retired). Cited as `rn:<note-id>.<n>`; a claim's number is
+never reused, and a claim that no longer holds is retired, not deleted.
+_Avoid_: finding, fact, citation (the reference to a claim, not the claim)
+
+**Local note**:
+A research note the coach writes in an instance, at
+`research/local/local-<slug>.md`, whenever it researches something for
+this athlete. Framework sync never touches it. It may supersede template
+claims for this instance by listing them in `updates`, and never edits a
+template note.
+_Avoid_: instance note, personal research, override note
 
 **Recipe bank**:
 The athlete's set of approved recipe cards in `nutrition/menu/`, plus
