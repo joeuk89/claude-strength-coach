@@ -108,6 +108,48 @@ type = "educator"
 year = 2026
 accessed = 2026-10-11
 
+[[sources]]
+id = "mifflin-1990"
+citation = "Mifflin MD, St Jeor ST, Hill LA, Scott BJ, Daugherty SA, Koh YO. A new predictive equation for resting energy expenditure in healthy individuals. Am J Clin Nutr. 1990;51(2):241-247."
+url = "https://doi.org/10.1093/ajcn/51.2.241"
+type = "observational"
+year = 1990
+
+[[sources]]
+id = "frankenfield-2005"
+citation = "Frankenfield D, Roth-Yousey L, Compher C. Comparison of predictive equations for resting metabolic rate in healthy nonobese and obese adults: a systematic review. J Am Diet Assoc. 2005;105(5):775-789."
+url = "https://doi.org/10.1016/j.jada.2005.02.005"
+type = "systematic-review"
+year = 2005
+
+[[sources]]
+id = "ten-haaf-2014"
+citation = "ten Haaf T, Weijs PJM. Resting energy expenditure prediction in recreational athletes of 18-35 years: confirmation of Cunningham equation and an improved weight-based alternative. PLoS One. 2014;9(10):e108460."
+url = "https://doi.org/10.1371/journal.pone.0108460"
+type = "observational"
+year = 2014
+
+[[sources]]
+id = "fao-2004"
+citation = "FAO/WHO/UNU. Human energy requirements: report of a joint FAO/WHO/UNU expert consultation, Rome, 17-24 October 2001. FAO Food and Nutrition Technical Report Series 1. Rome: FAO; 2004."
+url = "https://www.fao.org/4/y5686e/y5686e00.htm"
+type = "consensus"
+year = 2004
+
+[[sources]]
+id = "hall-2008"
+citation = "Hall KD. What is the required energy deficit per unit weight loss? Int J Obes (Lond). 2008;32(3):573-576."
+url = "https://doi.org/10.1038/sj.ijo.0803720"
+type = "narrative-review"
+year = 2008
+
+[[sources]]
+id = "slater-2019"
+citation = "Slater GJ, Dieter BP, Marsh DJ, Helms ER, Shaw G, Iraki J. Is an energy surplus required to maximize skeletal muscle hypertrophy associated with resistance training? Front Nutr. 2019;6:131."
+url = "https://doi.org/10.3389/fnut.2019.00131"
+type = "narrative-review"
+year = 2019
+
 [[claims]]
 n = 1
 text = "The protein target is 1.6 g/kg/day of the reference mass, because gains in fat-free mass from resistance training stop rising at about 1.6 g/kg/day."
@@ -200,6 +242,28 @@ text = "With an adaptive nutrition app, a missed day is logged as an estimate wi
 basis = "heuristic"
 sources = ["macrofactor-partial-logging"]
 status = "current"
+
+[[claims]]
+n = 14
+text = "Without a nutrition app, maintenance starts from the Mifflin–St Jeor resting rate, 10 × weight in kg + 6.25 × height in cm − 5 × age in years, + 5 for men or − 161 for women, the predictive equation most often within 10 % of measured resting rate in non-obese and obese adults."
+basis = "evidence"
+sources = ["mifflin-1990", "frankenfield-2005"]
+status = "current"
+
+[[claims]]
+n = 15
+text = "The resting rate is multiplied by a physical activity level of 1.53 for a sedentary or lightly active lifestyle, 1.76 for an active or moderately active one and 2.25 for a vigorous one, the FAO/WHO/UNU worked examples for those three lifestyles."
+basis = "consensus"
+sources = ["fao-2004"]
+status = "current"
+
+[[claims]]
+n = 16
+text = "Each phase's starting calorie estimate adds its weekly rate × 7700 kcal per kg ÷ 7 to maintenance, rounded to the nearest 50 kcal, and is only a start: 7700 kcal overstates the energy in a kg of weight change for lean athletes and no surplus for muscle gain has been validated, so the weight trend moves calories after that."
+basis = "heuristic"
+sources = ["hall-2008", "slater-2019"]
+status = "current"
+confidence = "low"
 -->
 <!-- coach:begin research protein-energy-deficit -->
 
@@ -220,6 +284,9 @@ status = "current"
 | 11 | A cut loses no faster than ~0.5–1 % of bodyweight per week, slower when close to the goal, because slower loss keeps more lean mass. | evidence | garthe-2011, helms-aragon-2014, murphy-koehler-2022 | current |
 | 12 | A bulk gains ~0.25–0.5 % of bodyweight per week, nearer the low end for advanced lifters, because faster gain adds mostly fat rather than more muscle or strength. | evidence (low confidence) | iraki-2019, helms-2023 | current |
 | 13 | With an adaptive nutrition app, a missed day is logged as an estimate within about 30 % of what was eaten rather than left half-logged, because partial logging skews the app's expenditure estimate most. | heuristic | macrofactor-partial-logging | current |
+| 14 | Without a nutrition app, maintenance starts from the Mifflin–St Jeor resting rate, 10 × weight in kg + 6.25 × height in cm − 5 × age in years, + 5 for men or − 161 for women, the predictive equation most often within 10 % of measured resting rate in non-obese and obese adults. | evidence | mifflin-1990, frankenfield-2005 | current |
+| 15 | The resting rate is multiplied by a physical activity level of 1.53 for a sedentary or lightly active lifestyle, 1.76 for an active or moderately active one and 2.25 for a vigorous one, the FAO/WHO/UNU worked examples for those three lifestyles. | consensus | fao-2004 | current |
+| 16 | Each phase's starting calorie estimate adds its weekly rate × 7700 kcal per kg ÷ 7 to maintenance, rounded to the nearest 50 kcal, and is only a start: 7700 kcal overstates the energy in a kg of weight change for lean athletes and no surplus for muscle gain has been validated, so the weight trend moves calories after that. | heuristic (low confidence) | hall-2008, slater-2019 | current |
 
 | Source | Citation | Type | Year |
 | --- | --- | --- | --- |
@@ -237,6 +304,12 @@ status = "current"
 | helms-2023 | [Helms ER, Spence AJ, Sousa C, et al. Effect of small and large energy surpluses on strength, muscle, and skinfold thickness in resistance-trained individuals: a parallel groups design. Sports Med Open. 2023;9:102.](<https://doi.org/10.1186/s40798-023-00651-y>) | rct | 2023 |
 | iraki-2019 | [Iraki J, Fitschen P, Espinar S, Helms E. Nutrition recommendations for bodybuilders in the off-season: a narrative review. Sports (Basel). 2019;7(7):154.](<https://doi.org/10.3390/sports7070154>) | narrative-review | 2019 |
 | macrofactor-partial-logging | [MacroFactor Help Center. How do MacroFactor's coaching algorithms deal with partially logged days? (undated help article).](<https://help.macrofactorapp.com/en/articles/29-how-do-macrofactor-s-coaching-algorithms-deal-with-partially-logged-days>) | educator, accessed 2026-10-11 | 2026 |
+| mifflin-1990 | [Mifflin MD, St Jeor ST, Hill LA, Scott BJ, Daugherty SA, Koh YO. A new predictive equation for resting energy expenditure in healthy individuals. Am J Clin Nutr. 1990;51(2):241-247.](<https://doi.org/10.1093/ajcn/51.2.241>) | observational | 1990 |
+| frankenfield-2005 | [Frankenfield D, Roth-Yousey L, Compher C. Comparison of predictive equations for resting metabolic rate in healthy nonobese and obese adults: a systematic review. J Am Diet Assoc. 2005;105(5):775-789.](<https://doi.org/10.1016/j.jada.2005.02.005>) | systematic-review | 2005 |
+| ten-haaf-2014 | [ten Haaf T, Weijs PJM. Resting energy expenditure prediction in recreational athletes of 18-35 years: confirmation of Cunningham equation and an improved weight-based alternative. PLoS One. 2014;9(10):e108460.](<https://doi.org/10.1371/journal.pone.0108460>) | observational | 2014 |
+| fao-2004 | [FAO/WHO/UNU. Human energy requirements: report of a joint FAO/WHO/UNU expert consultation, Rome, 17-24 October 2001. FAO Food and Nutrition Technical Report Series 1. Rome: FAO; 2004.](<https://www.fao.org/4/y5686e/y5686e00.htm>) | consensus | 2004 |
+| hall-2008 | [Hall KD. What is the required energy deficit per unit weight loss? Int J Obes (Lond). 2008;32(3):573-576.](<https://doi.org/10.1038/sj.ijo.0803720>) | narrative-review | 2008 |
+| slater-2019 | [Slater GJ, Dieter BP, Marsh DJ, Helms ER, Shaw G, Iraki J. Is an energy surplus required to maximize skeletal muscle hypertrophy associated with resistance training? Front Nutr. 2019;6:131.](<https://doi.org/10.3389/fnut.2019.00131>) | narrative-review | 2019 |
 
 <!-- coach:end research protein-energy-deficit -->
 
@@ -352,11 +425,50 @@ its algorithms' "one major Achilles heel" and advises estimating a missed
 day instead: an estimate "within about 30% of what you actually consumed"
 is close enough. This is the app maker's guidance, not a trial.
 
+**Claim 14.** Mifflin et al. (1990, 498 adults aged 19–78, normal-weight
+and obese) derived "REE (males) = 10 x weight (kg) + 6.25 x height (cm) -
+5 x age (y) + 5; REE (females) = ... - 161". Frankenfield et al. (2005)
+compared the four equations most used in practice and found Mifflin–St
+Jeor "the most reliable, predicting RMR within 10% of measured in more
+nonobese and obese individuals than any other equation", with "noteworthy
+errors" for individuals. Athletes tend to sit above it: ten Haaf and
+Weijs (2014, 90 recreational athletes aged 18–35 training ~9 hours a
+week) note that "REE in athletes is underestimated by the majority of
+the existing equations", found Mifflin and the other general equations
+under 50 % accurate, and saw every equation "underestimate a higher
+REE". They advise an athlete-specific equation. The estimate stays on Mifflin–St
+Jeor as the standard with systematic-review support for adults
+generally; the weight trend corrects the gap (claim 16).
+
+**Claim 15.** The FAO/WHO/UNU consultation (2004) classes lifestyles by
+physical activity level (PAL, daily energy as a multiple of basal rate):
+sedentary or light 1.40–1.69, active or moderately active 1.70–1.99 and
+vigorous 2.00–2.40. Its worked examples are 1.53, 1.76 and 2.25. It
+counts an hour a day of moderate exercise on top of a seated job as
+active. PAL multiplies basal rate; this note applies it to Mifflin's
+resting rate, which is close to it.
+
+**Claim 16.** 7700 kcal per kg is the "3500 kcal per pound" rule. Hall
+(2008) shows it "approximately matches the predicted energy density of
+lost weight in obese subjects" but "overestimates the cumulative energy
+deficit required per unit weight loss for people with lower initial body
+fat", because more of a lean person's loss is lean tissue, which holds
+less energy. Gain differs again: Slater et al. (2019) note that textbook
+surpluses rest "solely on the assumed energy stored within the tissue",
+miss the cost of building it, and "have never been validated in a
+resistance training population". So the figure gives one transparent
+start per phase and nothing more: `/check-in` moves calories from the
+2–3-week weight trend from then on. The 50 kcal rounding keeps the
+number from looking more precise than it is.
+
 ## Applying it
 
-- `/goals` picks the reference mass (claims 3–5), then records the floor,
-  target and stretch from it (claims 1, 2, 6–8). Round each to the
-  nearest 5 g.
+- `coach nutrition targets` picks the reference mass (claims 3–5) and
+  gives the floor, target and stretch from it (claims 1, 2, 6–8), each
+  rounded to 5 g; `/goals` quotes them.
+- Without a nutrition app, the same command gives one starting calorie
+  estimate per phase (claims 14–16); only the weight trend moves it
+  after that.
 - `/check-in` raises the floor by ~10–15 g after two consecutive check-ins
   at or above it (claim 9) and never lowers it.
 - On a cut, hold the trend to ~0.5–1 % of bodyweight a week and push
@@ -370,3 +482,6 @@ is close enough. This is the app maker's guidance, not a trial.
 
 - How well the 1.2 g/kg floor, drawn from adults with obesity, holds for
   lean, younger lifters.
+- Whether an athlete-specific resting-rate equation (ten Haaf and Weijs
+  2014) should replace Mifflin–St Jeor for lifters without a body-fat
+  reading.

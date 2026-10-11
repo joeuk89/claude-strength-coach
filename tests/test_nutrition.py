@@ -8,9 +8,9 @@ import unittest
 from datetime import date
 from pathlib import Path
 
-from coach import nutrition, research
+from coach import nutrition, protein, research
 from tests.support import FIXTURES, INSTANCES, REPO_ROOT, VALID, run_cli, run_module
-from tests.support.skills import skill_text
+from tests.support.skills import skill_text, step_text
 
 NOW = {"COACH_NOW": "2026-10-11T18:00:00Z"}
 READINGS = Path("data") / "nutrition" / "readings.json"
@@ -390,13 +390,23 @@ class NoCalorieModelTest(unittest.TestCase):
         for text in ("Mifflin", "harris_benedict", "Katch-McArdle", "bmr =", "TDEE", "Activity Factor"):
             self.assertTrue(self.BANNED.search(text), text)
 
-    def test_no_package_module_names_a_calorie_equation(self):
+    def test_only_the_no_app_estimate_names_a_calorie_equation(self):
         offenders = []
         for path in sorted((REPO_ROOT / "coach").rglob("*.py")):
+            if path == REPO_ROOT / "coach" / "calories.py":
+                continue
             for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
                 if self.BANNED.search(line):
                     offenders.append(f"{path.relative_to(REPO_ROOT)}:{number}: {line.strip()}")
-        self.assertEqual(offenders, [], "the nutrition app owns expenditure and calorie targets")
+        self.assertEqual(offenders, [], "only coach/calories.py estimates calories, and only without an app")
+
+    def test_no_calorie_figure_when_an_app_is_set(self):
+        code, envelope, stderr = run_cli(["--root", str(VALID), "nutrition", "targets", "--height", "180",
+                                          "--age", "30", "--sex", "male", "--activity", "active",
+                                          "--phase", "cut:-0.5"], env=NOW)
+        self.assertEqual(code, 0, (envelope, stderr))
+        self.assertEqual(envelope["data"]["calories"], {"by": "app"})
+        self.assertNotRegex(json.dumps(envelope["data"]), r"kcal")
 
 
 class SkillWiringTest(unittest.TestCase):
@@ -414,14 +424,20 @@ class SkillWiringTest(unittest.TestCase):
                        "What stays prose"):
             self.assertIn(needle, text)
 
-    def test_goals_uses_the_who_body_fat_line_and_a_relative_bulk_rate(self):
+    def test_targets_use_the_who_body_fat_line_and_goals_a_relative_bulk_rate(self):
+        self.assertEqual(protein.HIGH_BODY_FAT_PCT, {"male": 25, "female": 35})
         text = skill_text("goals")
         flat = " ".join(text.split())
-        self.assertIn("~25 % for men or ~35 % for women", flat)
-        self.assertIn("~25 %/~35 % body-fat lines", flat)
         self.assertNotRegex(flat, r"32 ?% for women|/~32 ?%")
         self.assertIn("~0.25–0.5 % of bodyweight per week, nearer the low end for advanced lifters", flat)
         self.assertNotRegex(text, r"lb ?(/|a |per )w(ee)?k")
+
+    def test_goals_quotes_the_protein_and_calorie_numbers(self):
+        for step in ("protein.md", "calories.md"):
+            with self.subTest(step=step):
+                text = step_text("goals", step)
+                self.assertIn("python3 -m coach nutrition targets", text)
+                self.assertNotRegex(text, r"×|\d g/kg|Mifflin|activity.factor")
 
 
 class ProteinNoteTest(unittest.TestCase):

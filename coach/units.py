@@ -105,6 +105,18 @@ def mass_kg(value, unit):
     return json_number(round(value * _factor(unit), 3))
 
 
+_HEIGHT_METRES_PER = {"cm": 0.01, "in": 0.0254}
+HEIGHT_UNITS = tuple(_HEIGHT_METRES_PER)
+
+
+def height_m(value, unit):
+    """Metres for a height in cm or in, to the millimetre."""
+    _number(value, "height")
+    if unit not in _HEIGHT_METRES_PER:
+        raise ValueError(f"unknown height unit {unit!r}; expected one of {', '.join(HEIGHT_UNITS)}")
+    return json_number(round(value * _HEIGHT_METRES_PER[unit], 3))
+
+
 _KCAL_PER = {"kcal": 1, "kJ": 1 / 4.184}
 
 

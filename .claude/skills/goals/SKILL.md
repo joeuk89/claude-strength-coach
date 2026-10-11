@@ -72,9 +72,9 @@ phase sequence, trend rate per phase and each phase's trigger.
 
 ## 4–5. Protein numbers and anchors
 
-Follow [protein.md](protein.md): pick the reference mass, set the floor,
-target and stretch from it, explain the floor's habit progression, and
-agree 2–3 standing protein anchors.
+Follow [protein.md](protein.md): quote `nutrition targets` for the floor,
+target and stretch, explain the floor's habit progression, and agree 2–3
+standing protein anchors.
 
 ## 6. Output the nutrition setup
 
