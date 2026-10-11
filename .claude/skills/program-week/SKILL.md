@@ -187,6 +187,35 @@ pattern.
 4. `python3 -m coach overlay validate <id>` — exit 1 lists each problem
    by JSONPath. Fix the draft, put the id in it, and build again: a
    draft that names an unapproved overlay rebuilds it.
+
+   **Then check every prescription before the brief.** Run `python3 -m
+   coach history sync`, then `python3 -m coach prescription check
+   --overlay <id> --write` (`--file <draft>` checks a draft without
+   building it). It stores its flags in the overlay and records, for
+   each line you wrote by hand, the exposure it came from. Per line it
+   reports `days_off` and the return `band`. Settle each flag:
+
+   - `stale_prescription` (block) — the lift's days off fall in a
+     return band, or an `ill` gap caps the first session back at RPE 7.
+     Decay the line to that band as step 2's return week says, and
+     record it in the line's `provenance.decay` (`days_off`, `band`,
+     `load_factor`, `set_delta`, `rpe_cap`) with `derived_from` set to
+     the exposure it came from.
+   - `unearned_load` (block) — the load is beyond failure for those
+     reps at the recent e1RM. Lower it.
+   - `load_cap`, `load_unrepresentable` (block) — over a cap, or not a
+     load the kit at the session's location makes. Snap it with `units
+     round` to a load that is.
+   - `load_mode_mismatch` (block) — the line's load mode or load
+     arithmetic disagrees with the library. Fix the line, or settle the
+     load mode with the athlete (`library set-mode`).
+   - `rpe_infeasible`, `session_over_cap` (warn) — name each in the
+     coach's brief, with the change you made or why it stands.
+
+   Fix the draft, then build, validate and check again until no
+   `block` flag is left. A block you and the athlete decide to keep
+   needs its flag's `resolved` set true with a `resolution` in the
+   overlay, or `overlay approve` refuses it.
 5. `python3 -m coach overlay render <id> --into <check-in record>`
    fills the week-ahead region — the per-session tables the brief
    shows.
@@ -201,7 +230,7 @@ pattern.
    title).
 
 A tweak to the coach's brief (step 4) means: edit the draft, then
-build, validate and render again.
+build, validate, check and render again.
 
 ## 4. Present the coach's brief — and stop
 
