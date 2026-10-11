@@ -184,7 +184,7 @@ anything. Rules that always apply:
 - **Frequency** — training each muscle ~2× per week generally beats one
   big session; count every session type when tallying weekly frequency.
   When adherence demands it, fewer sessions carrying the same weekly
-  volume beat more sessions that don't get trained.
+  hard sets per muscle beat more sessions that don't get trained.
 - **Proximity to failure** — most hypertrophy work belongs ~0–3 reps in
   reserve; heavy strength work leaves a little more in the tank to protect
   technique.
@@ -199,9 +199,12 @@ anything. Rules that always apply:
     when it happened.
   - **Reset:** a deload or other light week, a return week (see return
     after a layoff below), or any week with under 50 % of planned
-    sessions trained sets the count back to zero and starts a new block.
-    A week at 50–75 %, or a one-off week for travel or limited kit,
-    neither counts nor resets.
+    sessions trained sets the count back to zero. The check-in that
+    closes such a week ends the block, and the next block starts at
+    zero. `/one-off-week` zeroes the count when it plans a light week,
+    but the block number moves on only when that week closes. A week at
+    50–75 %, or a one-off week for travel or limited kit, neither counts
+    nor resets.
   - **Ceiling:** propose a light week when the count reaches the
     program's ceiling: default 6 completed hard weeks, settable from 4
     to 8 in `routine/program.md`. At the ceiling it is proposed whatever
@@ -216,10 +219,11 @@ anything. Rules that always apply:
     `light week: skipped (<n> hard weeks)`.
   - The 75 % and 50 % lines are coaching heuristics. `/check-in` keeps
     the count in a status line in `routine/program.md`'s header.
-- **Return after a layoff** — days off are the days since the last
-  lifting workout of any kind, solo or coach-led. A layoff over 10 days
-  gets one **return week**; after it, the normal progression scheme
-  resumes from the loads the return week logged.
+- **Return after a layoff** — days off are the days from the last
+  lifting workout of any kind, solo or coach-led, to the first session
+  back. A layoff over 10 days gets one **return week**; after it, the
+  normal progression scheme resumes from the loads the return week
+  logged.
 
   | Days off | Return week |
   | --- | --- |
@@ -235,10 +239,11 @@ anything. Rules that always apply:
 - **Adherence before structure** — a program the athlete trains beats a
   better one they don't. Adherence is defined, and checked, in
   `/check-in`. Under 70 % over the trailing four ordinary weeks, the
-  check-in must present a smaller schedule at equal weekly volume. Under
-  80 %, don't propose a new recurring session (a new session or weekly
-  slot, conditioning and optional sessions included), and push back when
-  the athlete asks for one; exercise swaps within a session are fine.
+  check-in must present a smaller schedule with the same weekly hard
+  sets per muscle. Under 80 %, don't propose a new recurring session (a
+  new session or weekly slot, conditioning and optional sessions
+  included), and push back when the athlete asks for one; exercise swaps
+  within a session are fine.
   Both thresholds are coaching heuristics, not research cut-offs.
 - **Recovery** — sleep, protein (~1.6–2.2 g/kg bodyweight), calories, and
   stress gate progress as much as the program; flag when they're the real

@@ -52,13 +52,15 @@ trend analysis, extend the lookback to the last deep check-in (~6 weeks)
 more history: read the check-in records and logs back as far as step 4
 needs.
 
-**Gap check.** Count the days since the last lifting workout of any
-kind — solo, or coach-led as the log or the reply shows it. Over 10 days
-means the coming week is a **return week** under the return rule in
-`CLAUDE.md` "Coaching principles": say so in the Sunday message's first
-line ("… — 16 days since your last workout, so next week is a return
-week"). An `ill` miss tag or reported illness in the gap brings in that
-rule's illness conditions too. Program-week applies the rule.
+**Gap check.** Count the days from the last lifting workout of any
+kind — solo, or coach-led as the log or the reply shows it — to the
+first session of the coming week, the same count program-week makes.
+Over 10 days means the coming week is a **return week** under the
+return rule in `CLAUDE.md` "Coaching principles": say so in the Sunday
+message's first line ("… — 16 days off by Tuesday's session, so next
+week is a return week"). An `ill` miss tag or reported illness in the
+gap brings in that rule's illness conditions too. Program-week applies
+the rule.
 
 **With Hevy** (key in `.env`): API details in `reference/hevy-api.md`.
 Page through `GET /v1/workouts` (`pageSize=10`, newest first) past the
@@ -235,12 +237,13 @@ concrete: did the athlete hit the prescribed load × reps @ RPE?
 
 **Both tiers — the hard-week count.** Class each week the window closes
 by the rules in `CLAUDE.md` "Coaching principles" → Fatigue management:
-a completed hard week adds one, a reset week sets the count to zero,
-anything else leaves it. Then check this week's four fatigue triggers:
-readiness from the reply and the workout notes, compound RPE drift from
-the drift check above (two sessions running), a niggle the Niggles field
-says was aggravated under load, and poor sleep from the Sleep field. The
-same rules say when a light week is proposed, watched or skipped.
+a completed hard week adds one, a reset week ends the block and starts
+the next one at zero, anything else leaves it. Then check this week's
+four fatigue triggers: readiness from the reply and the workout notes,
+compound RPE drift from the drift check above (two sessions running), a
+niggle the Niggles field says was aggravated under load, and poor sleep
+from the Sleep field. The same rules say when a light week is proposed,
+watched or skipped.
 
 **Both tiers — adherence.** Adherence = sessions trained ÷ sessions
 planned over the **trailing four ordinary weeks**:
@@ -359,7 +362,10 @@ A **declined** proposal isn't presented again until four ordinary weeks
 have passed since the decision; a **deferred** one is presented again at
 the first check-in on or after its date; an **adopted** one goes to
 `/new-program`'s redesign path and isn't presented again for four
-ordinary weeks.
+ordinary weeks. These rules and the hand-off apply only to the
+smaller-schedule decision. An override line (one with `(override: …)`)
+records the added session only: it never holds back or starts the
+under-70 % trigger, and never goes to `/new-program`.
 
 Deep records use the same skeleton titled `(deep)`, with **Training**
 expanded to the full analysis (e1RM trends per lift, drift, balance,
@@ -415,9 +421,10 @@ check-in the due one.
   it with its reason. Agreed → invoke the **one-off-week** skill in
   deload mode (below). Declined → record the reason in the status line;
   at the ceiling, propose it again next check-in.
-- **Adherence trigger adopted** → hand off to `/new-program`'s redesign
-  path with the agreed smaller schedule. Under 80 % adherence (step 4),
-  propose no new recurring session, here or in program-week.
+- **Adherence trigger adopted** (the smaller schedule, not an
+  override) → hand off to `/new-program`'s redesign path with the agreed
+  smaller schedule. Under 80 % adherence (step 4), propose no new
+  recurring session, here or in program-week.
 - On a normal (non-deload) week, once decisions are agreed, invoke the
   **program-week** skill — it computes per-exercise targets for the
   coming week, writes them to Hevy, and fills this record's "The week

@@ -172,9 +172,10 @@ athlete trains the temp sessions from it.
   resume.
 - If this was a **deload or other light week**, reset the hard-week
   count: in the block status line in `program.md`'s header the count
-  goes to zero and the next block starts (`Block <n+1> · 0 of <ceiling>
-  hard weeks`), with the light week shown as agreed. The rules are in
-  `CLAUDE.md` "Coaching principles" → Fatigue management.
+  goes to zero (`Block <n> · 0 of <ceiling> hard weeks`), with the light
+  week shown as agreed. Keep the block number: the check-in that closes
+  the light week starts the next block. The rules are in `CLAUDE.md`
+  "Coaching principles" → Fatigue management.
 
 ## 6. Close out
 
