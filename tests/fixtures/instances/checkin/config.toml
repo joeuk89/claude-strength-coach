@@ -25,7 +25,7 @@ machine_increment = 5.0
 cable_increment = 2.5
 
 [equipment.locations.home]
-available = ["dumbbell", "bench", "band", "bodyweight"]
+available = ["dumbbell", "band", "bodyweight"]
 dumbbells = [5, 10, 15, 20]
 dumbbell_max = 20.0
 

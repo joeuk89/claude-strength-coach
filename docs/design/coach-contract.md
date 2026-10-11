@@ -338,7 +338,7 @@ enabled = true
 cache_max_age_hours = 24  # coach check warns past this
 
 [equipment]               # the main place the athlete trains; all in athlete units
-available = []            # R-11 equipment enum values; empty = every piece assumed (not checked)
+available = []            # R-11 equipment enum values; empty = every piece assumed
 dumbbells = []            # per-hand dumbbell weights available; empty = not checked
 dumbbell_increment = 2.0  # per hand
 dumbbell_max = 40.0       # per hand; a cap
@@ -349,7 +349,7 @@ machine_increment = 5.0
 cable_increment = 2.5
 
 [equipment.locations.home]  # optional; any number of named places (name ^[a-z0-9-]+$)
-available = ["dumbbell", "bench", "band", "bodyweight"]
+available = ["dumbbell", "band", "bodyweight"]
 dumbbells = [5, 10, 15, 20] # any [equipment] key may appear; it overrides the main table at this place
 dumbbell_max = 20.0
 

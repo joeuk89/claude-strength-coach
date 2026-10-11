@@ -208,7 +208,7 @@ class SetupWritesConfigTest(unittest.TestCase):
             self.make_config(root, [
                 ('week_starts = "monday"', 'week_starts = "sunday"'),
                 ('timezone = ""', 'timezone = "Europe/London"'),
-                ("available = []", 'available = ["barbell", "dumbbell", "bench", "cable"]'),
+                ("available = []", 'available = ["barbell", "dumbbell", "cable"]'),
                 ("dumbbells = []", "dumbbells = [5, 7.5, 10, 12.5, 15, 17.5, 20]"),
                 ("# dumbbell_max = 40.0", "dumbbell_max = 20.0"),
             ])
