@@ -220,6 +220,15 @@ class SetupSkillTest(unittest.TestCase):
         cls.text = skill_text("setup")
         cls.flat = flat(cls.text)
 
+    def test_setup_commit_precedes_week_one_and_uses_athlete_reviewed_paths(self):
+        body = flat(section(self.text, "## 5."))
+        self.assertLess(body.index("[commit.md]"), body.index("**program-week**"))
+        commit = flat(step_text("setup", "commit.md"))
+        for required in ("written", "removed", "archived", "staged", "athlete to approve", "git add --",
+                         "git diff --cached", "upstream", "zip", "normal clone"):
+            self.assertIn(required, commit)
+        self.assertNotIn("git add -A", self.text)
+
     def test_names_the_onboarding_commands(self):
         for name in self.COMMANDS:
             with self.subTest(command=name):

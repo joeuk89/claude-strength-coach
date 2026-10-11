@@ -10,7 +10,7 @@ import tempfile
 import textwrap
 import types
 import unittest
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 
@@ -18,7 +18,8 @@ import coach.checks
 import coach.commands
 import coach.page_parts
 from coach import history, pages, stats, status
-from tests.support import INSTANCES, run_cli
+from tests.support import INSTANCES, REPO_ROOT, run_cli
+from tests.support.config_edit import apply
 from tests.support.history import R_A, R_B, HistoryCase, fixture_workouts, hevy_exercise, hevy_set, hevy_workout
 from tests.support.history import read_json, write_json
 
@@ -671,6 +672,115 @@ class PublishTest(PagesCase):
     def approve(self):
         self.coach("overlay", "approve", WEEKLY)
 
+    def snapshot(self):
+        files = {p.relative_to(self.root).as_posix(): p.read_bytes()
+                 for p in self.root.rglob("*") if p.is_file() and ".git" not in p.parts}
+        return (files, (self.root / ".git/index").read_bytes(),
+                git(self.root, "rev-parse", "HEAD", env=self.git_env))
+
+    def disable_hevy(self):
+        config = self.root / "config.toml"
+        config.write_text(apply(config.read_text(), {"hevy": {"enabled": False}}), encoding="utf-8")
+
+    def remote_page(self, path):
+        return git(self.remote, "show", f"main:{path}", env=self.git_env)
+
+    def test_no_hevy_dry_run_lists_sheets_without_changing_files_index_or_head(self):
+        self.disable_hevy()
+        self.approve()
+        (self.root / "this-week-sheets.md").write_text("stale sheet\n", encoding="utf-8")
+        before = self.snapshot()
+        report = self.publish("--dry-run")["data"]
+        self.assertEqual(sorted(report["paths"]), sorted(self.PUBLISHED + ["this-week-sheets.md"]))
+        self.assertEqual(self.snapshot(), before)
+
+    def test_no_hevy_publishes_missing_then_stale_sheets_for_the_approved_week(self):
+        self.disable_hevy()
+        self.approve()
+        self.assertFalse((self.root / "this-week-sheets.md").exists())
+        self.publish()
+        self.assertIn("| 3×5 | 100 |", self.remote_page("this-week-sheets.md"))
+        second_id = "2026-10-19-weekly"
+        doc = self.overlay_doc()
+        doc.update(id=second_id, approval=None, created_at="2026-10-18T18:00:00Z",
+                   span={"start": "2026-10-19", "end": "2026-10-25"})
+        for session in doc["sessions"]:
+            session["date"] = (date.fromisoformat(session["date"]) + timedelta(days=7)).isoformat()
+            for line in session["exercises"]:
+                if line["exercise_id"] == "bb_back_squat":
+                    for set_ in line["sets"]:
+                        set_["load"].update(hevy_total=110, hevy_kg=110)
+        self.write_overlay(doc, second_id)
+        self.env["COACH_NOW"] = "2026-10-18T18:00:00Z"
+        self.coach("overlay", "approve", second_id)
+        self.coach("checkin", "skeleton", "--date", "2026-10-18", "--overlay", second_id)
+        data = self.coach("pages", "publish", "--overlay", second_id)["data"]
+        self.assertTrue(data["pushed"])
+        brief, sheet = self.remote_page("this-week.md"), self.remote_page("this-week-sheets.md")
+        self.assertIn(second_id, brief)
+        self.assertIn(second_id, sheet)
+        self.assertNotIn(WEEKLY, sheet)
+        self.assertIn("110 kg", brief)
+        self.assertIn("| 3×5 | 110 |", sheet)
+        anchors = re.findall(r"this-week-sheets\.md#([^ )]+)", brief)
+        self.assertTrue(anchors)
+        for anchor in anchors:
+            self.assertIn(f'<a id="{anchor}"></a>', sheet)
+        self.assertEqual(git(self.root, "rev-parse", "HEAD", env=self.git_env),
+                         git(self.remote, "rev-parse", "main", env=self.git_env))
+
+    def test_hevy_publication_leaves_old_unlinked_sheets_alone(self):
+        self.approve()
+        old_sheet = self.root / "this-week-sheets.md"
+        old_sheet.write_text("old unlinked sheet\n", encoding="utf-8")
+        data = self.publish()["data"]
+        self.assertNotIn("this-week-sheets.md", data["paths"])
+        self.assertNotIn("this-week-sheets.md", self.remote_page("this-week.md"))
+        self.assertEqual(old_sheet.read_text(), "old unlinked sheet\n")
+        self.assertNotIn("this-week-sheets.md", git(self.remote, "ls-tree", "--name-only", "main", env=self.git_env))
+        git(self.root, "add", "--", "this-week-sheets.md", env=self.git_env)
+        before = self.snapshot()
+        self.publish(expect=3)
+        self.assertEqual(self.snapshot(), before)
+
+    def test_a_different_brief_overlay_is_refused_without_mutation(self):
+        self.disable_hevy()
+        self.approve()
+        newer = self.overlay_doc()
+        newer.update(id="2026-10-14-midweek", kind="midweek", created_at="2026-10-14T18:00:00Z", approval=None)
+        newer["supersedes"] = WEEKLY
+        self.write_overlay(newer, newer["id"])
+        before = self.snapshot()
+        error = self.publish(expect=3)["error"]["message"]
+        self.assertIn(newer["id"], error)
+        self.assertEqual(self.snapshot(), before)
+
+    def test_no_hevy_refusals_preserve_worktree_index_and_head(self):
+        self.disable_hevy()
+        self.approve()
+        with self.subTest(guard="unrelated index"):
+            git(self.root, "add", "--", "config.toml", env=self.git_env)
+            staged = self.snapshot()
+            self.assertIn("config.toml", self.publish(expect=3)["error"]["message"])
+            self.assertEqual(self.snapshot(), staged)
+            git(self.root, "reset", "-q", "HEAD", "--", "config.toml", env=self.git_env)
+        with self.subTest(guard="upstream"):
+            git(self.root, "branch", "--unset-upstream", env=self.git_env)
+            unchanged = self.snapshot()
+            self.assertIn("git push -u", self.publish(expect=3)["error"]["message"])
+            self.assertEqual(self.snapshot(), unchanged)
+            git(self.root, "branch", "--set-upstream-to=origin/main", env=self.git_env)
+        with self.subTest(guard="readme ownership"):
+            (self.root / "README.md").write_text("My own README\n", encoding="utf-8")
+            unchanged = self.snapshot()
+            self.assertIn("--replace-readme", self.publish(expect=3)["error"]["message"])
+            self.assertEqual(self.snapshot(), unchanged)
+        with self.subTest(guard="approval hash"):
+            self.edit_json(OVERLAY, lambda doc: doc.update(focus="Changed since approval"))
+            unchanged = self.snapshot()
+            self.assertIn("edited after approval", self.publish(expect=3)["error"]["message"])
+            self.assertEqual(self.snapshot(), unchanged)
+
     def test_an_unapproved_overlay_is_refused_with_no_commit(self):
         envelope = self.publish(expect=3)
         self.assertIn("overlay approve", envelope["error"]["message"])
@@ -710,6 +820,7 @@ class PublishTest(PagesCase):
         self.assertEqual(git(self.root, "diff", "--cached", "--name-only", env=self.git_env), "")
 
     def test_a_rejected_push_exits_4_and_keeps_the_commit(self):
+        self.disable_hevy()
         self.approve()
         hook = self.remote / "hooks" / "pre-receive"
         hook.parent.mkdir(exist_ok=True)
@@ -717,6 +828,8 @@ class PublishTest(PagesCase):
         hook.chmod(0o755)
         envelope = self.publish(expect=4)
         self.assertEqual(envelope["error"]["code"], "network")
+        self.assertIn("this-week-sheets.md", git(self.root, "show", "--name-only", "--format=", "HEAD",
+                                               env=self.git_env))
         message = envelope["error"]["message"]
         self.assertIn("push it by hand", message)
         self.assertIn("(error: failed to push some refs to ", message)
@@ -751,6 +864,74 @@ class PublishTest(PagesCase):
         envelope = self.publish(expect=3)
         self.assertIn("no upstream", envelope["error"]["message"])
         self.assertEqual(self.commits(), 1)
+
+
+@unittest.skipIf(shutil.which("git") is None, "needs git")
+class SetupPublishTest(unittest.TestCase):
+    def test_starter_adoption_reviewed_commit_then_first_no_hevy_publish(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root, remote = Path(tmp) / "instance", Path(tmp) / "remote.git"
+            root.mkdir()
+            env = {"COACH_NOW": "2026-10-11T18:00:00Z", **GIT_ENV}
+            git_env = dict(os.environ, **GIT_ENV)
+
+            def coach(*args):
+                code, envelope, stderr = run_cli(["--root", str(root), *args], env=env)
+                self.assertEqual(code, 0, (args, envelope, stderr))
+                return envelope["data"]
+
+            def local_git(*args):
+                return git(root, *args, env=git_env)
+
+            (root / ".gitignore").write_text("/.coach/\n.env\n", encoding="utf-8")
+            (root / "notes.txt").write_text("Before setup\n", encoding="utf-8")
+            (root / "README.md").write_text("Template README\n", encoding="utf-8")
+            git(Path(tmp), "init", "-q", "--bare", str(remote), env=git_env)
+            local_git("init", "-q")
+            local_git("symbolic-ref", "HEAD", "refs/heads/main")
+            local_git("add", "--", ".gitignore", "notes.txt", "README.md")
+            local_git("commit", "-qm", "template")
+            local_git("remote", "add", "origin", str(remote))
+            local_git("push", "-qu", "origin", "main")
+            (root / "notes.txt").write_text("Unrelated change\n", encoding="utf-8")
+            (root / ".env").write_text("UNUSED_TEST_VALUE=synthetic\n", encoding="utf-8")
+            config = apply((REPO_ROOT / "config.example.toml").read_text(), {
+                "hevy": {"enabled": False}, "nutrition": {"enabled": False},
+                "athlete": {"available_days": ["mon", "wed", "fri"]}})
+            (root / "config.toml").write_text(config, encoding="utf-8")
+            (root / "profile.md").write_text("Synthetic athlete: train three days.\n", encoding="utf-8")
+            coach("starters", "draft", "full-body-3")
+            adopted = coach("program", "adopt", "--input", str(root / ".coach/drafts/program.json"))
+            self.assertTrue(adopted["staged"])
+            self.assertEqual(local_git("rev-list", "--count", "HEAD").strip(), "1")
+            program = read_json(root / "data/program.json")
+            modes = {line["exercise_id"]: line["load_mode"] for session in program["sessions"]
+                     for line in session["exercises"]}
+            for row in adopted["unconfirmed"]:
+                coach("library", "set-mode", row["exercise_id"], modes[row["exercise_id"]])
+            approved_paths = sorted(set(adopted["written"] + adopted["removed"] + adopted["archived"]
+                                        + adopted["staged"] + ["config.toml", "profile.md", "data/exercises.json"]))
+            self.assertTrue(set(local_git("diff", "--cached", "--name-only").splitlines()) <= set(approved_paths))
+            local_git("add", "--", *approved_paths)
+            self.assertEqual(sorted(local_git("diff", "--cached", "--name-only").splitlines()), approved_paths)
+            local_git("commit", "-qm", "Initial setup: settings, profile and program")
+            self.assertEqual(sorted(local_git("show", "--name-only", "--format=", "HEAD").splitlines()), approved_paths)
+            self.assertEqual(local_git("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}").strip(),
+                             "origin/main")
+            proposal = coach("propose", "week", "--week", "2026-W42")
+            coach("propose", "finalize", "--proposal", proposal["id"])
+            coach("overlay", "approve", proposal["id"])
+            coach("checkin", "skeleton", "--date", "2026-10-11", "--overlay", proposal["id"])
+            coach("sheets", "render", "--overlay", proposal["id"])
+            coach("pages", "render", "--replace-readme")
+            published = coach("pages", "publish", "--overlay", proposal["id"])
+            self.assertTrue(published["pushed"])
+            self.assertIn("this-week-sheets.md", published["paths"])
+            self.assertEqual(local_git("diff", "--cached", "--name-only"), "")
+            self.assertEqual(git(remote, "show", "main:notes.txt", env=git_env), "Before setup\n")
+            self.assertIn("notes.txt", local_git("diff", "--name-only"))
+            self.assertNotIn(".env", local_git("ls-files"))
+            self.assertIn(proposal["id"], git(remote, "show", "main:this-week-sheets.md", env=git_env))
 
 
 if __name__ == "__main__":
