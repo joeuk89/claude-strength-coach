@@ -408,6 +408,24 @@ class BareHevyValuesTest(unittest.TestCase):
             self.assertIn("30 kg", failed[1]["message"])
             self.assertTrue(all("'25 kg'" not in r["message"] for r in failed))
 
+    def test_comma_preserves_load_instructions_but_not_a_new_numbered_exercise(self):
+        for text, expected in (("DB bench, move to 20 kg.", 1),
+                               ("DB bench 20/hand, 3 sets of leg curl at 25 kg.", 0),
+                               ("DB bench, 20 kg, leg curl at 25 kg.", 1)):
+            with self.subTest(text=text), TempCopy() as tmp:
+                tmp.write("profile.md", text)
+                code, results, _ = check(tmp.root, "bare_hevy_values")
+                self.assertEqual(code, expected, results)
+                self.assertTrue(all("'25 kg'" not in r["message"] for r in failures(results, "bare_hevy_values")))
+
+    def test_measurement_exemption_does_not_hide_a_later_prescription(self):
+        with TempCopy() as tmp:
+            tmp.edit_overlay(lambda doc: db_bench(doc).update(target_note="bodyweight 73 kg and move to 8 kg"))
+            code, results, _ = check(tmp.root, "bare_hevy_values")
+            self.assertEqual(code, 1)
+            [failed] = failures(results, "bare_hevy_values")
+            self.assertIn(": '8 kg' for db_bench_press", failed["message"])
+
     def test_a_comma_before_a_load_does_not_detach_it_from_the_exercise(self):
         with TempCopy() as tmp:
             tmp.write("profile.md", "DB bench, 20 kg")
@@ -556,6 +574,11 @@ class LoadFigureTest(unittest.TestCase):
             "dumbbells up to 30 kg; move to 8 kg": ["8 kg"],
             "equipment has 2.5 kg steps; add 2.5 kg": ["2.5 kg"],
             "bodyweight 73 kg; move to 8 kg": ["8 kg"],
+            "bodyweight 73 kg and move to 8 kg": ["8 kg"],
+            "Goal plan current: 1.9 kg to 73 kg and move to 8 kg": ["8 kg"],
+            "cables and dumbbells to 30 kg.": [],
+            "move cables and dumbbells to 8 kg": ["8 kg"],
+            "Next block: the 20 kg dumbbell is the heaviest she has.": [],
             "plates down to 1.25 kg": [],
             "go to 25/hand (Hevy: 50)": [],
             "22.5 → 25/hand": [],

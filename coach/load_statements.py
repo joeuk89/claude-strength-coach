@@ -66,17 +66,32 @@ def _chains(text, figures):
     return chains
 
 
-_NON_LOAD_BEFORE = re.compile(
-    r"(?:^\s*(?:(?:equipment|kit):\s*)?(?:adjustable\s+)?"
-    r"(?:dumbbells?|dbs?|plates?)\s+(?:(?:go\s+)?up\s+(?:to|in)|to|down\s+to)\s*|"
-    r"\b(?:body\s*weight|body mass|goal weight|goal plan current)\b[^,;!?]*)$", re.IGNORECASE,
+_EQUIPMENT_NOUN = r"(?:dumbbells?|dbs?|plates?|cables?|kettlebells?|barbells?)"
+_EQUIPMENT_CAPACITY_BEFORE = re.compile(
+    rf"^\s*(?:(?:home only|equipment|kit):\s*)?(?:adjustable\s+)?{_EQUIPMENT_NOUN}"
+    rf"(?:\s*(?:,|and)\s*(?:adjustable\s+)?{_EQUIPMENT_NOUN})*"
+    r"\s+(?:(?:go\s+)?up\s+(?:to|in)|to|down\s+to)\s*$", re.IGNORECASE,
+)
+_WEIGHT = r"\d+(?:\.\d+)?\s*(?:kgs?|lbs?|kilos?|pounds?)(?![A-Za-z])"
+_BODYWEIGHT_MEASUREMENT = re.compile(
+    r"\b(?:body\s*weight|body mass|goal weight|goal plan current)\b"
+    rf"\s*(?:(?:is|was|at|now|currently|current|target)\s+)*[:=]?\s*{_WEIGHT}"
+    rf"(?:\s*(?:to|→|->)\s*{_WEIGHT})?", re.IGNORECASE,
+)
+_EQUIPMENT_LIMIT = re.compile(
+    rf"{_WEIGHT}\s+{_EQUIPMENT_NOUN}\s+(?:is|are)\s+(?:the\s+)?(?:heaviest|maximum|largest)\b",
+    re.IGNORECASE,
 )
 _INCREMENT_AFTER = re.compile(r"\s*(?:cable\s+)?(?:steps?|increments?)\b", re.IGNORECASE)
 
 
 def _unrelated_measurement(text, figure):
     before = statements(text[:figure.start])[-1]
-    return bool(_NON_LOAD_BEFORE.search(before) or _INCREMENT_AFTER.match(text[figure.end:]))
+    measured = any(match.start() <= figure.start < match.end()
+                   for pattern in (_BODYWEIGHT_MEASUREMENT, _EQUIPMENT_LIMIT)
+                   for match in pattern.finditer(text))
+    return bool(measured or _EQUIPMENT_CAPACITY_BEFORE.search(before)
+                or _INCREMENT_AFTER.match(text[figure.end:]))
 
 
 def bare_figures(text, load_column=False):
@@ -105,6 +120,21 @@ def bare_message(rel, where, figures, exercise, text, hevy_enabled=True):
             f"{guidance}")
 
 
+_LOAD_CONTINUATION = re.compile(
+    r"^\s*(?:(?:move|go|work|increase|reduce|hold|stay|add|drop|raise|lower)\s+"
+    r"(?:(?:up|down)\s+)?(?:(?:to|at|by)\s+)?)?"
+    r"\d+(?:\.\d+)?\s*(?:kgs?|lbs?|kilos?|pounds?|/\s*hand|per\s+hand|each|→|->|=>|⇒)(?![A-Za-z])",
+    re.IGNORECASE,
+)
+
+
 def statements(text):
-    """Separate clauses while preserving decimals and numeric comma continuations."""
-    return re.split(r",(?!\s*\d)|[;!?\n]|\.(?!\d)", text)
+    """Keep comma-separated load instructions with their exercise, not numbered exercises."""
+    parts = re.split(r"(,|[;!?\n]|\.(?!\d))", text)
+    found = [parts[0]]
+    for separator, following in zip(parts[1::2], parts[2::2]):
+        if separator == "," and _LOAD_CONTINUATION.match(following):
+            found[-1] += separator + following
+        else:
+            found.append(following)
+    return found

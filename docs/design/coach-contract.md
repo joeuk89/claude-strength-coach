@@ -1346,7 +1346,10 @@ hand (`Per hand (kg)`, `Load/hand (kg)`), when it sits in a Hevy-headed
 column, or, in a load column, when the same row has a number in a
 Hevy-headed column. Ranges, dates, sets × reps, RPE, durations,
 distances, equipment increments and bodyweight measurements are not
-prescription loads.
+prescription loads. An excluded measurement covers only its own figures;
+a later instruction in the same sentence is still checked. Equipment
+capacity descriptions follow the same rules in profiles, overlay text
+and override reasons.
 
 The check reads a `per_hand_x2` overlay line's `target_note`, `change`,
 `cues`, `focus` and `override.reason`, and the prose of `profile.md` and
@@ -1354,7 +1357,9 @@ The check reads a `per_hand_x2` overlay line's `target_note`, `change`,
 authoring use the same load-figure parser. In free prose a figure
 belongs to an exercise named before it in its comma/semicolon-delimited
 clause or sentence; ownership does not cross into another clause. A
-comma directly before a number continues the same prescription.
+comma before a load or a load instruction (`DB bench, move to 20 kg`)
+continues the same prescription. A numbered exercise clause such as
+`3 sets of leg curl at 25 kg` does not.
 Equipment names alone do not identify an exercise prescription.
 Library names, aliases, Hevy titles and ids identify exercises; movement
 names shared by equipment variants require an unambiguous load mode,

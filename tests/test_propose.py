@@ -8,7 +8,7 @@ import textwrap
 import unittest
 from unittest import mock
 
-from coach import dates, jsonio, overlay, units
+from coach import config, dates, jsonio, overlay, units
 from coach.plugins.schemes import double_progression
 from coach.validate import validate as validate_schema
 from tests.support import INSTANCES, REPO_ROOT
@@ -624,6 +624,34 @@ class OverrideTest(ProposeCase):
                                     *standing, expect=1)
                 self.assertIn("per-hand", result["error"]["message"])
                 self.assertEqual(self.snapshot(), before)
+
+    def test_bodyweight_before_an_ambiguous_load_still_refuses_without_writes(self):
+        before = self.snapshot()
+        result = self.coach("propose", "override", "--proposal", FIRST_ID, "--session", "session-a",
+                            "--exercise", "db_bench_press", "--load", "8", "--reason",
+                            "bodyweight 73 kg and move to 8 kg", "--standing", expect=1)
+        self.assertIn("'8 kg'", result["error"]["message"])
+        self.assertEqual(self.snapshot(), before)
+
+    def test_equipment_only_reasons_pass_authoring_and_approved_overlay_checks(self):
+        examples = (
+            "Home only: adjustable dumbbells, 2–20 kg per hand in 2 kg steps.",
+            "dumbbells 5–40 kg per hand in 2.5 kg steps. Plates down to 1.25 kg",
+            "cables and dumbbells to 30 kg.",
+            "Next block: the 20 kg dumbbell is the heaviest she has. Goal plan current: 1.9 kg to 73 kg.",
+            "Dumbbells go up in 2.5 kg at the gym.",
+            "dumbbells up to 30 kg per hand.",
+        )
+        for reason in examples:
+            with self.subTest(reason=reason):
+                self.coach("propose", "override", "--proposal", FIRST_ID, "--session", "session-a",
+                           "--exercise", "db_bench_press", "--load", "8", "--reason", reason)
+                draft = read_json(self.draft_path())
+                built = overlay.build(draft, config.load(self.root), root=self.root, now=dates.parse_timestamp(NOW))
+                approved = overlay.approve(built, dates.parse_timestamp(NOW))
+                write_json(self.root / "data" / "overlays" / f"{FIRST_ID}.json", approved)
+                result = self.coach("check", "--only", "bare_hevy_values")
+                self.assertTrue(all(r["status"] != "fail" for r in result["data"]["results"]))
 
     def test_hevy_off_override_refusal_requests_only_per_hand_wording(self):
         self.set_config("enabled = true", "enabled = false")
