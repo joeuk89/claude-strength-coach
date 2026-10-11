@@ -211,12 +211,14 @@ class Run:
                      and (session_id is None or e.session_id == session_id)
                      and (load_mode is None or e.load_mode == load_mode))
 
-    def e1rm(self, exercise_id, day):
+    def model_evidence(self, exercise_id, day):
         if self._series is None:
-            self._series = stats.e1rm_series(self.root)["series"]
-        start = (day - timedelta(days=validity.E1RM_WINDOW_DAYS)).isoformat()
-        points = [p["e1rm"] for p in self._series.get(exercise_id, []) if start <= p["date"] < day.isoformat()]
-        return max(points) if points else None
+            self._series = stats.e1rm_series(self.root)
+        return stats.capacity_evidence(self._series, exercise_id, day, validity.E1RM_WINDOW_DAYS)
+
+    def e1rm(self, exercise_id, day):
+        evidence = self.model_evidence(exercise_id, day)
+        return evidence["estimate"]["e1rm"] if evidence["estimate"] else None
 
     def last_prescription(self, session_id, exercise_id):
         """This slot's line in the newest approved overlay that has it, loads as coaching numbers.
@@ -501,6 +503,9 @@ def propose_line(run, session, day, exercise, ctx_extra):
     proposal = plugin.module.propose(ctx)
     _check_proposal(plugin, proposal)
     clauses = [proposal.rationale.rstrip(". ")]
+    evidence = run.model_evidence(exercise_id, day)
+    if evidence["reason"] == "over_rep_cap":
+        clauses.append(evidence["message"].rstrip(". "))
     adjusted = []
     line_flags += list(proposal.flags)
     source = proposal.derived_from

@@ -391,7 +391,8 @@ def _compound_patterns():
 
 
 def _e1rm(inst, window, live, now):
-    series = stats.e1rm_series(inst.root, include_unsynced=live, now=now)["series"]
+    evidence = stats.e1rm_series(inst.root, include_unsynced=live, now=now, as_of=now)
+    series = evidence["series"]
     start, end = window.start.isoformat(), window.end.isoformat()
     order = {exercise_id: index for index, exercise_id in enumerate(inst.library.ids())}
     compounds = _compound_patterns()
@@ -408,7 +409,10 @@ def _e1rm(inst, window, live, now):
                      "delta": delta, "method": latest["method"]})
     rows.sort(key=lambda r: ((inst.library.get(r["exercise_id"]) or {}).get("pattern") not in compounds,
                              order.get(r["exercise_id"], len(order)), r["exercise_id"]))
-    return rows[:E1RM_ROW_LIMIT]
+    notes = [f"{inst.name(exercise_id)} ({o['date']}): {stats.capacity_note(o)}."
+             for exercise_id, observed in evidence["observations"].items()
+             for o in observed if start <= o["date"] <= end and not o["comparable"]]
+    return rows[:E1RM_ROW_LIMIT], notes
 
 
 def _verify_lines(root):
@@ -589,12 +593,13 @@ def _build(root, today, until=None, tier=None, now=None, live=True, parts=True, 
     raised = (stats.audit(inst.root, include_unsynced=live, today=end, now=now)["flags"]
               + stats.durations(inst.root, span=(window.start, window.end), include_unsynced=live, now=now)["flags"]
               + hevy_flags)
+    e1rm, e1rm_notes = _e1rm(inst, window, live, now)
     card = {
         "schema_version": CARD_VERSION, "date": end.isoformat(), "window": window.to_json(), "mode": mode,
         "tier_reasons": reasons, "deep_deferred": deferred,
         "days_since_last": (end - found[-1].date).days if found else None,
         "unsynced": sum(1 for w in workouts.values() if w["unsynced"] and window.contains(dates.parse_date(w["date"]))),
-        "sessions": sessions, "exercises": _exercises(inst, kept, workouts), "e1rm": _e1rm(inst, window, live, now),
+        "sessions": sessions, "exercises": _exercises(inst, kept, workouts), "e1rm": e1rm, "e1rm_notes": e1rm_notes,
         "hevy": hevy_rows, "flags": raised, "fields": [], "facts": [], "misses": None,
         "catch_up": None,
     }
@@ -814,6 +819,8 @@ def card_text(card):
     if card["e1rm"]:
         lines += ["", "e1RM: " + " · ".join(f"{r['name']} {_e1rm_value(r)} ({_signed(r['delta'])})"
                                              for r in card["e1rm"])]
+    if card.get("e1rm_notes"):
+        lines += ["", "Capacity evidence:"] + [f"- {note}" for note in card["e1rm_notes"]]
     if card["flags"]:
         lines += ["", "Flags:"] + [f"- `{f['code']}`: {f['message']}" for f in card["flags"]]
     loads = [h for h in card["hevy"] if h["state"] == "loads_edited"]
@@ -892,6 +899,8 @@ def _region(card, record_date):
         for row in card["e1rm"]:
             lines.append(_row([row["exercise_id"], _e1rm_value(row), _signed(row["delta"]),
                                render.short_date(row["date"])]))
+    if card.get("e1rm_notes"):
+        lines += ["", "Capacity evidence:"] + [f"- {note}" for note in card["e1rm_notes"]]
     if card["flags"]:
         lines += ["", "**Flags**", ""]
         for flag in card["flags"]:

@@ -121,7 +121,7 @@ def validate(doc, config=None, library=None, root=None):
 
 
 def warnings(doc):
-    """Warnings for a valid program, each starting with its code: a fixed_reps_rpe line too high-rep for an e1RM."""
+    """Warnings for valid programs whose prescriptions cannot supply their model evidence."""
     from coach import stats
     from coach.plugins import base
 
@@ -136,6 +136,16 @@ def warnings(doc):
             found.append(f"{NO_E1RM_WARNING}: {exercise['exercise_id']} in {session['id']} is "
                          f"{units.json_number(worst)} reps to failure, past the {stats.MAX_REPS_TO_FAILURE} an e1RM "
                          "allows, so fixed_reps_rpe gets no e1RM from it and holds its load; use double_progression")
+    for lift in doc.get("priority", []):
+        if lift["kpi"]["kind"] != "e1rm":
+            continue
+        exercise_id = lift["exercise_id"]
+        working = [s for _, _, _, exercise in slots(doc) if exercise["exercise_id"] == exercise_id
+                   for s in base.expand(exercise["sets"]) if s.working and s.target_reps is not None]
+        if not any(stats.reps_to_failure(s.target_reps, s.rpe) <= stats.MAX_REPS_TO_FAILURE for s in working):
+            found.append(f"priority_no_e1rm: {exercise_id}'s priority e1RM KPI has no prescribed working set "
+                         f"within {stats.MAX_REPS_TO_FAILURE} reps to failure; model evidence may stay unavailable. "
+                         "Choose top_load/top_reps or include an eligible normal exposure.")
     return found
 
 

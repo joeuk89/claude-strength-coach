@@ -311,8 +311,12 @@ class _View:
         return doc, session
 
     @cached_property
+    def capacity(self):
+        return stats.e1rm_series(self.root, as_of=self.as_of)
+
+    @cached_property
     def series(self):
-        return stats.e1rm_series(self.root, as_of=self.as_of)["series"]
+        return self.capacity["series"]
 
     @cached_property
     def weeks(self):
@@ -630,8 +634,10 @@ def render_progress(root, as_of, view=None):
 
 
 def _lifts_table(view):
+    notes = [f"{view.name(exercise_id)} ({observed[-1]['date']}): {stats.capacity_note(observed[-1])}."
+             for exercise_id, observed in view.capacity["observations"].items() if not observed[-1]["comparable"]]
     if not view.series:
-        return ["No e1RM yet: it comes from logged working sets of barbell, dumbbell and machine lifts."]
+        return ["No comparable e1RM yet: model evidence is unavailable.", ""] + notes
     cutoff = (view.today - timedelta(days=CHANGE_DAYS)).isoformat()
     rows = [_row(["Lift", f"Best e1RM ({view.unit})", "Date", "Latest", f"{CHANGE_DAYS}-day change"]),
             "|---|---|---|---|---|"]
@@ -643,7 +649,7 @@ def _lifts_table(view):
         suffix = view.per_hand(exercise_id)
         rows.append(_row([view.name(exercise_id), _num(best["e1rm"]) + suffix, _long_date(best["date"]),
                           _num(latest["e1rm"]) + suffix, _signed(change)]))
-    return rows
+    return rows + ([""] + notes if notes else [])
 
 
 def _bodyweight(view):

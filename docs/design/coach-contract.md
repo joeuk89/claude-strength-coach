@@ -1591,13 +1591,16 @@ references into the program. `program validate` reports all of them;
 `state show` refuses an invalid state the same way.
 `coach.program.warnings(doc)` lists what a valid program may keep but
 should not, each warning starting with its code. `program validate`
-puts them in the envelope's `warnings` and still exits 0. One code so
-far: `fixed_reps_no_e1rm`, for a `fixed_reps_rpe` slot with a working
+puts them in the envelope's `warnings` and still exits 0. Codes include
+`fixed_reps_no_e1rm`, for a `fixed_reps_rpe` slot with a working
 group past `stats.MAX_REPS_TO_FAILURE` reps to failure (its reps, or
 its range's start, plus 10 − RPE). Its sets give no e1RM, so its load
 holds unless another line of the exercise supplies one. The warning
 names the exercise, the session and the reps to failure, and suggests
-`double_progression`.
+`double_progression`. `priority_no_e1rm` names a priority lift whose
+`e1rm` KPI has no working set in any of its slots within the cap, using
+the start of a rep range plus the prescribed reps in reserve. It suggests
+`top_load`/`top_reps` or an eligible normal exposure; it does not block adoption.
 
 **A corrected load mode** (`program reconcile-mode ID --basis
 old|confirmed [--input FILE] [--dry-run]`). A line whose `load_mode`
@@ -1944,6 +1947,37 @@ rounded half up to 2 decimals; `load` is the number the formula used
 (bodyweight plus added load for `bodyweight`). Body-measurement weights
 come from the Hevy cache.
 
+`data.observations[exercise_id]` retains every resolved working exposure,
+including unsupported estimates and recovery work. Each row carries
+`date`, `workout_id`, `session_id`, `load_mode`, `eligible` (at least one
+set supports an estimate), `comparable` (eligible normal work), `reason`,
+`context`, `e1rm` (best eligible set, or null), and `sets`. Each set records
+`set_index`, formula `load`, `reps`, `rpe`, `reps_to_failure`, nullable
+`e1rm`, `eligible`, `reason` and `method`. Exclusion reasons include
+`over_rep_cap`, `excluded`, `suspect_convention`, `unsupported_load_mode`,
+`missing_load_or_reps`, and exposure-level `recovery_context`.
+
+Only comparable normal exposures enter `series`, `best`, `delta`,
+check-in capacity changes, progress tables and priority e1RM KPIs.
+Recovery observations can have an eligible estimate without representing
+capacity loss. Check-in `e1rm_notes` and progress text explain omitted
+observations; the raw values remain inspectable through `stats e1rm` and
+history. No lower-bound estimate is invented above the cap.
+
+C17 exposures also carry their stored `overlay_id` and additive
+`capacity_context = {kind, overlay_id, decision_id}`. Context uses the
+stored overlay when known, otherwise the approved overlay in force:
+`deload` kind, adopted `light_week` decisions (`deload`, `light`, `return`),
+actual return reductions in line `provenance.decay`, or an explicit
+matching adopted override that reduces working-set count, load, reps or
+RPE without increasing another of those measures (`reduced`; increased
+assistance is a load reduction). It never
+infers recovery from a `one_off` name or free text. Unknown context is
+`normal`. Decisions withdrawn before the exposure do not apply; a later
+withdrawal does not erase the exposure's historical recovery context.
+Neither this context nor capacity eligibility excludes an exposure from
+progression: return-week logs remain the next week's baseline.
+
 **Adherence per overlay.** `stats adherence (--overlay ID | --span A..B)`:
 
 - Planned sessions: those of the overlay in force on each date (C10),
@@ -2232,7 +2266,13 @@ coach.validity.estimate_minutes(root, session) -> int
   that session.
   R-24 reads `coach.statusdays` only once R-43 has added it.
 - **Feasibility** uses C18's `implied_rpe` with the best e1RM point in
-  the 42 days before the session date (none older): implied RPE above
+  the 42 days before the session date (none older), using comparable
+  normal work. If the newest usable observation exceeds the rep
+  cap and has no eligible set, older estimates become unavailable for
+  feasibility and scheme model inputs. Returned prescription-check lines
+  expose `model_evidence` with `estimate`, `reason`, `date` and an
+  explanation. The existing no-e1RM load-step guard, equipment checks,
+  return rules and progression rules still apply. Implied RPE above
   10.5 is `unearned_load`; otherwise an RPE target more than 1 from the
   implied RPE is `rpe_infeasible` (rn:autoregulation.6). Only working
   sets of `total`, `per_hand_x2` and `single_implement` lines are judged
@@ -4588,7 +4628,10 @@ which must be of the same `root` and `now`.
 `as_of` (an aware datetime, default None = no bound): workouts started at
 or before it (a workout with no start time: dated on or before its local
 date), annotations created at or before it, and body weights dated on or
-before its local date. Withdrawals created later do not apply.
+before its local date. Withdrawals created later do not apply. Capacity
+context only reads overlays created and approved by `as_of`, and
+recovery decisions made by then; later decision withdrawals cannot
+change that snapshot.
 
 **Publishing** (roadmap decision 1). `pages publish --overlay ID [--record D]`:
 

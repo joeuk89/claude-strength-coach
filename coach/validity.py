@@ -115,8 +115,12 @@ class _History:
 
     def series(self):
         if self._series is None:
-            self._series = stats.e1rm_series(self.root)["series"]
-        return self._series
+            self._series = stats.e1rm_series(self.root)
+        return self._series["series"]
+
+    def evidence(self, exercise_id, session_date):
+        self.series()
+        return stats.capacity_evidence(self._series, exercise_id, session_date, E1RM_WINDOW_DAYS)
 
     def workouts(self):
         if self._workouts is None:
@@ -443,10 +447,7 @@ class _Checker:
         return list(dict.fromkeys(missing))
 
     def best_e1rm(self, exercise_id, session_date):
-        start = (session_date - timedelta(days=E1RM_WINDOW_DAYS)).isoformat()
-        points = [p for p in self.history.series().get(exercise_id, [])
-                  if start <= p["date"] < session_date.isoformat()]
-        return max(points, key=lambda p: (p["e1rm"], p["date"])) if points else None
+        return self.history.evidence(exercise_id, session_date)["estimate"]
 
     def feasibility(self, session, session_date, line, working, facts):
         sets = [(s, history.coaching_number(s["load"]), _reps(s)) for s in working if self.sound(line, s.get("load"))]
@@ -454,6 +455,7 @@ class _Checker:
         if not sets:
             return
         best = self.best_e1rm(line["exercise_id"], session_date) if line["load_mode"] in FEASIBILITY_MODES else None
+        self.lines[-1]["model_evidence"] = self.history.evidence(line["exercise_id"], session_date)
         if best is None:
             self.unearned_without_e1rm(session, line, sets, facts)
             return

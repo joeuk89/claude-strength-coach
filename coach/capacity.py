@@ -1,0 +1,78 @@
+"""Recovery context for capacity comparisons; logged progression baselines stay intact."""
+
+from datetime import timedelta
+
+from coach import dates, decisions, overlay
+
+
+class Context:
+    def __init__(self, root, as_of=None):
+        self.as_of = as_of
+        self.decisions = [d for d in decisions.load(root)["decisions"] if d["outcome"] == "adopted"
+                          and (as_of is None or dates.parse_timestamp(d["made_at"]) <= as_of)]
+        self.overlays = [doc for doc in overlay.list(root) if overlay.is_approved(doc)
+                         and (as_of is None or (dates.parse_timestamp(doc["created_at"]) <= as_of
+                              and dates.parse_timestamp(doc["approval"]["approved_at"]) <= as_of))]
+
+    def for_exposure(self, exposure):
+        context = {"kind": "normal", "overlay_id": None, "decision_id": None}
+        day = dates.parse_date(exposure["date"])
+        for decision in self.decisions:
+            if decision["kind"] != "light_week" or not self.applies(decision, exposure):
+                continue
+            start = dates.parse_date(decision["details"]["week"])
+            if start <= day < start + timedelta(days=7):
+                context.update(kind=decision["details"]["type"], decision_id=decision["id"])
+        if exposure.get("overlay_id"):
+            doc = next((d for d in self.overlays if d["id"] == exposure["overlay_id"]), None)
+        else:
+            found = overlay.pick_in_force(self.overlays, exposure["date"])
+            doc = found[0] if found else None
+        if doc is None:
+            return context
+        sessions = [s for s in doc["sessions"] if s["session_id"] == exposure["session_id"]]
+        if not sessions:
+            return context
+        session = min(sessions, key=lambda s: abs((dates.parse_date(s["date"])
+                                                  - dates.parse_date(exposure["date"])).days))
+        line = next((e for e in session["exercises"] if e["exercise_id"] == exposure["exercise_id"]), None)
+        if line is None:
+            return context
+        context["overlay_id"] = doc["id"]
+        if doc["kind"] == "deload":
+            context["kind"] = "deload"
+        decay = (line.get("provenance") or {}).get("decay")
+        if decay and (decay["load_factor"] < 1 or decay["set_delta"] < 0 or decay["rpe_cap"] is not None):
+            context["kind"] = "return"
+        overrides = [d for d in self.decisions if d["kind"] == "override" and d["overlay_id"] == doc["id"]
+                     and d["scope"] == {"session_id": exposure["session_id"], "exercise_id": exposure["exercise_id"]}
+                     and self.applies(d, exposure)]
+        chosen = max(overrides, key=lambda d: (d["made_at"], d["id"]), default=None)
+        if chosen and _reduced(chosen, exposure["load_mode"]):
+            context.update(kind="reduced", decision_id=chosen["id"])
+        return context
+
+    def applies(self, decision, exposure):
+        closed = decision["closed_at"]
+        if decision["status"] == "withdrawn" and closed:
+            if (self.as_of is None or dates.parse_timestamp(closed) <= self.as_of) and closed[:10] <= exposure["date"]:
+                return False
+        return decision["until"] is None or exposure["date"] <= decision["until"]
+
+
+def _reduced(decision, load_mode):
+    proposed = [s for s in decision["proposed_sets"] or [] if overlay.is_working(s)]
+    chosen = [s for s in decision["chosen_sets"] or [] if overlay.is_working(s)]
+    if not proposed or not chosen or len(chosen) > len(proposed):
+        return False
+    reduced = len(chosen) < len(proposed)
+    for before, after in zip(proposed, chosen):
+        for key in ("load", "reps", "rpe"):
+            old, new = before.get(key), after.get(key)
+            if old is not None and new is not None:
+                if key == "load" and load_mode == "assisted":
+                    old, new = -old, -new
+                if new > old:
+                    return False
+                reduced |= new < old
+    return reduced
