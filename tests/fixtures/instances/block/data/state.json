@@ -1,0 +1,51 @@
+{
+  "schema_version": 4,
+  "rotation": {
+    "position": null,
+    "confirmed": true,
+    "confirmed_at": null,
+    "week": null
+  },
+  "block": {
+    "id": "b-0001",
+    "started": "2026-08-31",
+    "hard_weeks_completed": 0,
+    "last_closed_week": null,
+    "last_deep_review": "2026-09-27",
+    "light_week": {
+      "status": "not_due",
+      "type": null,
+      "reason": null,
+      "week": null,
+      "decision_id": null
+    }
+  },
+  "one_off": null,
+  "scheme_state": {
+    "session-a/bb_back_squat": {
+      "scheme": null,
+      "data": {},
+      "pending": null
+    },
+    "session-a/db_bench_press": {
+      "scheme": null,
+      "data": {},
+      "pending": null
+    }
+  },
+  "hevy": {
+    "routines": {
+      "00000000-0000-4000-8000-000000000001": {
+        "session_id": "session-a"
+      },
+      "00000000-0000-4000-8000-000000000002": {
+        "session_id": "session-b"
+      }
+    },
+    "folders": {
+      "program": 1,
+      "one_off": null
+    },
+    "temporary_routines": []
+  }
+}
