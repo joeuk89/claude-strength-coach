@@ -1972,7 +1972,7 @@ Reserved codes:
 |---|---|---|---|---|
 | `convention_slip` | warn | R-20 | | Dumbbell exposure jumped exactly 2× or ½× at the same reps and RPE; excluded from e1RM and progression until annotated. |
 | `duration_over_cap` | info | R-20 | | A logged workout ran longer than its session cap. |
-| `stale_prescription` | block | R-24 | | Line derived from an exposure outside the validity window and not decayed to its band, or above the RPE 7 cap on the first session after an illness. |
+| `stale_prescription` | block | R-24 | | Line derived from an exposure outside the validity window and not decayed to its band, or above the `ILLNESS_RPE_CAP` (7) cap on the first session after an illness. |
 | `unearned_load` | block | R-24 | | Load predicted beyond failure for the prescribed reps, or, with no e1RM, more than two increments above the last exposure. |
 | `load_cap` | block | R-24 | | Load above `[caps]` or `dumbbell_max`. |
 | `load_unrepresentable` | block | R-24 | | Load cannot be built from the available increments, dumbbells or plates. |
@@ -1981,9 +1981,9 @@ Reserved codes:
 | `session_over_cap` | warn | R-24 | | Estimated session duration above its cap. |
 | `no_data` | warn | R-23a | | No usable exposure and no start load; load left empty for the coach. |
 | `stalled` | warn | R-23a | | No load or rep gain over three exposures running. |
-| `rpe_drift` | warn | R-23a | | Compound or recovery-capped exercise: logged RPE at least 1 over target on two or more working sets of the last exposure (R-05). |
+| `rpe_drift` | warn | R-23a | | Compound or recovery-capped exercise: logged RPE at least 1 over target on two or more working sets of the last exposure. |
 | `return_week` | info | R-23a | | Decay applied; names the band and days off. |
-| `return_after_illness` | warn | R-23a | | An `ill` miss or status day in the gap: confirm 48 hours symptom-free; first session capped at RPE 7 (R-02). |
+| `return_after_illness` | warn | R-23a | | An `ill` miss or status day in the gap: confirm `SYMPTOM_FREE_HOURS` (48) hours symptom-free; first session capped at RPE `ILLNESS_RPE_CAP` (7). |
 | `constraint_applied` | info | R-23a | | A cap, a slot constraint or a niggle constraint changed the proposal. |
 | `override_standing` | info | R-23a | | A standing override was applied again instead of the scheme's proposal. |
 | `scheme_reset` | warn | R-23a | | A slot's scheme changed; its state restarted. |
@@ -2096,13 +2096,17 @@ coach.validity.estimate_minutes(root, session) -> int
   working load on each side.
 - A line with a `no_data` flag (C10) gets no R-24 flag but
   `load_mode_mismatch`.
-- Illness (R-02): when an `ill` miss annotation or an `ill` status day
+- Illness (R-02, rn:detraining-return.4, a heuristic for mild illness
+  above the neck): when an `ill` miss annotation or an `ill` status day
   (C50; `coach.statusdays.ill_in(root, span)`, added by R-43) falls in the
-  gap, the first session of the span must cap every set at RPE 7; R-23a
-  applies it and raises `return_after_illness`; R-24 checks it and
-  raises `stale_prescription` on each line of that session with a
-  working set over RPE 7 or without an RPE. The gap runs from the day
-  after the last lifting workout to the day before that session.
+  gap, the first session of the span must cap every set at
+  `ILLNESS_RPE_CAP` (RPE 7); R-23a applies it and raises
+  `return_after_illness`; R-24 checks it and raises `stale_prescription`
+  on each line of that session with a working set over the cap or
+  without an RPE. Text the athlete reads takes the 48 hours and the cap
+  from `SYMPTOM_FREE_HOURS` and `ILLNESS_RPE_CAP`, never a literal. The
+  gap runs from the day after the last lifting workout to the day before
+  that session.
   R-24 reads `coach.statusdays` only once R-43 has added it.
 - **Feasibility** uses C18's `implied_rpe` with the best e1RM point in
   the 42 days before the session date (none older): implied RPE above
@@ -2854,8 +2858,9 @@ the files, other than the note itself, that cite any of its claims. Exit
 0; exit 1 only if a note fails validation.
 
 **`research show REF`**: REF is a note id (data block, status, path) or a
-claim ref (claim, its sources in full, its note's status, and the local
-note superseding it, if any). Unknown REF exits 1.
+claim ref, with or without its `rn:` prefix (claim, its sources in full,
+its note's status, and the local note superseding it, if any). Unknown
+REF exits 1.
 
 **`research cites [--unresolved]`**: every reference found by the scan as
 `{ref, path, line, scope, resolved, retired}`.
@@ -3619,7 +3624,8 @@ coach.checkin.skeleton(root, date, tier=None, overlay_id=None, refresh=False, dr
 coach.checkin.mode_for(found, day) -> (mode, deep_reasons)                   # R-21b; due() and prepare() share it
 coach.checkin.tag_gap(root, today, tag, now=None, dry_run=False) -> dict      # R-21b
 coach.checkin_catchup.return_brief(root, config, now, proposal_id=None, overlay_id=None, reason="layoff") -> dict   # R-21b
-CATCH_UP_AFTER_DAYS = 10    # R-02's first return band ends at 10 days
+coach.checkin.catch_up_after_days() -> int     # validity.RETURN_BANDS[0].upper (10)
+coach.checkin.DEEP_AFTER_DAYS = 42             # rn:deloads.12
 ```
 
 The message renderer is `card_text`, not `render_card`: the C11 sweep
@@ -3628,10 +3634,11 @@ and `render_card` would capture R-33b's `card` regions.
 
 - **Window**: day after the last record's date to today (`--until` sets
   the end). No record: from the program's first overlay span start.
-- **Mode**: `catch_up` when `days_since > CATCH_UP_AFTER_DAYS`.
-  Otherwise `deep` when there is no record, the last deep record is 42 or
-  more days old, a card part adds a reason, or `--tier deep`; else
-  `weekly`. `--tier weekly` or `--tier deep` overrides a catch-up. A
+- **Mode**: `catch_up` when `days_since > catch_up_after_days()`, the
+  first return band's upper edge (C22).
+  Otherwise `deep` when there is no record, the last deep record is
+  `DEEP_AFTER_DAYS` (42, rn:deloads.12) or more days old, a card part
+  adds a reason, or `--tier deep`; else `weekly`. `--tier weekly` or `--tier deep` overrides a catch-up. A
   catch-up never runs deep; it sets `deep_deferred: true` (a record-based
   deep reason, or a part's tier reason), and its `tier_reasons` are the
   gap (`"28 days since the last check-in, over 10"`) plus `"deep review
@@ -3898,8 +3905,9 @@ as it was):
   (band, load and set change, RPE cap); (3) per-session lines; (4) what
   happens after (normal progression from the logged loads, R-02); (5) the
   write line. `ill` adds R-02's safety lines (48 hours symptom-free first;
-  first session at RPE 7 or below; fever, chest symptoms or a slow recovery
-  mean checking with a qualified professional first). `travel` and
+  first session at RPE 7 or below; fever, chest symptoms, other whole-body
+  symptoms or a slow recovery mean checking with a qualified professional
+  first; rn:detraining-return.4). `travel` and
   `no_kit` take a coach-built one-off overlay. Read-only; the coach may
   edit the words before presenting. Exactly one of `--proposal` and
   `--overlay` (exit 2 otherwise). Output: `text`, `days_off`, `band`,
@@ -4702,7 +4710,7 @@ Rules (R-02's prose, scripted; the prose stays the human copy):
   starts at zero. A week whose overlay carries a `22-42` decay classes as
   `return`.
 - The next check-in is deep (`deep_review.due`) when six weeks have passed
-  since the last deep close, a light week is being proposed, R-30a's
+  since the last deep close (rn:deloads.12), a light week is being proposed, R-30a's
   structural flags are raised (coach mode only: in run mode, C44, no
   `adherence_trigger` decision is ever recorded to clear them), a
   catch-up check-in deferred a due deep review, or on the first close;
@@ -4783,7 +4791,7 @@ Flags (registered in `coach/flags/block.py`; rows in C20):
   `coach.checkin.deep_reasons` over the `check-ins/` records, with
   `state.block.last_deep_review` counted as one more deep record:
   `first_close` when no deep review is on record, `six_weeks` when
-  `checkin.DEEP_AFTER_DAYS` (42) or more have passed since the newest;
+  `checkin.DEEP_AFTER_DAYS` (42, rn:deloads.12) or more have passed since the newest;
   `catch_up_deferred` when `coach.checkin.deferred_reason` finds a
   catch-up that put a due deep review off; `light_week_proposed`; and
   `restructure_required` (the adherence

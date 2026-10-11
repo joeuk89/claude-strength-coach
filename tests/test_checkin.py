@@ -14,7 +14,7 @@ from unittest import mock
 import coach.checkin_parts
 import coach.checks
 import coach.commands
-from coach import checkin, flags
+from coach import checkin, flags, validity
 from tests.support import INSTANCES, REPO_ROOT
 from tests.support.history import R_A, R_B, W, HistoryCase, read_json, write_json
 
@@ -89,8 +89,14 @@ class RecordsTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             self.assertEqual(checkin.due(Path(tmp), date(2026, 10, 15)).mode, "first")
 
-    def test_catch_up_threshold_is_r02s_first_return_band(self):
-        self.assertEqual(checkin.CATCH_UP_AFTER_DAYS, 10)
+    def test_catch_up_threshold_is_the_first_return_bands_upper_edge(self):
+        self.assertEqual(checkin.catch_up_after_days(), 10)
+        found = [checkin.Record(date(2026, 10, 1), "deep", Path("check-ins/2026-10-01.md"))]
+        self.assertEqual(checkin.mode_for(found, date(2026, 10, 13))[0], checkin.CATCH_UP)
+        wider = (validity.RETURN_BANDS[0]._replace(upper=14),) + validity.RETURN_BANDS[1:]
+        with mock.patch.object(validity, "RETURN_BANDS", wider):
+            self.assertEqual(checkin.catch_up_after_days(), 14)
+            self.assertEqual(checkin.mode_for(found, date(2026, 10, 13))[0], "weekly")
 
 
 class DueCommandTest(CheckinCase):

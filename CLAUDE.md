@@ -108,8 +108,9 @@ anything. Rules that always apply:
   design from scratch), or redesign it at a block boundary.
 - **`/check-in`** — weekly progress review: one Sunday message,
   pre-filled from the log, that the athlete answers in one reply. Runs a
-  deeper block-level review when one is 6+ weeks overdue, a light week
-  is being proposed, or the adherence trigger fires. Suggest one if it's
+  deeper block-level review when the last one is 6+ weeks old
+  (rn:deloads.12), a light week is being proposed, or the adherence
+  trigger fires. Suggest one if it's
   been over a week since the last entry in `check-ins/` and the
   conversation is heading that way anyway.
 - **`/program-week`** — the weekly programming pass: coach-set loads,
@@ -279,9 +280,12 @@ and its sources.
   | 22–42 | loads −10 %, one working set fewer per exercise (rn:detraining-return.3) |
   | 43+ | a re-test: every load −15 % from its pre-layoff working load, every set at RPE 7 or below, one working set fewer; next week's loads come from what this week logged (rn:detraining-return.3) |
 
-  **Illness adds:** no training until 48 hours symptom-free, and every exercise in the first session back capped at RPE 7, whatever the gap (rn:detraining-return.4).
-  Fever, chest symptoms or a slow recovery mean the athlete checks with a
-  qualified professional before training again.
+  The bands are coaching heuristics: the cuts are deeper than the measured strength loss, to ease the athlete back in, and the next week's progression corrects them from what the return week logged (rn:detraining-return.3).
+
+  **Illness adds:** after a mild illness with symptoms above the neck only, no training until 48 hours symptom-free, and every exercise in the first session back capped at RPE 7, whatever the gap (rn:detraining-return.4).
+  This is a coaching heuristic too: no study sets a fixed symptom-free period (rn:detraining-return.4).
+  Fever, chest symptoms, other whole-body symptoms or a slow recovery mean
+  the athlete checks with a qualified professional before training again.
 - **Prescription validity** — a prescription is only as current as the
   exposure it came from.
   Strength changes little in the first 2 weeks without training and fades after that (rn:detraining-return.1), so a lift's load decays by the return bands above.

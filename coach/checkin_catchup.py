@@ -1,11 +1,11 @@
 """Catch-up mode: the card after a long gap, one tag for the gap, and the return brief (contract C36).
 
-After more than `CATCH_UP_AFTER_DAYS` without a check-in the card stops
-asking about each session. It shows one summary row per week, asks three
-questions and carries the proposed return week, so one "ok" settles the
-check-in. The return brief is the coach's brief for the week back,
-whatever caused the gap: illness and layoffs from a proposal, travel and
-no kit from a coach-built one-off overlay.
+After more than `checkin.catch_up_after_days()` days without a check-in
+the card stops asking about each session. It shows one summary row per
+week, asks three questions and carries the proposed return week, so one
+"ok" settles the check-in. The return brief is the coach's brief for the
+week back, whatever caused the gap: illness and layoffs from a proposal,
+travel and no kit from a coach-built one-off overlay.
 """
 
 from datetime import timedelta
@@ -438,8 +438,8 @@ def return_brief(root, config, now, proposal_id=None, overlay_id=None, reason="l
     text = [f"**The gap.** {gap}", "", f"**This week.** {week}"]
     if ill:
         text += ["", f"**Before you train.** Train only once you have been {validity.SYMPTOM_FREE_HOURS} hours "
-                     "symptom-free. Fever, chest symptoms or a slow recovery mean checking with a qualified "
-                     "professional before training again."]
+                     "symptom-free. Fever, chest symptoms, other whole-body symptoms or a slow recovery mean "
+                     "checking with a qualified professional before training again."]
     text += ["", "**Sessions**"]
     for session in sessions:
         cap = f" (RPE cap {session['rpe_cap']})" if session["rpe_cap"] is not None else ""

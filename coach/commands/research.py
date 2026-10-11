@@ -67,7 +67,7 @@ def status(args, ctx):
 def show(args, ctx):
     today = ctx.today()
     notes = _load(ctx)
-    parsed = research.parse_ref(args.ref)
+    parsed = research.parse_ref(args.ref) or research.parse_ref(f"rn:{args.ref}")
     note_id = parsed[0] if parsed else args.ref
     note = next((n for n in notes if n.id == note_id), None)
     claim = note.claim(parsed[1]) if note and parsed else None
