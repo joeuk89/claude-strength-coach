@@ -4,7 +4,7 @@ import copy
 import json
 import re
 
-from coach import dates, flags, missed, overlay, propose, render
+from coach import dates, flags, jsonio, missed, overlay, propose, render
 from coach.library import Library
 from tests.support import INSTANCES, REPO_ROOT
 from tests.support.activity import write_hevy_cache
@@ -447,9 +447,9 @@ class MigrationTest(MissedCase):
         doc["approval"]["hash"] = overlay.approval_hash(doc)
         write_json(path, doc)
 
-    def v2_program(self):
+    def v3_program(self):
         def change(doc):
-            doc["schema_version"] = 2
+            doc["schema_version"] = 3
             doc["missed_day_rules"] = [
                 {"id": "miss-0001", "session_id": "session-a", "condition": "Session A missed",
                  "action": "train it Tue"},
@@ -459,13 +459,13 @@ class MigrationTest(MissedCase):
         self.edit_json("data/program.json", change)
 
     def test_run_upgrades_free_text_rules_to_manual_and_adds_overlay_nulls(self):
-        self.v2_program()
+        self.v3_program()
         self.v2_overlay()
         data = self.coach("migrate", "run")["data"]
         rule_notes = [n for n in data["notes"] if "missed-day rule" in n]
         self.assertEqual(len(rule_notes), 2)
         program_doc = read_json(self.root / "data" / "program.json")
-        self.assertEqual(program_doc["schema_version"], 3)
+        self.assertEqual(program_doc["schema_version"], jsonio.current_version(jsonio.load_schema("program")))
         self.assertEqual(program_doc["missed_day_rules"][0], {
             "id": "miss-0001", "session_id": "session-a", "text": "Session A missed → train it Tue", "when": {},
             "action": {"kind": "manual"}})
@@ -477,7 +477,7 @@ class MigrationTest(MissedCase):
         self.assertTrue(self.coach("program", "validate")["data"]["valid"])
 
     def test_dry_run_lists_approved_overlays_that_lose_approval_and_writes_nothing(self):
-        self.v2_program()
+        self.v3_program()
         self.v2_overlay()
         before = self.snapshot()
         data = self.coach("migrate", "run", "--dry-run")["data"]
@@ -485,7 +485,7 @@ class MigrationTest(MissedCase):
         self.assertTrue(any(f"{WEEKLY} loses its approval" in n for n in data["notes"]), data["notes"])
         steps = {row["path"]: row["steps"] for row in data["files"]}
         self.assertEqual(steps[f"data/overlays/{WEEKLY}.json"], ["overlay/0002_fold_marker"])
-        self.assertEqual(steps["data/program.json"], ["program/0002_executable_missed_day_rules"])
+        self.assertEqual(steps["data/program.json"], ["program/0003_executable_missed_day_rules"])
 
 
 class RegistrationTest(MissedCase):

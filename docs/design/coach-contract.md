@@ -3944,7 +3944,7 @@ changed lines and moved sessions carry `missed_day_rule` (info). It runs
 
 **Built with R-22** (details the text above leaves open):
 
-- Rule shape (program v3): `when` is `{}` or `{"min_days_left": n}`;
+- Rule shape (program v4): `when` is `{}` or `{"min_days_left": n}`;
   `action.kind` is one of the four kinds; `fold` takes `into` and
   `exercises` (each `{exercise_id, sets?, rpe?}`, `sets` ≥ 1, default 2),
   `shift` takes `to_weekdays` (weekday ids), and `skip` and `manual` take

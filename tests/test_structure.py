@@ -9,7 +9,7 @@ from datetime import date
 from pathlib import Path
 from unittest import mock
 
-from coach import decisions, flags, jsonio, program, stats, structure
+from coach import decisions, flags, jsonio, migrate, program, stats, structure
 from coach.library import MUSCLES, Library
 from tests.support import INSTANCES, VALID, run_cli
 from tests.support.history import read_json, write_json
@@ -591,16 +591,17 @@ class ProgramDoseTargetsTest(StructureCase):
         schema = jsonio.load_schema("program")
         self.assertEqual(tuple(schema["$defs"]["dose_targets"]["properties"]), MUSCLES)
 
-    def test_migrate_run_adds_empty_targets_to_the_previous_version(self):
+    def test_migrate_run_adds_empty_targets_to_the_version_before_them(self):
         current = jsonio.current_version(jsonio.load_schema("program"))
+        [step] = [s for s in migrate.registry().documents["program"].steps if s.name.endswith("_dose_targets")]
 
         def older(doc):
-            doc["schema_version"] = current - 1
+            doc["schema_version"] = step.from_version
             doc.pop("dose_targets", None)
         self.edit("data/program.json", older)
         data = self.data("migrate", "run")
         self.assertEqual([(f["path"], f["from"], f["to"]) for f in data["files"]],
-                         [("data/program.json", current - 1, current)])
+                         [("data/program.json", step.from_version, current)])
         migrated = read_json(self.root / "data" / "program.json")
         self.assertEqual(migrated["dose_targets"], {})
         self.assertEqual(program.load(self.root)["dose_targets"], {})
