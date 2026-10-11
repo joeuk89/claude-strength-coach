@@ -57,6 +57,17 @@ weekdays, alternating templates anchored to an external session,
 next-in-sequence, or an explicit calendar.
 _Avoid_: rotation (one kind of schedule rule), split
 
+**Load mode**:
+How an exercise is loaded in a given program slot, which fixes how the
+weight the athlete sets relates to the **Hevy value** (the `weight_kg`
+Hevy stores). With two dumbbells (`per_hand_x2`) the **per-hand** load is
+what each dumbbell weighs and the Hevy value is twice it: 25/hand is Hevy
+50. With one implement (`single_implement`) the two numbers match. The
+other modes are `total` (bar or stack), `bodyweight` (added load),
+`assisted` (assistance), and `band`, `duration` and `distance`, which
+carry no load. A property of the slot, not of the exercise's name.
+_Avoid_: load type, dumbbell weight (ambiguous between per-hand and Hevy value)
+
 **Coach's brief**:
 The narrative presentation of a proposed training week, given to the
 athlete for approval before anything is written: week focus, what's
