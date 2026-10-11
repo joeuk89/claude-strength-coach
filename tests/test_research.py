@@ -111,7 +111,7 @@ class ValidInstanceTest(InstanceCase):
             self.assertEqual(statuses[check_id], ["pass"], (check_id, rows))
 
     def test_check_from_the_command_line(self):
-        code, envelope, stderr = run_module(["--root", str(VALID), "check"])
+        code, envelope, stderr = run_module(["--root", str(VALID), "check"], env=NOW)
         self.assertEqual(code, 0, (envelope, stderr))
         statuses = {row["id"]: row["status"] for row in envelope["data"]["results"]}
         for check_id in RESEARCH_CHECKS:
