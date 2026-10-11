@@ -495,7 +495,7 @@ class HeaderFactsTest(PagesCase):
         self.assertEqual(found["checkin"]["data"], facts["checkin"])
         self.assertIn("(deep)", found["checkin"]["lines"][0])
         self.edit_json("data/state.json", lambda s: s.update(rotation={"position": "week-b", "confirmed": False,
-                                                                       "confirmed_at": None}))
+                                                                       "confirmed_at": None, "week": None}))
         with mock.patch.object(pages._View, "facts", new=property(lambda self: dict(
                 fake_facts(), rotation={"position": "week-a", "confirmed": True}))):
             program = status.collect(self.root, date(2026, 10, 14), env=self.env)
