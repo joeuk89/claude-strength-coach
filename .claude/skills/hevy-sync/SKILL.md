@@ -92,28 +92,40 @@ pick:
    then run `python3 -m coach program validate` and `python3 -m coach
    program render`. The overlay in force still holds the old shape:
    the next programming pass carries the change into the week.
-2. **Adopt the plan** → push it to Hevy (step 4).
+2. **Adopt the plan** → Hevy gets the plan's version in step 4, once
+   every discrepancy is settled.
 3. **Discuss / neither** — sometimes the right answer is a third option;
-   design it together, then apply it to the program data and to Hevy.
+   design it together, apply it to `data/program.json` as in option 1,
+   and let it reach Hevy through `/program-week` (step 4).
 
 After any program edit, re-check the day before and after (the rotation
 must stay clash-free) and the program's weekly balance.
 
 ## 4. Writing to Hevy
 
-Hevy is written only through an approved overlay. The athlete's choice
-in step 3 names the routine.
+Hevy is written only through an approved overlay, and `routines push`
+has no per-routine filter: it rewrites **every** routine in the
+overlay's span that differs from the overlay. So write once, after
+every discrepancy is settled.
 
-- When `overlay current` shows the overlay in force as `approved` (its
-  approval still holds), run `python3 -m coach routines push --overlay
-  <id>`. The permission
-  prompt shows exactly what it will write; it rewrites the whole
-  routine, notes included, so nothing the overlay lacks survives — fold
-  any Hevy note worth keeping into the program's `cues` first. A push
-  that exits 3 was refused by a guard: report its reason, never retry
-  it by hand.
-- When there is no approved overlay for the span, the change goes out
-  with the next programming pass: offer `/program-week`.
+- Run `python3 -m coach routines diff --overlay <id>` again and show
+  the athlete every routine it lists with changes — that is exactly
+  what a push writes, loads and notes included.
+- Push the overlay in force only when `overlay current` shows it
+  `approved` (its approval still holds) **and** every routine with a
+  structural change in that diff is one the athlete chose to adopt from
+  the plan. Then run `python3 -m coach routines push --overlay <id>`.
+  The permission prompt shows exactly what it will write; it rewrites
+  the whole routine, notes included, so nothing the overlay lacks
+  survives — fold any Hevy note worth keeping into the program's
+  `cues` first. A push that exits 3 was refused by a guard: report its
+  reason, never retry it by hand.
+- If any discrepancy was resolved "adopt Hevy" or "neither", don't push
+  the overlay in force: it still holds the old shape and would write it
+  back over the routine the athlete kept. Send the plan-side changes
+  through `/program-week` instead — its new overlay carries the adopted
+  shape. Offer `/program-week` too when no approved overlay covers the
+  span.
 - New exercise in the plan? It needs a library entry with a Hevy
   template: `python3 -m coach library search <name>`, then `python3 -m
   coach library seed` after the next pull if the athlete added it in

@@ -1,7 +1,6 @@
 """The skills call the Phase 1 commands instead of the Hevy API (contract preamble, C2, C3, C10, C12, C16)."""
 
 import re
-import shutil
 import tempfile
 import unittest
 from pathlib import Path

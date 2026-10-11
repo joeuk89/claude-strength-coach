@@ -141,10 +141,15 @@ print both numbers.
    by JSONPath. Fix the draft, put the id in it, and build again.
 5. `python3 -m coach overlay render <id> --into <check-in record>`
    fills the region.
-6. **Hevy users:** `python3 -m coach routines diff --overlay <id>`. It
-   lists each routine in the span that already exists by its Hevy
-   title. Temp sessions have no routine yet, so it exits 1 naming them:
-   "go" creates or reuses one each, under the session's title.
+6. **Hevy users:** `python3 -m coach routines diff --overlay <id>`. With
+   every session mapped to a routine, it lists each routine in the span
+   by its Hevy title. Temp sessions have no routine yet, so it exits 1
+   naming them — and then it lists nothing, not even the routines that
+   exist. Name them another way: "go" creates or reuses a routine for
+   each session the exit-1 message names, under the session's title;
+   every other session's routine keeps its own Hevy title (`state
+   show` maps it to the session, and `.coach/cache/hevy/routines.json`
+   holds the title).
 
 A tweak to the brief means: edit the draft, then build, validate and
 render again.
@@ -163,7 +168,7 @@ first:
    `overlay render`, concrete enough to train directly.
 4. **The write line** — the brief's last line names exactly what "go"
    will write: each routine by the Hevy title it will carry, from
-   `routines diff` and the temp sessions' titles.
+   `routines diff`, or from the titles step 3.6 names when it exited 1.
 
    `Reply "go" to train this and write: Deload Mon — Lower, Deload Wed — Upper (Hevy).`
 

@@ -207,8 +207,8 @@ Record any other gap once as "not supplied" and move on.
 Show the athlete only loads in their own units, from `units convert`.
 **Judge against the effective prescription**, not the base plan — the
 overlay in force for each day (`python3 -m coach overlay current --date
-<day>`): the weekly overlay `/program-week` wrote, or the deload or
-one-off overlay `/one-off-week` wrote. With an overlay, adherence is
+<day>`): the overlay `/program-week` wrote (kind `weekly`), or the deload
+or one-off overlay `/one-off-week` wrote. With an overlay, adherence is
 concrete: did the athlete hit the prescribed load × reps @ RPE?
 
 **Weekly tier** — keep it light:

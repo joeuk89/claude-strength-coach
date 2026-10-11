@@ -193,7 +193,12 @@ pattern.
 6. **Hevy users:** `python3 -m coach routines diff --overlay <id>`
    lists every routine in the span by its Hevy title, with what "go"
    would change. A session with no routine makes it exit 1 naming the
-   session: "go" creates its routine, so name it by its session title.
+   session — and then it lists nothing, not even the routines that
+   exist. Name them another way: "go" creates a routine for each
+   session the exit-1 message names, under its session title; every
+   other session's routine keeps its own Hevy title (`state show` maps
+   it to the session, and `.coach/cache/hevy/routines.json` holds the
+   title).
 
 A tweak to the coach's brief (step 4) means: edit the draft, then
 build, validate and render again.
@@ -225,8 +230,9 @@ first, tables second.
    replaced one is overwritten.
 6. **The write line** — the brief's last line names exactly what "go"
    will write: each Hevy routine in the span by its Hevy title from
-   `routines diff` (every one, changed or not, plus any routine "go"
-   creates), then `data/program.json` when there's a structural change:
+   `routines diff` (every one, changed or not), or from the titles step
+   3.6 names when it exited 1 (every routine, plus any "go" creates),
+   then `data/program.json` when there's a structural change:
 
    `Reply "go" to train this and write: Upper A, Lower A, Upper B (Hevy) · data/program.json (structural change).`
 
