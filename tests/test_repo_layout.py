@@ -59,6 +59,8 @@ class NamespaceMatcherTest(unittest.TestCase):
         self.assertFalse(in_namespace("tests/fixtures/instances/valid/config.toml"))
         self.assertFalse(in_namespace("config.example.toml"))
         self.assertFalse(in_namespace("research/deloads.md"))
+        self.assertTrue(in_namespace("research/local/local-knee.md"))
+        self.assertFalse(in_namespace("tests/fixtures/instances/valid/research/local/local-fixture-knee.md"))
 
 
 @unittest.skipUnless(_in_git_checkout(), "needs the template's git checkout")

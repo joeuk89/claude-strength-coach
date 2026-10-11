@@ -58,3 +58,22 @@ PLANS_DIR = CACHE_ROOT / "plans"
 DRAFTS_DIR = CACHE_ROOT / "drafts"
 NUDGE_STATE = CACHE_ROOT / "nudge.json"
 NUDGE_LOG = CACHE_ROOT / "logs" / "nudge.log"
+
+CITATION_SCAN_FRAMEWORK = (
+    "CLAUDE.md",
+    "README.md",
+    "config.example.toml",
+    ".claude/skills/**/*.md",
+    "reference/**/*.md",
+    "research/*.md",
+    "coach/**/*.py",
+    "coach/**/*.json",
+)
+CITATION_SCAN_INSTANCE = (
+    "profile.md",
+    "check-ins/**/*.md",
+    "data/**/*.json",
+    "data/**/*.jsonl",
+    "research/local/*.md",
+    "plugins/**/*.py",
+)
