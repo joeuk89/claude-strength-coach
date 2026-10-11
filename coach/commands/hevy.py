@@ -1,4 +1,4 @@
-"""`hevy` commands: pull the cache, report on it, record test fixtures (R-12)."""
+"""`hevy` commands: pull the cache, report on it, record test fixtures (contract C2, C8, C15)."""
 
 from pathlib import Path
 

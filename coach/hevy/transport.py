@@ -6,6 +6,7 @@ never retries, rate-limits or interprets status codes; the client does.
 """
 
 import copy
+import http.client
 import json
 import os
 import socket
@@ -75,6 +76,8 @@ class UrllibTransport:
             if isinstance(exc.reason, (socket.timeout, TimeoutError)):
                 raise TransportTimeout(str(exc.reason)) from None
             raise TransportUnreachable(str(exc.reason)) from None
+        except (http.client.HTTPException, OSError) as exc:
+            raise TransportUnreachable(str(exc) or type(exc).__name__) from None
 
 
 # Collection endpoint -> (fixture file stem, response key, largest page size Hevy accepts).

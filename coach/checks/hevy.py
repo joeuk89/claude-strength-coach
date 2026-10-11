@@ -1,4 +1,4 @@
-"""Checks on the local Hevy cache (R-12)."""
+"""Checks on the local Hevy cache (contract C8, C13)."""
 
 from coach import paths
 from coach.checks import Result, check

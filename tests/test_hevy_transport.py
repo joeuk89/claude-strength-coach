@@ -1,3 +1,4 @@
+import http.client
 import io
 import os
 import socket
@@ -111,6 +112,9 @@ class UrllibTransportTest(unittest.TestCase):
             (socket.timeout("timed out"), TransportTimeout),
             (urllib.error.URLError(socket.timeout("timed out")), TransportTimeout),
             (urllib.error.URLError(OSError("no route")), TransportUnreachable),
+            (ConnectionResetError("reset by peer"), TransportUnreachable),
+            (http.client.RemoteDisconnected("closed"), TransportUnreachable),
+            (http.client.IncompleteRead(b"par"), TransportUnreachable),
         ]
         for raised, expected in cases:
             with self.subTest(raised=raised), mock.patch("urllib.request.urlopen", side_effect=raised):
