@@ -45,10 +45,12 @@ Run a **deep** check-in when any of these is true, otherwise run **weekly**:
 - **The adherence trigger fires** (step 4: under 70 %).
 - The athlete asks for one.
 
-The coming week being a deload is not a trigger on its own. Judge the
-light-week and adherence triggers from the log before sending the Sunday
-message; if the reply changes the picture (a second fatigue trigger, a
-coach-led session that didn't happen), switch to deep and say so.
+The coming week being a deload is not a trigger on its own. Before
+sending the Sunday message, run `python3 -m coach block close --week
+<this week> --dry-run`: its `deep_review` (`due`, `reasons`) applies
+these rules to the log. If the reply changes the picture (a second
+fatigue trigger, a coach-led session that didn't happen), the real close
+in step 4 says so: switch to deep and tell the athlete.
 
 The Sunday message's first line names the tier and why; the athlete can
 override. Mark the tier in the record's title line.
@@ -365,15 +367,21 @@ concrete: did the athlete hit the prescribed load × reps @ RPE?
   planning without asking for a resolution — it is a lasting
   limitation.
 
-**Both tiers — the hard-week count.** Class each week the window closes
-by the rules in `CLAUDE.md` "Coaching principles" → Fatigue management:
-a completed hard week adds one, a reset week ends the block and starts
-the next one at zero, anything else leaves it. Then check this week's
-four fatigue triggers: readiness from the reply and the workout notes,
-compound RPE drift from the drift check above (two sessions running), a
-niggle the Niggles field says was aggravated under load, and poor sleep
-from the Sleep field. The same rules say when a light week is proposed,
-watched or skipped.
+**Both tiers — the hard-week count.** Run
+`python3 -m coach block close --week <this week> --readiness poor|ok
+--sleep poor|ok` (readiness from the reply and the workout notes, sleep
+from the Sleep field; leave a flag out when the reply doesn't say; add
+`--deep` on a deep check-in). It classes every week since the last close
+by the rules in `CLAUDE.md` "Coaching principles" → Fatigue management,
+updates the count, checks the four fatigue triggers (compound RPE drift
+two sessions running and an `aggravated` niggle come from the data), and
+proposes, watches or skips a light week. It writes `data/blocks.json`
+and `block` in `data/state.json`, re-renders `routine/program.md`, and
+prints the `status_line`, `deep_review` and the block flags
+(`light_week_due`, `light_week_skipped`, `fatigue_watch`,
+`deep_review_due`). Run it again for the same week after a correction,
+or after step 7 changes a niggle's status: a second close of the same
+week replaces its entry.
 
 **Both tiers — adherence.** Adherence = sessions trained ÷ sessions
 planned over the **trailing four ordinary weeks**:
@@ -564,16 +572,9 @@ Write the prose, each section short:
 Keep the prose outside the regions under 600 words (1,000 on a deep
 record); `python3 -m coach check` warns past that.
 
-**The block status line** opens Decisions, written after this check-in
-updates `block` in `data/state.json` (step 7): the block number carried
-from the last record's line (one more when this check-in starts a new
-block), the count from `hard_weeks_completed`, and the ceiling from the
-program's `blocks.hard_weeks_ceiling`.
-`<names>` lists the fatigue triggers that fired this week (none → `triggers
-0 of 4`). `<state>` is one of: `not due`, `watch`, `skipped (<n> hard
-weeks)`, `proposed for wk of <D Mon> (<type>, <reason>)`, `agreed:
-<type>, wk of <D Mon>`, or `declined (<reason>), proposed again next
-check-in`.
+**The block status line** opens Decisions: copy `status_line` from the
+last `block close` or `block decide` you ran (`python3 -m coach block
+status` prints it again). Never write it by hand.
 
 **The adherence decision line** goes in Decisions only when the
 adherence trigger was presented or an under-80 % override was agreed, in
@@ -643,20 +644,19 @@ check-in the due one.
   to `aggravated`), or when a niggle interferes with prescribed
   training.
 - **Update `data/state.json`:** the confirmed `rotation` (`position`,
-  `confirmed`, `confirmed_at`) if the program rotates, and `block` —
-  `hard_weeks_completed` as step 4 counted it; when this check-in closes
-  a light week, the next block's `started` date, a count of 0 and
-  `deload` `done`. A proposed light week that is declined or still
-  waiting sets `deload` to `due`, and one the skip rule holds back to
-  `skipped`, each with today as `since`; `/one-off-week` sets
-  `in_progress` when it plans the week. Then run `python3 -m coach program validate`,
+  `confirmed`, `confirmed_at`) if the program rotates. `block` is
+  written only by the `block` commands (step 4 and below). Then run `python3 -m coach program validate`,
   `python3 -m coach state show` (it refuses an invalid state) and
   `python3 -m coach program render`, and write the block status line
   into the record's header (step 6).
 - **A light week proposed** at the ceiling or on two triggers: present
-  it with its reason. Agreed → invoke the **one-off-week** skill in
-  deload mode (below). Declined → record the reason in the status line;
-  at the ceiling, propose it again next check-in.
+  it with its reason. Record the answer with `python3 -m coach block
+  decide --outcome adopted` (add `--type` and `--reason` to choose
+  another type) or `--outcome declined --reason "<why>"`; at the
+  ceiling, the next close proposes it again. To call a light week
+  nobody proposed, use `--outcome adopted --type <type> --reason
+  "<why>"`. Agreed → invoke the **one-off-week** skill in deload mode
+  (below).
 - **Adherence trigger adopted** (the smaller schedule, not an
   override) → hand off to `/new-program`'s redesign path with the agreed
   smaller schedule. Under 80 % adherence (step 4), propose no new
@@ -673,6 +673,7 @@ check-in the due one.
   along in its write step; `/hevy-sync` stays for reconciliation outside
   the pass.
 - When a light week is agreed, invoke the **one-off-week** skill
-  (deload mode) to build it — its schedule and sessions fill this
-  record's "The week ahead" section, it handles the Hevy writes, and it
-  resets the hard-week count.
+  (deload mode) to build it with the `command` `block decide` printed —
+  its schedule and sessions fill this record's "The week ahead"
+  section, and it handles the Hevy writes. The count resets when the
+  next check-in closes that week.

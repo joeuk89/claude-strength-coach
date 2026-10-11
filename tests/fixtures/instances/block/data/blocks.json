@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "blocks": [
+    {
+      "id": "b-0001",
+      "started": "2026-08-31",
+      "seed_hard_weeks": 0,
+      "seed_reason": null,
+      "ended": null,
+      "end_reason": null,
+      "weeks": []
+    }
+  ]
+}

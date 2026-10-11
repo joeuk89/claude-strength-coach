@@ -1,0 +1,58 @@
+{
+  "title": "Block ledger, data/blocks.json: every block and each week it closed (contract C42)",
+  "type": "object",
+  "required": ["schema_version", "blocks"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": 1},
+    "blocks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "started", "seed_hard_weeks", "seed_reason", "ended", "end_reason", "weeks"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string", "pattern": "^b-\\d{4,}$"},
+          "started": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+          "seed_hard_weeks": {"type": "integer", "minimum": 0},
+          "seed_reason": {"type": ["string", "null"], "pattern": "\\S"},
+          "ended": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+          "end_reason": {"enum": ["light", "return", "low", null]},
+          "weeks": {"type": "array", "items": {"$ref": "#/$defs/week"}}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "week": {
+      "type": "object",
+      "required": ["week", "class", "planned", "trained", "as_prescribed", "signals", "triggers", "count_after",
+                   "outcome", "deep", "closed_at"],
+      "additionalProperties": false,
+      "properties": {
+        "week": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+        "class": {"enum": ["hard", "partial", "low", "light", "return", "one_off"]},
+        "planned": {"type": "integer", "minimum": 0},
+        "trained": {"type": "integer", "minimum": 0},
+        "as_prescribed": {"type": "integer", "minimum": 0},
+        "signals": {
+          "type": "object",
+          "required": ["readiness", "sleep", "sleep_source", "rpe_drift", "niggle"],
+          "additionalProperties": false,
+          "properties": {
+            "readiness": {"enum": ["poor", "ok", "unknown"]},
+            "sleep": {"enum": ["poor", "ok", "unknown"]},
+            "sleep_source": {"enum": ["athlete", "sleep_debt", "none"]},
+            "rpe_drift": {"type": "boolean"},
+            "niggle": {"type": "boolean"}
+          }
+        },
+        "triggers": {"type": "array", "items": {"enum": ["readiness", "rpe_drift", "niggle", "sleep"]}},
+        "count_after": {"type": "integer", "minimum": 0},
+        "outcome": {"enum": ["none", "watch", "due", "skipped"]},
+        "deep": {"type": "boolean"},
+        "closed_at": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"}
+      }
+    }
+  }
+}

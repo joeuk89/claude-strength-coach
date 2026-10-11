@@ -42,7 +42,8 @@ coach scripts" sets out.
   .coach/drafts/program.json --dry-run` and, once they agree, the same
   without `--dry-run`. Adopt validates the draft (exit 1 names each
   problem by JSONPath), writes `data/program.json` and
-  `data/state.json` (block started today, the rotation at `--position`
+  `data/state.json` (the current block carried over, or one started
+  today for a first program; the rotation at `--position`
   or the schedule rule's first position, `hevy.routines` from the
   draft), renders `routine/program.md` and one page per session, and
   stages the files without committing. Never write a new

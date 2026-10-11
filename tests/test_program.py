@@ -364,7 +364,7 @@ class ChecksTest(unittest.TestCase):
 
     def test_state_schema_fails(self):
         results = self.assert_status(INSTANCES / "state-bad-schema", "state_schema", 1, "fail")
-        self.assertIn("$.block.deload.status", results[0]["message"])
+        self.assertIn("$.block.light_week.status", results[0]["message"])
         self.assertEqual(results[0]["path"], "data/state.json")
 
 

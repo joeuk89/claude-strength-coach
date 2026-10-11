@@ -4,11 +4,14 @@ Each owned document type is a subpackage `coach/migrations/<schema name>/`
 whose `__init__.py` sets `FILES` (glob patterns relative to the instance
 root). Its steps are modules `NNNN_<slug>.py` defining `DOC`, `FROM`, `TO`
 (= FROM + 1) and `migrate(doc) -> doc`, and optionally
-`notes(before, after) -> list[str]` for the run's report. The target
+`notes(before, after) -> list[str]` for the run's report and
+`creates(before, after) -> {path: doc}` for documents the step brings into
+being (written only where no file exists yet). The target
 version is the `schema_version` const in `coach/schemas/<schema name>.schema.json`.
 """
 
 import copy
+import fnmatch
 import importlib.util
 import json
 import re
@@ -38,6 +41,7 @@ class Step:
     to_version: int
     migrate: object
     notes: object = None
+    creates: object = None
 
 
 @dataclass
@@ -109,7 +113,8 @@ def _steps(doc_dir, document):
                                 f"{document.target}")
         if any(step.from_version == module.FROM for step in steps):
             raise RegistryError(f"{document.name} has two steps from version {module.FROM}")
-        steps.append(Step(name, document.name, module.FROM, module.TO, module.migrate, getattr(module, "notes", None)))
+        steps.append(Step(name, document.name, module.FROM, module.TO, module.migrate, getattr(module, "notes", None),
+                          getattr(module, "creates", None)))
     return sorted(steps, key=lambda step: step.from_version)
 
 
@@ -184,9 +189,9 @@ def plan(root, reg=None):
 
 
 def _migrated(root, entry, document):
-    """(new document, notes, errors) for one plan entry."""
+    """(new document, notes, errors, created {path: doc}) for one plan entry."""
     doc = json.loads((Path(root) / entry["path"]).read_text(encoding="utf-8"))
-    notes = []
+    notes, created = [], {}
     for name in entry["steps"]:
         step = next(s for s in document.steps if s.name == name)
         before = copy.deepcopy(doc)
@@ -194,9 +199,24 @@ def _migrated(root, entry, document):
         doc["schema_version"] = step.to_version
         if step.notes is not None:
             notes += list(step.notes(before, doc))
+        if step.creates is not None:
+            created.update(step.creates(before, doc))
     errors = [{"path": f"{entry['path']}: {error.path}", "message": error.message}
               for error in validate_schema(doc, document.schema)]
-    return doc, notes, errors
+    return doc, notes, errors, created
+
+
+def _owner(reg, relative):
+    return next((document for document in reg.documents.values()
+                 if any(fnmatch.fnmatchcase(relative, pattern) for pattern in document.files)), None)
+
+
+def _created_errors(reg, relative, doc):
+    document = _owner(reg, relative)
+    if document is None:
+        return [{"path": relative, "message": "a migration step created a file no owned document declares"}]
+    return [{"path": f"{relative}: {error.path}", "message": error.message}
+            for error in validate_schema(doc, document.schema)]
 
 
 def _backup_dir(root, now):
@@ -241,7 +261,8 @@ def run(root, dry_run, now=None, reg=None):
     root = Path(root)
     now = now or datetime.now(timezone.utc)
     entries, problems = plan(root, reg)
-    report = {"files": entries, "notes": [], "backup": None, "written": False, "staged": [], "warnings": []}
+    report = {"files": entries, "notes": [], "created": [], "backup": None, "written": False, "staged": [],
+              "warnings": []}
     if problems:
         raise ValidationError(f"{len(problems)} file(s) cannot be migrated", details=problems)
     if not entries:
@@ -256,12 +277,16 @@ def run(root, dry_run, now=None, reg=None):
             shutil.copy2(root / entry["path"], target)
         report["backup"] = backup.relative_to(root).as_posix()
 
-    results, errors = [], []
+    results, errors, created = [], [], {}
     for entry in entries:
-        doc, notes, doc_errors = _migrated(root, entry, reg.documents[entry["doc"]])
+        doc, notes, doc_errors, new_files = _migrated(root, entry, reg.documents[entry["doc"]])
         results.append((entry["path"], doc))
         report["notes"] += notes
         errors += doc_errors
+        created.update({relative: new for relative, new in new_files.items() if not (root / relative).exists()})
+    for relative, doc in sorted(created.items()):
+        errors += _created_errors(reg, relative, doc)
+    report["created"] = sorted(created)
     if errors:
         where = f"; the originals are unchanged and backed up in {report['backup']}" if backup else ""
         raise ValidationError(f"A migration step produced an invalid document ({len(errors)} problem(s)){where}",
@@ -273,11 +298,15 @@ def run(root, dry_run, now=None, reg=None):
     try:
         for relative, doc in results:
             jsonio.write_doc(root / relative, doc, False)
+        for relative, doc in sorted(created.items()):
+            jsonio.write_doc(root / relative, doc, False)
     except BaseException:
         _restore(root, backup, relatives)
+        for relative in created:
+            (root / relative).unlink(missing_ok=True)
         raise
     report["written"] = True
-    report["staged"], warning = stage(root, relatives)
+    report["staged"], warning = stage(root, relatives + sorted(created))
     if warning:
         report["warnings"].append(warning)
     return report

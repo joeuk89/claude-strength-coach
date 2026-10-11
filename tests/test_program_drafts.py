@@ -447,8 +447,10 @@ class AdoptOnEmptyTest(AdoptCase):
         code, envelope, _ = self.adopt(self.root, self.draft())
         self.assertEqual(code, 0, envelope)
         state = read(self.root, "data/state.json")
-        self.assertEqual(state["block"], {"started": "2026-10-11", "hard_weeks_completed": 0,
-                                          "deload": {"status": "not_due", "since": None}})
+        self.assertEqual(state["block"], {"id": "b-0001", "started": "2026-10-11", "hard_weeks_completed": 0,
+                                          "last_closed_week": None, "last_deep_review": None,
+                                          "light_week": {"status": "not_due", "type": None, "reason": None,
+                                                         "week": None, "decision_id": None}})
         self.assertEqual(state["rotation"], {"position": None, "confirmed": True, "confirmed_at": None, "week": None})
         self.assertEqual(state["scheme_state"], {})
         self.assertEqual(state["hevy"], {"routines": {ROUTINE_A: {"session_id": "session-a"},
@@ -623,6 +625,7 @@ class AdoptReplaceTest(AdoptCase):
                          old_state["scheme_state"]["session-a/bb_back_squat"])
         self.assertEqual(envelope["data"]["scheme_state"], {"kept": ["session-a/bb_back_squat"],
                                                             "dropped": ["session-a/db_bench_press"]})
+        self.assertEqual(state["block"], old_state["block"])
 
     def test_a_second_adoption_the_same_day_archives_beside_the_first(self):
         for _ in range(2):

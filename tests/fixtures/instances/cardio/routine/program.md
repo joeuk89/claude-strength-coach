@@ -20,6 +20,8 @@ None.
 
 Light week after at most 6 completed hard weeks. Deload rule: standard.
 
+Status: Block 1 · 2 of 6 hard weeks · triggers 0 of 4 · light week: not due
+
 ## If a day is missed
 
 No rules yet.

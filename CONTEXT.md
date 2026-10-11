@@ -81,6 +81,35 @@ The stretch of hard training between one light week and the next,
 counted in completed hard weeks rather than calendar weeks.
 _Avoid_: mesocycle, cycle, phase (reserved for bulk/cut/maintain)
 
+**Completed hard week**:
+A program week in which at least three quarters of the planned core and
+coach-led sessions were trained as prescribed: most of the prescribed
+working sets logged, at about the target effort. It adds one to the
+block's count; a light week, a return week or a week under half trained
+ends the block.
+_Avoid_: hard week (alone), training week, core-complete week (a different count)
+
+**Light week**:
+A week of reduced training that ends a block: a **deload** (the
+program's deload rule), a **light** week (fewer sets at held loads) or a
+**return** week (one set fewer after a layoff or illness). It is proposed
+at the block's ceiling or on two fatigue triggers, and agreed or declined
+by the athlete.
+_Avoid_: rest week, recovery week, deload (one kind of light week)
+
+**Fatigue trigger**:
+One of four signs a block needs a light week: poor readiness the athlete
+reports, RPE drift on a compound lift two sessions running, a niggle
+aggravated under load, and poor sleep for most of the week. Two in a
+week propose a light week; one is a watch.
+_Avoid_: fatigue flag, warning sign
+
+**Block ledger**:
+`data/blocks.json`: every block and each week a check-in closed in it,
+with the week's class, counts, signals and outcome. The block in
+`data/state.json` is its summary.
+_Avoid_: block log, block history
+
 **Overlay**:
 The per-exercise prescription in force for a span of days: loads, sets,
 reps, intensity and notes, as approved by the athlete. Adherence is judged

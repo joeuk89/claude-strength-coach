@@ -73,8 +73,15 @@ def _date(value, path, errors):
 def _dates(doc):
     errors = []
     _date(doc["rotation"]["confirmed_at"], "$.rotation.confirmed_at", errors)
-    _date(doc["block"]["started"], "$.block.started", errors)
-    _date(doc["block"]["deload"]["since"], "$.block.deload.since", errors)
+    block = doc["block"]
+    for key in ("started", "last_closed_week", "last_deep_review"):
+        _date(block[key], f"$.block.{key}", errors)
+    light = block["light_week"]
+    _date(light["week"], "$.block.light_week.week", errors)
+    if light["status"] in ("proposed", "agreed", "declined") and light["type"] is None:
+        errors.append(Error("$.block.light_week.type", f"a {light['status']} light week names its type"))
+    if light["status"] in ("not_due", "watch", "skipped") and any(light[k] for k in ("type", "reason", "week")):
+        errors.append(Error("$.block.light_week", f"a light week that is {light['status']} has no type, reason or week"))
     if doc["one_off"] is not None:
         start = _date(doc["one_off"]["span"]["start"], "$.one_off.span.start", errors)
         end = _date(doc["one_off"]["span"]["end"], "$.one_off.span.end", errors)

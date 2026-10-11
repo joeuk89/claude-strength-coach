@@ -186,16 +186,16 @@ class StatusCommandTest(unittest.TestCase):
 
     def test_program_reports_block_and_rotation(self):
         found = sections(self.run_status())["program"]
-        self.assertIn("Hard weeks completed: 2", text(found))
-        self.assertIn("deload not due", text(found))
+        self.assertIn("Block 1 · 2 of 6 hard weeks · triggers 0 of 4 · light week: not due", text(found))
         copy = TempCopy(self)
         state = json.loads((copy.root / "data/state.json").read_text(encoding="utf-8"))
         state["rotation"] = {"position": "week-b", "confirmed": False, "confirmed_at": None, "week": None}
-        state["block"]["deload"] = {"status": "due", "since": "2026-10-11"}
+        state["block"]["light_week"] = {"status": "proposed", "type": "deload", "reason": "ceiling",
+                                        "week": "2026-10-12", "decision_id": None}
         copy.write("data/state.json", json.dumps(state, indent=2) + "\n")
         found = copy.status()["program"]
         self.assertIn("Rotation: week-b, not confirmed", text(found))
-        self.assertIn("deload due", text(found))
+        self.assertIn("light week: proposed for wk of 12 Oct (deload, ceiling)", text(found))
         self.assertEqual(found["level"], "attention")
 
     def test_checkin_due_after_seven_days(self):

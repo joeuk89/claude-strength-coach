@@ -89,7 +89,7 @@ def snapshot(root):
 class DiscoveryTest(unittest.TestCase):
     def test_framework_registry_owns_the_json_documents(self):
         reg = migrate.registry()
-        self.assertEqual(sorted(reg.documents), ["annotations", "decisions", "exercise_library", "followups",
+        self.assertEqual(sorted(reg.documents), ["annotations", "blocks", "decisions", "exercise_library", "followups",
                                                "history_month", "niggles", "overlay", "program", "state",
                                                "status_days"])
         self.assertEqual(reg.documents["program"].files, ("data/program.json",))
@@ -129,7 +129,9 @@ class StatusAndPlanTest(unittest.TestCase):
     def test_status_on_the_valid_instance(self):
         rows = migrate.status(VALID)
         paths = {row["path"]: row for row in rows}
-        expected = {"data/program.json": PROGRAM_CURRENT, "data/state.json": 3, "data/exercises.json": 1, OVERLAY: CURRENT}
+        expected = {"data/program.json": PROGRAM_CURRENT,
+                    "data/state.json": jsonio.current_version(jsonio.load_schema("state")),
+                    "data/exercises.json": 1, OVERLAY: CURRENT}
         for path, version in expected.items():
             with self.subTest(path=path):
                 self.assertEqual(paths[path]["version"], version)

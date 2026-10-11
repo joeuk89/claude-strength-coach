@@ -302,12 +302,13 @@ def render_all(root):
         raise ValidationError(f"{paths.PROGRAM} is not valid ({len(errors)} problem(s)); "
                               "run python3 -m coach program validate",
                               details=[error.to_json() for error in errors])
-    return render_doc(doc, library, config.athlete.units)
+    from coach import block
+    return render_doc(doc, library, config.athlete.units, block.status_line(root))
 
 
-def render_doc(doc, library, unit):
-    """{relative path: text} for a valid, normalised program document."""
-    pages = {PROGRAM_PAGE: render_program_page(doc, library)}
+def render_doc(doc, library, unit, status_line=None):
+    """{relative path: text} for a valid, normalised program document; `status_line` is the block's (C43)."""
+    pages = {PROGRAM_PAGE: render_program_page(doc, library, status_line)}
     for session in doc["sessions"]:
         pages[page_path(session["id"])] = render_session_page(session, library, unit)
     return pages
@@ -455,7 +456,7 @@ def _sets_by_muscle(estimated):
     return ", ".join(f"{muscle.replace('_', ' ')} {estimated[muscle]}" for muscle in MUSCLES if muscle in estimated)
 
 
-def render_program_page(doc, library=None):
+def render_program_page(doc, library=None, status_line=None):
     lines = [header(), f"# {doc['name']}", "", "## Sessions", ""]
     lines.append(_row(["Session", "Id", "Kind", "Tier", "Status", "Location"]))
     lines.append("| --- | --- | --- | --- | --- | --- |")
@@ -482,6 +483,8 @@ def render_program_page(doc, library=None):
     lines += ["", "## Blocks and light weeks", "",
               f"Light week after at most {blocks['hard_weeks_ceiling']} completed hard weeks. "
               f"Deload rule: {_named(blocks['deload_rule']['name'], blocks['deload_rule']['params'])}."]
+    if status_line:
+        lines += ["", f"Status: {status_line}"]
 
     lines += ["", "## If a day is missed", ""]
     if doc["missed_day_rules"]:

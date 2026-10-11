@@ -1,5 +1,5 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "rotation": {
     "position": null,
     "confirmed": true,
@@ -7,11 +7,17 @@
     "week": null
   },
   "block": {
+    "id": "b-0001",
     "started": "2026-09-28",
     "hard_weeks_completed": 2,
-    "deload": {
+    "last_closed_week": null,
+    "last_deep_review": null,
+    "light_week": {
       "status": "pending",
-      "since": null
+      "type": null,
+      "reason": null,
+      "week": null,
+      "decision_id": null
     }
   },
   "one_off": null,
