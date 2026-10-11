@@ -11,7 +11,7 @@ from unittest import mock
 from coach import dates, jsonio, overlay, routines, units
 from coach.hevy.cache import HevyCache
 from coach.validate import validate
-from tests.support import FIXTURES, VALID, run_cli
+from tests.support import FIXTURES, INSTANCES, VALID, run_cli
 from tests.support.fake_hevy import FakeHevy
 
 SYNTHETIC = FIXTURES / "hevy" / "synthetic"
@@ -508,6 +508,37 @@ class DiffFunctionTest(unittest.TestCase):
         for set_ in stored["exercises"][0]["sets"]:
             del set_["weight_kg"]
         self.assertEqual(routines.diff(intended, stored), [])
+
+
+class DriftCheckTest(unittest.TestCase):
+    def check(self, root, now=NOW):
+        code, envelope, stderr = run_cli(["--root", str(root), "check", "--only", "overlay_hevy_drift"],
+                                         env={"COACH_NOW": now})
+        self.assertIn(code, (0, 1), (envelope, stderr))
+        results = envelope["data"]["results"]
+        self.assertTrue(all(r["owner"] == "R-14" for r in results))
+        return results
+
+    def test_matching_cache_passes(self):
+        results = self.check(INSTANCES / "routines-pushed")
+        self.assertEqual([r["status"] for r in results], ["pass"], results)
+
+    def test_drifted_cache_warns_per_routine(self):
+        results = self.check(INSTANCES / "routines-drift")
+        self.assertEqual([r["status"] for r in results], ["warn", "warn"], results)
+        self.assertIn("Session A", results[0]["message"])
+        self.assertIn(WEEKLY, results[0]["message"])
+
+    def test_skips_without_a_cache(self):
+        self.assertEqual([r["status"] for r in self.check(VALID)], ["skip"])
+
+    def test_skips_when_hevy_is_off(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            shutil.copytree(INSTANCES / "routines-drift", tmp, dirs_exist_ok=True)
+            path = Path(tmp, "config.toml")
+            path.write_text(path.read_text(encoding="utf-8").replace("enabled = true", "enabled = false"),
+                            encoding="utf-8")
+            self.assertEqual([r["status"] for r in self.check(tmp)], ["skip"])
 
 
 if __name__ == "__main__":
