@@ -90,7 +90,22 @@ def _phase(text):
     if name not in PHASES or rate is None:
         raise ValidationError(f"--phase takes PHASE:RATE, a phase of {', '.join(PHASES)} and its weekly rate in "
                               f"bodyweight units (cut:-0.5), found {text!r}")
+    problem = calories.phase_problem(name, rate)
+    if problem:
+        raise ValidationError(f"--phase {text}: {problem}")
     return [name, units.json_number(rate)]
+
+
+def _check_age(age, ctx):
+    if age is None:
+        return
+    low, high = calories.AGE_RANGE
+    if not low <= age <= high:
+        raise ValidationError(f"--age is in years, between {low} and {high}; found {age:g}")
+    low, high = calories.AGE_STUDIED
+    if not low <= age <= high:
+        ctx.warn(f"age {age:g} is outside the {low}–{high} years the resting-rate equation was built on, so treat "
+                 "the calorie estimate as rougher still")
 
 
 def _calories(args, table, inputs, unit):
@@ -104,6 +119,13 @@ def _calories(args, table, inputs, unit):
                                   height_m=inputs["height_m"], age=args.age, activity=args.activity,
                                   phases=_value(inputs["phases"]))
     return estimate, estimate.pop("missing")
+
+
+def _warn_below_resting(estimate, ctx):
+    for row in (estimate or {}).get("estimates", ()):
+        if row["below_resting"]:
+            ctx.warn(f"the {row['phase']} estimate ({row['kcal']} kcal) is under the resting rate "
+                     f"({estimate['resting_kcal']} kcal): slow the rate or check the inputs before using it")
 
 
 @command(
@@ -140,7 +162,7 @@ def targets(args, ctx):
     for name, value in (("--bodyweight", args.bodyweight), ("--goal-weight", args.goal_weight),
                         ("--height", args.height), ("--recent-intake", args.recent_intake)):
         _positive(name, value)
-    _positive("--age", args.age)
+    _check_age(args.age, ctx)
     phases = [_phase(text) for text in args.phase or ()]
 
     unit = ctx.config["athlete"]["bodyweight_units"]
@@ -171,6 +193,7 @@ def targets(args, ctx):
                              body_fat_source=args.body_fat_source, sex=args.sex, height_m=inputs["height_m"],
                              recent_intake_g=_value(inputs["recent_intake_g"]))
     result["calories"], needed = _calories(args, table, inputs, unit)
+    _warn_below_resting(result["calories"], ctx)
     named = {item["input"] for item in result["missing"]}
     result["missing"] += [item for item in needed if item["input"] not in named]
     return {"inputs": inputs, **result}

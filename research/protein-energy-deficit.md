@@ -431,10 +431,12 @@ and obese) derived "REE (males) = 10 x weight (kg) + 6.25 x height (cm) -
 compared the four equations most used in practice and found Mifflin–St
 Jeor "the most reliable, predicting RMR within 10% of measured in more
 nonobese and obese individuals than any other equation", with "noteworthy
-errors" for individuals. Lifters may sit above it: ten Haaf and Weijs
-(2014, 90 recreational athletes aged 18–35 training ~9 hours a week)
-found Mifflin and the other general equations under 50 % accurate, and
-advise an athlete-specific equation. The estimate stays on Mifflin–St
+errors" for individuals. Athletes tend to sit above it: ten Haaf and
+Weijs (2014, 90 recreational athletes aged 18–35 training ~9 hours a
+week) note that "REE in athletes is underestimated by the majority of
+the existing equations", found Mifflin and the other general equations
+under 50 % accurate, and saw every equation "underestimate a higher
+REE". They advise an athlete-specific equation. The estimate stays on Mifflin–St
 Jeor as the standard with systematic-review support for adults
 generally; the weight trend corrects the gap (claim 16).
 

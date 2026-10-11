@@ -3679,11 +3679,19 @@ dates unique:
     method, resting_kcal, activity_level, maintenance_kcal, estimates,
     refs}`: resting rate by Mifflin–St Jeor from bodyweight, height, age
     and sex (rounded to 1 kcal), times the activity level (`sedentary`
-    1.53, `active` 1.76, `vigorous` 2.25) for maintenance, and one
-    `{phase, rate_per_week, unit, adjustment_kcal, kcal}` per phase,
-    where the adjustment is the rate in kg × 7700 ÷ 7 and `maintenance_kcal`
-    and `kcal` round to the nearest 50 kcal. The numbers are null and
-    `estimates` empty while an input is missing. Refs: claims 14–16.
+    1.53, `active` 1.76, `vigorous` 2.25) and rounded to the nearest
+    50 kcal for `maintenance_kcal`, and one `{phase, rate_per_week, unit,
+    adjustment_kcal, kcal, below_resting}` per phase: the adjustment is
+    the rate in kg × 7700 ÷ 7 (rounded to 1 kcal) and `kcal` is
+    `maintenance_kcal` plus it, rounded to the nearest 50 kcal. A `kcal`
+    under `resting_kcal` sets `below_resting` and adds a warning. The
+    numbers are null and `estimates` empty while an input is missing.
+    Refs: claims 14–16.
+  - Exit 1 for a phase rate that isn't finite, a sign that doesn't fit
+    the phase (`cut` below 0, `bulk` above 0, `maintain` and `recomp`
+    0), or, with a bodyweight, a `cut` over 1 % or a `bulk` over 0.5 % of
+    bodyweight a week (claims 11, 12); for an `--age` outside 13–120. An
+    age outside 19–78, the equation's sample, adds a warning.
   - `missing`: `{input, flag, why}` for each input the rules still need,
     in order: `bodyweight`, then the one the basis needs next (`sex`,
     `height` or `goal_weight`), then `recent_intake`, then any the

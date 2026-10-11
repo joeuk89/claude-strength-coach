@@ -4,6 +4,7 @@ import json
 import unittest
 
 from coach import calories, protein, research
+from coach.errors import ValidationError
 from tests.support import INSTANCES, REPO_ROOT, VALID, run_cli
 from tests.test_nutrition import InstanceCopy, edit_config
 
@@ -219,7 +220,8 @@ class CalorieTest(unittest.TestCase):
         self.assertEqual((result["resting_kcal"], result["activity_level"], result["maintenance_kcal"]),
                          (1780, 1.76, 3150))
         rows = [(e["phase"], e["rate_per_week"], e["adjustment_kcal"], e["kcal"]) for e in result["estimates"]]
-        self.assertEqual(rows, [("cut", -0.5, -550, 2600), ("maintain", 0, 0, 3150), ("bulk", 0.25, 275, 3400)])
+        self.assertEqual(rows, [("cut", -0.5, -550, 2600), ("maintain", 0, 0, 3150), ("bulk", 0.25, 275, 3450)])
+        self.assertEqual([e["below_resting"] for e in result["estimates"]], [False, False, False])
         self.assertIn("Mifflin", result["method"])
         self.assertEqual(result["refs"], [REF + "14", REF + "15", REF + "16"])
         self.assertEqual(result["missing"], [])
@@ -245,6 +247,34 @@ class CalorieTest(unittest.TestCase):
     def test_the_activity_levels_are_the_fao_reference_lifestyles(self):
         self.assertEqual(calories.ACTIVITY_LEVEL, {"sedentary": 1.53, "active": 1.76, "vigorous": 2.25})
         self.assertEqual(calories.KCAL_PER_KG, 7700)
+
+    def test_method_names_the_numbers_it_uses(self):
+        for needle in ("Mifflin–St Jeor", str(calories.KCAL_PER_KG), str(calories.ROUND_KCAL)):
+            self.assertIn(needle, calories.METHOD)
+
+    def test_kcal_is_the_shown_maintenance_plus_the_shown_adjustment(self):
+        result = estimate(**self.MAN, phases=[("cut", -0.6)])
+        row = result["estimates"][0]
+        self.assertEqual(row["adjustment_kcal"], -660)
+        self.assertEqual(row["kcal"], 2500)
+
+    def test_an_estimate_under_the_resting_rate_is_flagged(self):
+        result = estimate(sex="female", bodyweight=55, height_m=1.6, age=60, activity="sedentary",
+                          phases=[("cut", -0.55)])
+        row = result["estimates"][0]
+        self.assertLess(row["kcal"], result["resting_kcal"])
+        self.assertIs(row["below_resting"], True)
+
+    def test_a_rate_outside_the_claims_is_refused(self):
+        for phase in (("cut", -0.9), ("bulk", 0.45)):
+            with self.subTest(phase=phase), self.assertRaises(ValidationError):
+                estimate(**self.MAN, phases=[phase])
+        self.assertEqual(estimate(**self.MAN, phases=[("cut", -0.8), ("bulk", 0.4)])["missing"], [])
+
+    def test_a_rate_against_its_phase_is_refused(self):
+        for phase in (("cut", 0.2), ("bulk", -0.2), ("maintain", 0.1), ("recomp", -0.1)):
+            with self.subTest(phase=phase), self.assertRaises(ValidationError):
+                estimate(**self.MAN, phases=[phase])
 
 
 def run(root, *argv, env=NOW):
@@ -368,10 +398,37 @@ class CliTest(unittest.TestCase):
         self.assertEqual(missing(data), ["height", "sex", "age", "activity"])
 
     def test_a_bad_phase_exits_1(self):
-        for value in ("cut", "shred:-0.5", "cut:fast"):
+        for value in ("cut", "shred:-0.5", "cut:fast", "cut:nan", "cut:inf", "cut:0.5", "bulk:-0.2",
+                      "maintain:0.1"):
             with self.subTest(value=value):
                 code, envelope = run(VALID, "--phase", value)
                 self.assertEqual(code, 1, envelope)
+
+    def test_a_rate_outside_the_claims_exits_1(self):
+        code, envelope = run(INSTANCES / "empty", "--app", "none", "--bodyweight", "80", "--height", "180",
+                             "--age", "30", "--sex", "male", "--activity", "active", "--phase", "cut:-1.5")
+        self.assertEqual(code, 1, envelope)
+        self.assertIn("1 %", envelope["error"]["message"])
+
+    def test_age(self):
+        base = ("--app", "none", "--bodyweight", "80", "--height", "180", "--sex", "male", "--activity", "active",
+                "--recent-intake", "100", "--phase", "maintain:0")
+        for age in ("0", "5", "150"):
+            with self.subTest(age=age):
+                code, envelope = run(INSTANCES / "empty", *base, "--age", age)
+                self.assertEqual(code, 1, envelope)
+        code, envelope = run(INSTANCES / "empty", *base, "--age", "82")
+        self.assertEqual(code, 0, envelope)
+        self.assertTrue(any("19–78" in warning for warning in envelope["warnings"]), envelope["warnings"])
+        code, envelope = run(INSTANCES / "empty", *base, "--age", "40")
+        self.assertEqual(envelope["warnings"], [])
+
+    def test_an_estimate_under_the_resting_rate_warns(self):
+        code, envelope = run(INSTANCES / "empty", "--app", "none", "--bodyweight", "55", "--height", "160",
+                             "--age", "60", "--sex", "female", "--activity", "sedentary", "--recent-intake", "80",
+                             "--phase", "cut:-0.55")
+        self.assertEqual(code, 0, envelope)
+        self.assertTrue(any("resting" in warning for warning in envelope["warnings"]), envelope["warnings"])
 
     def test_output_is_json_serialisable(self):
         json.dumps(self.ok(VALID, "--height", "180"))
