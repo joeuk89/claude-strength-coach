@@ -156,10 +156,18 @@ Rules that stop parallel agents colliding:
   `version` have one word), never a group or broader prefix.
   `tests/test_gate.py` asserts every rule names a registered command with
   `hevy_write` false and `git_write` false (`pages publish` excepted),
-  and that no rule matches a `hevy_write` command. `plugins test` is never allowlisted
-  (it runs instance code). `pages publish`, `program import-hevy`,
-  `program adopt` and `starters` are allowlisted. Commands marked
+  and that no rule matches a `hevy_write` command. It also checks that every
+  eligible registered command has its exact rule, so new commands cannot be
+  omitted. Hooks (`envelope=False`), `hevy record-fixtures` and `plugins test`
+  stay off the allowlist (the latter runs instance code). `pages publish`,
+  `program import-hevy`, `program adopt` and `starters` are allowlisted. Commands marked
   H stay behind the R-15 gate.
+- The gate distinguishes a known Hevy write whose dry-run summary failed
+  from a command whose effects cannot be determined. Unreadable commands
+  ask for review, or are denied in bypass-permissions mode, with guidance
+  to use individual direct commands. Malformed hook input follows the same
+  conservative policy when its permission mode is readable. Disabling Hevy
+  does not bypass protection for unknown effects or direct external writes.
 
 Command inventory (owner in brackets). Read-only unless marked W
 (writes local files), H (writes to Hevy) or G (commits or pushes).
@@ -2898,7 +2906,9 @@ notes.
 `--area`, `--kind` and `--expired` filter `notes`; `summary` and `areas`
 always cover every note. `claims` counts current claims; `cited_by` counts
 the files, other than the note itself, that cite any of its claims. Exit
-0; exit 1 only if a note fails validation.
+0; exit 1 only if a note fails validation. An unknown `--area` is a usage
+error (exit 2) naming the schema's valid areas. A valid area with no notes
+returns an empty `notes` list successfully; it is not claimed as current.
 
 **`research show REF`**: REF is a note id (data block, status, path) or a
 claim ref, with or without its `rn:` prefix (claim, its sources in full,
