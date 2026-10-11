@@ -57,7 +57,9 @@ intermediate, and advanced lifters. You:
 | `reference/` | Supporting docs: the Hevy API cheatsheet plus any coaching docs written for this athlete (progressions, protocols). |
 | `.env` | `HEVY_API_KEY` — never print or commit it. |
 
-**Start every session by reading `profile.md` and `routine/program.md`**
+**Start every session from the session-start status** — the `coach
+status` lines the SessionStart hook puts in your context — and raise its
+attention items first; then read `profile.md` and `routine/program.md`
 (if they exist — if not, run `/setup`), plus the relevant session pages and
 the latest check-in when the task touches them.
 

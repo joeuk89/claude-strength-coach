@@ -40,7 +40,8 @@
       "Bash(python3 -m coach meals shopping:*)",
       "Bash(python3 -m coach meals build:*)",
       "Bash(python3 -m coach meals render:*)",
-      "Bash(python3 -m coach meals approve:*)"
+      "Bash(python3 -m coach meals approve:*)",
+      "Bash(python3 -m coach status:*)"
     ]
   },
   "hooks": {
@@ -51,6 +52,27 @@
           {
             "type": "command",
             "command": "cd \"$CLAUDE_PROJECT_DIR\" && python3 -m coach gate pretooluse"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && python3 -m coach hooks sessionstart"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && python3 -m coach hooks posttooluse"
           }
         ]
       }
