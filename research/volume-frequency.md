@@ -68,7 +68,7 @@ year = 2023
 [[claims]]
 n = 1
 text = "A working range of about 10–20 hard sets per muscle per week suits most lifters: muscle growth keeps rising with weekly sets, but with diminishing returns, so more is not automatically better."
-basis = "evidence"
+basis = "heuristic"
 sources = ["pelland-2026", "schoenfeld-2017-volume", "acsm-2026"]
 status = "current"
 
@@ -107,7 +107,7 @@ status = "current"
 
 | # | Claim | Basis | Sources | Status |
 | --- | --- | --- | --- | --- |
-| 1 | A working range of about 10–20 hard sets per muscle per week suits most lifters: muscle growth keeps rising with weekly sets, but with diminishing returns, so more is not automatically better. | evidence | pelland-2026, schoenfeld-2017-volume, acsm-2026 | current |
+| 1 | A working range of about 10–20 hard sets per muscle per week suits most lifters: muscle growth keeps rising with weekly sets, but with diminishing returns, so more is not automatically better. | heuristic | pelland-2026, schoenfeld-2017-volume, acsm-2026 | current |
 | 2 | Count a hard set as 1 set for each muscle the exercise trains directly and 0.5 for each muscle it trains indirectly (fractional sets), because this count predicts growth better than counting indirect sets fully or not at all. | evidence | pelland-2026 | current |
 | 3 | About 11 fractional sets per muscle per session is the per-session ceiling: beyond it, extra sets for that muscle add little detectable growth and belong in another session. | evidence (low confidence) | remmert-2025 | current |
 | 4 | At equal weekly sets, how often a muscle is trained is a scheduling choice for hypertrophy, while training it more often adds strength, with diminishing returns. | evidence | pelland-2026, schoenfeld-2019, grgic-2018 | current |
@@ -144,12 +144,12 @@ about 0.37 % to the gain in muscle size, with a trend favouring 10 or
 more sets a week over fewer (P = 0.074). The 2026 ACSM position stand (an overview of 137 reviews)
 lists "higher volumes (≥10 sets/wk)" as one of the few variables that
 enhance hypertrophy. The lower bound of 10 is well supported. The upper
-bound of 20 is a recoverable working ceiling, not where gains stop:
-Pelland et al. found no clear plateau for hypertrophy, and their
-companion per-session paper reports the weekly point past which extra
-sets show no detectable advantage at about 31 fractional sets. Going
-above 20 is a deliberate, short-term choice for a lagging muscle, not a
-default.
+bound of 20 is not: Pelland et al. found no clear plateau for
+hypertrophy, and their companion per-session paper (Remmert et al.)
+reports the weekly point past which extra sets show no detectable
+advantage at about 31 fractional sets. So the claim is a heuristic: 20
+is a recoverable working ceiling, not where gains stop. Going above 20
+is a deliberate, short-term choice for a lagging muscle, not a default.
 
 **Claim 2.** Pelland et al. scored each indirect set as 1 ("total"), 0.5
 ("fractional") or 0 ("direct"). "The relative evidence for the

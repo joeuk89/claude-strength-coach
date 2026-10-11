@@ -60,21 +60,21 @@ status = "current"
 
 [[claims]]
 n = 3
-text = "Beginners, with under about 6 months of consistent training, can add load from one session to the next, so their main lifts use the linear scheme."
+text = "Beginners, with under about 6 months of consistent training, can add load from one session to the next or week to week, so their main lifts suit the linear scheme or double progression."
 basis = "heuristic"
 sources = ["acsm-2009", "rhea-2003"]
 status = "current"
 
 [[claims]]
 n = 4
-text = "Intermediate lifters, with about 6 months to a few years of consistent training, progress week to week or across a 3-week wave, so their main lifts use double progression or the wave scheme."
+text = "Intermediate lifters, with about 6 months to a few years of consistent training, progress week to week or across a 3-week wave, so their main lifts suit double progression, the 3-week wave or the RPE-anchored scheme."
 basis = "heuristic"
 sources = ["acsm-2009"]
 status = "current"
 
 [[claims]]
 n = 5
-text = "Advanced lifters, with years of consistent training, progress over blocks of several weeks rather than week to week, so their main lifts use the RPE-anchored scheme."
+text = "Advanced lifters, with years of consistent training, progress over blocks of several weeks rather than week to week, so their main lifts suit the RPE-anchored scheme."
 basis = "heuristic"
 sources = ["acsm-2009"]
 status = "current"
@@ -101,9 +101,9 @@ status = "current"
 | --- | --- | --- | --- | --- |
 | 1 | Strength comes fastest to untrained lifters and slows as training age rises, and trained lifters need heavier loads to keep progressing. | evidence | rhea-2003, acsm-2009 | current |
 | 2 | Raise the load once the lifter beats the current load with reps to spare: double progression adds the program's increment when every working set reaches the top of the rep range at or under the target RPE. | consensus | acsm-2009 | current |
-| 3 | Beginners, with under about 6 months of consistent training, can add load from one session to the next, so their main lifts use the linear scheme. | heuristic | acsm-2009, rhea-2003 | current |
-| 4 | Intermediate lifters, with about 6 months to a few years of consistent training, progress week to week or across a 3-week wave, so their main lifts use double progression or the wave scheme. | heuristic | acsm-2009 | current |
-| 5 | Advanced lifters, with years of consistent training, progress over blocks of several weeks rather than week to week, so their main lifts use the RPE-anchored scheme. | heuristic | acsm-2009 | current |
+| 3 | Beginners, with under about 6 months of consistent training, can add load from one session to the next or week to week, so their main lifts suit the linear scheme or double progression. | heuristic | acsm-2009, rhea-2003 | current |
+| 4 | Intermediate lifters, with about 6 months to a few years of consistent training, progress week to week or across a 3-week wave, so their main lifts suit double progression, the 3-week wave or the RPE-anchored scheme. | heuristic | acsm-2009 | current |
+| 5 | Advanced lifters, with years of consistent training, progress over blocks of several weeks rather than week to week, so their main lifts suit the RPE-anchored scheme. | heuristic | acsm-2009 | current |
 | 6 | Autoregulated loading, such as an RPE-anchored top set, builds strength at least as well as fixed percentages of 1RM. | evidence | hickmott-2022, zhang-2021 | current |
 | 7 | Every training age needs progressive overload, but no one periodization model consistently beats another. | consensus | acsm-2026, acsm-2009 | current |
 
@@ -121,9 +121,10 @@ status = "current"
 
 Beginners can add load every session, intermediates week to week or over
 a short wave, and advanced lifters over blocks of weeks. Match the
-progression scheme to that pace: linear, then double progression or a
-wave, then RPE-anchored. Any scheme works as long as it keeps adding
-stimulus.
+progression scheme to that pace, with overlap between stages: linear or
+double progression for beginners; double progression, the 3-week wave or
+RPE-anchored for intermediates; RPE-anchored for advanced lifters. Any
+scheme works as long as it keeps adding stimulus.
 
 ## Evidence
 
@@ -149,9 +150,9 @@ age. The 2009 ACSM position stand defines intermediate lifters as having
 novice stage. The pace (session, week, block) is the long-standing
 coaching model, consistent with claim 1's slowing response but not
 measured directly. These claims are heuristics, and they map onto the
-framework's starter programs: `linear` for beginners, double progression
-or the 3-week wave for intermediates, and the RPE-anchored scheme for
-intermediate to advanced lifters.
+framework's starter programs: `linear` or double progression for
+beginners, double progression or the 3-week wave for intermediates, and
+the RPE-anchored scheme for intermediate to advanced lifters.
 
 **Claim 6.** Hickmott et al. (2022, 15 studies) found that autoregulated
 and standardized load prescription "produced similar improvements in
