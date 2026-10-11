@@ -50,6 +50,8 @@ class Key:
     type: "string", "integer", "number", "boolean", "date" or "list".
     default: a value, REQUIRED, OMIT (absent stays absent), or a callable
     taking `[athlete] units` (see ByUnit).
+    table: for a list, the shape of each item; the list is then an array
+    of tables, written [[name]].
     check: an extra rule, called with the value; returns an error or None.
     """
 
@@ -61,6 +63,7 @@ class Key:
     distinct: bool = False
     minimum: float = None
     positive: bool = False
+    table: "Table" = None
     check: object = None
 
 
@@ -104,6 +107,8 @@ class Config(Section):
 def _sectioned(value):
     if isinstance(value, dict):
         return Section({k: _sectioned(v) for k, v in value.items()})
+    if isinstance(value, list):
+        return [_sectioned(v) for v in value]
     return value
 
 
@@ -236,10 +241,20 @@ class _Validator:
             return type(default)(default)
         return default
 
+    def table_list(self, label, name, spec, value):
+        where = f"{label}.{name}"
+        if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
+            self.problem(where, f"[{label}] {name} must be a list of tables, written [[{where}]] "
+                                f"(found {_describe(value)})")
+            return value
+        return [self.table(f"{where}[{index}]", item, spec) for index, item in enumerate(value)]
+
     def table(self, label, raw, spec):
         out = {}
         for name, value in raw.items():
-            if name in spec.keys:
+            if name in spec.keys and spec.keys[name].table is not None:
+                out[name] = self.table_list(label, name, spec.keys[name].table, value)
+            elif name in spec.keys:
                 self.key(label, label, name, spec.keys[name], value)
                 out[name] = value
             elif name in spec.tables:
