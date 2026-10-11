@@ -112,8 +112,10 @@ it can't, then wait for the athlete's single reply. They answer by number.
 This replaces an interview: no question-by-question turns.
 
 Run `python3 -m coach checkin prepare` and send its `data.text` as the
-Sunday message. You may tighten the wording, never the numbers, the
-fields or their order. `data.card` holds the same week as data: the
+Sunday message. You may tighten the wording, and drop a field that
+cannot apply or that the athlete's opening message already answers,
+renumbering the rest. Never change the card's figures or the order of
+the fields. `data.card` holds the same week as data: the
 window (the day after the last record to today), each planned session
 trained, missed (with any tag on file) or trained but not logged, with
 durations against the session cap; each exercise's result against the
@@ -423,8 +425,8 @@ If a dated plan in `nutrition/` covers (part of) this window, the Food
 field's habits question said how it went — note learnings for the next
 `/meal-plan` run (recipe-bank changes belong in `/recipes`, not here).
 
-Record the numbers in the check-in's Weight & nutrition section; the
-readings series holds them, so they no longer go into `profile.md`.
+Record the numbers in the weight and nutrition lines of the record's
+Coach's read (step 6); the readings series holds them, so they no longer go into `profile.md`.
 
 ## 6. Write the record
 
@@ -444,8 +446,9 @@ Exit 1 means the record exists. Never edit inside a rendered region:
 correct the data (`history annotate`), then run `checkin skeleton --date
 <today> --refresh`, which re-renders the regions and leaves every other
 byte as it was. Once the week's overlay is approved (step 7), run it
-with `--refresh --overlay <id>` to add the prescription as a collapsed
-appendix.
+with `--refresh --overlay <id>` to put the prescription in a collapsed
+appendix; it also collapses a region `overlay render --into` already
+wrote.
 
 Write the prose, each section short:
 

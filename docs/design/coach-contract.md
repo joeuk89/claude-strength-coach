@@ -3454,7 +3454,8 @@ record gives the same card:
   `structural` change and a cached `updated_at` after the routine's last
   C9 `verify` line; becomes a keep-or-replace question (R-03).
   `not_written`: no `verify: true` line for this routine, that overlay and
-  its approval hash; raises `stale_routine`. Load-only edits
+  its approval hash, whatever the cache holds; raises `stale_routine`.
+  `not_cached`: written and verified, but missing from the cache. Load-only edits
   (`loads_edited`) are listed as a fact, not asked (R-03 overwrites
   them). Skipped when `[hevy] enabled` is false.
 - `flags`: C20 objects for the window: `convention_slip` (open audit
@@ -3467,7 +3468,7 @@ record gives the same card:
   and `until`. Counts each missed planned session (C18 adherence over the
   span, by its tag or `untagged`) and each `miss` annotation in the span
   that no planned session's overlay span could match, so a tagged miss is
-  counted once.
+  counted once. A session the program marks `optional` is never counted.
 - `facts` and `nudge_lines` collect the parts' contributions. Facts print
   above the fields; nudge lines are for a short reminder (R-45) and never
   print in the card.
@@ -3563,7 +3564,8 @@ as it was):
 - `--refresh` re-renders the week-review region only on the newest
   record (an older one is archive, C11), and every `overlay` region in
   the file; with `--overlay ID` it adds the collapsed prescription when
-  the record has no region for it.
+  the record has no region for it, and wraps a bare region for it (one
+  `overlay render --into` appended) in the `<details>` block.
 - Coach's read, Decisions and Next week are prose the coach writes. R-01's
   `Missed:` line lives in the region; R-02's adherence decision line and
   block status line are prose in Decisions until R-30a and R-31 script

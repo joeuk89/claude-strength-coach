@@ -143,7 +143,7 @@ class CardSessionsTest(CheckinCase):
 
     def test_e1rm_rows(self):
         rows = {r["exercise_id"]: r for r in self.card()["e1rm"]}
-        # C18's delta is latest minus previous rounded point: 121.88 − 120.33 = 1.55 (R-20's tests agree).
+        # C18's delta is latest minus previous rounded point: 121.88 − 120.33 = 1.55.
         self.assertEqual((rows["bb_back_squat"]["e1rm"], rows["bb_back_squat"]["delta"],
                           rows["bb_back_squat"]["method"]), (121.88, 1.55, "epley_rir"))
         self.assertEqual((rows["db_bench_press"]["e1rm"], rows["db_bench_press"]["delta"]), (31.5, 0))
@@ -209,6 +209,26 @@ class CardSessionsTest(CheckinCase):
         self.assertIn("Session A", stale[0]["message"])
         self.assertEqual({h["title"]: h["state"] for h in card["hevy"]}["Session A"], "not_written")
 
+    def drop_cached_routine(self, routine_id):
+        self.edit_json(".coach/cache/hevy/routines.json",
+                       lambda doc: doc.update(data=[r for r in doc["data"] if r["id"] != routine_id]))
+
+    def test_stale_routine_does_not_need_the_cache(self):
+        path = self.root / "data" / "hevy" / "writes.jsonl"
+        kept = [line for line in path.read_text(encoding="utf-8").splitlines() if R_A not in line]
+        path.write_text("\n".join(kept) + "\n", encoding="utf-8")
+        self.drop_cached_routine(R_A)
+        card = self.card()
+        stale = [f for f in card["flags"] if f["code"] == "stale_routine"]
+        self.assertEqual([f["session_id"] for f in stale], ["session-a"])
+        self.assertEqual({h["routine_id"]: h["state"] for h in card["hevy"]}[R_A], "not_written")
+
+    def test_a_written_routine_missing_from_the_cache_is_not_cached(self):
+        self.drop_cached_routine(R_A)
+        card = self.card()
+        self.assertNotIn("stale_routine", {f["code"] for f in card["flags"]})
+        self.assertEqual({h["routine_id"]: h["state"] for h in card["hevy"]}[R_A], "not_cached")
+
     def test_hevy_off_skips_the_routine_comparison(self):
         config = (self.root / "config.toml").read_text(encoding="utf-8")
         (self.root / "config.toml").write_text(config.replace("[hevy]\nenabled = true", "[hevy]\nenabled = false"),
@@ -272,6 +292,14 @@ class DeepTierTest(CheckinCase):
                    "--tag", "family")
         data = self.coach("checkin", "misses", "--since", "2026-08-30")["data"]
         self.assertEqual((data["by_tag"]["family"], data["by_tag"]["untagged"], data["sessions_missed"]), (1, 0, 4))
+
+    def test_a_skipped_optional_session_is_not_a_miss(self):
+        def make_a_optional(doc):
+            next(s for s in doc["sessions"] if s["id"] == "session-a")["tier"] = "optional"
+        self.edit_json("data/program.json", make_a_optional)
+        data = self.coach("checkin", "misses", "--since", "2026-08-30")["data"]
+        self.assertEqual(data["by_session"], {"session-b": 1})
+        self.assertEqual((data["by_tag"]["untagged"], data["sessions_missed"]), (0, 1))
 
     def test_no_record_is_a_first_deep_check_in(self):
         for path in (self.root / "check-ins").glob("*.md"):
@@ -476,6 +504,19 @@ class SkeletonTest(CheckinCase):
         self.assertEqual(after[start:], text[old_start:])
         self.assertEqual(after[:after.index("<!-- coach:begin week-review")],
                          text[:text.index("<!-- coach:begin week-review")])
+
+    def test_refresh_collapses_an_overlay_region_written_by_overlay_render(self):
+        self.skeleton()
+        self.coach("overlay", "render", "2026-10-12-weekly", "--into", str(self.root / self.RECORD))
+        self.assertNotIn("<details>", self.record())
+        self.skeleton("--refresh", "--overlay", "2026-10-12-weekly")
+        text = self.record()
+        self.assertEqual(text.count("<!-- coach:begin overlay 2026-10-12-weekly -->"), 1)
+        details = text[text.index("<details>"):text.index("</details>")]
+        self.assertIn("<!-- coach:begin overlay 2026-10-12-weekly -->", details)
+        self.assertIn("<!-- coach:end overlay 2026-10-12-weekly -->", details)
+        self.skeleton("--refresh", "--overlay", "2026-10-12-weekly")
+        self.assertEqual(self.record(), text)
 
     def test_deep_record_adds_block_planning_and_misses(self):
         self.rename("2026-09-06", "2026-08-30")

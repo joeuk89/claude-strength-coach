@@ -84,8 +84,6 @@ def _signed(value):
     return "±0" if value == 0 else f"{'+' if value > 0 else ''}{_text(value)}"
 
 
-# Records and the due date.
-
 @dataclass(frozen=True)
 class Record:
     date: date
@@ -182,8 +180,6 @@ def due(root, today):
     return Due(last, days, due_date, max(0, (today - due_date).days), mode, reasons)
 
 
-# Text helpers.
-
 def _reps(set_):
     if set_.get("rep_range") is not None:
         return f"{set_['rep_range']['start']}–{set_['rep_range']['end']}"
@@ -256,8 +252,6 @@ def _cell(value):
 def _row(cells):
     return "| " + " | ".join(_cell(c) for c in cells) + " |"
 
-
-# The card.
 
 @dataclass
 class _Instance:
@@ -463,27 +457,28 @@ def _hevy(inst, end):
         doc, session = _carried(inst, routine_id, session_id, end)
         if doc is None:
             continue
+        lines = [line for line in audit if line.get("routine_id") == routine_id]
+        written = any(line.get("overlay_id") == doc["id"] and line.get("overlay_hash") == doc["approval"]["hash"]
+                      and line.get("verified") is True for line in lines)
         cached = cache.routine(routine_id)
         entry = {"routine_id": routine_id, "title": (cached or {}).get("title") or session["title"],
                  "session_id": session_id, "overlay_id": doc["id"], "state": "not_cached", "changes": [],
                  "summary": None}
         rows.append(entry)
-        if cached is None:
-            continue
-        changes = routines.diff(routines.intended_body(doc, session, cached), cached)
-        lines = [line for line in audit if line.get("routine_id") == routine_id]
-        written = any(line.get("overlay_id") == doc["id"] and line.get("overlay_hash") == doc["approval"]["hash"]
-                      and line.get("verified") is True for line in lines)
-        verified_at = max((dates.parse_timestamp(line["at"]) for line in lines if line.get("at")), default=None)
-        updated = cached.get("updated_at")
-        edited = bool(updated) and (verified_at is None or dates.parse_timestamp(updated) > verified_at)
-        structural = [c for c in changes if c["class"] == routines.STRUCTURAL]
         if not written:
             entry["state"] = "not_written"
             raised.append(flags.make("stale_routine", session_id=session_id, message=(
                 f"{entry['title']}: routine {routine_id} does not hold overlay {doc['id']}; the last programming "
                 "pass did not write and verify it")))
-        elif structural and edited:
+            continue
+        if cached is None:
+            continue
+        changes = routines.diff(routines.intended_body(doc, session, cached), cached)
+        verified_at = max((dates.parse_timestamp(line["at"]) for line in lines if line.get("at")), default=None)
+        updated = cached.get("updated_at")
+        edited = bool(updated) and (verified_at is None or dates.parse_timestamp(updated) > verified_at)
+        structural = [c for c in changes if c["class"] == routines.STRUCTURAL]
+        if structural and edited:
             entry.update(state="edited_in_app", changes=structural)
         elif changes and edited:
             entry.update(state="loads_edited", changes=changes)
@@ -506,7 +501,8 @@ def _hevy_runs(inst, window):
 
 
 def misses(root, since, until, now=None, include_unsynced=True):
-    """Missed sessions by tag and by session: `miss` annotations plus untagged missed planned sessions (C18)."""
+    """Missed sessions by tag and by session: `miss` annotations plus untagged missed planned sessions (C18).
+    An optional session skipped is not a miss, so it is never counted."""
     since, until = _as_date(since), _as_date(until)
     by_tag = {tag: 0 for tag in history.MISS_TAGS + ("untagged",)}
     by_session = {}
@@ -515,14 +511,16 @@ def misses(root, since, until, now=None, include_unsynced=True):
         by_tag[tag or "untagged"] += 1
         by_session[session_id] = by_session.get(session_id, 0) + 1
 
+    program_doc = history.load_optional(program, root)
+    optional = {s["id"] for s in (program_doc["sessions"] if program_doc else []) if s["tier"] == "optional"}
     adherence = stats.adherence(root, span=(since, until), include_unsynced=include_unsynced, today=until, now=now)
     spans = {doc["id"]: doc["span"] for doc in overlay.list(root)}
     planned = [(row["session_id"], spans[row["overlay_id"]]) for row in adherence["sessions"]]
     for row in adherence["sessions"]:
-        if row["status"] == "missed":
+        if row["status"] == "missed" and row["session_id"] not in optional:
             count(row["tag"], row["session_id"])
     for note in history.annotations(root, "miss"):
-        if not since.isoformat() <= note["date"] <= until.isoformat():
+        if not since.isoformat() <= note["date"] <= until.isoformat() or note["session_id"] in optional:
             continue
         if any(sid == note["session_id"] and span["start"] <= note["date"] <= span["end"] for sid, span in planned):
             continue
@@ -608,8 +606,6 @@ def prepare(root, today, until=None, tier=None, now=None):
         raise ValueError(f"tier must be one of {', '.join(CARD_TIERS)}")
     return _build(root, today, until, tier, now)
 
-
-# Builtin fields: R-01's Sunday message, in R-01's order and wording.
 
 def _minutes_text(row):
     if row["minutes"] is None:
@@ -716,8 +712,6 @@ def _builtin_fields(inst, card, runs):
     }
 
 
-# Rendering the card as the Sunday message.
-
 def _e1rm_value(row):
     value = _text(row["e1rm"])
     return f"{value}/hand" if row["load_mode"] == "per_hand_x2" else value
@@ -786,8 +780,6 @@ def card_text(card):
         lines += _field_lines(field)
     return "\n".join(lines) + "\n"
 
-
-# The record and its week-review region.
 
 def _review_card(root, day, tier):
     return _build(root, day, tier="deep" if tier == "deep" else "weekly", live=False, parts=False)
@@ -885,6 +877,10 @@ def _details(overlay_region):
     return "\n".join(["<details>", "<summary>Prescription</summary>", "", overlay_region, "", "</details>"])
 
 
+def _collapsed(text, start, end):
+    return any(block.start() <= start and end <= block.end() for block in _DETAILS.finditer(text))
+
+
 def skeleton_text(day, tier, review, overlay_region=None):
     sections = [f"# Check-in — {day.isoformat()} ({tier})", "", "## Week in review", review, "",
                 "## Coach's read", "", "## Decisions", ""]
@@ -931,9 +927,14 @@ def skeleton(root, record_date, tier=None, overlay_id=None, refresh=False, dry_r
         for region_id, start, end in reversed(render.find_regions(text, render.REGION_KIND)):
             text = text[:start] + render.render_overlay(root, region_id) + text[end:]
             rendered.append(f"{render.REGION_KIND} {region_id}")
-        if overlay_id is not None and overlay_id not in {r for r, _, _ in render.find_regions(text, render.REGION_KIND)}:
-            text = text.rstrip("\n") + "\n\n" + _details(overlay_region) + "\n"
-            rendered.append(f"{render.REGION_KIND} {overlay_id}")
+        if overlay_id is not None:
+            found = {r: (start, end) for r, start, end in render.find_regions(text, render.REGION_KIND)}
+            if overlay_id not in found:
+                text = text.rstrip("\n") + "\n\n" + _details(overlay_region) + "\n"
+                rendered.append(f"{render.REGION_KIND} {overlay_id}")
+            elif not _collapsed(text, *found[overlay_id]):
+                start, end = found[overlay_id]
+                text = text[:start] + _details(text[start:end]) + text[end:]
         changed = text != before
     else:
         if path.exists():
