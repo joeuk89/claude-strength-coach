@@ -92,6 +92,10 @@ def main(argv=None, env=None, stdout=None, stderr=None, commands=None):
         command_name = cmd.name
         ctx = Context(resolve_root(args.root, env), env, stderr)
         data = cmd.func(args, ctx)
+        if not cmd.envelope:
+            if data is not None:
+                _emit(stdout, data)
+            return int(ExitCode.OK)
         _emit(stdout, _envelope(command_name, ctx.warnings, data=data if data is not None else {}))
         return int(ExitCode.OK)
     except CoachError as exc:

@@ -123,8 +123,10 @@ Rules that stop parallel agents colliding:
 - Commands are declared with `coach.commands.command` (R-10):
   `@command("units format", help=..., args=(arg("--mode", ...), ...),
   writes=False, hevy_write=False, network=False, git_write=False,
-  writes_scope=None)` on a function `(args, ctx) -> dict` that returns the
-  envelope's `data`. A one-word name is a top-level command (`check`,
+  writes_scope=None, envelope=True)` on a function `(args, ctx) -> dict` that returns the
+  envelope's `data`. A Claude Code hook command (`gate pretooluse`, R-26b's
+  `hooks` commands) declares `envelope=False`: the CLI prints the dict it
+  returns as the hook response, or nothing for None, and exits 0 (C3, C53). A one-word name is a top-level command (`check`,
   `version`). The helper adds `--dry-run` to every command with `writes`,
   `hevy_write` or `git_write`, and `Command.metadata()` gives the five
   flags R-15 reads. `ctx` is `coach.context.Context`.
@@ -150,7 +152,13 @@ Rules that stop parallel agents colliding:
 - Runtime switch: `COACH_READ_ONLY=1` refuses every data, Hevy and git
   write (C39, R-45).
 - Each owner adds its read-only and local-write commands to the R-15
-  allowlist in its own PR and says so. `plugins test` is never allowlisted
+  allowlist in its own PR and says so. The allowlist is
+  `permissions.allow` in `.claude/settings.json`: one prefix rule per
+  command, `Bash(python3 -m coach <group> <command>:*)` (`check` and
+  `version` have one word), never a group or broader prefix.
+  `tests/test_gate.py` asserts every rule names a registered command with
+  `hevy_write` false and `git_write` false (`pages publish` excepted),
+  and that no rule matches a `hevy_write` command. `plugins test` is never allowlisted
   (it runs instance code). `pages publish`, `program import-hevy`,
   `program adopt`, `starters` and `nudge` are allowlisted. Commands marked
   H stay behind the R-15 gate.
@@ -240,7 +248,9 @@ Phase 2 to 4 command inventory. No command here writes to Hevy.
 
 ## C3. Output envelope and exit codes
 
-stdout carries exactly one JSON object per run, UTF-8, followed by a newline:
+stdout carries exactly one JSON object per run, UTF-8, followed by a newline
+(a hook command declared with `envelope=False`, C2, prints a hook response
+or nothing instead):
 
 ```json
 {"schema_version": 1, "ok": true, "command": "units format",
