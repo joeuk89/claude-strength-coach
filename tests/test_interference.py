@@ -128,7 +128,7 @@ class MigrationTest(Case):
     def test_the_step_adds_both_framework_rules_with_their_defaults(self):
         current = jsonio.current_version(jsonio.load_schema("program"))
         [step] = [s for s in migrate.registry().documents["program"].steps if s.name.endswith("_interference_rules")]
-        self.assertEqual(step.to_version, current)
+        self.assertLessEqual(step.to_version, current)
 
         def older(doc):
             doc["schema_version"] = step.from_version

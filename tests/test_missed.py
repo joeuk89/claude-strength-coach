@@ -471,7 +471,7 @@ class MigrationTest(MissedCase):
             "action": {"kind": "manual"}})
         self.assertEqual([r["action"]["kind"] for r in program_doc["missed_day_rules"]], ["manual", "manual"])
         doc = read_json(self.root / "data" / "overlays" / f"{WEEKLY}.json")
-        self.assertEqual(doc["schema_version"], 3)
+        self.assertEqual(doc["schema_version"], overlay.current_version())
         self.assertEqual({s["moved_from"] for s in doc["sessions"]}, {None})
         self.assertEqual({repr(line["fold"]) for s in doc["sessions"] for line in s["exercises"]}, {"None"})
         self.assertTrue(self.coach("program", "validate")["data"]["valid"])
@@ -484,7 +484,7 @@ class MigrationTest(MissedCase):
         self.assertEqual(self.snapshot(), before)
         self.assertTrue(any(f"{WEEKLY} loses its approval" in n for n in data["notes"]), data["notes"])
         steps = {row["path"]: row["steps"] for row in data["files"]}
-        self.assertEqual(steps[f"data/overlays/{WEEKLY}.json"], ["overlay/0002_fold_marker"])
+        self.assertEqual(steps[f"data/overlays/{WEEKLY}.json"][0], "overlay/0002_fold_marker")
         self.assertEqual(steps["data/program.json"][0], "program/0003_executable_missed_day_rules")
 
 
