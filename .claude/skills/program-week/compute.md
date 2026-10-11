@@ -31,8 +31,10 @@ Run `python3 -m coach history sync`, then the proposal for the mode:
   illness conditions (when training may restart, the first session's
   cap, when the athlete checks with a qualified professional first)
   and, after a long gap, its matching band.
-- **minimum:** follow [short-week.md](short-week.md) to validate the
-  configured minimum, write its plan and propose with `--plan`.
+- **minimum:** validate the configured minimum and write its plan as
+  [short-week.md](short-week.md) says, then `python3 -m coach propose
+  week --week <label> --plan <the path structure minimum printed>`
+  proposes the week from it as a weekly overlay.
 
 `propose week` plans the span's dated sessions with the program's
 schedule rule and asks each exercise's progression scheme for its line,

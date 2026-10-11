@@ -47,9 +47,9 @@ Older lifters can need more work to retain muscle size
 (rn:minimum-effective-dose.2); discuss that before reducing their program.
 
 When the check passes, run `python3 -m coach structure minimum --week
-<label> --write`, then `python3 -m coach propose week --week <label>
---plan <the path it printed>`. Review its retained coach-led sessions as
-well as its lifting sessions. Continue with compute.md's line review and
-finalize, then build.md and the usual brief and approval. The overlay stays
-`weekly`; the minimum plan marks the week so the hard-week count neither
-counts nor resets it.
+<label> --write` and return to compute.md's minimum step, which proposes
+the week from the plan path it printed. Review the plan's retained
+coach-led sessions as well as its lifting sessions. Continue with
+compute.md's line review and finalize, then build.md and the usual brief
+and approval. The overlay stays `weekly`; the minimum plan marks the week
+so the hard-week count neither counts nor resets it.

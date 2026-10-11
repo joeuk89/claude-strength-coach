@@ -7,7 +7,7 @@ from coach import dates, flags, jsonio, missed, overlay, program, structure
 from coach.library import Library
 from tests.support import INSTANCES, REPO_ROOT
 from tests.support.history import HistoryCase, read_json, write_json
-from tests.support.skills import skill_text
+from tests.support.skills import flat, skill_text, step_text
 
 WEEKLY = "2026-10-12-weekly"
 SQUAT = "bb_back_squat"
@@ -637,7 +637,8 @@ class RegistrationTest(PriorityCase):
     def test_program_week_offers_the_minimum_week(self):
         text = " ".join(skill_text("program-week").split())
         self.assertIn("python3 -m coach structure minimum", text)
-        self.assertIn("--plan", text)
+        self.assertIn("python3 -m coach propose week --week <label> --plan",
+                      flat(step_text("program-week", "compute.md")))
 
     def test_short_week_workflow_explains_creation_validation_and_fallback(self):
         text = " ".join(skill_text("program-week").split())
