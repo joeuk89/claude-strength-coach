@@ -1,4 +1,4 @@
-"""RPE-anchored: one top set loaded from the e1RM at a target RPE, then back-off sets at a share of its load."""
+"""RPE-anchored: one top set loaded from the e1RM at a target RPE, then back-off sets from it at a lower RPE."""
 
 import math
 from dataclasses import replace
@@ -10,7 +10,7 @@ API = 1
 KIND = "scheme"
 NAME = "rpe_anchored"
 SUMMARY = ("Loads one top set from the e1RM at its target reps and RPE, with the newest logged top set "
-           "recalibrating the e1RM, then puts the back-off sets at a share of the top set's load.")
+           "recalibrating the e1RM, then loads the back-off sets from the same e1RM at a lower RPE.")
 NULLABLE_COUNT = {"type": ["integer", "null"], "minimum": 1}
 PARAMS = {
     "schema": {
@@ -20,19 +20,22 @@ PARAMS = {
             "top_rpe": {"type": ["number", "null"], "minimum": 5, "maximum": 10},
             "backoff_sets": {"type": ["integer", "null"], "minimum": 0},
             "backoff_reps": NULLABLE_COUNT,
-            "backoff_pct": {"type": "number", "minimum": 0.5, "maximum": 1},
+            "backoff_rpe": {"type": ["number", "null"], "minimum": 5, "maximum": 10},
+            "backoff_pct": {"type": ["number", "null"], "minimum": 0.5, "maximum": 1},
         },
     },
-    "defaults": {"top_reps": None, "top_rpe": None, "backoff_sets": None, "backoff_reps": None, "backoff_pct": 0.9},
+    "defaults": {"top_reps": None, "top_rpe": None, "backoff_sets": None, "backoff_reps": None, "backoff_rpe": None,
+                 "backoff_pct": None},
 }
 STATE = {"schema": base.EMPTY_SCHEMA, "initial": {}}
 FLAGS = {}
 LOAD_MODES = base.E1RM_MODES
-CITES = ("rn:progression-training-age.6", "rn:autoregulation.1")
+CITES = ("rn:progression-training-age.6", "rn:progression-training-age.8", "rn:autoregulation.1")
+HOLD_BACKOFF_PCT = 0.9
 
 
 def _shape(ctx):
-    """(warm-ups, top SetSpec, back-off count, back-off reps): params first, else the program's set groups."""
+    """(warm-ups, top SetSpec, back-off SetSpec, back-off count): params first, else the program's set groups."""
     sets = base.expand(ctx.slot.sets)
     warmups = tuple(s for s in sets if not s.working)
     program_working = base.working(sets)
@@ -42,10 +45,13 @@ def _shape(ctx):
     top_rpe = params["top_rpe"] if params["top_rpe"] is not None else first.rpe
     count = params["backoff_sets"] if params["backoff_sets"] is not None else max(0, len(program_working) - 1)
     groups = [g for g in ctx.slot.sets if (g.get("type") or "normal") in base.WORKING_TYPES]
-    program_backoff_reps = base.SetSpec.from_dict(groups[1]).target_reps if len(groups) > 1 else None
-    backoff_reps = params["backoff_reps"] or program_backoff_reps or top_reps
+    program_backoff = base.SetSpec.from_dict(groups[1]) if len(groups) > 1 else base.SetSpec()
+    backoff_reps = params["backoff_reps"] or program_backoff.target_reps or top_reps
+    backoff_rpe = next((r for r in (params["backoff_rpe"], program_backoff.rpe) if r is not None),
+                       top_rpe - 1 if top_rpe is not None else None)
     top = base.SetSpec(type="normal", reps=top_reps, rpe=top_rpe)
-    return warmups, top, count, backoff_reps
+    backoff = base.SetSpec(type="normal", reps=backoff_reps, rpe=backoff_rpe)
+    return warmups, top, backoff, count
 
 
 def _calibration(ctx, source):
@@ -64,29 +70,42 @@ def _calibration(ctx, source):
 
 
 def _floored(load, step):
-    """Floored to the increment, so the back-offs are a share of the load the top set will carry."""
+    """Floored to the increment, so no set asks for more than its reps at its RPE."""
     if not step:
         return load
     return math.floor(load / step + 1e-9) * step
 
 
+def _share(load, pct):
+    return round(load * pct, 4) if load is not None else None
+
+
 def propose(ctx):
     source = base.baseline(ctx.exposures)
-    warmups, top, count, backoff_reps = _shape(ctx)
+    warmups, top, backoff, count = _shape(ctx)
     pct = ctx.params["backoff_pct"]
     value, words = _calibration(ctx, source)
     if value is None or top.reps is None or top.rpe is None:
         load = source.top_load if source else base.start_load(ctx)
         why = "no e1RM in the last 42 days" if value is None else "no top-set reps or RPE target"
         rationale = f"RPE-anchored: {why}, so the top set holds at {base.load_words(ctx, load)}"
+        backoff = replace(backoff, rpe=None, load=_share(load, HOLD_BACKOFF_PCT if pct is None else pct))
         round_down = False
     else:
         load = _floored(load_for(value, top.reps, top.rpe), ctx.exercise.increment)
-        rationale = (f"RPE-anchored: top set {top.reps} at RPE {base.number(top.rpe)} from {words}, then "
-                     f"{count}×{backoff_reps} at {base.number(pct * 100)} % of it")
+        lead = (f"RPE-anchored: top set {top.reps} at RPE {base.number(top.rpe)} from {words}, then "
+                f"{count}×{backoff.reps} at RPE {base.number(backoff.rpe)}")
+        if pct is None:
+            from_e1rm = _floored(load_for(value, backoff.reps, backoff.rpe), ctx.exercise.increment)
+            backoff_load = min(load, from_e1rm)
+            capped = ", capped at the top set" if from_e1rm > load else ""
+            rationale = f"{lead}, loaded from the same e1RM{capped}"
+        else:
+            backoff_load = _share(load, pct)
+            rationale = f"{lead}, loaded at {base.number(pct * 100)} % of the top set by backoff_pct"
+        backoff = replace(backoff, load=backoff_load)
         round_down = True
-    backoff = round(load * pct, 4) if load is not None else None
-    sets = warmups + (replace(top, load=load),) + (base.SetSpec(type="normal", reps=backoff_reps, load=backoff),) * count
+    sets = warmups + (replace(top, load=load),) + (backoff,) * count
     return base.Proposal(sets=sets, rationale=rationale, derived_from=source, state={}, round_down=round_down)
 
 

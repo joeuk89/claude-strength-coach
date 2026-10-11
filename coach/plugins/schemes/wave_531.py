@@ -55,7 +55,7 @@ STATE = {
 }
 FLAGS = {}
 LOAD_MODES = base.E1RM_MODES
-CITES = ("rn:progression-training-age.4",)
+CITES = ("rn:progression-training-age.4", "rn:progression-training-age.9")
 
 
 def _increment(ctx):

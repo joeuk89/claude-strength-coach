@@ -2,7 +2,7 @@
   "schema_version": 1,
   "id": "rpe-full-body-3",
   "title": "Full body by RPE, 3 days",
-  "summary": "Three full-body sessions a week where each main lift works up to one top set at a target RPE, the load follows how that set felt, and back-off sets follow at a share of it.",
+  "summary": "Three full-body sessions a week where each main lift works up to one top set at a target RPE, the load follows how that set felt, and back-off sets follow from the same e1RM at a lower RPE.",
   "level": [
     "intermediate",
     "advanced"

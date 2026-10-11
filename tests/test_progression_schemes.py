@@ -150,13 +150,52 @@ class AssistedReturnAndDeloadTest(unittest.TestCase):
 
 class RpeAnchoredTest(unittest.TestCase):
     PARAMS = {"top_reps": 3, "top_rpe": 8, "backoff_sets": 3}
+    STARTER_SETS = ({"count": 1, "type": "normal", "reps": 5, "rpe": 8},
+                    {"count": 3, "type": "normal", "reps": 5, "rpe": 7})
 
-    def test_top_set_from_the_e1rm_inverse_then_back_offs_at_ninety_percent(self):
+    def test_top_set_from_the_e1rm_inverse_then_back_offs_from_it_one_rpe_lower(self):
         proposal = run(context("rpe_anchored", self.PARAMS, e1rm=121.88))
         top, *backoffs = [s for s in proposal.sets if s.working]
         self.assertEqual((top.load, top.reps, top.rpe), (102.5, 3, 8))
-        self.assertEqual([(s.load, s.reps) for s in backoffs], [(92.25, 3)] * 3)
+        self.assertEqual([(s.load, s.reps, s.rpe) for s in backoffs], [(100, 3, 7)] * 3)
         self.assertTrue(proposal.round_down)
+
+    def test_starter_back_offs_come_from_the_e1rm_at_their_rpe_floored_to_the_increment(self):
+        proposal = run(context("rpe_anchored", {}, e1rm=121.88, sets=self.STARTER_SETS))
+        top, *backoffs = [s for s in proposal.sets if s.working]
+        self.assertEqual((top.load, top.reps, top.rpe), (97.5, 5, 8))
+        self.assertEqual([(s.load, s.reps, s.rpe) for s in backoffs], [(95, 5, 7)] * 3)
+        self.assertLessEqual(95, stats.load_for(121.88, 5, 7))
+        self.assertAlmostEqual(stats.load_for(121.88, 5, 7) / stats.load_for(121.88, 5, 8), 0.97, delta=0.005)
+        self.assertIn("RPE 7", proposal.rationale)
+
+    def test_an_explicit_backoff_pct_overrides_the_e1rm_rule_and_keeps_the_back_off_rpe(self):
+        proposal = run(context("rpe_anchored", {"backoff_pct": 0.9}, e1rm=121.88, sets=self.STARTER_SETS))
+        top, *backoffs = [s for s in proposal.sets if s.working]
+        self.assertEqual(top.load, 97.5)
+        self.assertEqual([(s.load, s.reps, s.rpe) for s in backoffs], [(87.75, 5, 7)] * 3)
+        self.assertIn("backoff_pct", proposal.rationale)
+
+    def test_backoff_rpe_comes_from_the_param_else_the_second_group_else_one_below_the_top(self):
+        def backoff_rpes(params, sets):
+            proposal = run(context("rpe_anchored", params, e1rm=121.88, sets=sets))
+            return {s.rpe for s in proposal.sets[1:] if s.working}
+
+        self.assertEqual(backoff_rpes({"backoff_rpe": 6.5}, self.STARTER_SETS), {6.5})
+        self.assertEqual(backoff_rpes({}, self.STARTER_SETS), {7})
+        no_rpe = (self.STARTER_SETS[0], {"count": 3, "type": "normal", "reps": 5})
+        self.assertEqual(backoff_rpes({}, no_rpe), {7})
+        self.assertEqual(backoff_rpes({"top_rpe": 9}, no_rpe), {8})
+
+    def test_a_back_off_never_exceeds_the_top_set(self):
+        for params in ({"backoff_rpe": 9}, {"backoff_rpe": 8, "backoff_reps": 3}, {"backoff_pct": 1}):
+            with self.subTest(params=params):
+                proposal = run(context("rpe_anchored", params, e1rm=121.88, sets=self.STARTER_SETS))
+                top, *backoffs = [s for s in proposal.sets if s.working]
+                self.assertTrue(all(s.load <= top.load for s in backoffs), proposal.sets)
+        proposal = run(context("rpe_anchored", {"backoff_rpe": 9}, e1rm=121.88, sets=self.STARTER_SETS))
+        self.assertEqual({s.load for s in proposal.sets if s.working}, {97.5})
+        self.assertIn("capped at the top set", proposal.rationale)
 
     def test_the_logged_top_set_recalibrates_the_next_week(self):
         heavier = exposure(date(2026, 10, 5), [(110, 3, 9), (99, 3, None), (99, 3, None)])
@@ -174,15 +213,23 @@ class RpeAnchoredTest(unittest.TestCase):
         self.assertEqual(proposal.sets[0].type, "warmup")
         top, *backoffs = [s for s in proposal.sets if s.working]
         self.assertEqual((top.load, top.reps, top.rpe), (110, 2, 9))
-        self.assertEqual([(s.load, s.reps, s.rpe) for s in backoffs], [(88, 4, None)] * 4)
+        self.assertEqual([(s.load, s.reps, s.rpe) for s in backoffs], [(88, 4, 8)] * 4)
 
     def test_with_no_e1rm_the_top_set_holds(self):
         proposal = run(context("rpe_anchored", self.PARAMS))
         self.assertEqual(proposal.sets[0].load, 100)
         self.assertIn("no e1RM", proposal.rationale)
 
+    def test_with_no_e1rm_the_back_offs_stay_at_ninety_percent_with_no_rpe(self):
+        proposal = run(context("rpe_anchored", {}, sets=self.STARTER_SETS))
+        self.assertEqual([(s.load, s.reps, s.rpe) for s in proposal.sets if s.working],
+                         [(100, 5, 8)] + [(90, 5, None)] * 3)
+
     def test_programs_only_lines_with_an_e1rm(self):
         self.assertEqual(scheme("rpe_anchored").module.LOAD_MODES, base.E1RM_MODES)
+
+    def test_cites_the_back_off_claim(self):
+        self.assertIn("rn:progression-training-age.8", scheme("rpe_anchored").module.CITES)
 
 
 class AssistanceLadderTest(unittest.TestCase):
@@ -376,6 +423,9 @@ class Wave531Test(unittest.TestCase):
     def test_programs_only_lines_with_an_e1rm(self):
         self.assertEqual(scheme("wave_531").module.LOAD_MODES, base.E1RM_MODES)
 
+    def test_cites_the_published_wave_numbers(self):
+        self.assertIn("rn:progression-training-age.9", scheme("wave_531").module.CITES)
+
 
 def squat_loads(doc):
     return [(coaching(s["load"]), s["reps"], s["type"]) for s in working(find_line(doc, "bb_back_squat"))]
@@ -431,13 +481,13 @@ class Wave531LayoffTest(LayoffCase):
 
 
 class RpeAnchoredProposeTest(ProposeCase):
-    def test_top_set_from_the_e1rm_rounded_down_then_back_offs_at_ninety_percent(self):
+    def test_top_set_and_back_offs_from_the_e1rm_rounded_down(self):
         self.set_scheme("session-a", "bb_back_squat", "rpe_anchored", {"top_reps": 3, "top_rpe": 8, "backoff_sets": 3})
         doc = self.propose("--dry-run")["overlay"]
         self.assertEqual([(coaching(s["load"]), s["reps"], s["rpe"]) for s in working(find_line(doc, "bb_back_squat"))],
-                         [(102.5, 3, 8), (90, 3, None), (90, 3, None), (90, 3, None)])
+                         [(102.5, 3, 8), (100, 3, 7), (100, 3, 7), (100, 3, 7)])
         self.assertLessEqual(102.5, stats.load_for(121.88, 3, 8))
-        self.assertLessEqual(90, 0.9 * 102.5)
+        self.assertLessEqual(100, stats.load_for(121.88, 3, 7))
         self.assertEqual([f for f in doc["flags"] if f["severity"] == "block"], [])
 
 

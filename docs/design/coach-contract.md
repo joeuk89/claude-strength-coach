@@ -2392,12 +2392,22 @@ and `plugins test` runs them. Loaded with
 - `rpe_anchored` params: `top_reps`, `top_rpe`, `backoff_sets`,
   `backoff_reps` (each null by default: the program's first working set
   is the top set, its other working sets the back-offs, their reps those
-  of a second working set group, else the top set's), `backoff_pct` 0.9.
+  of a second working set group, else the top set's), `backoff_rpe`
+  (null: the RPE of a second working set group, else `top_rpe` − 1),
+  `backoff_pct` (null).
   The e1RM comes from the newest valid exposure's heaviest working set
   when it logged reps and an RPE (C18 `e1rm`), else `ctx.e1rm`. The top
-  set is `load_for(e1rm, top_reps, top_rpe)` floored to the increment;
-  back-offs are `backoff_pct` of that floored load with no RPE target.
-  `round_down` is set. State is empty. `LOAD_MODES` is `E1RM_MODES`.
+  set is `load_for(e1rm, top_reps, top_rpe)` floored to the increment.
+  Each back-off is `load_for(e1rm, backoff_reps, backoff_rpe)` floored
+  to the increment and never above the top-set load; a set `backoff_pct`
+  overrides that, loading the back-offs at `backoff_pct` of the floored
+  top-set load. Either way the back-offs carry `rpe = backoff_rpe`, and
+  the rationale names the rule that set their load.
+  With no e1RM, or no top-set reps or RPE, the top set holds at the last
+  or start load and the back-offs sit at `backoff_pct` (0.9 when null)
+  of it with no RPE target.
+  `round_down` is set when the e1RM sets the loads. State is empty.
+  `LOAD_MODES` is `E1RM_MODES`.
 - `wave_531` params: `training_max` (null: `training_max_pct`, 0.9, of
   `ctx.e1rm`), `increment_upper` and `increment_lower` (null: 2.5 and 5
   in kg, 5 and 10 in lb), `region` (null: lower for the squat, hinge,
