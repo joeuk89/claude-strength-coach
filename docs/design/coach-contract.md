@@ -736,16 +736,19 @@ none and `bodyweight`, `assisted`, `duration` or `distance`; band and
   `properties`, `additionalProperties`, `items`, `minItems`, `minimum`,
   `maximum`, `pattern`, `$ref` to `#/$defs/...`. Errors carry a JSONPath
   (`$.a[0].b`).
-- **A schema names where its documents live** (R-16). A schema for an
-  instance document carries a top-level `"x-coach-paths"`: globs relative
-  to the instance root (`["data/overlays/*.json"]`). The validator treats
-  it as an annotation, so adding it bumps no version. R-16's
-  `schema_versions` check reads every document these globs match; JSONL
-  files are read line by line, and when several schemas claim one file
-  (the C9 audit log), each line goes to the schema whose `kind` const
-  matches. Every item that adds an instance document type adds the key to
-  its own schema; a document no schema claims is not version-checked.
-  Framework files (the catalogue), drafts and the envelope carry none.
+- **Where versioned documents live** (R-16). The documents the migration
+  runner owns are found through its registry (C16 `FILES`). A schema for
+  any other instance document (append-only JSONL logs, `.coach/` caches,
+  and committed documents no runner subpackage declares yet: the
+  readings series and the activity sync map) carries a top-level
+  `"x-coach-paths"`: globs relative to the instance root
+  (`["data/hevy/writes.jsonl"]`). The validator treats it as an
+  annotation, so adding it bumps no version. `schema_versions` reads both;
+  when several schemas claim one JSONL file, each line goes to the schema
+  whose constant fields (`kind`, `op`) it matches. An item that adds an
+  instance document either declares it to the runner or adds the key to
+  its schema; a document neither names is not version-checked. Framework
+  files (the catalogue), drafts and the envelope carry neither.
 - On-disk format: `indent=2`, `ensure_ascii=False`, trailing newline,
   written atomically (temp file plus `os.replace`).
 - Canonical form for hashing: `json.dumps(obj, sort_keys=True,
@@ -1125,7 +1128,7 @@ JSONPath or line, and the offending value.
 
 | Check | Overlays | Fails when | Skips when |
 |---|---|---|---|
-| `schema_versions` | all | a document claimed by an `x-coach-paths` glob (C7) has a newer version ("run /framework-sync"), an older one ("run python3 -m coach migrate run"), none, or is not JSON | no claimed documents |
+| `schema_versions` | all | a document the runner owns or an `x-coach-paths` glob claims (C7) has a newer version ("run /framework-sync"), an older one ("run python3 -m coach migrate run"; a Hevy cache file: "rebuild the cache with python3 -m coach hevy pull --full"), none, or is not JSON. A JSONL line fails only when newer: lines keep the version they were written at (C29) | no versioned documents |
 | `dangling_exercise_ids` | all | an overlay line's `exercise_id` is not in the library | no overlays; invalid library |
 | `dangling_routine_ids` | span not ended | a session's `hevy_routine_id` is not in the cached routines | Hevy off; no `.coach/cache/`; no cached routines; no such overlay |
 | `overlay_library_consistency` | span not ended | a line's `load_mode` differs from the confirmed one (unconfirmed is `load_modes_confirmed`'s), or its `hevy_template_id` is not one of the entry's | no such overlay; invalid library |
