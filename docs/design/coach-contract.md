@@ -296,13 +296,18 @@ stderr carries human-readable diagnostics and progress, each line prefixed
   module under `coach/config_tables/` that exports `TABLES = {"name":
   Table(...)}`, built from `coach.config.Key` and `Table`. An item that
   adds a table adds its own module; it does not edit `config.py`. A table
-  marked `optional=True` stays absent when the file leaves it out, so
-  `"nutrition" in config` tells a reader whether nutrition is enabled.
-- **Rules across keys** (R-42a): a `config_tables` module may also export
-  `RULES`, a list of functions that take the validated config and return
-  `[(key path, message)]`. They run once every table is valid, and their
-  problems exit 5 like any other. R-42a's rule checks `[activity]
-  precedence` against the enabled sources (C32).
+  marked `optional=True` stays absent when the file leaves it out. A key
+  declared `Key("list", table=Table(...))` is an array of tables
+  (`[[name]]`), each item validated like a table, its path written
+  `nutrition.anchors[0].name` (R-33a). Whether nutrition is on is
+  `coach.nutrition.enabled(config)`, not `"nutrition" in config`: a
+  `[nutrition]` table holding only `[nutrition.bank]` leaves it off.
+- **Rules across keys** (R-42a, R-33a): a `config_tables` module may also
+  export `RULES`, a list of functions that take the validated config and
+  return `[(key path, message)]`. They run once every table is valid, and
+  their problems exit 5 like any other. R-42a's rule checks `[activity]
+  precedence` against the enabled sources (C32); R-33a's check the
+  `[nutrition]` cross-key rules (C4).
 - `coach.config.load(root) -> Config`. `Config` is a dict with attribute
   access (`config.athlete.units`, `config["equipment"]`) and a `path`.
 - `plates` lists the plate sizes the athlete has in pairs, one per side;
@@ -370,8 +375,19 @@ time = "18:00"              # local time the recipe runs, daily
 after_days = 2              # first nudge when days since the last check-in reach cadence_days + after_days
 ```
 
-**Nutrition keys** (R-33a, R-33b, R-33c). An absent `[nutrition]` table
-means nutrition is disabled. Weights are in `[athlete] bodyweight_units`.
+**Nutrition keys** (R-33a, R-33b, R-33c). Nutrition is enabled only by
+`[nutrition] enabled = true`. An absent table, `enabled = false`, or a
+table holding only `[nutrition.bank]` means disabled. A table that sets
+any R-33a key (`app`, `phase`, `target_rate_per_week`, `goal_weight`,
+`kcal_target`, `[nutrition.protein]`, anchors or `[nutrition.override]`)
+must say `enabled`, so the numbers are never silently ignored. With
+`enabled = true`, `app`, `phase`, `target_rate_per_week` and
+`[nutrition.protein]` are required. Rules across keys (R-33a `RULES`):
+`kcal_target` with `app` other than `"none"` is an error at
+`nutrition.kcal_target`; `floor_g <= target_g <= stretch_g`; an
+override's `expires` is after `start` and at most 21 days after it;
+`renewal` is 0, 1 or 2; an anchor names at least one day. Weights are
+in `[athlete] bodyweight_units`.
 No key holds a calorie figure the nutrition app owns. All three items
 declare their keys in one module, `coach/config_tables/nutrition.py`
 (R-33b created it with `[nutrition.bank]`; R-33a and R-33c add theirs to
@@ -1088,8 +1104,8 @@ files to it; nobody edits another item's files.
 | activities (R-42a) | `manual:2026-10-08-run-1` run 5 km, 30 min, RPE 6; Hevy workout `00000000-0000-4000-8000-0000000000c1` "Conditioning", all-conditioning, starting 6 min after `manual:2026-10-10-conditioning-1` (the dedup pair); `[activity] enabled = true` in `config.toml`; `data/activity/sync.json` with the Hevy workout seen at 2026-10-11T12:00:00Z. The Hevy workout lives in `tests/fixtures/hevy/conditioning/` (below), not in a cache in `valid/` |
 | wellness (R-42a) | in `.coach/activity/wellness.jsonl`: daily `apple_health` records 2026-10-05 to 2026-10-10 with sleep; one manual span record `manual:2026-10-05..2026-10-11-wellness` at 7.0 h |
 | planned (R-42a) | `manual:2026-10-14-run-1` "Easy 5 km", `manual:2026-10-16-run-1` "Intervals" `quality: true` |
-| nutrition (R-33a) | `[nutrition]` app macrofactor, phase recomp, reference mass 80, floor 110, target 128, stretch 176, `floor_since` 2026-09-28, one anchor "Whey shake" 150 kcal / 30 g daily snack |
-| readings (R-33a) | 2026-09-28 (avg protein 104), 2026-10-04 (112), 2026-10-11 (115), app target protein 110 |
+| nutrition (R-33a) | `[nutrition]` enabled, app macrofactor, phase recomp, target rate 0.0, reference mass 80, floor 110, target 128, stretch 176, `floor_since` 2026-09-28, one anchor "Whey shake" 150 kcal / 30 g daily snack |
+| readings (R-33a) | 2026-09-28 (avg protein 104), 2026-10-04 (112), 2026-10-11 (115), app target protein 110; trend weights 82.6, 82.5, 82.4; 7 days logged and anchors yes each week. Seed input for `nutrition import`: `tests/fixtures/nutrition/seed.json` (2026-09-07, 09-14, 09-21) |
 | cards (R-33b) | `chicken-rice-bowl` lunch 610/50/55/18 with `light` variation; `overnight-oats` breakfast; `whey-shake` snack |
 | meal plan (R-33c) | `2026-10-12`, span 2026-10-12 to 2026-10-18 |
 | research (R-32a) | template note `research/fixture-dose.md` (area `volume`, claims 1 and 2 current, `review_by` 2028-03-01); local note `research/local/local-fixture-knee.md` (area `rehab`, `updates = ["rn:fixture-dose.2"]`); `reference/fixture-guide.md` citing claim 1 of `fixture-dose`; record `check-ins/2026-08-30.md` (weekly) citing claim 1 of `local-fixture-knee` |
@@ -1128,6 +1144,8 @@ Unless stated, each is a copy of `valid/` plus what is listed.
 | `activity-wellness-misplaced/` | R-42a | not a copy of `valid/`: the valid config (`wellness_in_git` left false) and the wellness file at `data/activity/wellness.jsonl` |
 | `research-bad/` | R-32a | not a copy of `valid/`: the valid config; `fixture-dose` with a hand-edited claims table; `fixture-broken` with two claims numbered 1; `fixture-old` expired 2026-10-01 (area `sleep`); `reference/fixture-guide.md` citing a missing claim |
 | `interference/` | R-44a | a planned quality run on 2026-10-11 and Session A (squat at RPE 7) on 2026-10-12 |
+| `nutrition-bad-readings/` | R-33a | the valid config; a readings series with 2026-10-04 twice, the second with no weight and no protein |
+| `nutrition-override/` | R-33a | the valid config plus `[nutrition.override]` 2026-10-01 to 2026-10-22, renewal 1; no readings |
 | `overlay-bad-schema/`, `overlay-bad-arithmetic/`, `overlay-stale-render/` | R-13 | `config.toml` plus the valid overlay with one fault each: Session B dated outside the span; DB bench working sets at `hevy_total` 25 for 25/hand; a hand-edited check-in region |
 | `routines-drift/`, `routines-pushed/` | R-14 | not copies of `valid/`: its `config.toml`, the valid overlay and a Hevy cache (`meta.json`, `routines.json`). `routines-drift/` caches the synthetic routines as pulled; `routines-pushed/` caches them after `routines push` of the valid overlay to the fake |
 | `program-bad-schema/`, `program-misspelt-key/`, `program-unknown-exercise/`, `program-avoided/`, `program-stale-render/`, `program-top-set/`, `state-bad-schema/` | R-17a | not copies of `valid/`: `config.toml` plus the valid program with one change each: DB bench without `load_mode`; squat `rest_secs`; squat as `no_such_exercise`; an instance library marking DB bench `avoid`; the valid routine pages with one character of `session-a.md` edited; squat as a 1×3 top set and 3×5 back-offs; a state with deload status `pending` |
@@ -2881,6 +2899,46 @@ dates unique:
   absent or `{"enabled": false}` means nothing is printed).
 - Checks: `nutrition_readings` (schema), `nutrition_override` (warn when
   expired or renewed twice).
+- `nutrition record` stores `source: "app"` when `[nutrition] app` is
+  set and `"scale"` with `app = "none"`; `weight_unit` is `[athlete]
+  bodyweight_units`; it never writes `window`. `nutrition import`
+  takes a JSON list of readings, or `{"readings": [...]}`; each item
+  needs `date`, may omit any other field (stored as null), and may carry
+  `source` only as `"seeded"`. A date already on file exits 1 for
+  either command unless `--replace` is given.
+- `nutrition status` data, when enabled: `enabled`, `app`, `phase`,
+  `weight_unit`, `target_rate_per_week`, `goal_weight`, `kcal_target`,
+  `protein` (the `[nutrition.protein]` table), `anchors`, `override`
+  (the table plus `state`: `upcoming`, `active` or `expired`; null when
+  none), `template` (whether `[nutrition.template]` exists),
+  `latest_reading`, `trend`, `flags`, `brief_line`, `questions`.
+  Disabled: `{"enabled": false, "brief_line": null, "questions": []}`.
+- `trend`: `{basis, rate_per_week, span, days, target_rate_per_week}`.
+  `basis` is `trend_weight` with an app and `scale_weight` without one.
+  The rate runs from the newest weight back to the newest earlier
+  weight at least 14 days before it, in `weight_unit`, per 7 days,
+  rounded to 0.01; null (with `span` and `days`) when the readings cover
+  under 14 days. A number only: no flag judges it.
+- A flag is `{code, message, ...}` with the numbers it names.
+  `protein_floor_raise` (`floor_g`, `proposed_floor_g`, `dates`): the
+  two most recent readings dated on or after `floor_since` both have
+  `avg_protein_g >= floor_g`, and the floor is under the target; it
+  proposes `min(floor_g + floor_step_g, target_g)`. `override_expired`
+  (`expires`): today is on or after `expires`. `override_renewed_twice`
+  (`renewal`): `renewal` is 2. `app_protein_mismatch` (`app_protein_g`,
+  `floor_g`, `override_active`): an app is in use and the latest
+  reading's `target_protein_g` differs from `floor_g`.
+  `logging_incomplete` (`days_logged`): the latest reading logged fewer
+  than 7 days. `no_recent_reading` (`last_reading`): no reading, or the
+  latest is more than 14 days old.
+- `questions` are plain strings in order: the readings question (the
+  app's numbers in R-01's order, or, without an app, "this week's
+  morning weigh-ins · average daily protein, if you track it"), the
+  habits question, and the food-exceptions question only when
+  `template` is true. `brief_line` reads `Food: protein floor <g> g,
+  last week <g> g · anchors: <names or none> · override: <none | what,
+  until D | what, from D | expired D>`; with no reading it says "no
+  reading yet", with no protein figure "last week not tracked".
 - Readers: R-25 reads C4 `phase` and may read C35 weights for
   `progress.md`'s bodyweight trend; R-40a reads `[nutrition] enabled` and
   writes the table at setup; R-45 reads the card's nutrition question and
