@@ -225,6 +225,39 @@ class RenderTest(PagesCase):
         self.assertEqual(len(section(text, "If you miss a day")), 25)
         self.assertEqual(self.check("pages_line_ceiling")[0]["status"], "pass")
 
+    def test_if_you_miss_a_day_is_cut_last_and_points_to_the_program_page(self):
+        doc = self.overlay_doc()
+        doc["sessions"] = [dict(copy.deepcopy(doc["sessions"][n % 2]), date=f"2026-10-{12 + n // 2}")
+                           for n in range(12)]
+        self.write_overlay(doc)
+        self.edit_json("data/program.json", lambda p: p.update(missed_day_rules=[
+            {"id": f"miss-{n}", "session_id": "session-a", "condition": f"miss {n}", "action": "move it"}
+            for n in range(45)]))
+        text = self.brief()
+        self.assertLessEqual(len(text.splitlines()), 60, text)
+        self.assertEqual(headings(text), ["Focus", "Sessions", "If you miss a day"])
+        self.assertEqual(len(section(text, "Sessions")), 14)
+        missed = section(text, "If you miss a day")
+        more = re.fullmatch(r"- and (\d+) more in routine/program\.md", missed[-1])
+        self.assertIsNotNone(more, missed[-1])
+        self.assertEqual(missed[0], "- miss 0 → move it")
+        self.assertEqual(len(missed) - 1 + int(more.group(1)), 45)
+        self.assertEqual(len(text.splitlines()), 60)
+        self.assertEqual(self.check("pages_line_ceiling")[0]["status"], "pass")
+
+    def test_lifts_that_share_a_name_without_the_parenthesis_keep_their_full_names(self):
+        doc = self.overlay_doc()
+        barbell = copy.deepcopy(doc["sessions"][0]["exercises"][1])
+        barbell.update(exercise_id="bb_bench_press", load_mode="total", change="80 → 82.5")
+        for set_ in barbell["sets"]:
+            set_["load"] = {"mode": "total", "unit": "kg", "per_hand": None, "hevy_total": 82.5, "hevy_kg": 82.5}
+        doc["sessions"][0]["exercises"].append(barbell)
+        self.write_overlay(doc)
+        changed = section(self.brief(), "Changed")
+        self.assertTrue(changed[0].startswith("- Back Squat 97.5 → 100"), changed[0])
+        self.assertIn("- Bench Press (Dumbbell) 22.5 → 25/hand (Hevy: 50)", changed)
+        self.assertIn("- Bench Press (Barbell) 80 → 82.5", changed)
+
     def test_line_ceiling_check_fails_on_a_61_line_brief(self):
         (self.root / "this-week.md").write_text("".join(f"line {n}\n" for n in range(61)), encoding="utf-8")
         results = self.check("pages_line_ceiling", expect=1)
@@ -674,9 +707,32 @@ class PublishTest(PagesCase):
         hook.chmod(0o755)
         envelope = self.publish(expect=4)
         self.assertEqual(envelope["error"]["code"], "network")
-        self.assertIn("push it by hand", envelope["error"]["message"])
+        message = envelope["error"]["message"]
+        self.assertIn("push it by hand", message)
+        self.assertIn("(error: failed to push some refs to ", message)
+        self.assertNotIn("['", message)
         self.assertEqual(self.commits(), 2)
         self.assertEqual(git(self.root, "log", "-1", "--format=%s", env=self.git_env).strip(), self.MESSAGE)
+        self.assertEqual(git(self.remote, "log", "-1", "--format=%s", "main", env=self.git_env).strip(), "baseline")
+
+    def test_a_push_that_hangs_exits_4_and_keeps_the_commit(self):
+        self.approve()
+        real_git = pages._git
+        push_envs = []
+
+        def hanging_push(root, *argv, env=None):
+            if argv[0] == "push":
+                push_envs.append(env)
+                raise subprocess.TimeoutExpired(["git", *argv], 120)
+            return real_git(root, *argv, env=env)
+
+        with mock.patch.object(pages, "_git", hanging_push):
+            envelope = self.publish(expect=4)
+        self.assertEqual(envelope["error"]["code"], "network")
+        self.assertIn("no answer after 120 s", envelope["error"]["message"])
+        self.assertIn("push it by hand", envelope["error"]["message"])
+        self.assertEqual(push_envs[0]["GIT_TERMINAL_PROMPT"], "0")
+        self.assertEqual(self.commits(), 2)
         self.assertEqual(git(self.remote, "log", "-1", "--format=%s", "main", env=self.git_env).strip(), "baseline")
 
     def test_a_branch_with_no_upstream_is_refused(self):

@@ -3715,9 +3715,9 @@ carrying its as-of time. Nothing writes them but `pages render`.
 
 | Page | Source path in the header | Renderer |
 |---|---|---|
-| `this-week.md` (the brief) | the overlay in force | `render_brief(as_of)` |
-| `README.md` (the dashboard) | `data/state.json` | `render_dashboard(as_of)` |
-| `progress.md` | `data/history/` | `render_progress(as_of)` |
+| `this-week.md` (the brief) | the overlay in force | `render_brief(root, as_of)` |
+| `README.md` (the dashboard) | `data/state.json` | `render_dashboard(root, as_of)` |
+| `progress.md` | `data/history/` | `render_progress(root, as_of)` |
 
 `coach.pages.header_facts(root, as_of) -> dict` computes the brief
 header's facts once, for the brief, the dashboard and R-26b's `status`:
@@ -3759,10 +3759,10 @@ these headings:
 ## Sessions
 | Day | Session | Tier | Key | Done |
 |---|---|---|---|---|
-| Mon 12 | Session A | core | Squat 3×5 @ 100 | ✔ |
+| Mon 12 | Session A | core | Back Squat 3×5 @ 100 kg | ✔ |
 
 ## Changed
-- DB bench 22.5 → 25/hand (Hevy: 50): hit 3×10 at RPE 8.
+- Bench Press 22.5 → 25/hand (Hevy: 50): hit 3×10 at RPE 8.
 
 ## Watch
 - …
@@ -3780,14 +3780,13 @@ these headings:
 - Sessions: every session of the overlay in force on each day of the
   week, by date (C18 adherence over the week's span, as of); Tier from
   the program (`core` for a session the program lacks); Key = first
-  exercise's library name without its trailing parenthesis
-  (`Back Squat`) and its working sets in C12 Target form without RPE
-  (consecutive sets with equal reps and load collapse; a `total` load
-  carries its unit: `Back Squat 3×5 @ 100 kg`); Done = ✔ trained, ✗
+  exercise's page name (below) and its working sets in C12 Target form
+  without RPE (consecutive sets with equal reps and load collapse; a
+  `total` load carries its unit: `Back Squat 3×5 @ 100 kg`); Done = ✔ trained, ✗
   missed, blank upcoming. A session dated `as_of`'s own day with no
   workout and no miss tag is blank, not ✗: the day is not over.
 - Changed: lines whose `change` is set, by date then exercise order, at
-  most five, then "and N more in the check-in". Each reads `<name>
+  most five, then "and N more in the check-in". Each reads `<page name>
   <change>: <reason>`. Reason: `override.reason`, else
   `provenance.rationale` (C21), else `target_note`. A `per_hand_x2`
   change that ends on the bare per-hand load (`22.5 → 25/hand`) gets the
@@ -3806,7 +3805,18 @@ these headings:
 - An empty Changed, Watch or Wins prints one line saying so.
 - Over 60 lines: cut items from the end of Wins, then Watch, then
   Changed, until it fits; a section left with no items goes, heading
-  included. Sessions, Focus and If you miss a day are never cut.
+  included. Still over with those three gone: cut items from the end of
+  If you miss a day, which then ends "and N more in
+  routine/program.md" and keeps its heading. Sessions and Focus are
+  never cut.
+- Page name, wherever the brief or the dashboard names a lift (Key,
+  Changed, Wins, the dashboard's e1RM bests): the library name without
+  its trailing parenthesis (`Back Squat (Barbell)` → `Back Squat`),
+  unless another exercise the pages can name (in the program, any
+  overlay, or the C18 e1RM series) loses its parenthesis to the same
+  name; then both keep their full names (`Bench Press (Barbell)`,
+  `Bench Press (Dumbbell)`). `progress.md`'s table always uses the full
+  name.
 
 **Dashboard** (`README.md`): first, a status block of at most six lines
 (the brief's header line; block `hard_weeks_completed` and

@@ -8,6 +8,7 @@ overlays and records are read as they are now. Later items add content
 through page parts (`coach.page_parts`). Loads print only through `_load`.
 """
 
+import os
 import re
 import shutil
 import subprocess
@@ -44,8 +45,9 @@ CHANGE_DAYS = 28
 TEMPLATE_README = "https://github.com/joeuk89/claude-strength-coach#readme"
 PRIORITY = {"block": 20, "warn": 30, "e1rm": 20, "streak": 30, "last_week": 40}
 SESSIONS_HEADER = ("| Day | Session | Tier | Key | Done |", "|---|---|---|---|---|")
-BRIEF_HEADINGS = ("Focus", "Sessions", "Changed", "Watch", "If you miss a day", "Wins")
-CUT_ORDER = ("Wins", "Watch", "Changed")
+IF_YOU_MISS = "If you miss a day"
+BRIEF_HEADINGS = ("Focus", "Sessions", "Changed", "Watch", IF_YOU_MISS, "Wins")
+CUT_ORDER = ("Wins", "Watch", "Changed", IF_YOU_MISS)
 TRAINED, MISSED = "✔", "✗"
 NO_DATA = "–"
 
@@ -256,8 +258,26 @@ class _View:
         entry = self.library.get(exercise_id)
         return entry["name"] if entry else exercise_id
 
-    def short_name(self, exercise_id):
+    def _stripped(self, exercise_id):
         return _TRAILING_PARENTHESIS.sub("", self.name(exercise_id)) or self.name(exercise_id)
+
+    @cached_property
+    def _named_ids(self):
+        """{name without its trailing parenthesis: exercise ids} over every exercise the pages can name."""
+        ids = {line["exercise_id"] for session in (self.program or {}).get("sessions", [])
+               for line in session["exercises"]}
+        ids |= {line["exercise_id"] for doc in self.overlays for session in doc["sessions"]
+                for line in session["exercises"]}
+        ids |= set(self.series)
+        found = {}
+        for exercise_id in ids:
+            found.setdefault(self._stripped(exercise_id), set()).add(exercise_id)
+        return found
+
+    def short_name(self, exercise_id):
+        """The library name without its trailing parenthesis, unless another exercise would then read the same."""
+        stripped = self._stripped(exercise_id)
+        return stripped if self._named_ids.get(stripped, set()) <= {exercise_id} else self.name(exercise_id)
 
     def mode(self, exercise_id):
         return self.library.effective_load_mode(exercise_id) if self.library.get(exercise_id) else None
@@ -500,9 +520,9 @@ def render_brief(root, as_of, view=None):
     changed = view.changed()
     items = {"Changed": changed[:CHANGED_LIMIT] or ["No changes this week."],
              "Watch": view.watch() or ["Nothing flagged."],
-             "Wins": view.wins() or ["None yet; they come from new bests and complete weeks."]}
+             "Wins": view.wins() or ["None yet; they come from new bests and complete weeks."],
+             IF_YOU_MISS: view.if_you_miss()}
     shown = {heading: len(found) for heading, found in items.items()}
-    if_you_miss = view.if_you_miss()
 
     def build():
         sections = [("Focus", focus, [], []), ("Sessions", sessions, [], [])]
@@ -512,7 +532,9 @@ def render_brief(root, as_of, view=None):
             sections.append(("Changed", [], items["Changed"][:shown["Changed"]], tail))
         if shown["Watch"]:
             sections.append(("Watch", [], items["Watch"][:shown["Watch"]], []))
-        sections.append(("If you miss a day", [], if_you_miss, []))
+        more = len(items[IF_YOU_MISS]) - shown[IF_YOU_MISS]
+        tail = [f"- and {more} more in {paths.ROUTINE_PROGRAM_PAGE.as_posix()}"] if more else []
+        sections.append((IF_YOU_MISS, [], items[IF_YOU_MISS][:shown[IF_YOU_MISS]], tail))
         if shown["Wins"]:
             sections.append(("Wins", [], items["Wins"][:shown["Wins"]], []))
         return _brief_text(view, sections)
@@ -773,9 +795,14 @@ def publish(root, overlay_id, now, record_date=None, dry_run=False, env=None):
     if committed.returncode != 0:
         raise ValidationError(f"git commit failed: {committed.stderr.strip() or committed.stdout.strip()}")
     report["commit"] = _git(root, "rev-parse", "HEAD", env=env).stdout.strip()
-    pushed = _git(root, "push", remote, f"HEAD:{merge}", env=env)
-    if pushed.returncode != 0:
-        raise NetworkError(f"git push to {remote} failed ({pushed.stderr.strip().splitlines()[-1:] or ['no output']}); "
-                           f"the commit {report['commit'][:12]} is kept: push it by hand with git push", data=report)
+    push_env = dict(os.environ if env is None else env, GIT_TERMINAL_PROMPT="0")
+    try:
+        pushed = _git(root, "push", remote, f"HEAD:{merge}", env=push_env)
+        reason = None if pushed.returncode == 0 else (pushed.stderr.strip().splitlines() or ["no output"])[-1]
+    except subprocess.TimeoutExpired as exc:
+        reason = f"no answer after {exc.timeout:g} s"
+    if reason is not None:
+        raise NetworkError(f"git push to {remote} failed ({reason}); the commit {report['commit'][:12]} is kept: "
+                           "push it by hand with git push", data=report)
     report["pushed"] = True
     return report
