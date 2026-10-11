@@ -2,10 +2,9 @@ import json
 import re
 from pathlib import Path
 
-from coach import dates, history, jsonio, paths
+from coach import dates, history
 from coach.commands import arg, command
 from coach.errors import UsageError, ValidationError
-from coach.validate import validate
 
 _MONTH = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 
@@ -164,28 +163,5 @@ def _from_file(path):
 )
 def annotate(args, ctx):
     new = _from_file(args.input) if args.input else _from_flags(args)
-    doc = history.read_annotations(ctx.root)
-    checker = history.Checker(ctx.root)
-    created_at = ctx.now().strftime("%Y-%m-%dT%H:%M:%SZ")
-    details = []
-    added = []
-    for position, item in enumerate(new):
-        fields = {k: v for k, v in item.items() if k not in ("id", "created_at")}
-        annotation = {"id": history.next_annotation_id(doc), "kind": fields.pop("kind", None), **fields,
-                      "created_at": created_at}
-        where = f"$[{position}]" if args.input else "$"
-        tag = annotation.get("tag")
-        if tag is not None and tag not in history.MISS_TAGS:
-            raise ValidationError(f"tag {tag!r} is not a miss tag; use one of {', '.join(history.MISS_TAGS)}")
-        errors = validate({"schema_version": 1, "annotations": [annotation]},
-                          jsonio.load_schema(history.ANNOTATIONS_SCHEMA))
-        details += [{"path": where + e.path.replace("$.annotations[0]", ""), "message": e.message} for e in errors]
-        if not errors:
-            details += [{"path": where, "message": m} for m in checker.problems(annotation, doc["annotations"])]
-        doc["annotations"].append(annotation)
-        added.append(annotation)
-    if details:
-        raise ValidationError(f"the annotation is not valid ({len(details)} problem(s)): {details[0]['message']}",
-                              details=details)
-    jsonio.write_doc(ctx.root / paths.ANNOTATIONS, doc, args.dry_run)
+    added = history.add_annotations(ctx.root, new, ctx.now(), args.dry_run, batch=bool(args.input))
     return {"annotations": added, "annotation": added[0] if len(added) == 1 else None, "written": not args.dry_run}

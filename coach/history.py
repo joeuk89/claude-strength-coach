@@ -124,6 +124,36 @@ def next_annotation_id(doc):
     return f"a-{max(numbers, default=0) + 1:04d}"
 
 
+def add_annotations(root, items, now, dry_run=False, batch=True):
+    """Check and append annotations to the annotations file in one write; returns them with ids and created_at.
+
+    Raises ValidationError naming every problem (paths `$[n]` for a batch, `$` for one) and writes nothing then.
+    """
+    doc = read_annotations(root)
+    checker = Checker(root)
+    created_at = _timestamp(now)
+    details, added = [], []
+    for position, item in enumerate(items):
+        fields = {k: v for k, v in item.items() if k not in ("id", "created_at")}
+        annotation = {"id": next_annotation_id(doc), "kind": fields.pop("kind", None), **fields,
+                      "created_at": created_at}
+        where = f"$[{position}]" if batch else "$"
+        tag = annotation.get("tag")
+        if tag is not None and tag not in MISS_TAGS:
+            raise ValidationError(f"tag {tag!r} is not a miss tag; use one of {', '.join(MISS_TAGS)}")
+        errors = validate({"schema_version": 1, "annotations": [annotation]}, jsonio.load_schema(ANNOTATIONS_SCHEMA))
+        details += [{"path": where + e.path.replace("$.annotations[0]", ""), "message": e.message} for e in errors]
+        if not errors:
+            details += [{"path": where, "message": m} for m in checker.problems(annotation, doc["annotations"])]
+        doc["annotations"].append(annotation)
+        added.append(annotation)
+    if details:
+        raise ValidationError(f"the annotation is not valid ({len(details)} problem(s)): {details[0]['message']}",
+                              details=details)
+    jsonio.write_doc(annotations_path(root), doc, dry_run)
+    return added
+
+
 def _in_span(span, day):
     return span["start"] <= day <= span["end"]
 
