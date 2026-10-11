@@ -10,8 +10,8 @@ A thin orchestrator: each step checks whether it's already done and skips
 or offers to redo it, so `/setup` is safe to re-run and resumes cleanly
 after a partial run. It's also how the athlete **reconfigures** later —
 on a fully set-up workspace, report each area's state and ask what they
-want to change (add an integration like Notion, refresh the profile),
-rather than declaring everything done.
+want to change (add an integration, refresh the profile), rather than
+declaring everything done.
 
 Work conversationally — this is the athlete's first contact with the
 coach. One question at a time.
@@ -21,9 +21,8 @@ coach. One question at a time.
 Look at what exists and what's been decided: `profile.md`,
 `routine/program.md`, a "Nutrition & goals" section with real content,
 and — on the profile's `Apps:` line — a recorded yes/no for each
-integration (Hevy, MacroFactor, Notion). A recorded **"no" counts as
-done**, not missing: never re-pitch an integration the athlete already
-declined. The workspace is fully set up when the profile and program
+integration (Hevy, MacroFactor). A recorded **"no" counts as done**,
+not missing: never re-pitch an integration the athlete already declined. The workspace is fully set up when the profile and program
 exist, goals are set, and every integration has an answer. Report each
 area's state, then continue from the first genuinely unfinished piece —
 or, if nothing's left, ask what the athlete wants to change (add an
@@ -64,17 +63,6 @@ engine (optional). And the rhythm: train and log, then a weekly
 - Ask whether they use it (or want to — it's paid, and the best-in-class
   option for this loop). No API either way: its numbers are read off the
   dashboard at check-ins. Record yes/no.
-
-**Notion (optional):**
-- Ask whether they want their coaching docs (check-ins, meal plans,
-  recipes, routine) mirrored to Notion for reading on the go. Record
-  yes/no. If yes, invoke the **notion-sync** skill's setup flow — it
-  checks for a Notion MCP connection and explains how to connect one. If
-  no MCP is connected (common mid-setup), note that Notion can be added
-  any time with `/notion-sync` once connected, and carry on with setup —
-  don't stall onboarding on it. There's usually little to mirror this
-  early anyway; the mirror fills in as check-ins, meal plans, and recipes
-  get created. Easy to skip and add later.
 
 ## 3. Profile interview
 
@@ -130,7 +118,7 @@ watching for recurrence; it's created when the first one appears.)
 
 (Filled by /goals — phase sequence, targets, trend rate, app config.)
 
-- **Apps:** Hevy: yes-Pro / yes-free / no · MacroFactor: yes / no · Notion: yes / no
+- **Apps:** Hevy: yes-Pro / yes-free / no · MacroFactor: yes / no
 
 ## Food & eating
 
