@@ -300,7 +300,37 @@ def _convert_parse(ctx):
             row["slug"] = path.stem
         cards.append({"slug": path.stem, "card": draft, "toml": recipes.card_toml(draft)})
         rows.append(row)
-    return {"cards": cards, "review": rows, "table": recipes.review_table(rows), "dry_run": True}
+    notes, unplaced = _old_index_notes(ctx)
+    configured = recipes.bank_settings(ctx.config)["slot_notes"]
+    return {
+        "cards": cards,
+        "review": rows,
+        "slot_notes": notes,
+        "slot_notes_toml": recipes.slot_notes_toml(notes),
+        "slot_notes_unplaced": unplaced,
+        "table": recipes.review_table(rows, notes, configured),
+        "dry_run": True,
+    }
+
+
+def _old_index_notes(ctx):
+    index_path = ctx.root / paths.MENU_INDEX
+    if not index_path.is_file():
+        return {}, []
+    return recipes.legacy_slot_notes(recipes.read_text(index_path), recipes.configured_slots(ctx.config))
+
+
+def _notes_config_lacks(ctx):
+    notes, unplaced = _old_index_notes(ctx)
+    configured = recipes.bank_settings(ctx.config)["slot_notes"]
+    missing = {slot: note for slot, note in notes.items() if configured.get(slot) != note}
+    for slot, note in missing.items():
+        ctx.warn(f"the old index has a {slot} note that [nutrition.bank.slot_notes] lacks, so the rendered "
+                 f"index drops it: {note}")
+    for entry in unplaced:
+        ctx.warn(f"the old index has a note under {entry['heading'] or 'no heading'} that matches no slot: "
+                 f"{entry['note']}")
+    return missing
 
 
 def _convert_apply(ctx, args):
@@ -331,6 +361,7 @@ def _convert_apply(ctx, args):
         "written": [_rel(paths.MENU_DIR / f"{slug}.md") for slug, *_ in planned],
         "still_old_format": remaining,
         "index": None,
+        "slot_notes_missing": _notes_config_lacks(ctx),
         "dry_run": args.dry_run,
     }
     if args.dry_run:

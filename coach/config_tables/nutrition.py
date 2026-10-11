@@ -1,4 +1,4 @@
-"""The [nutrition] table (contract C4). R-33b declares [nutrition.bank]."""
+"""The [nutrition] table (contract C4)."""
 
 from coach.config import Key, Table
 

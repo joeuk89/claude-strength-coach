@@ -253,6 +253,19 @@ class RenderTest(unittest.TestCase):
         again = recipes.rendered_text(card_from_text(card.slug, once))
         self.assertEqual(again, once)
 
+    def test_region_runs_from_marker_to_marker(self):
+        card = valid_card()
+        region = recipes.current_region(card)
+        self.assertTrue(region.startswith("<!-- coach:begin card chicken-rice-bowl -->"))
+        self.assertTrue(region.endswith("<!-- coach:end card chicken-rice-bowl -->"))
+        self.assertEqual(card.text[recipes.find_region(card)[1]], "\n")
+
+    def test_second_region_is_an_error(self):
+        card = valid_card()
+        text = card.text + "\n" + recipes.render_card_region(card) + "\n"
+        with self.assertRaises(recipes.ValidationError):
+            recipes.find_region(card_from_text(card.slug, text))
+
     def test_mismatched_region_marker_is_an_error(self):
         card = valid_card()
         text = card.text.replace("coach:end card chicken-rice-bowl", "coach:end card other")
@@ -294,15 +307,27 @@ class IngredientParseTest(unittest.TestCase):
             "1.5 kg potatoes": (1500, "g", "potatoes"),
             "2 Tbsp. Olive Oil": (2, "tbsp", "olive oil"),
             "4 garlic cloves": (4, "each", "garlic cloves"),
+            "1,000 g flour": (1000, "g", "flour"),
+            "1,250g beef mince": (1250, "g", "beef mince"),
+            "12,5 g butter": (12.5, "g", "butter"),
         }
         for line, (qty, unit, item) in cases.items():
             with self.subTest(line=line):
                 self.assertEqual(recipes.parse_ingredient(line), {"qty": qty, "unit": unit, "item": item})
 
     def test_unreadable_lines(self):
-        for line in ("Salt and pepper, to taste", "1-2 tbsp honey", "2 to 3 eggs", "a handful of spinach", "0 g x"):
+        for line in ("Salt and pepper, to taste", "1-2 tbsp honey", "2 to 3 eggs", "a handful of spinach", "0 g x",
+                     "2 x 400g tins chopped tomatoes", "2x400g tins chopped tomatoes", "3 × 25 g sachets oats"):
             with self.subTest(line=line):
                 self.assertIsNone(recipes.parse_ingredient(line))
+
+    def test_energy(self):
+        cases = {"1883 kJ / 450 kcal": 450, "1,883kJ (450kcal)": 450, "450 kcal": 450, "450 Calories": 450,
+                 "2,100 kcal": 2100, "450": 450, 450: 450}
+        for value, kcal in cases.items():
+            with self.subTest(value=value):
+                self.assertEqual(recipes._energy_kcal(value), kcal)
+        self.assertAlmostEqual(recipes._energy_kcal("1883 kJ"), 1883 / recipes.KJ_PER_KCAL)
 
     def test_aisle_guesses(self):
         cases = {"chicken stock": "tins-jars-dry", "frozen peas": "frozen", "0% greek yoghurt": "dairy-eggs",
@@ -407,6 +432,30 @@ class ConvertTest(RoundTripMixin, unittest.TestCase):
         draft, row = recipes.convert_yaml_card(text)
         self.assertEqual(draft["variations"][0]["delta"]["kcal"], 40)
         self.assertTrue(any("big" in note for note in row["notes"]))
+
+    def test_block_lists_and_unread_front_matter(self):
+        text = ("---\nname: x\nslot:\n  - snack\nkcal: 100\nprotein: 5\ncarbs: 10\nfat: 4\ntags:\n  - portable\n"
+                "  - quick\nmacros:\n  fibre: 3\nrating: 5\n---\n\n# X\n")
+        draft, row = recipes.convert_yaml_card(text)
+        self.assertEqual(draft["slots"], ["snack"])
+        self.assertEqual(draft["tags"], ["portable", "quick"])
+        self.assertIn("front matter line not read: fibre: 3", row["notes"])
+        self.assertIn("front matter key macros is not carried over", row["notes"])
+        self.assertIn("front matter key rating is not carried over", row["notes"])
+        self.assertIn("rating", recipes.review_table([row]))
+
+    def test_legacy_slot_notes(self):
+        index = (YAML_MENU / "index.md").read_text(encoding="utf-8")
+        notes, unplaced = recipes.legacy_slot_notes(index, list(recipes.DEFAULT_SLOTS))
+        self.assertEqual(notes, {"dinner": "Family cooks most nights; top up protein on light nights."})
+        self.assertEqual(unplaced, [])
+        odd = "# Index\nOld intro.\n\n## Treats\nWeekends only.\n\n## Breakfast\nMust be fast.\n\n| a |\n"
+        notes, unplaced = recipes.legacy_slot_notes(odd, list(recipes.DEFAULT_SLOTS))
+        self.assertEqual(notes, {"breakfast": "Must be fast."})
+        self.assertEqual(unplaced, [{"heading": None, "note": "Old intro."},
+                                    {"heading": "Treats", "note": "Weekends only."}])
+        rendered = (MENU / "index.md").read_text(encoding="utf-8")
+        self.assertEqual(recipes.legacy_slot_notes(rendered, ["lunch"]), ({}, []))
 
     def test_needs_front_matter(self):
         with self.assertRaises(recipes.ValidationError):

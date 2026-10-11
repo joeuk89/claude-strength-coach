@@ -202,12 +202,20 @@ fail `recipes validate`. To convert a bank:
 
 1. `recipes convert --parse` reads every old card and returns a draft per
    card plus a review table: title, macros, ingredient count, ingredient
-   lines it could not read, the aisle it guessed for each ingredient, and
-   the variations whose `changes` need filling in. It writes nothing.
+   lines it could not read, the aisle it guessed for each ingredient, the
+   variations whose `changes` need filling in, and notes (front matter it
+   could not read, for one). It also reads the old index's slot notes
+   (the prose under each slot heading) and returns them as
+   `slot_notes_toml`, listed under the card table. It writes nothing.
 2. Walk the table with the athlete: add the unread ingredients exactly,
    correct the aisles, and give each variation its `changes`. Save the
    corrected drafts as `{"cards": [{"slug": ..., "card": {...}}]}`.
-3. `recipes convert --apply --input FILE` copies the old cards and the
+3. Add the slot notes to `config.toml` under
+   `[nutrition.bank.slot_notes]` (`slot_notes_toml` is the text to add),
+   with any the athlete wants changed. The rendered index takes its slot
+   notes from there, so a note left out is dropped; `--apply` warns about
+   each one config lacks.
+4. `recipes convert --apply --input FILE` copies the old cards and the
    old index to `.coach/backups/<UTC timestamp>/`, writes each card as a
    data block plus a rendered region plus its original prose (the Method
    and What to order sections keep their exact text), then re-renders the

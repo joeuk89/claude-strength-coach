@@ -909,7 +909,9 @@ and `retire` line schemas). The API key never appears.
   kind, id, region)` (R-13) find and replace marked regions for every
   renderer. `splice_region` replaces the region in place; when the file has
   none, it adds the region at the end of the `## The week ahead` section,
-  or at the end of the file, and changes nothing else.
+  or at the end of the file, and changes nothing else. A recipe card
+  (C33) finds its region with `find_regions` but places a missing one
+  right after its data block, so it does not use `splice_region`.
 - **Archive rule:** `week-review` regions in any record but the newest are
   archive. `render_week_review(id)` returns them unchanged, so R-16's sweep
   never fails an old record because history was later corrected. `cardio`
@@ -2465,7 +2467,10 @@ the block after TOML parsing):
 - Slots outside the configured slots fail.
 - The rendered region sits after the block; `recipes render` inserts it
   there when a card has none. `render_card_region(card)` is the freshness
-  reference. A begin or end marker naming another slug is an error.
+  reference and, as in C11, runs from the start of the begin marker to the
+  end of the end marker; the line ending after the end marker belongs to
+  the prose. `coach.render.find_regions` locates it. A begin or end marker
+  naming another slug, or a second region, is an error.
 - The index (C11 header, source `nutrition/menu/`, command `recipes
   render`) has one `## ` section per configured slot in order, the slot
   note under it, then a table of the cards in that slot: active cards by
@@ -2482,15 +2487,23 @@ the block after TOML parsing):
   output works as is) and returns `{slug, path, exists, text, results}`;
   a failing draft exits 1.
 - `recipes convert --parse` returns `{cards: [{slug, card, toml}], review,
-  table}`. Each review row: `slug`, `title`, the four macros,
-  `ingredients` (count), `unparsed` (lines), `guessed_aisles` (`{item,
-  aisle, matched}`), `variations` (count), `variations_to_fill` (names;
-  none on eat-out cards), `notes`. `--apply --input FILE` takes `{cards:
-  [{slug, card}]}`, refuses (exit 1, nothing written) a card that fails
-  validation or is not an old YAML card, backs up the old cards and index,
-  and keeps every section of the old body except the title, stats table,
-  `## Ingredients` and `## Variations`. It re-renders the index only once
-  no old cards remain, and lists the rest under `still_old_format`.
+  slot_notes, slot_notes_toml, slot_notes_unplaced, table}`. Each review
+  row: `slug`, `title`, the four macros, `ingredients` (count), `unparsed`
+  (lines), `guessed_aisles` (`{item, aisle, matched}`), `variations`
+  (count), `variations_to_fill` (names; none on eat-out cards), `notes`
+  (including every front-matter line it could not read and every key it
+  does not carry over). `slot_notes` maps each configured slot to the prose
+  under its heading in the old hand-kept index; `slot_notes_toml` is that
+  map as a `[nutrition.bank.slot_notes]` table for the coach to add to
+  `config.toml`; `slot_notes_unplaced` lists `{heading, note}` for prose
+  under no slot heading. The table lists the slot notes after the cards.
+  `--apply --input FILE` takes `{cards: [{slug, card}]}`, refuses (exit 1,
+  nothing written) a card that fails validation or is not an old YAML
+  card, backs up the old cards and index, and keeps every section of the
+  old body except the title, stats table, `## Ingredients` and
+  `## Variations`. It re-renders the index only once no old cards remain,
+  and lists the rest under `still_old_format`. It warns about, and returns
+  as `slot_notes_missing`, each old slot note that config lacks.
 - An old YAML card fails `recipe_cards` with a message that names
   `recipes convert`.
 

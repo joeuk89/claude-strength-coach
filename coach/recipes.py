@@ -15,7 +15,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlparse
 
-from coach import datablock, paths
+from coach import datablock, paths, render
 from coach.checks import Result
 from coach.config_tables.nutrition import bank_defaults
 from coach.errors import ValidationError
@@ -279,7 +279,7 @@ def _validate_variation(variation, by_item, aisles, bank, prep, names, fail, war
 
 
 def region_markers(slug):
-    return f"<!-- coach:begin card {slug} -->", f"<!-- coach:end card {slug} -->"
+    return render.begin_marker(KIND, slug), render.end_marker(KIND, slug)
 
 
 def _signed(value):
@@ -307,7 +307,7 @@ def _cell(text):
 
 
 def render_card_region(card):
-    """The card's rendered region, markers included, ending in a newline."""
+    """The card's rendered region, from the start of its begin marker to the end of its end marker."""
     data = card.data
     per_serving = data["per_serving"]
     begin, end = region_markers(card.slug)
@@ -334,35 +334,24 @@ def render_card_region(card):
         lines += ["", "## Variations"]
         lines += [f"- **{v['name']}** — {v['label']}{_delta_text(v['delta'])}" for v in data["variations"]]
     lines.append(end)
-    return "\n".join(lines) + "\n"
-
-
-def _line_end(text, index):
-    if text.startswith("\r\n", index):
-        return index + 2
-    if text.startswith("\n", index):
-        return index + 1
-    return index
+    return "\n".join(lines)
 
 
 def find_region(card):
     """Return (start, stop) of the card's region in its text, or None when it has none."""
-    text, start_at = card.text, card.body_start
-    begin, end = region_markers(card.slug)
-    other = re.search(r"<!-- coach:(begin|end) card (\S+) -->", text[start_at:])
-    if other and other.group(2) != card.slug:
-        raise ValidationError(f"{card.rel}: its region is marked for card \"{other.group(2)}\", not \"{card.slug}\"")
-    start = text.find(begin, start_at)
-    if start < 0:
-        if text.find(end, start_at) >= 0:
-            raise ValidationError(f"{card.rel}: the region has an end marker but no begin marker")
+    try:
+        regions = render.find_regions(card.rest, KIND)
+    except ValueError as exc:
+        raise ValidationError(f"{card.rel}: {exc}") from None
+    for region_id, _, _ in regions:
+        if region_id != card.slug:
+            raise ValidationError(f'{card.rel}: its region is marked for card "{region_id}", not "{card.slug}"')
+    if len(regions) > 1:
+        raise ValidationError(f"{card.rel}: the region appears {len(regions)} times")
+    if not regions:
         return None
-    if text.find(begin, start + len(begin)) >= 0:
-        raise ValidationError(f"{card.rel}: the region begin marker appears twice")
-    stop = text.find(end, start)
-    if stop < 0:
-        raise ValidationError(f"{card.rel}: the region has no end marker ({end})")
-    return start, _line_end(text, stop + len(end))
+    _, start, stop = regions[0]
+    return card.body_start + start, card.body_start + stop
 
 
 def current_region(card):
@@ -377,7 +366,7 @@ def rendered_text(card):
     if span is None:
         rest = card.rest
         gap = "" if not rest or rest.startswith(("\n", "\r\n")) else "\n"
-        return card.text[:card.body_start] + region + gap + rest
+        return card.text[:card.body_start] + region + "\n" + gap + rest
     return card.text[:span[0]] + region + card.text[span[1]:]
 
 
@@ -481,7 +470,7 @@ def compose_card(slug, draft, prose=""):
     """A whole card file: data block, fresh region, then the prose."""
     block = f"<!-- coach:{KIND}\n{card_toml(draft)}{datablock.CLOSER}\n"
     card = Card(slug=slug, path=paths.MENU_DIR / f"{slug}.md", text=block, data=draft, body_start=len(block))
-    text = block + render_card_region(card)
+    text = block + render_card_region(card) + "\n"
     prose = prose.strip("\r\n")
     return text + "\n" + prose + "\n" if prose else text
 
@@ -492,7 +481,10 @@ def suggest_slug(title):
 
 
 _FRACTIONS = {"½": 0.5, "¼": 0.25, "¾": 0.75, "⅓": 1 / 3, "⅔": 2 / 3}
-_QTY = re.compile(r"(\d+\s+\d+/\d+|\d+/\d+|\d+(?:[.,]\d+)?\s*[½¼¾⅓⅔]?|[½¼¾⅓⅔])")
+_THOUSANDS = r"\d{1,3}(?:,\d{3})+(?![\d,])(?:\.\d+)?"
+_DECIMAL = r"\d+(?:[.,]\d+)?"
+_QTY = re.compile(rf"(\d+\s+\d+/\d+|\d+/\d+|(?:{_THOUSANDS}|{_DECIMAL})\s*[½¼¾⅓⅔]?|[½¼¾⅓⅔])")
+_MULTIPLIER = re.compile(r"^[x×]\s*\d", re.I)
 _UNITS = {
     "g": ("g", 1), "gr": ("g", 1), "gram": ("g", 1), "grams": ("g", 1),
     "kg": ("g", 1000), "kilogram": ("g", 1000), "kilograms": ("g", 1000),
@@ -543,8 +535,15 @@ def guess_aisle(item):
     return DEFAULT_AISLE_GUESS, False
 
 
+def _plain_number(token):
+    """A number with a decimal point: `1,000` is a thousand, `1,5` is one and a half."""
+    if re.fullmatch(_THOUSANDS, token):
+        return token.replace(",", "")
+    return token.replace(",", ".")
+
+
 def _qty_value(token):
-    token = token.strip().replace(",", ".")
+    token = _plain_number(token.strip())
     total = 0.0
     for symbol, value in _FRACTIONS.items():
         if token.endswith(symbol):
@@ -575,7 +574,7 @@ def parse_ingredient(line):
         return None
     qty = _qty_value(match.group(1))
     rest = text[match.end():].lstrip()
-    if re.match(r"^(?:-|–|to\s)\s*\d", rest):
+    if re.match(r"^(?:-|–|to\s)\s*\d", rest) or _MULTIPLIER.match(rest):
         return None
     unit, container = "each", None
     word = re.match(r"^([A-Za-z]+)\.?(?=\s|\(|$)", rest)
@@ -662,17 +661,23 @@ def _clean(value):
     return re.sub(r"\s+", " ", text).strip()
 
 
+_NUMBER = rf"(?:{_THOUSANDS}|{_DECIMAL})"
+
+
 def _first_number(value):
-    match = re.search(r"\d+(?:[.,]\d+)?", str(value))
-    return float(match.group(0).replace(",", ".")) if match else None
+    match = re.search(_NUMBER, str(value))
+    return float(_plain_number(match.group(0))) if match else None
 
 
 def _energy_kcal(value):
-    number = _first_number(value)
+    text = str(value)
+    kcal = re.search(rf"({_NUMBER})\s*(?:kcal|cal(?:orie)?s?)\b", text, re.I)
+    if kcal:
+        return float(_plain_number(kcal.group(1)))
+    number = _first_number(text)
     if number is None:
         return None
-    text = str(value).lower()
-    if "kj" in text and "kcal" not in text and "cal" not in text.replace("kj", ""):
+    if re.search(r"kj\b", text, re.I) and not re.search(r"cal", text, re.I):
         return number / KJ_PER_KCAL
     return number
 
@@ -864,22 +869,33 @@ def _strip_yaml_comment(line):
 
 
 def split_front_matter(text):
-    """Return (meta, body) for an old card whose text starts with `---`."""
+    """Return (meta, body, unread) for an old card whose text starts with `---`.
+
+    Reads `key: value` lines and block lists (`key:` then `- item` lines); `unread` lists every other line.
+    """
     lines = text.splitlines(keepends=True)
     if not lines or lines[0].rstrip("\r\n") != "---":
         raise ValidationError("the card has no YAML front matter")
-    meta, offset = {}, len(lines[0])
+    meta, unread, offset, list_key = {}, [], len(lines[0]), None
     for line in lines[1:]:
         offset += len(line)
         bare = line.rstrip("\r\n")
         if bare == "---":
-            return meta, text[offset:]
+            return meta, text[offset:], unread
         content = _strip_yaml_comment(bare)
         if not content.strip():
             continue
-        match = re.match(r"^([A-Za-z_][A-Za-z0-9_]*):(.*)$", content)
-        if match:
-            meta[match.group(1)] = _yaml_scalar(match.group(2))
+        key = re.match(r"^([A-Za-z_][A-Za-z0-9_]*):(.*)$", content)
+        item = re.match(r"^\s*-\s+(.*)$", content)
+        if key:
+            value = _yaml_scalar(key.group(2))
+            meta[key.group(1)] = value
+            list_key = key.group(1) if value is None else None
+        elif item and list_key:
+            meta[list_key] = (meta[list_key] or []) + [_yaml_scalar(item.group(1))]
+        else:
+            unread.append(bare.strip())
+            list_key = None
     raise ValidationError("the card's YAML front matter has no closing ---")
 
 
@@ -897,11 +913,13 @@ def _sections(body):
 
 
 _GENERATED_SECTIONS = ("ingredients", "variations")
+_LEGACY_KEYS = ("name", "slot", "kcal", "protein", "carbs", "fat", "nutrition", "prep", "time", "servings", "source",
+                "tags", "status")
 
 
 def legacy_prose(text):
     """An old card's prose: every section but the title, stats table, Ingredients and Variations."""
-    _, body = split_front_matter(text)
+    _, body, _ = split_front_matter(text)
     kept = []
     for heading, chunk in _sections(body):
         if heading is None:
@@ -952,7 +970,7 @@ def _variation_from_line(line):
 
 def convert_yaml_card(text, slug=None):
     """Return (draft, review_row) for an old YAML-front-matter card. Writes nothing."""
-    meta, body = split_front_matter(text)
+    meta, body, unread = split_front_matter(text)
     slug = meta.get("name") or slug
     title_match = re.search(r"^# (.+)$", body, re.M)
     title = title_match.group(1).strip() if title_match else str(slug).replace("-", " ").capitalize()
@@ -976,6 +994,8 @@ def convert_yaml_card(text, slug=None):
         "carbs_g": meta.get("carbs"), "fat_g": meta.get("fat"),
     }
     notes = [f"no {key} in the front matter" for key, value in draft["per_serving"].items() if value is None]
+    notes += [f"front matter line not read: {line}" for line in unread]
+    notes += [f"front matter key {key} is not carried over" for key in meta if key not in _LEGACY_KEYS]
     draft["per_serving"] = {k: (0 if v is None else v) for k, v in draft["per_serving"].items()}
 
     ingredients, unparsed, guessed_aisles, variations = [], [], [], []
@@ -1023,11 +1043,48 @@ def convert_yaml_card(text, slug=None):
     return draft, review
 
 
-def review_table(rows):
-    """The review table as markdown, one row per card."""
+def legacy_slot_notes(index_text, slots):
+    """Return (notes, unplaced) from an old hand-kept index: the prose under each slot heading.
+
+    `notes` maps a configured slot to its note; `unplaced` lists `{heading, note}` for prose under no
+    heading or under one that names no configured slot. An index that coach rendered has neither.
+    """
+    if index_text.startswith("<!-- generated by coach"):
+        return {}, []
+    by_heading = {}
+    for slot in slots:
+        for name in (slot, f"{slot}s", _slot_heading(slot)):
+            by_heading[name.lower()] = slot
+    notes, unplaced = {}, []
+    for heading, chunk in _sections(index_text):
+        lines = chunk.splitlines()[1:] if heading is not None else chunk.splitlines()
+        prose = [line.rstrip() for line in lines if not line.lstrip().startswith(("|", "# "))]
+        note = "\n".join(prose).strip("\n")
+        note = re.sub(r"\n{3,}", "\n\n", note)
+        if not note:
+            continue
+        slot = by_heading.get((heading or "").strip().lower())
+        if slot and slot not in notes:
+            notes[slot] = note
+        else:
+            unplaced.append({"heading": heading, "note": note})
+    return notes, unplaced
+
+
+def slot_notes_toml(notes):
+    if not notes:
+        return ""
+    lines = ["[nutrition.bank.slot_notes]"]
+    lines += [f"{_toml_key(slot)} = {_toml_string(note)}" for slot, note in notes.items()]
+    return "\n".join(lines) + "\n"
+
+
+def review_table(rows, slot_notes=None, configured_notes=None):
+    """The review table as markdown: one row per card, then the old index's slot notes."""
     lines = [
-        "| Card | Title | kcal / P / C / F | Ingredients | Unparsed lines | Aisles to check | Variations to fill |",
-        "| --- | --- | --- | --- | --- | --- | --- |",
+        "| Card | Title | kcal / P / C / F | Ingredients | Unparsed lines | Aisles to check | Variations to fill "
+        "| Notes |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for row in rows:
         aisles = ", ".join(f"{a['item']} → {a['aisle']}{'' if a['matched'] else ' (default)'}"
@@ -1036,6 +1093,13 @@ def review_table(rows):
             f"| {row['slug']} | {_cell(row['title'])} | {_num(row['kcal'])} / {_num(row['protein_g'])} / "
             f"{_num(row['carbs_g'])} / {_num(row['fat_g'])} | {row['ingredients']} | "
             f"{_cell('; '.join(row['unparsed'])) or '—'} | {_cell(aisles)} | "
-            f"{', '.join(row['variations_to_fill']) or '—'} |"
+            f"{', '.join(row['variations_to_fill']) or '—'} | {_cell('; '.join(row['notes'])) or '—'} |"
         )
+    if slot_notes:
+        configured_notes = configured_notes or {}
+        lines += ["", "| Slot | Note in the old index | In config |", "| --- | --- | --- |"]
+        for slot, note in slot_notes.items():
+            in_config = "yes" if configured_notes.get(slot) == note else "no"
+            cell = _cell(note).replace("\n", " ")
+            lines.append(f"| {slot} | {cell} | {in_config} |")
     return "\n".join(lines) + "\n"

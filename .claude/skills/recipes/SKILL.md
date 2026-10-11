@@ -23,7 +23,9 @@ targets. If Nutrition & goals is missing or TBD, send the athlete to
 Then run `python3 -m coach recipes validate`. If it reports old YAML
 cards, convert the bank first (`reference/recipe-cards.md`, "Converting
 old cards"): run `recipes convert --parse`, walk the review table with
-the athlete, then `recipes convert --apply --input <file>`. If
+the athlete, write its slot notes to `config.toml` under
+`[nutrition.bank.slot_notes]` (the output's `slot_notes_toml`), then run
+`recipes convert --apply --input <file>`. If
 `python3 -m coach check --only recipe_index_fresh,recipe_render_fresh`
 fails, run `python3 -m coach recipes render` before reading the index.
 

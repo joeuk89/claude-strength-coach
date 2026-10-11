@@ -1,6 +1,7 @@
 import json
 import shutil
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 
@@ -10,6 +11,7 @@ from tests.support import FIXTURES, INSTANCES, VALID, run_cli, run_module
 YAML_CARDS = INSTANCES / "yaml-cards"
 STALE = INSTANCES / "recipes-stale"
 NOW = {"COACH_NOW": "2026-10-11T18:00:00Z"}
+DINNER = "Family cooks most nights; top up protein on light nights."
 
 
 def snapshot(root):
@@ -262,7 +264,38 @@ class ConvertCommandTest(CliMixin, unittest.TestCase):
         self.assertEqual((chicken["ingredients"], chicken["variations"]), (4, 2))
         self.assertEqual(chicken["variations_to_fill"], ["light", "+egg"])
         self.assertIn("| chicken-rice-bowl |", data["table"])
-        self.assertEqual(len(data["table"].strip().splitlines()), 2 + 3)
+        cards_table, notes_table = data["table"].strip().split("\n\n")
+        self.assertEqual(len(cards_table.splitlines()), 2 + 3)
+
+        self.assertEqual(data["slot_notes"], {"dinner": DINNER})
+        self.assertEqual(data["slot_notes_unplaced"], [])
+        self.assertEqual(tomllib.loads(data["slot_notes_toml"]),
+                         {"nutrition": {"bank": {"slot_notes": {"dinner": DINNER}}}})
+        self.assertIn(f"| dinner | {DINNER} | no |", notes_table)
+
+    def test_apply_warns_about_a_slot_note_config_lacks(self):
+        with InstanceCopy(YAML_CARDS) as root:
+            data = self.run_ok(root, "recipes", "convert", "--parse")["data"]
+            input_file = root / "reviewed.json"
+            input_file.write_text(json.dumps(reviewed(data)), encoding="utf-8")
+            envelope = self.run_ok(root, "recipes", "convert", "--apply", "--input", str(input_file), env=NOW)
+            self.assertEqual(envelope["data"]["slot_notes_missing"], {"dinner": DINNER})
+            self.assertTrue(any(DINNER in warning for warning in envelope["warnings"]), envelope["warnings"])
+            self.assertNotIn(DINNER, recipes.read_text(menu(root) / "index.md"))
+
+    def test_slot_notes_written_to_config_survive_apply(self):
+        with InstanceCopy(YAML_CARDS) as root:
+            data = self.run_ok(root, "recipes", "convert", "--parse")["data"]
+            config = root / "config.toml"
+            config.write_text(recipes.read_text(config) + "\n" + data["slot_notes_toml"], encoding="utf-8")
+            again = self.run_ok(root, "recipes", "convert", "--parse")["data"]
+            self.assertIn(f"| dinner | {DINNER} | yes |", again["table"])
+            input_file = root / "reviewed.json"
+            input_file.write_text(json.dumps(reviewed(data)), encoding="utf-8")
+            envelope = self.run_ok(root, "recipes", "convert", "--apply", "--input", str(input_file), env=NOW)
+            self.assertEqual(envelope["data"]["slot_notes_missing"], {})
+            dinners = recipes.read_text(menu(root) / "index.md").split("## Dinners")[1].split("## Snacks")[0]
+            self.assertIn(DINNER, dinners)
 
     def test_apply_then_validate(self):
         with InstanceCopy(YAML_CARDS) as root:
