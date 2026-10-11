@@ -1,0 +1,11 @@
+{
+  "readings": [
+    {"date": "2026-09-07", "weight_unit": "kg", "trend_weight": 83.0, "avg_protein_g": 95,
+     "days_logged": 6, "note": "from the 2026-09-07 check-in"},
+    {"date": "2026-09-14", "weight_unit": "kg", "trend_weight": 82.9, "avg_protein_g": 98,
+     "days_logged": 7, "anchors_most_days": false},
+    {"date": "2026-09-21", "weight_unit": "kg", "trend_weight": 82.7, "expenditure_kcal": 2640,
+     "target_kcal": 2400, "target_protein_g": 110, "avg_kcal": 2420, "avg_protein_g": 101,
+     "days_logged": 7, "anchors_most_days": true}
+  ]
+}

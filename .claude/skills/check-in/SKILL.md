@@ -118,27 +118,32 @@ fields, always in this order:
    your watch or phone if it tracks sleep), and how it felt".
 5. **Niggles** — anything new? Name each open niggle-log row (`watching`
    or `easing`) and ask whether it is quiet or still there.
-6. **Nutrition** — MacroFactor users: trend weight · expenditure ·
-   targets (kcal / protein) · last 7 days' average (kcal / protein). A
-   dashboard screenshot is accepted. Without MacroFactor: this week's
-   morning weigh-ins, and roughly how eating went (with your average
-   daily protein if you track it). Then, for both: days
-   logged (of 7) · anchors most days (y/n). Leave out days logged for an
-   athlete who doesn't track food, and anchors when none are on file.
-   Nutrition setup still TBD in `profile.md`: one morning scale weight.
-7. **Meal plan** — what stuck, what got swapped?
-8. **Next week** — anything different: travel, schedule, kit, illness?
+6. **Food** — the food questions, worded as `python3 -m coach nutrition
+   status` gives them in `data.questions`, one line each:
+   1. Readings: the app's numbers (trend weight · expenditure · targets
+      (kcal/protein) · 7-day average (kcal/protein) · days logged), or,
+      without an app, this week's morning weigh-ins and average daily
+      protein if they track it. A dashboard screenshot is accepted.
+   2. Habits: anchors most days (y/n)? Anything in the plan that didn't
+      work? The anchors ask is left out when no anchors are on file.
+   3. Next week: food exceptions — who cooks which nights, office-day
+      changes, meals out. Asked **only when a standing weekly template
+      exists** (`[nutrition.template]` in `config.toml`); `data.questions`
+      leaves it out otherwise.
+
+   Nutrition not enabled (`data.enabled` is false): one morning scale
+   weight instead.
+7. **Next week** — anything different: travel, schedule, kit, illness?
 
 **Leave out a field that cannot apply** and renumber the rest from 1: no
 coach-led sessions in the window → no Coach-led field; no cardio in the
-athlete's week → no Runs field; no dated plan in `nutrition/` covering
-the window → no Meal plan field. **A fact the log already answers is
+athlete's week → no Runs field. **A fact the log already answers is
 stated for confirmation, not asked.** If the athlete's opening message
 already covers the fields, don't send the template; leave out any single
 field it already answers.
 
 Reference template (wording may be tightened; the fields and their order
-are fixed):
+are fixed; the Food field's a/b/c wording comes from `data.questions`):
 
 ```
 Check-in for <window> (<weekly|deep> — <reason>).
@@ -149,11 +154,12 @@ Check-in for <window> (<weekly|deep> — <reason>).
 3. Runs. How many, and total distance?
 4. Sleep. One line: average hours a night (from your watch or phone if it tracks sleep), and how it felt.
 5. Niggles. Anything new? Left knee (watching): quiet or still there?
-6. Nutrition. MacroFactor: trend weight · expenditure · targets (kcal/protein) · 7-day average (kcal/protein). A screenshot works.
-   No MacroFactor: this week's morning weigh-ins, and roughly how eating went (with your average daily protein if you track it).
-   Both: days logged (of 7) · anchors most days (y/n).
-7. Meal plan: what stuck, what got swapped?
-8. Next week. Anything different: travel, schedule, kit, illness?
+6. Food.
+   a. MacroFactor: trend weight · expenditure · targets (kcal/protein) · 7-day average (kcal/protein) · days logged. A screenshot works.
+      (No app: this week's morning weigh-ins · average daily protein, if you track it.)
+   b. Anchors most days (y/n)? Anything in the plan that didn't work?
+   c. (only with a standing weekly template) Food exceptions next week: who cooks which nights, office-day changes, meals out?
+7. Next week. Anything different: travel, schedule, kit, illness?
 ```
 
 **Deep tier:** the same message. Any deep-only asks follow the last field,
@@ -291,57 +297,70 @@ meal on a day they couldn't track and no half-logged days
 (MacroFactor's guidance, in `/goals`). Record the days logged either
 way.
 
-**If the athlete uses MacroFactor** (per `profile.md`): take the reply's
-Nutrition field — **trend weight**, **expenditure**, the **kcal/protein
-targets**, the **last 7 days' average**, and **days logged**. Then
-compare:
+**Record the reading.** Turn the Food field's numbers into one
+reading:
 
-- Trend weight vs. the **target trend rate** in `profile.md` (Nutrition &
-  goals). One odd week is noise; a **2–3-week trend** off target is a
-  flag. MacroFactor auto-adjusts targets weekly — usually the right
-  response is "let it work and keep logging", not a manual override.
-- The app's protein target vs. the **protein floor** on file. They
-  should be the same number unless an active override covers protein;
-  if not, say so and have the athlete set the app to the floor.
-- If the **phase itself** looks wrong (trend says cut while the plan says
-  bulk, a phase trigger arrived, or the goal has changed) — point the
-  athlete at `/goals` rather than tweaking numbers here.
+```bash
+python3 -m coach nutrition record --date <check-in date> \
+  --trend-weight X --expenditure N --target-kcal N --target-protein N \
+  --avg-kcal N --avg-protein N --days-logged N --anchors yes|no
+```
 
-**Without MacroFactor:** take the morning weigh-ins and the eating read
-from the Nutrition field; compare the weight trend across recent
-check-ins against the target trend rate in `profile.md`. When a
-**2–3-week trend** misses the target rate, propose moving the calorie
-target on file by ~100–150 kcal/day in the direction the trend needs.
-With the athlete's yes, update it and its reason in Nutrition & goals.
-Never re-derive it from an equation; a fresh estimate comes only from
-`/goals` with a new phase.
+Pass only what the reply gave; without an app, pass `--scale-weight`
+(the mean of the week's morning weigh-ins) and `--avg-protein` if they
+track it. Weights are in `[athlete] bodyweight_units`. A reading already
+on file for the date exits 1: re-run with `--replace` only to correct
+it. Then run `python3 -m coach nutrition status` and work from its
+output. The numbers on file (phase, target trend rate, protein floor,
+target and stretch, anchors, any override) are in `config.toml`'s
+`[nutrition]` table; `nutrition status` returns them.
 
-**Both — protein habit progression.** Read the weekly average protein
-against the **floor** in `profile.md`: the app's 7-day average, or,
-without MacroFactor, the average daily protein from the Nutrition field.
-No figure (the athlete doesn't track protein) → skip the progression
-this week.
+**Weight trend.** `data.trend` gives the rate per week over the latest
+span of 14 days or more, next to `target_rate_per_week`; it is a number,
+not a verdict. One odd week is noise; a **2–3-week trend** off target is
+a flag. **With MacroFactor**, the app auto-adjusts targets weekly:
+usually the right response is "let it work and keep logging", not a
+manual override. **Without MacroFactor**, when a 2–3-week trend misses
+the target rate, propose moving `[nutrition] kcal_target` by ~100–150
+kcal/day in the direction the trend needs. With the athlete's yes, edit
+it in `config.toml` and note the reason in Nutrition & goals in
+`profile.md`. Never re-derive it from an equation; a fresh estimate
+comes only from `/goals` with a new phase. If the **phase itself** looks
+wrong (trend says cut while the plan says bulk, a phase trigger arrived,
+or the goal has changed), point the athlete at `/goals` rather than
+tweaking numbers here.
 
-- Average at or over the floor at **two consecutive check-ins** since
-  the floor last changed → propose raising the floor by ~10–15 g,
-  **capped at the target**. With the athlete's yes, update the floor and
-  its date in `profile.md`; MacroFactor users set the app's protein to
-  the new floor the same day.
-- Under the floor → the floor stays. Missing it never lowers it; only
-  `/goals` lowers it.
-- **Anchors:** note the "anchors most days" answer. A "no" two weeks
-  running is a cue to revisit the anchors in `/goals`, not to lower the
-  floor.
+**Act on each flag** in `data.flags`:
 
-**Both — nutrition override.** If `profile.md` has an **Active
-override**, check its expiry date. On or after it, the override
-**expires**: clear the block, tell the athlete they're back on the app's
-numbers (or, without an app, the calorie target on file), and record it.
-Its exit condition firing earlier ends it the same way. Renewal is not
-done here: it needs `/goals` with a fresh reason. An active override at
-**renewal 2** (a second consecutive renewal) is **flagged** in the record
-at every check-in while it stands, as a sign the plan itself needs
-changing.
+- `protein_floor_raise` — average protein met the floor at the two most
+  recent readings since `floor_since`. Propose raising the floor to
+  `proposed_floor_g` (the step, capped at the target). With the
+  athlete's yes, set `floor_g` to `proposed_floor_g` and `floor_since`
+  to `proposed_floor_since` (the day after the latest counted reading,
+  so this week's reading, taken under the old floor, doesn't count
+  toward the next raise) in `[nutrition.protein]` in `config.toml`;
+  MacroFactor users set the app's protein to the new floor the same
+  day. No flag → the floor
+  stays: missing it never lowers it; only `/goals` lowers it.
+- `app_protein_mismatch` — the app's protein target is not the floor.
+  Have the athlete set the app to the floor, unless the active override
+  covers protein.
+- `logging_incomplete` — fewer than 7 days logged: ask for every day to
+  be logged, as in the framework rule above.
+- `override_expired` — on or after its expiry date the override ends:
+  remove `[nutrition.override]` from `config.toml`, tell the athlete
+  they're back on the app's numbers (or, without an app, the calorie
+  target on file), and record it. Its exit condition firing earlier ends
+  it the same way. Renewal is not done here: it needs `/goals` with a
+  fresh reason.
+- `override_renewed_twice` — flag it in the record at every check-in
+  while it stands, as a sign the plan itself needs changing.
+- `no_recent_reading` — nothing recorded in the last 14 days: record
+  this week's reading before reading anything else into the trend.
+
+**Anchors:** note the "anchors most days" answer. A "no" two weeks
+running is a cue to revisit the anchors in `/goals`, not to lower the
+floor.
 
 **Sleep gate.** Once the athlete has a sleep source (a watch or phone
 that tracks sleep), take the trailing 14-day average: the tracker's own
@@ -352,18 +371,19 @@ recorded as `pending measurement` gets its first measurement the same
 way: under ~7 h confirms recomp; at or over it, offer `/goals` to
 reconsider the deficit. Update the gate status in `profile.md`.
 
-If `profile.md` shows nutrition setup still TBD, just record the scale
-weight and prompt `/goals` to get set up.
+If `nutrition status` says `enabled: false`, just note the scale weight
+in the record and prompt `/goals` to get set up.
 
 **Deep tier, body composition:** when the reply carries a reading, read
 it against the goal or phase trigger that uses it and against the last
 reading. A trigger that fires sends the athlete to `/goals`.
 
-If a dated plan in `nutrition/` covers (part of) this window, the Meal
-plan field said how it went — note learnings for the next `/meal-plan`
-run (recipe-bank changes belong in `/recipes`, not here).
+If a dated plan in `nutrition/` covers (part of) this window, the Food
+field's habits question said how it went — note learnings for the next
+`/meal-plan` run (recipe-bank changes belong in `/recipes`, not here).
 
-Record the numbers in the check-in and refresh them in `profile.md`.
+Record the numbers in the check-in's Weight & nutrition section; the
+readings series holds them, so they no longer go into `profile.md`.
 
 ## 6. Write the record
 
@@ -454,10 +474,10 @@ check-in the due one.
   `routine/` files after the athlete approves** — on normal weeks the
   edit lands via program-week's write step (below); re-check the day
   before and after any edited day and the program's weekly balance.
-- Update `profile.md`: weight/nutrition numbers every time; e1RMs, watch
-  notes, and `_Last reviewed_` when they move (deep tier refreshes the
-  whole file). Add or retire **Coach's notes** as patterns emerge or
-  resolve — with the athlete's confirmation.
+- Update `profile.md`: e1RMs, watch notes, and `_Last reviewed_` when
+  they move (deep tier refreshes the whole file). Add or retire
+  **Coach's notes** as patterns emerge or resolve — with the athlete's
+  confirmation.
 - **Maintain the niggle log** in `profile.md` (Injuries / limitations →
   a `### Niggle log` table: `Area · First noted · Last noted · Mentions
   · Status · Notes`; statuses `watching` / `easing` / `resolved`;

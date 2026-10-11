@@ -49,6 +49,55 @@ dumbbells = []                # per-hand dumbbell weights available; [] = not ch
 [caps]
 # db_bench_press = 30.0
 
+# Nutrition strategy, set by /goals with the athlete's approval. Left out,
+# or with enabled = false, nutrition is off: the check-in asks for one
+# morning weigh-in and /goals sets things up. Weights are in [athlete]
+# bodyweight_units. No key holds a calorie figure the nutrition app owns:
+# kcal_target is only for app = "none", and is an error otherwise.
+#   protein: floor, target and stretch in grams a day; readings dated on
+#     or after floor_since count toward a raise, and floor_step_g is how far
+#     the floor rises once average protein meets it at two check-ins running
+#     (never above target).
+#   anchors: the 2-3 standing protein anchors. days: "daily", "office",
+#     "home" or weekday ids "mon" .. "sun".
+#   override: at most one, expiring no more than 21 days after it starts;
+#     renewal is 0 for a first override, 1 once renewed, 2 renewed twice.
+# What stays prose in profile.md: the goal in the athlete's words, the
+# phase sequence and its triggers, why that protein basis, how the anchors
+# were chosen, the sleep gate and the app setup notes.
+#
+# [nutrition]
+# enabled = true
+# app = "macrofactor"             # "macrofactor" | "none"
+# phase = "recomp"                # "bulk" | "cut" | "maintain" | "recomp"
+# target_rate_per_week = 0.0      # bodyweight units a week; negative = loss
+# # goal_weight = 78.0
+# # kcal_target = 2400            # only with app = "none"
+#
+# [nutrition.protein]
+# reference_basis = "bodyweight"  # "bodyweight" | "goal_weight" | "fat_free_mass"
+# reference_mass = 80.0
+# floor_g = 110                   # the number entered in the app
+# target_g = 128
+# stretch_g = 176
+# floor_since = 2026-09-28
+# floor_step_g = 10
+#
+# [[nutrition.anchors]]
+# name = "Whey shake"
+# slot = "snack"
+# days = ["daily"]
+# kcal = 150
+# protein_g = 30
+#
+# # [nutrition.override]
+# # start = 2026-10-11
+# # expires = 2026-11-01
+# # what = "app protein target held at 120"
+# # reason = "..."
+# # exit_condition = "..."
+# # renewal = 0
+
 # Recipe bank checks (/recipes). Left commented, the values shown apply;
 # uncomment [nutrition.bank] to change them.
 #   aisles: the shopping walk order; every ingredient names one.

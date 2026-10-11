@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Nutrition readings series, data/nutrition/readings.json (contract C35)",
+  "type": "object",
+  "required": ["schema_version", "readings"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"type": "integer", "const": 1},
+    "readings": {"type": "array", "items": {"$ref": "#/$defs/reading"}}
+  },
+  "$defs": {
+    "date": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+    "weight": {"type": ["number", "null"], "minimum": 0},
+    "kcal": {"type": ["number", "null"], "minimum": 0},
+    "grams": {"type": ["number", "null"], "minimum": 0},
+    "reading": {
+      "type": "object",
+      "required": ["date", "source", "weight_unit", "trend_weight", "scale_weight", "expenditure_kcal",
+                   "target_kcal", "target_protein_g", "avg_kcal", "avg_protein_g", "days_logged",
+                   "anchors_most_days", "note"],
+      "additionalProperties": false,
+      "properties": {
+        "date": {"$ref": "#/$defs/date"},
+        "source": {"enum": ["app", "scale", "seeded"]},
+        "window": {
+          "type": "object",
+          "required": ["start", "end"],
+          "additionalProperties": false,
+          "properties": {"start": {"$ref": "#/$defs/date"}, "end": {"$ref": "#/$defs/date"}}
+        },
+        "weight_unit": {"enum": ["kg", "lb"]},
+        "trend_weight": {"$ref": "#/$defs/weight"},
+        "scale_weight": {"$ref": "#/$defs/weight"},
+        "expenditure_kcal": {"$ref": "#/$defs/kcal"},
+        "target_kcal": {"$ref": "#/$defs/kcal"},
+        "target_protein_g": {"$ref": "#/$defs/grams"},
+        "avg_kcal": {"$ref": "#/$defs/kcal"},
+        "avg_protein_g": {"$ref": "#/$defs/grams"},
+        "days_logged": {"type": ["integer", "null"], "minimum": 0, "maximum": 7},
+        "anchors_most_days": {"type": ["boolean", "null"]},
+        "note": {"type": ["string", "null"]}
+      }
+    }
+  }
+}

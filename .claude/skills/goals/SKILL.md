@@ -9,8 +9,9 @@ A coaching conversation that turns "what the athlete wants" into a
 recorded plan: target weight (or body-comp outcome), phase sequence, trend
 rate, protein floor, target and stretch, the standing protein anchors,
 and — if they use MacroFactor — the exact configuration for it. The
-result lives in the **Nutrition & goals** section of `profile.md`, which
-check-ins read.
+numbers live in the `[nutrition]` table of `config.toml`, which scripts
+and check-ins read; the reasoning behind them lives in the **Nutrition &
+goals** section of `profile.md` (step 9).
 
 **The framework rule (nutrition app users).** MacroFactor is the
 nutrition engine: it estimates expenditure from logged food and weight
@@ -37,7 +38,8 @@ unchanged.
 ## 1. Gather current state
 
 - Read `profile.md`, `routine/program.md` (if it exists), and the newest
-  file in `check-ins/` (if any).
+  file in `check-ins/` (if any). Run `python3 -m coach nutrition status`
+  for the numbers on file and the latest reading.
 - Ask the athlete for (skip anything the conversation already covered):
   - A **fresh weigh-in** (morning, before food; record in their preferred
     units with the metric value alongside). If they don't have one to
@@ -183,7 +185,11 @@ consecutive check-ins** since the floor last changed, the floor rises by
 ~10–15 g, **never above the target**. Missing the floor never lowers it;
 only `/goals` lowers it, with a reason. `/check-in` applies the raise.
 For MacroFactor users the athlete sets the app's protein to the new
-floor the same day.
+floor the same day. Whenever `/goals` changes `floor_g`, set
+`floor_since` to the day after the newest reading on file (`python3 -m
+coach nutrition readings --last 1`), or today if that is later: a
+reading already on file measured the old floor and must not count
+toward the next raise.
 
 ## 5. Agree the protein anchors
 
@@ -198,7 +204,7 @@ meal plan. An anchor is a fixed daily item in a set slot that:
 Propose candidates from what the athlete already eats and likes, check
 the sum (anchors + a typical day's meals ≥ floor), and agree each
 anchor's name, slot (breakfast, lunch, dinner, snack) and days (daily,
-office days, named weekdays). Record them as a table (step 9).
+office days, named weekdays). Record them in `config.toml` (step 9).
 `/meal-plan` treats them as fixed blocks; `/check-in` asks whether they
 happened most days.
 
@@ -233,19 +239,21 @@ number other than the app's (or, without an app, other than the
 trend-driven calorie target on file): holding calories at expenditure
 instead of the app's deficit, a manual calorie band, a protein figure
 other than the floor. Push back first; usually the right answer is "let
-the app work and keep logging". If one is agreed, record it in
-`profile.md` → Nutrition & goals → **Active override** with every field:
+the app work and keep logging". If one is agreed, record it as the
+`[nutrition.override]` table in `config.toml` (step 9) with every field:
 
-- **Start** date;
-- **What** is overridden, with the number the athlete eats to;
-- **Reason**;
-- **Exit condition** — what ends it early;
-- **Expires** — no later than **21 days** after the start;
-- **Renewal** — 0 for a first override, 1 once renewed, 2 for a second
+- `start` date;
+- `what` is overridden, with the number the athlete eats to;
+- `reason`;
+- `exit_condition` — what ends it early;
+- `expires` — no later than **21 days** after the start (`config
+  validate` refuses a later date);
+- `renewal` — 0 for a first override, 1 once renewed, 2 for a second
   consecutive renewal.
 
 Only **one override at a time**. `/check-in` expires it on or after its
-expiry date and returns the athlete to the app's numbers. Renewing it
+expiry date (`nutrition status` flags `override_expired`) and returns the
+athlete to the app's numbers. Renewing it
 needs this skill, a fresh reason and a new expiry no later than 21 days
 from the renewal. A second consecutive renewal is flagged to the athlete
 as a sign the plan itself needs changing (usually the phase or the trend
@@ -260,33 +268,74 @@ side.
 
 ## 9. Record it
 
-Update the **Nutrition & goals** section of `profile.md` — with the
-athlete's confirmation, like any profile edit. A goal or trigger that
-uses waist, body fat or photos is recorded with "(measured at deep
-check-ins)" beside it. The section holds:
+Two places, both with the athlete's confirmation, like any profile edit.
+
+**The numbers go in `config.toml`.** Propose the exact TOML edit to the
+`[nutrition]` table — every changed line as it will read — and wait for
+the athlete's approval. Then write it with the Write or Edit tool and
+run `python3 -m coach config validate`; it exits 5 naming the key if
+anything is wrong (a `kcal_target` with an app, protein numbers out of
+order, an override longer than 21 days). The table holds the floor,
+target and stretch, the reference mass and basis, the anchors and any
+override, plus the app, phase and trend rate:
+
+```toml
+[nutrition]
+enabled = true
+app = "macrofactor"             # or "none"
+phase = "recomp"                # "bulk" | "cut" | "maintain" | "recomp"
+target_rate_per_week = 0.0      # bodyweight units a week; negative = loss
+# goal_weight = 78.0            # when the goal is a weight
+# kcal_target = 2400            # no app only: the current calorie target
+
+[nutrition.protein]
+reference_basis = "bodyweight"  # "bodyweight" | "goal_weight" | "fat_free_mass"
+reference_mass = 80.0
+floor_g = 110                   # app users: the protein number set in the app
+target_g = 128
+stretch_g = 176
+floor_since = 2026-09-28        # readings dated on or after this count toward a raise
+floor_step_g = 10               # how far the floor rises (step 4: 10–15 g)
+
+[[nutrition.anchors]]           # one table per anchor
+name = "Whey shake"
+slot = "snack"
+days = ["daily"]                # "daily" | "office" | "home" | "mon" .. "sun"
+kcal = 150
+protein_g = 30
+
+[nutrition.override]            # only while one is active; delete it when it ends
+start = 2026-10-11
+expires = 2026-11-01
+what = "app protein target held at 120"
+reason = "..."
+exit_condition = "..."
+renewal = 0
+```
+
+The numbers are placeholders; weights are in `[athlete]
+bodyweight_units`.
+
+**What stays prose** in the **Nutrition & goals** section of
+`profile.md` is what only a human reads: the goal in the athlete's
+words, the phase sequence and its triggers, why that protein basis (the
+body-fat reading and its source), how the anchors were chosen and what
+the athlete likes, the sleep-gate status and its reasoning, and the
+MacroFactor setup summary and revision notes. It holds:
 
 ```markdown
 ## Nutrition & goals
 
+The numbers (phase, trend rate, protein, anchors, any override) are in `config.toml` → `[nutrition]`.
+
 - **Apps:** Hevy: … · MacroFactor: yes / no
-- **Goal:** <in the athlete's words> · **Phase:** <phase> (from <date>) → <next phase and its trigger>
-- **Target trend rate:** <rate per week>
+- **Goal:** <in the athlete's words> → <phase sequence, with the trigger for each next phase>
 - **Calories:** set by MacroFactor (<goal type, rate, calorie shifting>)
-  — or, no app: starting estimate <kcal> (<method>, <date>) · current target <kcal> (last changed <date>: <trend reason>)
-- **Protein reference mass:** <mass> · basis: bodyweight | goal weight | fat-free mass (<why: the reading, its method and date>)
-- **Protein:** floor <g> (since <date>; app users: = the app's protein setting) · target <g> · stretch <g>
+  — or, no app: starting estimate (<method>, <date>); trend changes since: <date: reason>, …
+- **Protein basis:** <why this reference mass: the body-fat reading, its method and date>
+- **Anchors:** <how they were chosen; what the athlete likes>
+- **Override:** <the story behind an active one, if any>
 - **Sleep gate:** passed (<14-day avg>, <date>) | recomp (<14-day avg>, <date>) | pending measurement (<what was reported>) | not evaluated
-
-### Protein anchors
-| Anchor | Slot | Days | Protein | kcal |
-| --- | --- | --- | --- | --- |
-| <name> | snack | daily | 30 g | 150 |
-
-### Active override
-None.
-
-(While one is active, the "None." line is replaced by:)
-**Start:** <date> · **Expires:** <date, ≤ start + 21 days> · **What:** <…> · **Reason:** <…> · **Exit condition:** <…> · **Renewal:** 0 | 1 | 2
 
 _Revised: YYYY-MM-DD_
 ```
@@ -294,6 +343,6 @@ _Revised: YYYY-MM-DD_
 **If the phase is written in more than one place, sync them all in the
 same edit** (e.g. a phase word in `routine/program.md`'s header). Bump
 `profile.md`'s `_Last reviewed_` date. Check-ins take it from here: they
-track the trend against this plan, apply the floor's habit progression,
-expire overrides, and send the athlete back to `/goals` when the phase
-plan itself needs rethinking.
+record a reading each week, track the trend against this plan, apply the
+floor's habit progression, expire overrides, and send the athlete back
+to `/goals` when the phase plan itself needs rethinking.
