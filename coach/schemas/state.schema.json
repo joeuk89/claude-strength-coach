@@ -1,0 +1,81 @@
+{
+  "title": "Program state, data/state.json: rotation, block counters, one-off span, scheme state, Hevy ids (contract C16)",
+  "type": "object",
+  "required": ["schema_version", "rotation", "block", "one_off", "scheme_state", "hevy"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": 1},
+    "rotation": {
+      "type": "object",
+      "required": ["position", "confirmed", "confirmed_at"],
+      "additionalProperties": false,
+      "properties": {
+        "position": {"type": ["string", "null"], "pattern": "^[a-z0-9-]+$"},
+        "confirmed": {"type": "boolean"},
+        "confirmed_at": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"}
+      }
+    },
+    "block": {
+      "type": "object",
+      "required": ["started", "hard_weeks_completed", "deload"],
+      "additionalProperties": false,
+      "properties": {
+        "started": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+        "hard_weeks_completed": {"type": "integer", "minimum": 0},
+        "deload": {
+          "type": "object",
+          "required": ["status", "since"],
+          "additionalProperties": false,
+          "properties": {
+            "status": {"enum": ["not_due", "due", "in_progress", "done", "skipped"]},
+            "since": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"}
+          }
+        }
+      }
+    },
+    "one_off": {
+      "type": ["object", "null"],
+      "required": ["overlay_id", "span"],
+      "additionalProperties": false,
+      "properties": {
+        "overlay_id": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}-[a-z0-9-]+$"},
+        "span": {
+          "type": "object",
+          "required": ["start", "end"],
+          "additionalProperties": false,
+          "properties": {
+            "start": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+            "end": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"}
+          }
+        }
+      }
+    },
+    "scheme_state": {"type": "object", "additionalProperties": {"type": "object"}},
+    "hevy": {
+      "type": "object",
+      "required": ["routines", "folders", "temporary_routines"],
+      "additionalProperties": false,
+      "properties": {
+        "routines": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["session_id"],
+            "additionalProperties": false,
+            "properties": {"session_id": {"type": "string", "pattern": "^[a-z0-9-]+$"}}
+          }
+        },
+        "folders": {
+          "type": "object",
+          "required": ["program", "one_off"],
+          "additionalProperties": false,
+          "properties": {
+            "program": {"type": ["integer", "null"], "minimum": 0},
+            "one_off": {"type": ["integer", "null"], "minimum": 0}
+          }
+        },
+        "temporary_routines": {"type": "array", "items": {"type": "string", "pattern": "\\S"}}
+      }
+    }
+  }
+}
