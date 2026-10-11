@@ -1,162 +1,280 @@
-# Recipe cards & index — the bank format
+# Recipe cards and the index: the bank format
 
 The contract between `/recipes` (which writes the bank) and `/meal-plan`
-(which plans from it). Follow it exactly — shopping-list arithmetic
-depends on it.
+(which plans from it). Shopping-list arithmetic reads the structured part
+of every card, so follow it exactly.
 
 ## Layout
 
-- **`nutrition/menu/<slug>.md`** — one card per recipe. The filename slug
-  is the recipe's identity; there are no meal codes.
-- **`nutrition/menu/index.md`** — the selection index (see below).
+- **`nutrition/menu/<slug>.md`**: one card per recipe. The file name's
+  slug (lowercase letters, digits and hyphens) is the recipe's identity.
+- **`nutrition/menu/index.md`**: the selection index. `recipes render`
+  writes it from the cards; never edit it by hand.
 
-## Card frontmatter
+All commands below run from the workspace root as
+`python3 -m coach recipes <command>`.
 
-```yaml
----
-name: chicken-rice-bowl   # must equal the filename slug
-slot: [lunch]             # list — a meal may fit several slots:
-                          # breakfast | lunch | dinner | snack
-kcal: 610                 # per serving
-protein: 50               # grams per serving
-carbs: 55                 # grams per serving
-fat: 18                   # grams per serving
-nutrition: estimated      # estimated | published (source site's numbers)
-prep: assemble            # assemble | quick-cook | cook | eat-out
-time: 5                   # active minutes
-servings: 1               # portions the ingredient quantities make
-source: null              # URL when sourced online; null if not
-tags: []                  # freeform, e.g. [post-workout, portable, batch]
-status: active            # active | benched
----
+## A card has three parts
+
+1. **The data block.** TOML inside an HTML comment at the very top, so
+   GitHub hides it. The first line is exactly `<!-- coach:card` and the
+   block ends at the first line that is exactly `-->`. The coach writes
+   it with the Write or Edit tool; scripts never rewrite it. (The one
+   exception is `recipes convert --apply`, which writes each old card's
+   block once, with a backup.) The TOML must never contain `-->`.
+2. **The rendered region**, between `<!-- coach:begin card <slug> -->`
+   and `<!-- coach:end card <slug> -->`: the title, the stats table, the
+   ingredient list and the variations. `recipes render` writes it from
+   the data block. Never edit it by hand; `coach check` fails a region
+   that differs from a fresh render.
+3. **Prose**: `## Method` (numbered steps), or `## What to order` on an
+   eat-out card, plus any notes. Nothing parses the prose. A trivial
+   snack needs none.
+
+## The data block
+
+```toml
+schema_version = 1
+title = "Chicken + rice bowl"
+slots = ["lunch"]
+servings = 1
+prep = "assemble"
+time_min = 5
+status = "active"
+nutrition = "estimated"
+tags = ["post-workout"]
+
+[per_serving]
+kcal = 610
+protein_g = 50
+carbs_g = 55
+fat_g = 18
+
+[[ingredients]]
+qty = 170
+unit = "g"
+item = "chicken breast, cooked"
+aisle = "meat-fish"
+
+[[variations]]
+name = "light"
+label = "half the rice pouch"
+changes = [{item = "microwave basmati rice pouch", qty = -0.5, unit = "each"}]
+delta = {kcal = -105, protein_g = 0, carbs_g = -22, fat_g = 0}
 ```
 
-All four macro fields are **required**. Use the source's published
-per-serving numbers when available (`nutrition: published`); otherwise
-estimate from the ingredients (`nutrition: estimated`). Keep `published`
-through unit or portion conversions — the numbers still describe the
-food — but drop to `estimated` the moment you swap, add, or remove an
-ingredient, since the published figures no longer match. Rough is fine —
-the athlete's food log is ground truth — but fields are never blank.
+| Key | Required | Values |
+| --- | --- | --- |
+| `schema_version` | yes | `1` |
+| `title` | yes | the name shown on the card and in the index |
+| `slots` | yes | one or more of the configured slots: `breakfast`, `lunch`, `dinner`, `snack` |
+| `servings` | yes | portions the ingredient quantities make, a whole number |
+| `prep` | yes | `assemble`, `quick-cook`, `cook` or `eat-out` |
+| `time_min` | yes | active minutes |
+| `status` | yes | `active` or `benched` |
+| `nutrition` | yes | `published` (the source's numbers) or `estimated` |
+| `source` | no | the URL when the recipe came from a page |
+| `tags` | no | free-form, lowercase with hyphens: `post-workout`, `batch`, `meal-kit` |
+| `[per_serving]` | yes | `kcal`, `protein_g`, `carbs_g`, `fat_g` for one serving |
+| `[[ingredients]]` | yes, except on `eat-out` cards | `qty`, `unit`, `item`, `aisle` |
+| `[[variations]]` | no | `name`, `label`, `changes`, `delta` |
 
-## Card body
+### Macros
 
-### Stats block (the visible summary)
+All four macros are required. Use the source's per-serving numbers when it
+publishes them (`nutrition = "published"`); otherwise estimate from the
+ingredients (`nutrition = "estimated"`). Keep `published` through unit or
+portion conversions, since the numbers still describe the food. Drop to
+`estimated` the moment you swap, add or remove an ingredient. Rough is
+fine (the athlete's food log is the ground truth), but no field is ever
+left out.
 
-Directly under the recipe's `# Title`, a two-column table that mirrors
-the frontmatter — so the macros and attributes are visible in rendered
-markdown (most viewers hide frontmatter). Rows, in order:
+`recipes validate` checks that `kcal` agrees with the macros, using the
+Atwater general factors: 4 kcal per gram of protein and of carbohydrate,
+9 per gram of fat (FAO 2003, *Food energy: methods of analysis and
+conversion factors*). It warns when `kcal` is more than 10 % away from
+that sum and fails above 20 % (`macro_sum_warn_pct` and
+`macro_sum_fail_pct` in `[nutrition.bank]`). Small gaps are normal:
 
-| | |
-| --- | --- |
-| **Per serving** | `<kcal>` kcal · `<P>` g P · `<C>` g C · `<F>` g F |
-| **Slot** | the slot(s) |
-| **Prep** | `<prep>` · `<time>` min · serves `<servings>` |
-| **Nutrition** | estimated / published |
-| **Source** | `[link](<url>)` — **omit this row when `source` is null** |
-| **Tags** | the tags — **omit when there are none** |
-| **Status** | active / benched |
+- UK and EU labels count fibre at 2 kcal per gram on top of carbohydrate,
+  which excludes fibre (Regulation (EU) 1169/2011, Annex XIV). A card
+  copied from such a label sits about 2 kcal per gram of fibre above the
+  sum: 8 g of fibre adds 16 kcal, under 3 % of a 600 kcal meal.
+- US labels count fibre inside total carbohydrate, so the sum can run a
+  little above the label's kcal.
 
-The stats block is a **mirror, not a second source of truth** — the
-frontmatter is what skills parse. Any write that changes a frontmatter
-field updates the stats block in the same operation (same discipline as
-the index same-write rule).
+A card outside the bands is nearly always a typo or a per-recipe figure
+copied as per-serving.
+
+### Protein density
+
+`recipes validate` warns when a card has less protein per 100 kcal than
+`min_protein_per_100kcal` sets for any of its slots. The default is 5 g
+for breakfast, lunch and dinner, and 0 (not checked) for snacks. It is a
+heuristic to catch protein-light meals, not an evidence-based cut-off.
+Set a slot to `0.0` to switch it off.
 
 ### Ingredients
 
-Exact quantities for the stated `servings`. **No ranges** — "½–1 pouch"
-is banned; a quantity choice is a named variation instead. Every line
-must be shoppable: quantity + unit + item.
-
-### Method
-
-Numbered steps. **Optional for trivial items** — a two-ingredient snack
-needs no method section.
+- **Exact quantities, no ranges.** "½ to 1 pouch" is banned; a quantity
+  choice is a named variation instead.
+- `unit` is `g`, `ml`, `each`, `tsp` or `tbsp`. Count packaged things as
+  `each` and put the package in the item: `1 each "microwave basmati rice
+  pouch"`.
+- `item` is lowercase. Together with `unit` it is the shopping-list key,
+  so spell an ingredient the same way on every card ("eggs", not "egg"
+  on one card and "large eggs" on another).
+- `aisle` is one of `[nutrition.bank] aisles` (default: `produce`,
+  `bakery`, `meat-fish`, `dairy-eggs`, `chilled`, `frozen`,
+  `tins-jars-dry`, `snacks`, `drinks`, `household`). The shopping list
+  walks the aisles in that order.
 
 ### Variations
 
-**Named exact deltas** on the base recipe. Each variation states its
-ingredient changes and macro deltas:
+A variation is a named, exact change to the base recipe.
 
-```markdown
-## Variations
-- **light** — ½ rice pouch instead of full · −105 kcal · −22 g carbs
-- **+egg** — add 1 boiled egg · +70 kcal · +6 g protein · +5 g fat
-```
+- `name`: short, lowercase (`light`, `+egg`). Plans refer to it as
+  `recipe (variation)`.
+- `label`: what the athlete reads: "half the rice pouch".
+- `changes`: the ingredient changes. A negative `qty` reduces or removes
+  an ingredient the card already has, in that ingredient's unit. A
+  positive `qty` adds to one, or adds a new item, which must carry its
+  `aisle`.
+- `delta`: the change to the per-serving macros. `recipes validate`
+  checks it against 4/4/9 like the card, but never flags a gap under
+  20 kcal, since small deltas round badly.
 
-Plans reference `recipe (variation)`; shopping-list maths applies the
-ingredient delta. A plan entry may stack **more than one** variation when
-they touch different ingredients — `recipe (+banana, +PB)` — and the
-deltas simply add; never stack two variations that change the same
-ingredient. A variation with no exact delta is not a variation — it's a
-new card.
+A plan may stack variations that change different ingredients
+(`recipe (+banana, +PB)`), and the deltas add. Two variations that change
+the same ingredient never stack. A change with no exact delta is not a
+variation: it is a new card.
 
 ## Special cards
 
-Everything the plan can slot is a card, however small:
+Everything a plan can slot is a card, however small:
 
-- **Tiny snacks** — ingredients + macros, no method.
-- **Eating-out fallbacks** — a **"What to order"** section instead of
-  ingredients, tag `eat-out` and `prep: eat-out`. With no ingredient
-  lines they are naturally excluded from shopping lists.
-- **Meal-kit recipes** (Gousto and similar) — imported like any other
-  card, tagged `meal-kit` plus a provider tag (e.g. `gousto`), with the
-  ingredient list included when the provider publishes it. Exclusion
-  from shopping lists is decided by the **plan** (a pool entry marked
-  covered by the box), not by the tag — a meal-kit recipe cooked
-  outside a box shops normally.
+- **Tiny snacks**: ingredients and macros, no method.
+- **Eat-out fallbacks**: `prep = "eat-out"`, no ingredients, and a
+  `## What to order` section in the prose. With no ingredients they never
+  reach a shopping list.
+- **Meal-kit recipes** (Gousto, HelloFresh and similar): imported like any
+  other card, tagged `meal-kit` plus a provider tag (`gousto`), with the
+  ingredients the provider publishes. The **plan** decides whether a meal
+  is covered by the box, not the tag: a meal-kit recipe cooked outside a
+  box shops normally.
 
-## The index — `nutrition/menu/index.md`
+## The index
 
-The planner reads the index to *select* recipes, then reads only the
-chosen cards. Format:
+`recipes render` writes `nutrition/menu/index.md` whole: one section per
+configured slot, in config order, each a table of the cards that fit it
+(a card with several slots appears in each). Active cards come first,
+then benched ones. The planner reads the index to choose recipes, then
+reads only the chosen cards.
 
-- One section per slot (Breakfasts / Lunches / Dinners / Snacks) with a
-  table, one row per card:
+Notes that are not recipes (standing coverage such as "dinners covered by
+family, top up protein on light nights", or a slot's priority such as
+"breakfast must be fast or it gets skipped") go in
+`[nutrition.bank.slot_notes]` in `config.toml`. The index prints each one
+under its slot.
 
-```markdown
-| Recipe | kcal | Protein | Prep | Status |
-| --- | --- | --- | --- | --- |
-| [Chicken + rice bowl](chicken-rice-bowl.md) | 610 | 50 g | assemble | active |
-```
+## Commands
 
-  (A card with several slots gets a row in each section.)
-- **Slot notes** under each section heading for things that aren't
-  recipes: standing coverage ("dinners covered by family — top up
-  protein on low-protein nights"), per-slot priorities ("breakfast must
-  be fast or it gets skipped"), eat-out context.
+| Command | Use it to |
+| --- | --- |
+| `recipes list [--slot S] [--status S]` | list the cards |
+| `recipes show SLUG` | read one card's data |
+| `recipes validate [SLUG]` | check the schema, the macro sum, protein density, variations and aisles; exit 1 on a fail |
+| `recipes render [SLUG] [--dry-run]` | rewrite the cards' rendered regions and the index from the data blocks |
+| `recipes import --html FILE [--url URL]` | read a saved recipe page's schema.org JSON-LD into a draft card, with flags to resolve |
+| `recipes draft --input FILE` | turn a draft (`{"slug", "card", "prose"}`) into the full card text, validated, for the athlete to approve |
+| `recipes convert --parse` / `--apply --input FILE` | convert old YAML cards (below) |
 
-### Same-write rule (hard)
+`recipes import` and `recipes draft` write nothing: the coach shows the
+athlete the card and writes the file only after approval. After any card
+is written or edited, run `recipes render`, then `recipes validate`.
+`python3 -m coach check` runs the same checks as `recipe_cards`,
+`recipe_render_fresh` and `recipe_index_fresh`.
 
-Any operation that creates, edits, or benches a card **updates
-`index.md` in the same operation**. Any skill that reads the index
-spot-checks it against the card filenames and flags drift to the
-athlete instead of silently trusting either side.
+## Converting old cards
+
+Cards written before this format open with YAML front matter (`---`) and
+fail `recipes validate`. To convert a bank:
+
+1. `recipes convert --parse` reads every old card and returns a draft per
+   card plus a review table: title, macros, ingredient count, ingredient
+   lines it could not read, the aisle it guessed for each ingredient, and
+   the variations whose `changes` need filling in. It writes nothing.
+2. Walk the table with the athlete: add the unread ingredients exactly,
+   correct the aisles, and give each variation its `changes`. Save the
+   corrected drafts as `{"cards": [{"slug": ..., "card": {...}}]}`.
+3. `recipes convert --apply --input FILE` copies the old cards and the
+   old index to `.coach/backups/<UTC timestamp>/`, writes each card as a
+   data block plus a rendered region plus its original prose (the Method
+   and What to order sections keep their exact text), then re-renders the
+   index once no old cards remain. Try it first with `--dry-run`.
 
 ## Example card
 
 `nutrition/menu/chicken-rice-bowl.md`:
 
 ```markdown
----
-name: chicken-rice-bowl
-slot: [lunch]
-kcal: 610
-protein: 50
-carbs: 55
-fat: 18
-nutrition: estimated
-prep: assemble
-time: 5
-servings: 1
-source: null
-tags: [post-workout]
-status: active
----
+<!-- coach:card
+schema_version = 1
+title = "Chicken + rice bowl"
+slots = ["lunch"]
+servings = 1
+prep = "assemble"
+time_min = 5
+status = "active"
+nutrition = "estimated"
+tags = ["post-workout"]
 
+[per_serving]
+kcal = 610
+protein_g = 50
+carbs_g = 55
+fat_g = 18
+
+[[ingredients]]
+qty = 170
+unit = "g"
+item = "chicken breast, cooked"
+aisle = "meat-fish"
+
+[[ingredients]]
+qty = 1
+unit = "each"
+item = "microwave basmati rice pouch"
+aisle = "tins-jars-dry"
+
+[[ingredients]]
+qty = 80
+unit = "g"
+item = "mixed salad leaves"
+aisle = "produce"
+
+[[ingredients]]
+qty = 6
+unit = "each"
+item = "cherry tomatoes"
+aisle = "produce"
+
+[[variations]]
+name = "light"
+label = "half the rice pouch"
+changes = [{item = "microwave basmati rice pouch", qty = -0.5, unit = "each"}]
+delta = {kcal = -105, protein_g = 0, carbs_g = -22, fat_g = 0}
+
+[[variations]]
+name = "+egg"
+label = "add a boiled egg"
+changes = [{item = "eggs", qty = 1, unit = "each", aisle = "dairy-eggs"}]
+delta = {kcal = 70, protein_g = 6, carbs_g = 0, fat_g = 5}
+-->
+<!-- coach:begin card chicken-rice-bowl -->
 # Chicken + rice bowl
 
-|  |  |
+| | |
 | --- | --- |
 | **Per serving** | 610 kcal · 50 g P · 55 g C · 18 g F |
 | **Slot** | lunch |
@@ -166,51 +284,17 @@ status: active
 | **Status** | active |
 
 ## Ingredients
-- 170 g pre-cooked chicken breast
-- 1 pouch (250 g) microwave basmati rice
+- 170 g chicken breast, cooked
+- 1 microwave basmati rice pouch
 - 80 g mixed salad leaves
 - 6 cherry tomatoes
 
-## Method
-1. Heat the rice pouch (90 sec).
-2. Bowl everything; season.
-
 ## Variations
-- **light** — ½ rice pouch instead of full · −105 kcal · −22 g carbs
-- **+egg** — add 1 boiled egg · +70 kcal · +6 g protein · +5 g fat
-```
+- **light** — half the rice pouch · −105 kcal · −22 g C
+- **+egg** — add a boiled egg · +70 kcal · +6 g P · +5 g F
+<!-- coach:end card chicken-rice-bowl -->
 
-Minimal snack card, `nutrition/menu/yoghurt-honey-nuts.md`:
-
-```markdown
----
-name: yoghurt-honey-nuts
-slot: [snack]
-kcal: 250
-protein: 20
-carbs: 22
-fat: 9
-nutrition: estimated
-prep: assemble
-time: 2
-servings: 1
-source: null
-tags: []
-status: active
----
-
-# Greek yoghurt + honey + nuts
-
-|  |  |
-| --- | --- |
-| **Per serving** | 250 kcal · 20 g P · 22 g C · 9 g F |
-| **Slot** | snack |
-| **Prep** | assemble · 2 min · serves 1 |
-| **Nutrition** | estimated |
-| **Status** | active |
-
-## Ingredients
-- 200 g 0% Greek yoghurt
-- 1 tsp (7 g) honey
-- 15 g almonds
+## Method
+1. Heat the rice pouch (90 seconds).
+2. Bowl everything and season.
 ```

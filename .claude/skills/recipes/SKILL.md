@@ -20,9 +20,12 @@ is **goal-aware**: adds and sweeps serve the athlete's current phase and
 targets. If Nutrition & goals is missing or TBD, send the athlete to
 `/goals` before building a bank around numbers that don't exist.
 
-When reading the index, spot-check it against the card filenames in
-`nutrition/menu/` — flag drift to the athlete rather than trusting
-either side (see the same-write rule below).
+Then run `python3 -m coach recipes validate`. If it reports old YAML
+cards, convert the bank first (`reference/recipe-cards.md`, "Converting
+old cards"): run `recipes convert --parse`, walk the review table with
+the athlete, then `recipes convert --apply --input <file>`. If
+`python3 -m coach check --only recipe_index_fresh,recipe_render_fresh`
+fails, run `python3 -m coach recipes render` before reading the index.
 
 ## 2. First run — the food interview
 
@@ -42,14 +45,17 @@ Write/refresh the Food & eating section with the athlete's confirmation.
 Then **seed the bank**: draft cards for what the athlete already eats
 and likes (macros estimated per the card format), slot by slot, snacks
 included; offer a sourcing sweep (below) to fill thin slots.
-Create `index.md` with the slot notes that came out of the interview
-(coverage, per-slot priorities).
+Record the slot notes that came out of the interview (coverage,
+per-slot priorities) in `config.toml` under
+`[nutrition.bank.slot_notes]`, then run `python3 -m coach recipes
+render`, which writes `index.md` with them.
 
 ## 3. Adding and shaping recipes — five modes
 
 Whatever the mode, **no card is ever written unseen** (presentation
 rules below), every card follows `reference/recipe-cards.md`, and every
-write updates `index.md` in the same operation.
+card write is followed by `python3 -m coach recipes render`, then
+`recipes validate`.
 
 **The research mandate.** Whenever you are inventing or shaping a
 recipe — design, improve, sweep — online research per
@@ -61,9 +67,11 @@ transcriptions of meals the athlete already eats, and trivial
 assemble-only cards with no method. Rule of thumb: if you'd be writing
 a Method section from your own head, research first.
 
-**From an exact link.** Fetch the URL, extract the structured recipe
-data (`reference/recipe-sources.md`), normalise into a draft card, show
-the athlete the **full card**, adjust, then write on approval. Meal-kit
+**From an exact link.** Save the page and run `python3 -m coach recipes
+import --html <file> --url <url>` (`reference/recipe-sources.md`),
+resolve its flags, turn the draft into the card text with `recipes
+draft --input <file>`, show the athlete the **full card**, adjust, then
+write it on approval. Meal-kit
 recipe pages (Gousto etc.) import the same way — tag `meal-kit` plus
 the provider. If the provider doesn't publish shareable pages, ask the
 athlete for the essentials off the app instead (name, per-serving
@@ -107,7 +115,9 @@ and one line on why it fits the brief. The athlete picks; only picked
 candidates become cards.
 
 **Presenting for approval.** A single new card is shown **in full** —
-the athlete is approving exact quantities and macros. An edit or
+the rendered part of `recipes draft`'s text — since the athlete is
+approving exact quantities and macros. Drafts that `recipes draft`
+fails never reach the athlete; fix them first. An edit or
 improve shows a **before/after of the changed lines**, not the whole
 card. A batch of 2+ cards gets a **summary table first** — name, core
 ingredients, prep type, active time, per-serving kcal/protein — with
@@ -116,11 +126,12 @@ is written until the athlete approves.
 
 ## 4. Editing and benching
 
-- **Edit**: adjust any part of a card (quantities, macros, variations,
-  tags) with the athlete; keep `name` = filename; update the index row
-  if a listed field changed. Making a recipe *better* (not just
+- **Edit**: adjust any part of a card's data block (quantities, macros,
+  variations, tags) with the athlete, then run `recipes render`. The
+  file name is the slug; never edit the rendered region or `index.md`. Making a recipe *better* (not just
   correcting it) is the **Improve** mode above — research included.
-- **Bench**: set `status: benched` — never delete. Benched recipes keep
+- **Bench**: set `status = "benched"` in the data block and run
+  `recipes render` — never delete. Benched recipes keep
   their history and can come back; `/meal-plan` ignores them. Un-bench
   by flipping status back.
 - If a change makes a recipe into a genuinely different dish, that's a
@@ -137,8 +148,9 @@ the start of each planning run.
 
 ## Rules that always apply
 
-- **Same-write rule:** any card create/edit/bench updates `index.md`
-  in the same operation.
+- **Render after every write:** any card create, edit or bench is
+  followed by `recipes render`; `index.md` and each card's rendered
+  region are never hand-edited.
 - **Exact quantities, no ranges** — ranges become named variations.
 - **Provenance:** sourced cards record the URL in `source`.
 - **All four macros on every card**, `estimated` or `published`.
