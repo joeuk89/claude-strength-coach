@@ -141,11 +141,51 @@ class StatusTest(CliMixin, unittest.TestCase):
 
     def test_app_protein_mismatch_and_logging_incomplete(self):
         with InstanceCopy() as root:
-            edit_latest(root, target_protein_g=120, days_logged=6)
+            edit_latest(root, target_protein_g=100, days_logged=6)
             data = self.run_ok(root, "nutrition", "status")
             self.assertIn("app_protein_mismatch", codes(data))
-            self.assertEqual(flag(data, "app_protein_mismatch")["app_protein_g"], 120)
+            self.assertEqual(flag(data, "app_protein_mismatch")["app_protein_g"], 100)
             self.assertIn("logging_incomplete", codes(data))
+
+    def test_app_targets_at_or_above_floor_are_retained(self):
+        for app_target in (110, 120, 150):
+            with self.subTest(app_target=app_target), InstanceCopy() as root:
+                edit_config(root, "floor_g = 110", "floor_g = 120")
+                edit_config(root, "target_g = 128", "target_g = 120")
+                edit_config(root, "stretch_g = 176", "stretch_g = 165")
+                edit_latest(root, target_protein_g=app_target, avg_protein_g=152)
+                before = (root / READINGS).read_bytes()
+                self.run_ok(root, "config", "validate")
+                data = self.run_ok(root, "nutrition", "status")
+                self.assertEqual("app_protein_mismatch" in codes(data), app_target < 120)
+                self.assertEqual(data["latest_reading"]["target_protein_g"], app_target)
+                self.assertEqual(data["protein"]["floor_g"], 120)
+                self.assertEqual((root / READINGS).read_bytes(), before)
+
+    def test_raise_retains_higher_app_target_and_reviews_active_override(self):
+        for app_target in (110, 120, 150, None):
+            for override in (False, True):
+                with self.subTest(app_target=app_target, override=override), InstanceCopy() as root:
+                    edit_latest(root, target_protein_g=app_target)
+                    if override:
+                        append_config(root, OVERRIDE)
+                    message = flag(self.run_ok(root, "nutrition", "status"), "protein_floor_raise")["message"]
+                    if app_target is None:
+                        self.assertIn("raise it only if below", message)
+                    elif app_target >= 120:
+                        self.assertIn(f"retain the app's compatible {app_target} g", message)
+                        self.assertNotIn("raising the app", message)
+                    else:
+                        self.assertIn("raising the app's protein to at least 120 g", message)
+                    self.assertEqual("review whether the active override covers protein" in message, override)
+
+    def test_below_floor_app_target_preserves_override_review(self):
+        with InstanceCopy() as root:
+            edit_latest(root, target_protein_g=100)
+            append_config(root, OVERRIDE)
+            concern = flag(self.run_ok(root, "nutrition", "status"), "app_protein_mismatch")
+            self.assertTrue(concern["override_active"])
+            self.assertIn("unless the active override covers protein", concern["message"])
 
     def test_no_recent_reading(self):
         data = self.run_ok(VALID, "nutrition", "status", env={"COACH_NOW": "2026-10-26T18:00:00Z"})
@@ -203,6 +243,71 @@ class StatusTest(CliMixin, unittest.TestCase):
     def test_absent_table_is_disabled(self):
         root = INSTANCES / "hevy-fresh"
         self.assertEqual(self.run_ok(root, "nutrition", "status")["enabled"], False)
+
+
+class UnmeasuredProteinTest(CliMixin, unittest.TestCase):
+    def prepare(self, root):
+        edit_config(root, 'app = "macrofactor"', 'app = "none"')
+        edit_config(root, "target_g = 128", "target_g = 150")
+        (root / READINGS).unlink()
+        for day in ("2026-09-28", "2026-10-04", "2026-10-11"):
+            self.run_ok(root, "nutrition", "record", "--date", day, "--scale-weight", "78", "--anchors", "yes")
+
+    def test_three_unmeasured_readings_offer_choices_without_a_raise(self):
+        with InstanceCopy() as root:
+            self.prepare(root)
+            data = self.run_ok(root, "nutrition", "status")
+            self.assertEqual(codes(data), ["protein_unmeasured"])
+            prompt = flag(data, "protein_unmeasured")
+            self.assertEqual(prompt["dates"], ["2026-09-28", "2026-10-04", "2026-10-11"])
+            self.assertEqual((prompt["floor_g"], prompt["target_g"]), (110, 150))
+            for text in ("optional", "/goals", "deliberate hold", "one-day estimate"):
+                self.assertIn(text, prompt["message"])
+
+    def test_reset_measurement_and_target_each_stop_the_prompt(self):
+        for change in ("date", "measurement", "target", "app_source", "seeded_source", "interrupted"):
+            with self.subTest(change=change), InstanceCopy() as root:
+                self.prepare(root)
+                if change == "date":
+                    edit_config(root, "floor_since = 2026-09-28", "floor_since = 2026-10-01")
+                elif change == "measurement":
+                    edit_latest(root, avg_protein_g=111)
+                elif change == "target":
+                    edit_config(root, "floor_g = 110", "floor_g = 150")
+                elif change in ("app_source", "seeded_source"):
+                    edit_latest(root, source=change.removesuffix("_source"))
+                else:
+                    path = root / READINGS
+                    doc = json.loads(path.read_text())
+                    doc["readings"][1]["avg_protein_g"] = 111
+                    path.write_text(json.dumps(doc))
+                self.assertNotIn("protein_unmeasured", codes(self.run_ok(root, "nutrition", "status")))
+
+    def test_no_app_weekly_measurements_still_raise_and_reset_the_count(self):
+        with InstanceCopy() as root:
+            self.prepare(root)
+            self.run_ok(root, "nutrition", "record", "--date", "2026-10-04", "--replace",
+                        "--scale-weight", "78", "--avg-protein", "112")
+            self.run_ok(root, "nutrition", "record", "--date", "2026-10-11", "--replace",
+                        "--scale-weight", "78", "--avg-protein", "115")
+            edit_config(root, "floor_step_g = 10", "floor_step_g = 50")
+            data = self.run_ok(root, "nutrition", "status")
+            self.assertEqual(codes(data), ["protein_floor_raise"])
+            raised = flag(data, "protein_floor_raise")
+            self.assertEqual(raised["proposed_floor_g"], 150)
+            self.assertEqual(raised["proposed_floor_since"], "2026-10-12")
+            edit_config(root, "floor_since = 2026-09-28", "floor_since = 2026-10-12")
+            self.assertEqual(codes(self.run_ok(root, "nutrition", "status")), [])
+
+    def test_one_day_estimate_stays_in_notes_without_becoming_a_weekly_average(self):
+        with InstanceCopy() as root:
+            self.prepare(root)
+            reading = self.run_ok(root, "nutrition", "record", "--date", "2026-10-11", "--replace",
+                                  "--scale-weight", "78", "--anchors", "yes",
+                                  "--note", "One-day estimate: 130 g; no measured weekly average")["reading"]
+            self.assertIsNone(reading["avg_protein_g"])
+            self.assertIn("130 g", reading["note"])
+            self.assertEqual(codes(self.run_ok(root, "nutrition", "status")), ["protein_unmeasured"])
 
 
 class QuestionsTest(unittest.TestCase):
@@ -413,7 +518,7 @@ class SkillWiringTest(unittest.TestCase):
     def test_check_in_runs_the_commands_and_handles_every_flag(self):
         text = skill_text("check-in")
         for needle in ("6. **Food**", "nutrition record", "nutrition status", "only when a standing weekly template",
-                       "protein_floor_raise", "override_expired", "override_renewed_twice", "app_protein_mismatch",
+                       "protein_floor_raise", "protein_unmeasured", "override_expired", "override_renewed_twice", "app_protein_mismatch",
                        "logging_incomplete", "no_recent_reading"):
             self.assertIn(needle, text)
         self.assertNotIn("**Meal plan**", text)
@@ -423,6 +528,17 @@ class SkillWiringTest(unittest.TestCase):
         for needle in ("[nutrition.protein]", "[[nutrition.anchors]]", "[nutrition.override]", "config validate",
                        "What stays prose"):
             self.assertIn(needle, text)
+
+    def test_protein_workflow_keeps_minimum_and_measurement_distinct(self):
+        goals = " ".join(skill_text("goals").split())
+        check_in = " ".join(step_text("check-in", "nutrition.md").split())
+        for text in (goals, check_in):
+            self.assertIn("minimum commitment", text)
+            self.assertIn("deliberate hold", text)
+            self.assertIn("weekly average", text)
+            self.assertNotIn("most that still adds anything", text)
+        self.assertIn("only an observed weekly average belongs in `avg_protein_g`", goals)
+        self.assertIn("Keep one-day estimates in `--note`, not `--avg-protein`", check_in)
 
     def test_targets_use_the_who_body_fat_line_and_goals_a_relative_bulk_rate(self):
         self.assertEqual(protein.HIGH_BODY_FAT_PCT, {"male": 25, "female": 35})
@@ -449,6 +565,17 @@ class ProteinNoteTest(unittest.TestCase):
         self.assertIn("~25 % for men or ~35 % for women", claim.text)
         self.assertEqual(claim.basis, "heuristic")
         self.assertEqual(claim.sources[0], "romero-corral-2008")
+
+    def test_replacement_policies_are_current_heuristics(self):
+        for number in (17, 18, 19, 20):
+            with self.subTest(claim=number):
+                claim = self.claim(number)
+                self.assertEqual(claim.basis, "heuristic")
+                self.assertEqual(claim.status, "current")
+        for number in (1, 2, 5):
+            self.assertEqual(self.claim(number).status, "retired")
+        self.assertIn("Three consecutive", self.claim(20).text)
+        self.assertIn("floor_since", self.claim(20).text)
 
     def test_bulk_rate_is_a_share_of_bodyweight(self):
         claim = self.claim(12)

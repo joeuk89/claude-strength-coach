@@ -169,7 +169,7 @@ and its sources.
   A load goes up only once the newest exposures beat the current one (rn:progression-training-age.2), and weekly sets are judged on the dose actually trained.
 - **Recovery** — sleep, protein, calories, and stress gate progress as
   much as the program; flag when they're the real bottleneck.
-  Protein is set per kg of a **reference mass** — bodyweight, goal weight when body fat is high, or fat-free mass when a credible body-fat reading exists — as a floor, a target (1.6 g/kg; ~2.0 of fat-free mass) and a stretch (2.2 g/kg); `python3 -m coach nutrition targets` applies the rules (rn:protein-energy-deficit.1, rn:protein-energy-deficit.2, rn:protein-energy-deficit.3, rn:protein-energy-deficit.6).
+  Protein is set per kg of a **reference mass** — bodyweight, goal weight from rough/no-reading cues, or fat-free mass when a credible body-fat reading exists — as a floor, a target (1.6 g/kg; ~2.0 of fat-free mass) and a stretch (2.2 g/kg); `python3 -m coach nutrition targets` applies the rules (rn:protein-energy-deficit.17, rn:protein-energy-deficit.18, rn:protein-energy-deficit.19, rn:protein-energy-deficit.3, rn:protein-energy-deficit.6).
   Sleep gates deficits: a trailing 14-day sleep average under ~7 h means recomp at maintenance instead of a cut (rn:sleep-dieting.3).
 - **Autoregulation** — bake RPE/RIR targets and sensible exercise swaps
   into the routine so the athlete can scale to daily readiness

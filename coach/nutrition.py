@@ -204,34 +204,57 @@ def _flags(nutrition, series, override, today):
     floor, target, step = protein["floor_g"], protein["target_g"], protein["floor_step_g"]
     has_app = nutrition["app"] != "none"
     flags = []
-
-    counted = [r for r in series if dates.parse_date(r["date"]) >= protein["floor_since"]][-2:]
+    latest = series[-1] if series else None
+    active = override is not None and override["state"] == "active"
+    since_floor = [r for r in series if dates.parse_date(r["date"]) >= protein["floor_since"]]
+    counted = since_floor[-2:]
     if (floor < target and len(counted) == 2
             and all(r["avg_protein_g"] is not None and r["avg_protein_g"] >= floor for r in counted)):
         proposed = min(floor + step, target)
         # The counted readings measured weeks under the old floor, so the new floor's count starts after them.
         since = (dates.parse_date(counted[-1]["date"]) + timedelta(days=1)).isoformat()
         shown = ", ".join(f"{r['date']}: {_num(r['avg_protein_g'])} g" for r in counted)
+        app_note = ""
+        if has_app:
+            app_target = latest["target_protein_g"]
+            if app_target is None:
+                app_note = "; check the app target and raise it only if below the new floor"
+            elif app_target < proposed:
+                app_note = f"; propose raising the app's protein to at least {_num(proposed)} g"
+            else:
+                app_note = f"; retain the app's compatible {_num(app_target)} g protein target"
+        if active:
+            app_note += "; review whether the active override covers protein before changing agreed values"
         flags.append({
             "code": "protein_floor_raise",
             "message": f"Average protein met the {_num(floor)} g floor at the last two check-ins ({shown}). "
                        f"Propose raising the floor to {_num(proposed)} g in [nutrition.protein] floor_g, with "
-                       f"floor_since = {since}" + ("; the athlete sets the app's protein to match." if has_app
-                                                   else "."),
+                       f"floor_since = {since}{app_note}.",
             "floor_g": floor, "proposed_floor_g": proposed, "proposed_floor_since": since,
             "dates": [r["date"] for r in counted],
         })
 
+    unmeasured = since_floor[-3:]
+    if (not has_app and floor < target and len(unmeasured) == 3
+            and all(r["source"] == "scale" and r["avg_protein_g"] is None for r in unmeasured)):
+        flags.append({
+            "code": "protein_unmeasured",
+            "message": "The last three no-app check-ins have no measured weekly protein average. "
+                       "Anchor adherence cannot establish grams or qualify a floor raise. Offer optional "
+                       "protein calibration, an explicit /goals review, or a deliberate hold at the current floor. "
+                       "Keep a one-day estimate in notes, not in the measured weekly average.",
+            "floor_g": floor, "target_g": target, "dates": [r["date"] for r in unmeasured],
+            "refs": ["rn:protein-energy-deficit.20"],
+        })
+
     flags += override_flags(override, has_app)
 
-    latest = series[-1] if series else None
     if latest is not None and has_app and latest["target_protein_g"] is not None \
-            and latest["target_protein_g"] != floor:
-        active = override is not None and override["state"] == "active"
+            and latest["target_protein_g"] < floor:
         flags.append({
             "code": "app_protein_mismatch",
-            "message": f"The app's protein target ({_num(latest['target_protein_g'])} g) is not the floor "
-                       f"({_num(floor)} g). Have the athlete set the app to the floor"
+            "message": f"The app's protein target ({_num(latest['target_protein_g'])} g) is below the floor "
+                       f"({_num(floor)} g). Review raising the app target to at least the floor"
                        + (", unless the active override covers protein." if active else "."),
             "app_protein_g": latest["target_protein_g"], "floor_g": floor, "override_active": active,
         })

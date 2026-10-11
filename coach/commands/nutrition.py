@@ -140,7 +140,7 @@ def _warn_below_resting(estimate, ctx):
             "weighing or skinfolds by an experienced tester, from the last ~3 months; rough: anything else, such "
             "as a smart scale or a tape method"),
         arg("--sex", choices=tuple(protein.HIGH_BODY_FAT_PCT), help="judges a rough body-fat reading"),
-        arg("--height", type=float, metavar="N", help="for BMI when there is no body-fat reading"),
+        arg("--height", type=float, metavar="N", help="for the BMI cue with a rough or absent body-fat reading"),
         arg("--height-unit", choices=units.HEIGHT_UNITS, help="default: cm with kg bodyweight, in with lb"),
         arg("--recent-intake", type=float, metavar="G", help="recent average protein a day, g (default: the newest "
             "reading's 7-day average from the last 14 days)"),

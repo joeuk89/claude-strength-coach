@@ -79,7 +79,7 @@ standing protein anchors.
 ## 6. Output the nutrition setup
 
 Follow [calories.md](calories.md): MacroFactor users get exact app setup
-steps with protein at the floor and the logging rule, and never a
+steps with protein at or above the floor and the logging rule, and never a
 calorie figure of yours; everyone else gets one transparent starting
 calorie estimate per phase, after which only the weight trend moves it.
 

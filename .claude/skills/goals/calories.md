@@ -2,7 +2,7 @@
 
 **MacroFactor users:** give exact setup steps — goal type
 (gain/lose/maintain; recomp is maintain), rate, macro program, the
-**protein setting at the floor**, and **calorie shifting** so
+**protein setting at or above the floor**, and **calorie shifting** so
 higher-output days (per the schedule in `profile.md`) get more calories
 if the athlete wants that. Their app UI is the source of truth — walk it
 with them and adjust names to what they actually see. Then state the

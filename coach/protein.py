@@ -21,9 +21,9 @@ FLOOR_ABOVE_INTAKE_G = 15
 MISSING = {
     "bodyweight": ("--bodyweight", "every protein figure starts from bodyweight"),
     "sex": ("--sex", f"a rough body-fat reading between {BOTH_LINES} is judged against the athlete's own line"),
-    "height": ("--height", "with no body-fat reading and no goal weight 10 % or more below bodyweight, BMI decides "
-                           "whether body fat is high"),
-    "goal_weight": ("--goal-weight", "body fat counts as high, so protein is set from goal weight"),
+    "height": ("--height", "without a usable body-fat cue or a goal weight 10 % or more below bodyweight, "
+                           "height is needed for the BMI reference-mass cue"),
+    "goal_weight": ("--goal-weight", "a positive reference-mass cue selects goal weight, which is still missing"),
     "recent_intake": ("--recent-intake", "the floor starts from recent average protein intake"),
 }
 
@@ -59,38 +59,51 @@ def reference_mass(*, unit, bodyweight, goal_weight=None, body_fat_pct=None, bod
         return _reference("fat_free_mass", fat_free, unit, f"a credible body-fat reading of {pct} %, so fat-free mass",
                           _refs(3), bmi), None
 
+    reasons = []
+    high = False
+    rough_high = None
     if body_fat_source == "rough":
         if sex is not None:
             line = HIGH_BODY_FAT_PCT[sex]
-            high = body_fat_pct > line
+            rough_high = body_fat_pct > line
             against = f"the ~{line} % line for {SEX_WORD[sex]}"
         elif body_fat_pct > max(HIGH_BODY_FAT_PCT.values()):
-            high, against = True, BOTH_LINES
+            rough_high, against = True, BOTH_LINES
         elif body_fat_pct <= min(HIGH_BODY_FAT_PCT.values()):
-            high, against = False, BOTH_LINES
+            rough_high, against = False, BOTH_LINES
+        if rough_high is not None:
+            reasons.append(f"a rough body-fat reading of {pct} %, "
+                           f"{'above' if rough_high else 'not above'} {against}")
+            high = rough_high
         else:
-            return None, "sex"
-        reason = f"a rough body-fat reading of {pct} %, {'above' if high else 'not above'} {against}"
-        refs = _refs(3, 4)
+            reasons.append(f"a rough body-fat reading of {pct} % without sex to judge its line")
     else:
-        gap = None if goal_weight is None else round((bodyweight - goal_weight) / bodyweight * 100, 6)
-        if gap is not None and gap >= GOAL_GAP_PCT:
-            high = True
-            reason = f"no body-fat reading, and the goal weight is {GOAL_GAP_PCT} % or more below bodyweight"
-        elif bmi is None:
-            return None, "height"
-        else:
-            high = bmi >= HIGH_BMI
-            reason = (f"no body-fat reading, and BMI {units.format_number(bmi)} is {HIGH_BMI} or more" if high else
-                      f"no body-fat reading, BMI {units.format_number(bmi)} is under {HIGH_BMI} and no goal weight is "
-                      f"{GOAL_GAP_PCT} % or more below bodyweight")
-        refs = _refs(3, 5)
+        reasons.append("no body-fat reading")
+
+    gap = None if goal_weight is None else round((bodyweight - goal_weight) / bodyweight * 100, 6)
+    if gap is not None:
+        goal_high = gap >= GOAL_GAP_PCT
+        high = high or goal_high
+        reasons.append(f"the goal weight is {'at least' if goal_high else 'less than'} "
+                       f"{GOAL_GAP_PCT} % below bodyweight")
+    if bmi is not None:
+        bmi_high = bmi >= HIGH_BMI
+        high = high or bmi_high
+        reasons.append(f"BMI {units.format_number(bmi)} is "
+                       + (f"{HIGH_BMI} or more" if bmi_high else f"under {HIGH_BMI}"))
 
     if not high:
-        return _reference("bodyweight", bodyweight, unit, reason + ", so bodyweight", refs, bmi), None
-    if goal_weight is None:
+        if body_fat_source == "rough" and rough_high is None:
+            return None, "sex"
+        if rough_high is None and bmi is None:
+            return None, "height"
+    elif goal_weight is None:
         return None, "goal_weight"
-    return _reference("goal_weight", goal_weight, unit, reason + ", so goal weight", refs, bmi), None
+
+    basis, mass = ("goal_weight", goal_weight) if high else ("bodyweight", bodyweight)
+    refs = _refs(3, 4, 19) if body_fat_source == "rough" else _refs(3, 19)
+    reason = "; ".join(reasons) + (", so goal weight" if high else ", so bodyweight")
+    return _reference(basis, mass, unit, reason, refs, bmi), None
 
 
 def _grams(mass_kg, per_kg, direction="nearest"):
@@ -114,10 +127,10 @@ def numbers(reference, recent_intake_g):
         clamped = "min" if from_intake < floor_min else "target" if from_intake > target_g else None
         floor.update(g=min(max(from_intake, floor_min), target_g), from_intake_g=from_intake, clamped=clamped)
     return {
-        "target": {"g": target_g, "g_per_kg": per_kg["target"], "refs": _refs(1) + converted},
+        "target": {"g": target_g, "g_per_kg": per_kg["target"], "refs": _refs(17) + converted},
         "stretch": {"g": _grams(mass_kg, per_kg["stretch"]), "g_high": _grams(mass_kg, per_kg["stretch_high"]),
                     "g_per_kg": per_kg["stretch"], "g_per_kg_high": per_kg["stretch_high"],
-                    "refs": _refs(2) + converted},
+                    "refs": _refs(18) + converted},
         "floor": floor,
     }
 

@@ -14,8 +14,9 @@ with `python3 -m coach nutrition record --date <check-in date>
 --avg-kcal N --avg-protein N --days-logged N --anchors yes|no`. Pass
 only what the reply gave; without an app, pass `--scale-weight` (the
 mean of the week's morning weigh-ins) and `--avg-protein` if they track
-it. Weights are in `[athlete] bodyweight_units`. A reading already on
-file for the date exits 1: re-run with `--replace` only to correct it.
+it as an observed weekly average. Keep one-day estimates in `--note`,
+not `--avg-protein`; anchors alone supply no grams. Weights are in
+`[athlete] bodyweight_units`. A reading already on file for the date exits 1: re-run with `--replace` only to correct it.
 Then run `python3 -m coach nutrition status` and work from its output.
 The numbers on file (phase, target trend rate, protein floor, target and
 stretch, anchors, any override) are in `config.toml`'s `[nutrition]`
@@ -45,12 +46,20 @@ tweaking numbers here.
   to `proposed_floor_since` (the day after the latest counted reading,
   so this week's reading, taken under the old floor, doesn't count
   toward the next raise) in `[nutrition.protein]` in `config.toml`;
-  MacroFactor users set the app's protein to the new floor the same day.
+  MacroFactor users raise their app setting only if below the new floor;
+  retain a compatible higher setting. Review any active protein override
+  before changing agreed values.
   No flag: the floor stays. Missing it never lowers it; only `/goals`
   lowers it.
-- `app_protein_mismatch`: the app's protein target is not the floor.
-  Have the athlete set the app to the floor, unless the active override
-  covers protein.
+- `app_protein_mismatch`: the app's protein target is below the floor.
+  Review increasing it to at least the floor, unless the active override
+  covers protein. The floor is a minimum commitment, the target a coaching
+  aim, and the app setting and actual intake may be higher.
+- `protein_unmeasured`: three consecutive no-app readings since
+  `floor_since` have no measured weekly protein average and the floor is
+  below target. Offer optional calibration, explicit `/goals` review or
+  a deliberate hold. Anchor adherence cannot qualify a numerical raise
+  (rn:protein-energy-deficit.20).
 - `logging_incomplete`: fewer than 7 days logged. Ask for every day to
   be logged, as in the framework rule above.
 - `override_expired`: on or after its expiry date the override ends.

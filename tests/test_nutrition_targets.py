@@ -35,8 +35,8 @@ class BasisTest(unittest.TestCase):
         self.assertEqual((numbers["stretch"]["g_per_kg"], numbers["stretch"]["g_per_kg_high"]), (2.6, 2.8))
         self.assertEqual((numbers["floor"]["g"], numbers["floor"]["g_min"], numbers["floor"]["g_per_kg_min"]),
                          (115, 100, 1.5))
-        self.assertEqual(numbers["target"]["refs"], [REF + "1", REF + "6"])
-        self.assertEqual(numbers["stretch"]["refs"], [REF + "2", REF + "6"])
+        self.assertEqual(numbers["target"]["refs"], [REF + "17", REF + "6"])
+        self.assertEqual(numbers["stretch"]["refs"], [REF + "18", REF + "6"])
         self.assertEqual(result["missing"], [])
 
     def test_high_rough_reading_for_a_man_uses_goal_weight(self):
@@ -44,12 +44,12 @@ class BasisTest(unittest.TestCase):
                          recent_intake_g=120)
         reference = result["reference"]
         self.assertEqual((reference["basis"], reference["mass"]), ("goal_weight", 85))
-        self.assertEqual(reference["refs"], [REF + "3", REF + "4"])
+        self.assertEqual(reference["refs"], [REF + "3", REF + "4", REF + "19"])
         numbers = result["protein"]
         self.assertEqual((numbers["target"]["g"], numbers["stretch"]["g"], numbers["stretch"]["g_high"]),
                          (135, 185, 185))
         self.assertEqual((numbers["floor"]["g"], numbers["floor"]["g_min"]), (135, 105))
-        self.assertEqual(numbers["target"]["refs"], [REF + "1"])
+        self.assertEqual(numbers["target"]["refs"], [REF + "17"])
 
     def test_high_rough_reading_for_a_woman_uses_goal_weight(self):
         result = targets(bodyweight=90, body_fat_pct=38, body_fat_source="rough", sex="female", goal_weight=70)
@@ -58,7 +58,7 @@ class BasisTest(unittest.TestCase):
         self.assertEqual(result["protein"]["floor"]["g_min"], 85)
 
     def test_womens_line_is_35_not_25(self):
-        result = targets(bodyweight=70, body_fat_pct=30, body_fat_source="rough", sex="female", goal_weight=62)
+        result = targets(bodyweight=70, body_fat_pct=30, body_fat_source="rough", sex="female", goal_weight=65)
         self.assertEqual(result["reference"]["basis"], "bodyweight")
 
     def test_the_lines_are_strictly_above(self):
@@ -74,6 +74,38 @@ class BasisTest(unittest.TestCase):
         between = targets(bodyweight=80, body_fat_pct=25.5, body_fat_source="rough")
         self.assertIsNone(between["reference"])
 
+    def test_rough_reading_cannot_erase_a_positive_goal_gap(self):
+        for reading in (None, 34, 36):
+            with self.subTest(reading=reading):
+                result = targets(bodyweight=78, goal_weight=70, sex="female", recent_intake_g=65,
+                                 body_fat_pct=reading, body_fat_source="rough" if reading else None)
+                self.assertEqual((result["reference"]["basis"], result["reference"]["mass"]),
+                                 ("goal_weight", 70))
+                self.assertEqual(result["protein"]["target"]["g"], 110)
+                self.assertIn("10 %", result["reference"]["reason"])
+                self.assertEqual(result["missing"], [])
+
+    def test_rough_reading_cannot_erase_a_positive_bmi(self):
+        for reading in (None, 24, 34):
+            with self.subTest(reading=reading):
+                result = targets(bodyweight=97.2, goal_weight=95, height_m=1.8, sex="female",
+                                 body_fat_pct=reading, body_fat_source="rough" if reading else None)
+                self.assertEqual(result["reference"]["basis"], "goal_weight")
+                self.assertIn("BMI 30 is 30 or more", result["reference"]["reason"])
+
+    def test_positive_independent_cue_needs_no_sex(self):
+        for other in ({"goal_weight": 70}, {"goal_weight": 76, "height_m": 1.6}):
+            with self.subTest(other=other):
+                result = targets(bodyweight=78, body_fat_pct=30, body_fat_source="rough", **other)
+                self.assertEqual(result["reference"]["basis"], "goal_weight")
+                self.assertNotIn("sex", missing(result))
+
+    def test_credible_reading_retains_ffm_despite_other_positive_cues(self):
+        result = targets(bodyweight=78, goal_weight=70, height_m=1.5, body_fat_pct=34,
+                         body_fat_source="credible", recent_intake_g=65)
+        self.assertEqual(result["reference"]["basis"], "fat_free_mass")
+        self.assertEqual(result["missing"], [])
+
     def test_bmi_just_under_30_is_not_high(self):
         result = targets(bodyweight=97.1, height_m=1.8, goal_weight=95)
         self.assertEqual((result["reference"]["basis"], result["reference"]["bmi"]), ("bodyweight", 29.9))
@@ -82,7 +114,7 @@ class BasisTest(unittest.TestCase):
         result = targets(bodyweight=97.2, height_m=1.8, goal_weight=95)
         reference = result["reference"]
         self.assertEqual((reference["basis"], reference["mass"], reference["bmi"]), ("goal_weight", 95, 30.0))
-        self.assertEqual(reference["refs"], [REF + "3", REF + "5"])
+        self.assertEqual(reference["refs"], [REF + "3", REF + "19"])
         self.assertIn("BMI", reference["reason"])
 
     def test_no_reading_and_a_goal_10_percent_below_uses_goal_weight(self):
@@ -100,7 +132,7 @@ class BasisTest(unittest.TestCase):
         result = targets(bodyweight=80, height_m=1.8, goal_weight=78, recent_intake_g=104)
         reference = result["reference"]
         self.assertEqual((reference["basis"], reference["mass"], reference["bmi"]), ("bodyweight", 80, 24.6))
-        self.assertEqual(reference["refs"], [REF + "3", REF + "5"])
+        self.assertEqual(reference["refs"], [REF + "3", REF + "19"])
         numbers = result["protein"]
         self.assertEqual((numbers["target"]["g"], numbers["target"]["g_per_kg"]), (130, 1.6))
         self.assertEqual((numbers["stretch"]["g"], numbers["stretch"]["g_high"]), (175, 175))
@@ -170,6 +202,13 @@ class MissingInputTest(unittest.TestCase):
         self.assertEqual(missing(result), ["goal_weight"])
         self.assertIsNone(result["reference"])
 
+    def test_rough_positive_bmi_without_goal_weight_requests_it(self):
+        result = targets(bodyweight=97.2, height_m=1.8, body_fat_pct=24, body_fat_source="rough",
+                         recent_intake_g=100)
+        self.assertEqual(missing(result), ["goal_weight"])
+        self.assertEqual(result["missing"][0]["flag"], "--goal-weight")
+        self.assertIsNone(result["reference"])
+
     def test_no_bodyweight(self):
         result = targets(bodyweight=None, recent_intake_g=100)
         self.assertEqual(missing(result), ["bodyweight"])
@@ -192,9 +231,9 @@ class ClaimTest(unittest.TestCase):
                                                    "floor_min": 1.2})
         self.assertEqual(protein.PER_KG["fat_free_mass"], {"target": 2.0, "stretch": 2.6, "stretch_high": 2.8,
                                                            "floor_min": 1.5})
-        for n, needle in ((1, "1.6 g/kg"), (2, "2.2 g/kg"), (6, "~2.0 g/kg"), (6, "~2.6–2.8 g/kg"),
+        for n, needle in ((17, "1.6 g/kg"), (18, "2.2 g/kg"), (6, "~2.0 g/kg"), (6, "~2.6–2.8 g/kg"),
                           (7, "1.2 g/kg"), (7, "~1.5 g/kg"), (4, "~25 % for men or ~35 % for women"),
-                          (5, "BMI is 30 or more"), (5, "10 % or more below"), (8, "~15–20 g")):
+                          (19, "BMI 30 or more"), (19, "10 % or more below"), (8, "~15–20 g")):
             with self.subTest(claim=n, needle=needle):
                 self.assertIn(needle, self.claim(n))
         self.assertEqual((protein.HIGH_BMI, protein.GOAL_GAP_PCT, protein.FLOOR_ABOVE_INTAKE_G), (30, 10, 15))
