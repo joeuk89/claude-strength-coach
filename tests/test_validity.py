@@ -391,6 +391,29 @@ class LayoffTest(unittest.TestCase):
         self.assertIn("load 95 is above 100 × 0.9", flag["message"])
         self.assertIn("3 working sets, at most 2", flag["message"])
 
+    def decayed_without_a_source(self, derived_from):
+        path = self.root / OVERLAY
+        doc = read_json(path)
+        line = doc["sessions"][0]["exercises"][0]
+        line["sets"] = working(5, None, 100, count=3)
+        line["provenance"] = {
+            "scheme": None, "derived_from": derived_from, "inferred": False, "rationale": None,
+            "decay": {"days_off": 28, "band": "22-42", "load_factor": 0.9, "set_delta": -1, "rpe_cap": None},
+        }
+        write_json(path, doc)
+        [flag] = self.squat_flags()
+        self.assertEqual(flag["code"], "stale_prescription")
+        return flag["message"]
+
+    def test_a_decayed_line_with_no_derived_from_is_stale(self):
+        self.assertIn("cannot be checked against the decay: provenance.derived_from is null",
+                      self.decayed_without_a_source(None))
+
+    def test_a_decayed_line_derived_from_an_unknown_workout_is_stale(self):
+        unknown = "10000000-0000-4000-8000-000000000099"
+        message = self.decayed_without_a_source({"date": "2026-09-14", "workout_id": unknown})
+        self.assertIn(f"derived_from names workout {unknown}, which the history does not hold", message)
+
     def test_a_no_data_line_gets_no_load_flag(self):
         path = self.root / OVERLAY
         doc = read_json(path)
@@ -405,6 +428,19 @@ class LayoffTest(unittest.TestCase):
         self.assertEqual(code, 1)
         fails = [r for r in envelope["data"]["results"] if r["status"] == "fail"]
         self.assertTrue(any("stale_prescription" in r["message"] and "28 days off" in r["message"] for r in fails))
+
+
+class SlipTest(HistoryCase):
+    """Bench on 2026-10-05 is an open convention-slip candidate at Hevy 90 (C17)."""
+
+    base = INSTANCES / "slip"
+
+    def test_inferred_derived_from_skips_the_open_slip(self):
+        envelope = self.coach("prescription", "check", "--overlay", "2026-10-12-weekly")
+        bench = next(row for row in envelope["data"]["lines"] if row["exercise_id"] == "db_bench_press")
+        self.assertEqual(bench["derived_from"], {"date": "2026-09-28", "workout_id": W[1]})
+        squat = next(row for row in envelope["data"]["lines"] if row["exercise_id"] == "bb_back_squat")
+        self.assertEqual(squat["derived_from"], {"date": "2026-10-05", "workout_id": W[3]})
 
 
 class CheckTest(unittest.TestCase):

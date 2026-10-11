@@ -99,6 +99,10 @@ class _History:
         before = before.isoformat()
         return [e for e in self.exposures.get(exercise_id, []) if not e["excluded"] and e["date"] < before]
 
+    def baselines(self, exercise_id, before):
+        """Usable exposures that are not open convention-slip candidates, newest first: what loads derive from."""
+        return [e for e in self.usable(exercise_id, before) if not e["suspect"]]
+
     def last_lifting(self, before):
         if before not in self._last_lifting:
             self._last_lifting[before] = history.last_lifting_date(self.root, before)
@@ -123,8 +127,9 @@ class _History:
         age = (session_date - dates.parse_date(newest["date"])).days if newest else None
         interval = interval_days(found) if found else None
         candidates = [value for value in (layoff, age - interval if newest else None) if value is not None]
+        baseline = next((e for e in found if not e["suspect"]), None)
         return {"days_off": max(0, *candidates) if candidates else None, "layoff_days": layoff,
-                "exposure_age": age, "interval_days": interval, "newest": newest}
+                "exposure_age": age, "interval_days": interval, "newest": newest, "baseline": baseline}
 
 
 def days_off(root, exercise_id, session_date):
@@ -292,7 +297,7 @@ class _Checker:
         if provenance is not None:
             return provenance["derived_from"], provenance["inferred"]
         before = min(session_date, dates.parse_date(self.created) + timedelta(days=1))
-        found = self.history.usable(line["exercise_id"], before)
+        found = self.history.baselines(line["exercise_id"], before)
         return ({"date": found[0]["date"], "workout_id": found[0]["workout_id"]} if found else None), True
 
     def check_line(self, session, session_date, line, illness):
@@ -333,7 +338,9 @@ class _Checker:
         if decay["band"] != band.id:
             return [f"{lead}, but the line is decayed to band {decay['band']}"]
         problems = []
-        source = self.exposure(line["exercise_id"], derived)
+        source, unchecked = self.decay_source(line["exercise_id"], derived)
+        if unchecked:
+            problems.append(f"{lead}, but its load and sets cannot be checked against the decay: {unchecked}")
         top = _top_load([s for s in working if self.sound(line, s.get("load"))])
         if source is not None and top is not None:
             before = _top_load(source["sets"])
@@ -354,11 +361,18 @@ class _Checker:
                                 f"({len(over)} set(s) are not)")
         return problems
 
-    def exposure(self, exercise_id, derived):
+    def decay_source(self, exercise_id, derived):
+        """The exposure a decayed line derives from, or None and why it can't serve as the baseline."""
         if not derived:
-            return None
-        return next((e for e in self.history.exposures.get(exercise_id, [])
-                     if e["workout_id"] == derived["workout_id"]), None)
+            return None, "provenance.derived_from is null"
+        source = next((e for e in self.history.exposures.get(exercise_id, [])
+                       if e["workout_id"] == derived["workout_id"]), None)
+        if source is None:
+            return None, f"derived_from names workout {derived['workout_id']}, which the history does not hold"
+        if source["suspect"]:
+            return None, (f"derived_from names workout {derived['workout_id']}, an open convention-slip "
+                          "candidate")
+        return source, None
 
     def increment(self, line, session):
         if self.library is None:
@@ -440,9 +454,10 @@ class _Checker:
                       f"{units.format_load(s['load'])} × {reps} implies RPE {_number(implied)} at {basis}")
 
     def unearned_without_e1rm(self, session, line, sets, facts):
-        if line["load_mode"] == "assisted" or facts["newest"] is None:
+        baseline = facts["baseline"]
+        if line["load_mode"] == "assisted" or baseline is None:
             return
-        before = _top_load(facts["newest"]["sets"])
+        before = _top_load(baseline["sets"])
         step = self.increment(line, session)
         if before is None or not step:
             return
@@ -450,7 +465,7 @@ class _Checker:
         if top > before + NO_E1RM_INCREMENTS * step + 1e-9:
             self.flag("unearned_load", session, line,
                       f"{self.where(session, line)}: {_number(top)} is more than {NO_E1RM_INCREMENTS} increments "
-                      f"of {_number(step)} above {_number(before)} on {facts['newest']['date']}, and there is no "
+                      f"of {_number(step)} above {_number(before)} on {baseline['date']}, and there is no "
                       "e1RM to judge it by")
 
     def check_duration(self, session):

@@ -2007,9 +2007,9 @@ Overlay `schema_version` 2 adds one nullable object per exercise line
 - `provenance` is a required key on every v2 line, null or an object
   carrying all five keys above. In the draft it is optional.
 - `provenance` null: a hand-built line. The R-24 validator then infers
-  `derived_from` (the latest non-excluded exposure of the exercise dated
-  on or before the overlay's `created_at` date and before the line's
-  session date); with `prescription check --write` it stores the result
+  `derived_from` (the latest exposure of the exercise neither excluded
+  nor `suspect` (C17), dated on or before the overlay's `created_at`
+  date and before the line's session date); with `prescription check --write` it stores the result
   with `inferred: true`, and `scheme`, `decay` and `rationale` null.
 - `derived_from` null inside a non-null `provenance`: no exposure (first
   time, start load).
@@ -2046,7 +2046,7 @@ coach.validity.interval_days(exposures) -> int     # median of the last ≤4 gap
 coach.validity.days_off(root, exercise_id, session_date) -> int | None
 #   = max(layoff_days, exposure_age − interval_days), never below 0; None with no lifting workout and no exposure
 #   layoff_days  = session_date − last_lifting_date(before=session_date)   (R-02: any lifting workout)
-#   exposure_age = session_date − date of the newest non-excluded exposure of the exercise (any slot)
+#   exposure_age = session_date − date of the newest non-excluded exposure of the exercise (any slot; suspect counts)
 coach.validity.window_ok(exposure_age, interval) -> bool   # exposure_age ≤ interval_days + GRACE_DAYS
 coach.validity.check_overlay(root, doc) -> list[flag]
 coach.validity.report(root, doc, config=None) -> {"flags": [...], "lines": [...]}   # what the command prints
@@ -2059,6 +2059,9 @@ coach.validity.estimate_minutes(root, session) -> int
   load is at most the derived-from load × `load_factor` (plus one
   increment for rounding). Anything else is `stale_prescription`. An
   exercise with no exposure (first time, start load) is never stale.
+  A decayed line of an exercise that has exposures is stale when its
+  `derived_from` is null, names a workout the history doesn't hold, or
+  names a `suspect` exposure (C17): its load and sets can't be checked.
 - Days off are measured to the line's session date. The band's set and
   RPE parts are checked as well as the load: at most `max(1, n +
   set_delta)` working sets, `n` being the derived-from exposure's
@@ -2083,7 +2086,8 @@ coach.validity.estimate_minutes(root, session) -> int
   range is judged at its start. With no e1RM point (and for
   `bodyweight` lines, whose added load has no e1RM), a top working load
   more than two increments (`Library.increment`, else the equipment
-  increment) above the newest exposure's is `unearned_load`. `assisted`
+  increment) above the newest exposure neither excluded nor `suspect`
+  is `unearned_load`. `assisted`
   lines are not judged.
 - **Duration estimate** per session: Σ over sets of (reps × 4 s, or
   `duration_seconds`) + `rest_seconds` between sets, + 60 s per exercise,
