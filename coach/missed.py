@@ -257,8 +257,14 @@ def apply_rule(root, doc, session_id, day, rule, now=None, config=None, library=
     return built
 
 
-def _sets_text(line, with_rpe):
-    return render.target_line(line)[len("Target: "):] if with_rpe else pages.sets_text(line)
+def _sets_text(line, with_rpe, show_hevy):
+    if with_rpe and show_hevy:
+        return render.target_line(line)[len("Target: "):]
+    text = pages.sets_text(line, show_hevy)
+    rpes = {s.get("rpe") for s in line["sets"] if overlay.is_working(s)}
+    if with_rpe and len(rpes) == 1 and None not in rpes:
+        text += f" @ RPE {units.json_number(rpes.pop())}"
+    return text
 
 
 def _folded_lines(draft):
@@ -268,12 +274,12 @@ def _folded_lines(draft):
             yield session, lines
 
 
-def _change_text(draft, names, with_rpe):
+def _change_text(draft, names, with_rpe, show_hevy=True):
     if draft is None:
         return None
     parts = []
     for session, lines in _folded_lines(draft):
-        words = _and([f"{names.exercise(line['exercise_id'])} {_sets_text(line, with_rpe)}" for line in lines])
+        words = _and([f"{names.exercise(line['exercise_id'])} {_sets_text(line, with_rpe, show_hevy)}" for line in lines])
         parts.append(f"{words} added to {render.day_label(session['date'])} {session['title']}, this week only")
     for session in draft["sessions"]:
         if session.get("moved_from"):
@@ -351,7 +357,7 @@ def plan(root, session_id, day, now=None):
     if draft is None:
         summary.append("Nothing else changes this week; only the miss is recorded.")
     else:
-        summary.append(_change_text(draft, names, with_rpe=True) + ".")
+        summary.append(_change_text(draft, names, with_rpe=True, show_hevy=config.hevy.enabled) + ".")
         summary.append(f"Mid-week overlay {draft['id']}: {render.day_label(draft['span']['start'])} to "
                        f"{render.day_label(draft['span']['end'])}, over {doc['id']} on those days.")
         summary.append(_check_text(draft))
@@ -402,7 +408,7 @@ def _annotation(root, session_id, day, tag, now):
 def record_lines(found, tag, names, config):
     rule, draft = found["rule"], found["draft"]
     lines = [f"- Missed {render.day_label(found['date'])} {found['title']} ({tag or 'untagged'}).",
-             f"- Rule {rule['id']}: {_change_text(draft, names, with_rpe=False) or 'nothing changes this week'}."]
+             f"- Rule {rule['id']}: {_change_text(draft, names, with_rpe=False, show_hevy=config.hevy.enabled) or 'nothing changes this week'}."]
     if draft is None:
         lines.append("- No overlay; nothing goes to Hevy.")
     elif config.hevy.enabled:

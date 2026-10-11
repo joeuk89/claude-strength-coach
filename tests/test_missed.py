@@ -187,7 +187,12 @@ class FoldPlanTest(MissedCase):
         path = self.root / "config.toml"
         path.write_text(path.read_text(encoding="utf-8").replace("[hevy]\nenabled = true", "[hevy]\nenabled = false"),
                         encoding="utf-8")
-        self.assertEqual(self.plan()["write_line"], 'Reply "go" to train this. Nothing goes to Hevy (no Hevy).')
+        data = self.plan()
+        self.assertEqual(data["write_line"], 'Reply "go" to train this. Nothing goes to Hevy (no Hevy).')
+        self.assertIn("Single-arm row 2×10 @ 30 @ RPE 8 added to Sat 17 Oct Session A", data["summary"][1])
+        lines = self.apply("--dry-run")["record_lines"]
+        self.assertEqual(lines[1:], ["- Rule miss-b: Single-arm row 2×10 @ 30 added to Sat 17 Oct Session A, this "
+                                     "week only.", "- Overlay 2026-10-17-midweek; no Hevy."])
 
     def test_a_session_not_planned_that_day_exits_1(self):
         envelope = self.coach("missed", "plan", "--session", "session-b", "--date", "2026-10-13", expect=1)
