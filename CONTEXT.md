@@ -116,6 +116,32 @@ what changed, what to watch, what to do if a day is missed. Rewritten
 every programming pass; the thing the athlete reads during the week.
 _Avoid_: dashboard, summary, this-week doc
 
+**Dashboard**:
+The instance's `README.md`, rendered: where the instance stands this
+week (the brief's header line, the block, the last check-in, open flags),
+the week's sessions, a progress summary and links. The page GitHub shows
+first on a phone.
+_Avoid_: home page, status page, session-start status (what the coach sees)
+
+**Progress page**:
+`progress.md`, rendered: the best e1RM of each lift with its date, the
+core-complete streak, and bodyweight by week.
+_Avoid_: stats page, PR list
+
+**Core-complete week**:
+A week in which every planned core session was trained, logged or not,
+and no coach-led session is recorded as not having happened. Optional
+sessions never count, and a coach-led session nobody recorded neither
+counts nor breaks it. Consecutive ones make the core-complete streak.
+_Avoid_: perfect week, full week, completed hard week (the block's count)
+
+**Publish**:
+After the athlete's "go", commit and push exactly the brief, the
+dashboard, the progress page, the week's overlay and the newest check-in
+record, so the phone shows the week. The only push the coach makes
+without being asked.
+_Avoid_: deploy, sync (Hevy sync and framework sync are other things)
+
 **Sunday message**:
 The one message the coach sends at check-in about the week just
 trained: it states what the log shows and numbers what it cannot

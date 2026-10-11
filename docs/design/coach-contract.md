@@ -1280,6 +1280,7 @@ Unless stated, each is a copy of `valid/` plus what is listed.
 | `library-unconfirmed/` | R-11 | not a copy of `valid/`: config, cached Session A, and an instance library where `db_bench_press` has a proposal but no confirmed load mode |
 | `library-invalid/` | R-11 | not a copy of `valid/`: config and an instance library with an unknown field on `db_bench_press` |
 | `empty/` | R-41a | `config.toml` and an instance library only: no program, no state. Not a copy of `valid/` |
+| `pages/`, `pages-stale/`, `pages-long-brief/` | R-25 | not copies of `valid/`: its config without `[activity]` and `[nutrition]`, library, program, state, overlay and record `check-ins/2026-10-11.md`; `data/history/2026-09.json` and `2026-10.json` from `history sync` of the C14 workouts plus Session A on 2026-10-12 (squat 3×5 @ 100 RPE 7, DB bench 3×10 @ Hevy 50 RPE 8); no Hevy cache; the three pages rendered at 2026-10-14T18:00:00Z. `pages-stale/` hand-edits the brief's focus; `pages-long-brief/` pads the brief to 61 lines |
 | `hevy-fresh/` | R-12 | `valid/`'s `config.toml` and a cache `meta.json` with the last pull at 2026-10-11T12:00:00Z (6 hours before `COACH_NOW`) |
 | `hevy-stale/` | R-12 | the same with the last pull at 2026-10-09T12:00:00Z (54 hours) |
 | `cardio/` | R-43 | see C50 |
@@ -3729,10 +3730,17 @@ header's facts once, for the brief, the dashboard and R-26b's `status`:
              "days_since": 3, "mode": "weekly"}}
 ```
 
-`week` is the C7 label and `week_start` the configured week's first day.
-`phase` comes from R-33a's `nutrition status` when present (null when
-absent or disabled); `checkin` from C36 `due()`; `overlay_id` null when no
-overlay is in force.
+The brief's week is the coming week as C52 defines it: the week holding
+the day after `as_of`'s local date, so on a week's last day the pages
+show the week ahead. `week` is its C7 label and `week_start` its first
+day. `overlay_id` is the latest created of the overlays in force (C10) on
+the week's days, null when none is. `rotation` is `state.rotation`'s
+position and confirmation, null with no `data/state.json`. `phase` comes
+from R-33a's `nutrition status` when present (null when absent or
+disabled). `checkin` comes from C36 `due()` on `as_of`'s date: `last`,
+`due_date`, `days_since` and `mode` as `due()` gives them, and `tier`, the
+next check-in's tier: `deep` when `deep_reasons` holds on the due date
+(today when there is no record), else `weekly`.
 
 `as_of` bounds history (workouts started and annotations created at or
 before it); "today" inside a render is `as_of`'s local date. Program,
@@ -3769,52 +3777,75 @@ these headings:
 - Header: week start; `state.rotation` position and whether confirmed;
   phase (from a part; omitted until R-33a); next check-in date and tier
   (C36 `due`).
-- Sessions: every session of the overlay in force for the week, by date;
-  Tier from the program; Key = first exercise's name and its working
-  sets in C12 Target form without RPE; Done = ✔ trained, ✗ missed, blank
-  upcoming (C18, as of).
+- Sessions: every session of the overlay in force on each day of the
+  week, by date (C18 adherence over the week's span, as of); Tier from
+  the program (`core` for a session the program lacks); Key = first
+  exercise's library name without its trailing parenthesis
+  (`Back Squat`) and its working sets in C12 Target form without RPE
+  (consecutive sets with equal reps and load collapse; a `total` load
+  carries its unit: `Back Squat 3×5 @ 100 kg`); Done = ✔ trained, ✗
+  missed, blank upcoming. A session dated `as_of`'s own day with no
+  workout and no miss tag is blank, not ✗: the day is not over.
 - Changed: lines whose `change` is set, by date then exercise order, at
-  most five, then "and N more in the check-in". Reason: `override.reason`,
-  else `provenance.rationale` (C21), else `target_note`.
-- Watch: at most three items by priority: unresolved `block`, then `warn`
-  flags on the overlay (through `coach.flags.for_mode`, C44), then part
-  items.
+  most five, then "and N more in the check-in". Each reads `<name>
+  <change>: <reason>`. Reason: `override.reason`, else
+  `provenance.rationale` (C21), else `target_note`. A `per_hand_x2`
+  change that ends on the bare per-hand load (`22.5 → 25/hand`) gets the
+  Hevy value appended (`22.5 → 25/hand (Hevy: 50)`).
+- Watch: at most three items by priority: unresolved `block` flags
+  (priority 20), then unresolved `warn` flags (30) on the overlays behind
+  the week's sessions, then part items (default 50). R-40a routes them
+  through `coach.flags.for_mode` (C44).
 - If you miss a day: one line per `program.missed_day_rules` entry (v1:
   `condition → action`); R-22's part replaces the slot with `describe`.
-- Wins: at most three: a new best e1RM in the last seven days; a
-  core-complete streak of two weeks or more; every core session trained
-  last week; part items.
-- Over 60 lines: cut Wins, then Watch, then Changed to fit; Sessions and
-  Focus are never cut.
+- Wins: at most three, by priority: a new best e1RM in the last seven
+  days (20; `total`, `per_hand_x2` and `single_implement` lifts only, a
+  point strictly above every earlier one); a core-complete streak of two
+  weeks or more (30); every core session trained last week (40); part
+  items.
+- An empty Changed, Watch or Wins prints one line saying so.
+- Over 60 lines: cut items from the end of Wins, then Watch, then
+  Changed, until it fits; a section left with no items goes, heading
+  included. Sessions, Focus and If you miss a day are never cut.
 
 **Dashboard** (`README.md`): first, a status block of at most six lines
 (the brief's header line; block `hard_weeks_completed` and
 `deload.status` from state; last check-in date, tier and link; open flag
-count; last publish time), then the Sessions table, then a progress
-summary of at most five lines (top three e1RM bests, streak, latest
-bodyweight), then links (`this-week.md`, `progress.md`, latest record,
-`routine/program.md`, `check-ins/`, and the template's README on GitHub
-for "how this works"). The Sessions table header is within the first 12
-lines.
+count (unresolved `warn` and `block` flags on the week's overlays); the
+page's as-of time as "Updated <day> <HH:MM> (<zone>)", then part lines up
+to six), then the Sessions table, then a progress summary of at most
+five lines (three e1RM bests, streak, latest bodyweight), then links
+(`this-week.md`, `progress.md`, latest record, `routine/program.md`,
+`check-ins/`, and the template's README on GitHub for "how this works").
+The Sessions table header is within the first 12 lines. The three bests
+are the program's exercises in session order, then any others by name.
+"Last publish time" is the as-of time: `pages publish` renders the page
+just before it commits, so the two match, while a time read from git
+would make every publish stale its own dashboard.
 
 **Progress** (`progress.md`): a table of every lift with a C18 series
-(best e1RM and date, latest, change over 28 days); part sections (ladder
-state, priority lifts); core-complete streak (current, longest, and the
-last 12 weeks as ✔/✗); bodyweight (part, else the Hevy body-measurement
-cache as weekly means labelled "scale (Hevy)"; the section says "no
+(best e1RM and date, latest, change over 28 days: the latest point minus
+the newest point dated at least 28 days before `as_of`); part sections
+(ladder state, priority lifts); core-complete streak (current, longest,
+and the last 12 weeks as ✔/✗, – for a week with no planned core
+session); bodyweight (part, else the Hevy body-measurement cache dated by
+`as_of` as weekly means labelled "scale (Hevy)"; the section says "no
 bodyweight source" when neither exists).
 
 **Core-complete week**: every planned core session of the overlay in force
-trained (including `trained_unlogged`), and every external session with an
-`external` annotation marked done. External sessions with no annotation
-neither count nor break the streak. Optional sessions never count.
+trained (including `trained_unlogged`), and no external session with an
+`external` annotation marked not done. External sessions with no annotation
+neither count nor break the streak. Optional sessions never count. The
+weeks run from the week of the first overlay's span start to the week
+before the brief's week; a week with no planned core session is neither
+complete nor missed, and it ends a streak.
 
 **Page parts** (`coach/page_parts/<topic>.py`):
 
 ```python
 SLOTS = ("brief.watch",)
 def contribute(ctx: PageContext) -> dict[str, list[Item]] | None
-# PageContext: root, as_of, overlay (in force), program, state
+# PageContext: root, as_of, today (as_of's local date), overlay (in force for the week), program, state
 # Item(text: str, priority: int = 50)     # lower sorts first
 ```
 
@@ -3829,7 +3860,9 @@ def contribute(ctx: PageContext) -> dict[str, list[Item]] | None
 | `progress.sections` | append sections (`text` holds the section markdown) |
 | `progress.bodyweight` | replace (R-33a) |
 
-Two parts replacing the same slot is an error at discovery.
+Two parts replacing the same slot, a part naming an unknown slot, and a
+part filling a slot it does not declare in `SLOTS` are errors (exit 1,
+naming the modules). Parts run in module-name order and read only.
 
 R-25 ships one part itself, `nutrition`: when `coach.nutrition` exists and
 `nutrition status` says enabled, it adds `data.brief_line` to
@@ -3843,22 +3876,38 @@ change (C5) is one line.
 `README.md` that does not start with the C11 header, unless
 `--replace-readme` is given; that first replacement is reported. Checks
 `pages_fresh` (fail: a page differs from a fresh render at its own as-of
-time; skip when absent) and the 60-line ceiling (fail).
+time, or `this-week.md` or `progress.md` has no as-of header; a `README.md`
+coach did not generate is not checked; skip when no page exists) and
+`pages_line_ceiling` (fail: `this-week.md` over 60 lines; skip when
+absent). The renderers are `coach.pages.render_brief(root, as_of)`,
+`render_dashboard(root, as_of)` and `render_progress(root, as_of)`;
+`render_all(root, now, kinds)` renders from one read of the instance.
+
+**As-of reads** (C17, C18). `coach.history.workouts`, `annotations` and
+`all_exposures`, and `coach.stats.e1rm_series` and `adherence`, take
+`as_of` (an aware datetime, default None = no bound): workouts started at
+or before it (a workout with no start time: dated on or before its local
+date), annotations created at or before it, and body weights dated on or
+before its local date. Withdrawals created later do not apply.
 
 **Publishing** (roadmap decision 1). `pages publish --overlay ID [--record D]`:
 
 1. Refuses (exit 3) unless the overlay is approved with a matching hash
    (C10), or in read-only mode (C39).
-2. Renders all three pages and refreshes the newest record's regions
+2. Refuses (exit 3) outside a git work tree, on a branch with no upstream
+   (or a detached HEAD), when the git index already holds staged changes
+   to any other path (naming them), and when `README.md` is not coach's
+   (README ownership). Every refusal comes before anything is written.
+   No record to publish (or no `check-ins/<D>.md`) exits 1; no git exits 5.
+3. Renders all three pages and refreshes the record's regions
    (`checkin skeleton --refresh`).
-3. Refuses (exit 3) when the git index already holds staged changes to any
-   other path; names them.
 4. Stages exactly `this-week.md`, `README.md`, `progress.md`,
    `data/overlays/<ID>.json` and `check-ins/<D>.md` (D defaults to the
    newest record), commits with the message
-   `coach: publish week of <span.start> (<ID>)`, and pushes the current
-   branch to its upstream (never `--force`). A failed push exits 4 and
-   keeps the commit; the message says to push by hand.
+   `coach: publish week of <span.start> (<ID>)`, and pushes `HEAD` to the
+   current branch's upstream (never `--force`). A failed commit exits 1. A
+   failed push exits 4 and keeps the commit; the message says to push by
+   hand.
 5. `--dry-run` reports the paths and message and changes nothing.
 
 Metadata: `writes`, `git_write`. It is allowlisted (C2).
@@ -4801,8 +4850,8 @@ Providers R-26b ships:
 | `checks` | the `coach check` summary and the ids of any `fail` or `warn` |
 | `hevy` | cache age against `[hevy] cache_max_age_hours`; skipped when Hevy is disabled |
 | `overlay` | the overlay in force today (id, kind, span), else the next to start with its first session; whether it is approved, pushed and verified (a routine counts as verified when its latest `verify` line for the overlay's id and approval hash says so; Hevy off: approved only); the next one or two planned sessions; and the days of the coming week no overlay covers. The coming week is the week holding tomorrow (`[athlete] week_starts`), from today on: the rest of this week, or all of next week on its last day. Invalid overlays are skipped (`checks` names them) |
-| `program` | rotation position and whether it is confirmed (from R-25's `header_facts` when present, else C16 `state.json`); hard weeks completed and deload status (`state.json`); `attention` when the position is unconfirmed or the deload is `due` or `in_progress` |
-| `checkin` | last check-in, days since, due date, tier and mode (`first`, `weekly`, `deep`, `catch_up`) from R-25's `header_facts`; before R-25 merges, the newest record in `check-ins/` dated today or earlier, "due" at 7 or more days, and mode `first` (no record) or `weekly` |
+| `program` | rotation position and whether it is confirmed (R-25's `header_facts`), the confirmation date (`state.json`); hard weeks completed and deload status (`state.json`); `attention` when the position is unconfirmed or the deload is `due` or `in_progress` |
+| `checkin` | last check-in, days since, due date, tier and mode (`first`, `weekly`, `deep`, `catch_up`) from R-25's `header_facts` (its `data` is `header_facts`' `checkin`); `attention` when there is no record or the due date is today or past |
 
 Later items add a provider when they own a fact the coach should see at
 session start: R-21b (next check-in runs in catch-up mode), R-23a (an
@@ -4810,10 +4859,9 @@ unfinalised proposal draft), R-27 (follow-ups due, aggravated niggles),
 R-31 (light week proposed), R-32a (expired research notes), R-33a
 (nutrition override expiring), R-42a (source sync age).
 
-Once R-25 merges, the `checkin` and `program` providers read
-`coach.pages.header_facts` (C38) and stop computing those facts
-themselves; whichever of R-25 and R-26b merges second makes that switch.
-`status` passes `as_of` = now.
+The `checkin` and `program` providers read `coach.pages.header_facts`
+(C38) and stop computing those facts themselves (R-25 made the switch;
+R-26b merged first). `status` passes `as_of` = now.
 
 ## C53. Session hooks (R-26b; R-15 owns the `PreToolUse` hook)
 
@@ -4861,6 +4909,8 @@ rule (hooks run outside the permission layer); `status` gets one. R-15's
   | `nutrition/menu/*.md` | `recipe_cards`, `recipe_render_fresh`, `recipe_index_fresh`, `nutrition_template` |
   | `research/local/*.md` | `research_notes`, `research_render_fresh`, `research_citations` |
   | `research/*.md` | `research_notes`, `research_render_fresh` |
+  | `this-week.md` | `pages_fresh`, `pages_line_ceiling` |
+  | `README.md`, `progress.md` | `pages_fresh` |
 
   The first matching row wins; `*` matches within one path segment.
   R-26b added the rows after `profile.md`, and R-16's and R-33c's checks
