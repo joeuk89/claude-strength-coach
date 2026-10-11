@@ -86,9 +86,10 @@ anything. Rules that always apply:
   design from scratch), or redesign it at a block boundary.
 - **`/check-in`** — weekly progress review: one Sunday message,
   pre-filled from the log, that the athlete answers in one reply. Runs a
-  deeper block-level review on deload weeks or when one is 6+ weeks
-  overdue. Suggest one if it's been over a week since the last entry in
-  `check-ins/` and the conversation is heading that way anyway.
+  deeper block-level review when one is 6+ weeks overdue, a light week
+  is being proposed, or the adherence trigger fires. Suggest one if it's
+  been over a week since the last entry in `check-ins/` and the
+  conversation is heading that way anyway.
 - **`/program-week`** — the weekly programming pass: coach-set loads,
   rep targets, RPE, and per-exercise notes for the coming week, written
   to Hevy and recorded as the weekly overlay in the newest check-in.
@@ -182,12 +183,68 @@ anything. Rules that always apply:
   failure.
 - **Frequency** — training each muscle ~2× per week generally beats one
   big session; count every session type when tallying weekly frequency.
+  When adherence demands it, fewer sessions carrying the same weekly
+  hard sets per muscle beat more sessions that don't get trained.
 - **Proximity to failure** — most hypertrophy work belongs ~0–3 reps in
   reserve; heavy strength work leaves a little more in the tank to protect
   technique.
-- **Fatigue management & deloads** — build a deload or lighter week in
-  roughly every 4–8 weeks, or sooner if recovery, joints, sleep, or
-  motivation slide.
+- **Fatigue management & deloads** — light weeks are triggered by
+  fatigue, with a ceiling on how long a block runs without one. Count
+  **completed hard weeks**, not calendar weeks:
+  - A **completed hard week** is a normal program week in which at
+    least 75 % of planned sessions, coach-led ones included, were trained
+    as prescribed. A session is trained as prescribed when at least two
+    thirds of its prescribed working sets were logged and its mean logged
+    RPE was no more than 1.5 below target; a coach-led session counts
+    when it happened.
+  - **Reset:** a deload or other light week, a return week (see return
+    after a layoff below), or any week with under 50 % of planned
+    sessions trained sets the count back to zero. The check-in that
+    closes such a week ends the block, and the next block starts at
+    zero. `/one-off-week` zeroes the count when it plans a light week,
+    but the block number moves on only when that week closes. A week at
+    50–75 %, or a one-off week for travel or limited kit, neither counts
+    nor resets.
+  - **Ceiling:** propose a light week when the count reaches the
+    program's ceiling: default 6 completed hard weeks, settable from 4
+    to 8 in `routine/program.md`. At the ceiling it is proposed whatever
+    else is true; if the athlete declines, record the reason and propose
+    it again at the next check-in.
+  - **Fatigue triggers:** poor readiness the athlete reports; RPE drift
+    on a compound lift in two sessions running; a niggle aggravated under
+    load; poor sleep for most of the week. Two in the same week → propose
+    a light week. One → record it as a watch.
+  - **Skip rule:** below three completed hard weeks, no light week is
+    scheduled, even on two triggers; the status line records it as
+    `light week: skipped (<n> hard weeks)`.
+  - The 75 % and 50 % lines are coaching heuristics. `/check-in` keeps
+    the count in a status line in `routine/program.md`'s header.
+- **Return after a layoff** — days off are the days from the last
+  lifting workout of any kind, solo or coach-led, to the first session
+  back. A layoff over 10 days gets one **return week**; after it, the
+  normal progression scheme resumes from the loads the return week
+  logged.
+
+  | Days off | Return week |
+  | --- | --- |
+  | up to 10 | no change |
+  | 11–21 | loads −5 %, one working set fewer per exercise |
+  | 22–42 | loads −10 %, one working set fewer per exercise |
+  | 43+ | a re-test: every load −15 % from its pre-layoff working load, every set at RPE 7 or below, one working set fewer; next week's loads come from what this week logged |
+
+  **Illness adds:** no training until 48 hours symptom-free, and every
+  exercise in the first session back capped at RPE 7, whatever the gap.
+  Fever, chest symptoms or a slow recovery mean the athlete checks with a
+  qualified professional before training again.
+- **Adherence before structure** — a program the athlete trains beats a
+  better one they don't. Adherence is defined, and checked, in
+  `/check-in`. Under 70 % over the trailing four ordinary weeks, the
+  check-in must present a smaller schedule with the same weekly hard
+  sets per muscle. Under 80 %, don't propose a new recurring session (a
+  new session or weekly slot, conditioning and optional sessions
+  included), and push back when the athlete asks for one; exercise swaps
+  within a session are fine.
+  Both thresholds are coaching heuristics, not research cut-offs.
 - **Recovery** — sleep, protein (~1.6–2.2 g/kg bodyweight), calories, and
   stress gate progress as much as the program; flag when they're the real
   bottleneck.
