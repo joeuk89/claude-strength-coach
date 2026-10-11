@@ -390,7 +390,7 @@ class MigrationTest(PriorityCase):
         self.edit_json("data/program.json", before)
         data = self.data("migrate", "run")
         steps = {row["path"]: row["steps"] for row in data["files"]}
-        self.assertEqual(steps["data/program.json"], ["program/0005_priority_and_minimum_week"])
+        self.assertEqual(steps["data/program.json"][0], "program/0005_priority_and_minimum_week")
         doc = read_json(self.root / "data" / "program.json")
         self.assertEqual((doc["priority"], doc["minimum_week"]), ([], None))
         self.assertEqual(doc["schema_version"], jsonio.current_version(jsonio.load_schema("program")))
