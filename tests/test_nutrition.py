@@ -88,7 +88,8 @@ class StatusTest(CliMixin, unittest.TestCase):
         self.assertEqual(data["latest_reading"]["date"], "2026-10-11")
         self.assertIsNone(data["override"])
         self.assertEqual(data["brief_line"], BRIEF_LINE)
-        self.assertEqual(len(data["questions"]), 2)
+        self.assertIs(data["template"], True)
+        self.assertEqual(len(data["questions"]), 3)
         self.assertEqual(codes(data), ["protein_floor_raise"])
 
     def test_floor_raise_proposes_the_next_step(self):
@@ -205,7 +206,7 @@ class StatusTest(CliMixin, unittest.TestCase):
 
 class QuestionsTest(unittest.TestCase):
     def test_app_template_and_no_app(self):
-        status = nutrition.status(VALID, date(2026, 10, 11))
+        status = dict(nutrition.status(VALID, date(2026, 10, 11)), template=False)
         questions = nutrition.questions(status)
         self.assertEqual(len(questions), 2)
         self.assertIn("trend weight · expenditure · targets (kcal/protein) · 7-day average (kcal/protein) · "

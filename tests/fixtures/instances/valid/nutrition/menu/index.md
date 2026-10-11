@@ -6,16 +6,21 @@
 | Recipe | kcal | Protein | Prep | Time | Status |
 | --- | --- | --- | --- | --- | --- |
 | [Overnight oats](overnight-oats.md) | 440 | 30 g | assemble | 5 min | active |
+| [Spinach omelette](spinach-omelette.md) | 330 | 26 g | quick-cook | 10 min | active |
 
 ## Lunches
 
 | Recipe | kcal | Protein | Prep | Time | Status |
 | --- | --- | --- | --- | --- | --- |
 | [Chicken + rice bowl](chicken-rice-bowl.md) | 610 | 50 g | assemble | 5 min | active |
+| [Turkey chilli](turkey-chilli.md) | 620 | 48 g | cook | 40 min | active |
 
 ## Dinners
 
-_No cards yet._
+| Recipe | kcal | Protein | Prep | Time | Status |
+| --- | --- | --- | --- | --- | --- |
+| [Spinach omelette](spinach-omelette.md) | 330 | 26 g | quick-cook | 10 min | active |
+| [Turkey chilli](turkey-chilli.md) | 620 | 48 g | cook | 40 min | active |
 
 ## Snacks
 
