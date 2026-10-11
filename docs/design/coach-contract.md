@@ -2574,10 +2574,12 @@ CONFIG = {"enabled": Key("boolean", default=False), "path": Key("string", defaul
                                  # the [sources.<NAME>] keys; absent only for "manual"
 FRESH_BY = "records"             # optional: "sync" judges freshness by the last sync
 def is_enabled(config) -> bool: ...  # optional: when the source needs more than its own switch
+def fetch_file(ctx, path, sync_state) -> FetchResult: ...  # optional: `activity import` of one file
+def anonymise(ctx, path, out_dir, dry_run) -> dict: ...     # optional: `activity anonymise`
 
 def fetch(ctx, sync_state: dict) -> FetchResult: ...
-    # reads the source; never writes. FetchResult(items, sync_state, warnings),
-    # from coach.activity.adapters.
+    # reads the source; never writes. FetchResult(items, sync_state, warnings, info),
+    # from coach.activity.adapters; `info` is merged into the source's report row.
 def normalise(item, ctx) -> list[dict]: ...
     # pure: one raw item -> zero or more C30 records (without content_hash/recorded_at),
     # or a void {"op": "void", "id", "source", "reason"}.
@@ -2592,9 +2594,18 @@ def normalise(item, ctx) -> list[dict]: ...
   to whichever of the adapter's `KINDS` files holds the id. Every line is
   validated before anything is appended; an invalid record, or a file
   outside `KINDS`, fails that adapter.
-- `activity sync` reports, per source, `appended`, `voided`, `dropped`
-  (`{reason: count}`) and `last_sync_at`, and warns once per drop reason
-  with its count.
+- `activity sync` reports, per source, `records` (`{file kind: count}` of
+  the upserts the source normalised, changed or not), `appended`,
+  `voided`, `dropped` (`{reason: count}`), `last_sync_at` and the keys of
+  the adapter's `info`, and warns once per drop reason with its count.
+- `activity import --source NAME --file PATH [--dry-run]` runs one file
+  through the source's `fetch_file` and appends exactly as a sync does.
+  The source need not be enabled (a backfill can come before the folder
+  is set up). It writes the returned state to the sync map, with
+  `last_sync_at` set to now, only when the state or a record changed; a
+  source without `fetch_file` is exit 2. Errors in the file are exit 1,
+  not a warning. `activity anonymise` needs `[activity] enabled` like
+  every activity command, and a source without `anonymise` is exit 2.
 
 - `activity sync` runs every enabled adapter: `fetch`, `normalise`, hash,
   append changed records, then write the adapter's returned `sync_state`
@@ -2650,6 +2661,60 @@ def normalise(item, ctx) -> list[dict]: ...
     the lifting logbook".
   - `FRESH_BY = "sync"`: its freshness is the last sync, since a week
     without conditioning is not a broken source.
+
+- **`apple_health` adapter** (R-42b). Reads Health Auto Export's Version 2
+  JSON (vendor format pages: Export Format, Health Metrics, Workouts,
+  Manual Export, Sync to iCloud Drive at help.healthyapps.dev).
+  - `activity sync` reads every `*.json` in `[sources.apple_health] path`
+    (`~` expanded; relative to the instance root) whose content hash is
+    not a value in the sync state, in file-name order and in place. Its
+    state is `{"files": {file name: "sha256:..."}}`; `info` is
+    `files_read`. `activity import` keys the file by its base name and
+    reports `file` and `already_seen`.
+  - Refused with the setting to change: a CSV file ("set Export Format to
+    JSON") and a Version 1 file, told apart by a workout without `id` or
+    `duration` ("set Export Version to Export Version 2"). In a folder
+    sync each is a warning and the file stays unread; on import, exit 1.
+    An iCloud placeholder (`.<name>.json.icloud`) is a warning naming
+    `brctl download`.
+  - Workouts become Activities with id `apple_health:<workout id>`,
+    `utc_offset` from the start's offset, distance and elevation through
+    `coach.units`, `active_kcal` from kcal or kJ, `avg_hr`/`max_hr` from
+    `heartRate` (else `avgHeartRate`/`maxHeartRate`), `indoor` from
+    `isIndoor` (else `location`), `device` the workout's `source`.
+    Drops, in order: a `source` naming an app in `drop_source_names`
+    ("written to Apple Health by <app>, which is in drop_source_names");
+    a name the table maps to lifting ("lifting workout; Hevy is the
+    lifting logbook"); with `Hevy` in `drop_source_names`, a workout with
+    no `source` starting within `dedup_window_minutes` of any cached Hevy
+    workout's start ("no source, and it starts within N minutes of a Hevy
+    workout"). With no Hevy cache that last check is skipped with a
+    warning.
+  - Metrics become one wellness record per day, id `apple_health:<date>`.
+    A day's record keeps the previous `apple_health` record's readings
+    for fields this file does not carry, so a file holding only some
+    metrics never erases the rest. Unknown metric names are ignored with
+    one summary warning; unsummarised sleep segments are ignored with a
+    warning naming Summarize Data; readings in units the table does not
+    accept are left out with a counted warning. Mass is stored in kg
+    through `coach.units`.
+  - Every mapping the vendor docs leave open (workout names to kinds,
+    metric names to wellness fields with their units and how a day's
+    entries combine, the sleep fields and the sleep-date rule) lives in
+    the one `MAPPING` table in the adapter, for R-42c to correct against
+    a real export.
+  - The anonymiser (`activity anonymise`) writes
+    `<out>/health-auto-export.json` marked `"x-anonymised": true`. It
+    keeps only `metrics` and `workouts`; drops `route` and `metadata`;
+    shifts every date by more whole weeks than the export spans, so no
+    shifted date equals an original; replaces every `id` with a salted
+    fake UUID (deterministic within a run) and every `source`/`device`
+    name part other than `Hevy` with `Device N`; and moves every number
+    by 0.5 to 3 % (integers stay integers). It refuses to write when any
+    original id, timestamp, date or source name survives. The salt is
+    random per run and never stored.
+  - Fixtures: `tests/fixtures/apple_health/` (synthetic, `"x-synthetic":
+    true`).
 
 ## C32. Activity config (R-42a defines; each adapter adds its source table)
 

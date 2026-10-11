@@ -129,3 +129,11 @@ gap_warn_days = 3             # `coach check` warns when an enabled source's new
 [sources.hevy_conditioning]   # Hevy conditioning workouts (all-conditioning exercises, or a routine mapped to a
                               # conditioning session); reads the Hevy cache, never the API
 enabled = true                # also needs [hevy] enabled = true
+
+[sources.apple_health]        # Apple Health through the Health Auto Export app: JSON, Export Version 2,
+                              # Summarize Data on. Files are read in place, never copied
+enabled = false               # true to read the folder on every `activity sync`
+path = ""                     # the automation's folder; on a Mac, iCloud Drive's AutoExport/<automation name>:
+                              # "~/Library/Mobile Documents/com~apple~CloudDocs/AutoExport/<automation name>"
+drop_source_names = ["Hevy"]  # workouts these apps wrote to Apple Health are dropped; with "Hevy" listed, a workout
+                              # with no source that starts within dedup_window_minutes of a Hevy workout is dropped too

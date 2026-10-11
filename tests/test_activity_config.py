@@ -76,8 +76,12 @@ class ExampleTest(unittest.TestCase):
         raw = tomllib.loads((REPO_ROOT / "config.example.toml").read_text(encoding="utf-8"))
         tables = config.registered_tables()
         self.assertEqual(set(raw["activity"]), set(tables["activity"].keys))
-        self.assertEqual(set(raw["sources"]["hevy_conditioning"]), set(tables["sources"].tables["hevy_conditioning"].keys))
+        self.assertEqual(set(raw["sources"]), set(tables["sources"].tables))
+        for name, table in tables["sources"].tables.items():
+            with self.subTest(source=name):
+                self.assertEqual(set(raw["sources"][name]), set(table.keys))
         self.assertFalse(raw["activity"]["enabled"])
+        self.assertFalse(raw["sources"]["apple_health"]["enabled"])
 
 
 if __name__ == "__main__":
