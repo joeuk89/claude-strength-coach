@@ -32,7 +32,10 @@ Use the schema's enums. `load_mode_default` describes the entry's default;
 `load_mode` records the athlete's explicit choice, which a program slot
 must match. Optional entry fields such as `aliases`, `hevy_titles`,
 `increment` and `substitutes` use the same schema. The command does not
-infer any required fact or fill a confirmed mode from the default.
+infer any required fact or fill a confirmed mode from the default. It
+refuses `hevy_template_id`, `hevy_template_ids`, `load_mode_proposed`,
+`confidence` and `avoid`; record an avoidance afterwards with
+`library set-avoid`.
 
 Preview the proposed merged entry:
 

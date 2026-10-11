@@ -66,6 +66,15 @@ def _sorted(doc):
             "exercises": {key: doc["exercises"][key] for key in sorted(doc["exercises"])}}
 
 
+_SEPARATE_STEPS = {
+    "hevy_template_id": "Hevy mapping is a separate step once a real Hevy template is confirmed",
+    "hevy_template_ids": "Hevy mapping is a separate step once a real Hevy template is confirmed",
+    "load_mode_proposed": "library seed records it for imported exercises",
+    "confidence": "library seed records it for imported exercises",
+    "avoid": "record it after creation with library set-avoid",
+}
+
+
 @command(
     "library create",
     help="Create a custom exercise from an instance-entry JSON file; preview with --dry-run",
@@ -89,6 +98,14 @@ def create(args, ctx):
         raise ValidationError(f"cannot read custom exercise JSON from {source}: {exc}") from None
     if not isinstance(entry, dict):
         raise ValidationError(f"{source} must contain one exercise_library entry object")
+    if existing is not None:
+        if lib.instance["exercises"][args.id] != entry:
+            raise ValidationError(f"{args.id!r} already exists with different metadata; creation cannot update it. "
+                                  "Use library show to review it or choose a new custom_ id")
+        return {"exercise": existing, "path": paths.EXERCISES, "unchanged": True, "written": False}
+    refused = [f"{key} ({reason})" for key, reason in _SEPARATE_STEPS.items() if key in entry]
+    if refused:
+        raise ValidationError(f"creation does not accept {'; '.join(refused)}; remove it from {source}")
     missing = [key for key in (*library.CUSTOM_REQUIRED, "load_mode") if key not in entry]
     if missing:
         raise ValidationError(f"a custom exercise needs explicit values for: {', '.join(missing)}")
@@ -100,14 +117,12 @@ def create(args, ctx):
     if errors:
         raise ValidationError("custom exercise does not match the exercise_library schema",
                               details=[error.to_json() for error in errors])
-    proposed = Library(doc, lib.path)
-    unchanged = args.id in lib.instance["exercises"] and lib.instance["exercises"][args.id] == entry
-    if existing is not None and not unchanged:
-        raise ValidationError(f"{args.id!r} already exists with different metadata; creation cannot update it. "
-                              "Use library show to review it or choose a new custom_ id")
-    written = False if unchanged else _write(lib, doc, args)
-    return {"exercise": proposed.get(args.id), "path": paths.EXERCISES,
-            "unchanged": unchanged, "written": written}
+    try:
+        proposed = Library(doc, lib.path)
+    except ValidationError as exc:
+        raise ValidationError("custom exercise conflicts with the exercise library", details=exc.details) from None
+    written = _write(lib, doc, args)
+    return {"exercise": proposed.get(args.id), "path": paths.EXERCISES, "unchanged": False, "written": written}
 
 
 @command(

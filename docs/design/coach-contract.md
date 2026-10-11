@@ -181,7 +181,7 @@ Command inventory (owner in brackets). Read-only unless marked W
 | `check [--only ids] [--list]` | R-10 (framework), each item adds checks | |
 | `version` | R-10 | |
 | `library list [--avoided]`, `library show`, `library search`, `library validate` | R-11 | |
-| `library seed`, `library confirm`, `library set-mode`, `library set-avoid` | R-11 | W |
+| `library seed`, `library confirm`, `library set-mode`, `library set-avoid`, `library create ID --input FILE [--dry-run]` | R-11 | W |
 | `hevy status` | R-12 | |
 | `hevy pull [--full]` | R-12 | W (gitignored cache only) |
 | `hevy record-fixtures --out DIR` | R-12 | W (GET only, needs a real key) |
@@ -621,13 +621,16 @@ merges them; with no instance file the catalogue stands alone.
 - **Local creation.** `library create ID --input FILE` (W, `--dry-run`)
   accepts one existing instance-entry object, requires every custom field
   above and a non-null confirmed `load_mode`, and creates only a new
-  `custom_` id. The schema and merged-library checks run before the atomic
-  write. Catalogue collisions and conflicting custom ids fail without
-  changes; an identical retry succeeds with `unchanged: true` and
-  `written: false`. Output includes the proposed merged `exercise`, `path`,
-  `unchanged` and `written`; dry-run writes nothing. No required facts or
-  Hevy ids are guessed. Local creation does not establish Hevy readiness:
-  a real template mapping is a separate requirement when Hevy is enabled.
+  `custom_` id. It refuses `hevy_template_id`, `hevy_template_ids`,
+  `load_mode_proposed`, `confidence` and `avoid`: those come from separate
+  steps. A conflicting existing custom id fails before any other check; the
+  schema and merged-library checks then run before the atomic write.
+  Catalogue collisions and conflicts fail without changes; an identical
+  retry succeeds with `unchanged: true` and `written: false`. Output
+  includes the proposed merged `exercise`, `path`, `unchanged` and
+  `written`; dry-run writes nothing. No required facts or Hevy ids are
+  guessed. Local creation does not establish Hevy readiness: a real
+  template mapping is a separate requirement when Hevy is enabled.
   The search, review and approval workflow is in
   `reference/custom-exercises.md`.
 - **Match key.** Names are compared lower-cased, punctuation dropped,
@@ -728,7 +731,7 @@ none and `bodyweight`, `assisted`, `duration` or `distance`; band and
 | `.coach/backups/<UTC timestamp>/` | pre-migration copies; old recipe cards and index before conversion | gitignored | R-17a; R-33b (`recipes convert --apply`) |
 | `.coach/proposals/<id>.json`, `<id>.proposed.json`, `<id>.meta.json` | editable proposal draft (an overlay draft, C10), its untouched original, and the run's facts (kind, span, transform, rotation, each slot's proposed scheme state) | gitignored | R-23a |
 | `.coach/plans/<week start>-<name>.json` | schedule plans handed to `propose week --plan` | gitignored | R-30b; R-22 may |
-| `.coach/drafts/` | drafts the coach edits before a command applies them (program drafts, log drafts, recipe drafts and saved recipe pages) | gitignored | R-40c, R-41a, R-41b; the coach (R-33b recipe pages) |
+| `.coach/drafts/` | drafts the coach edits before a command applies them (program drafts, log drafts, custom-exercise entries, recipe drafts and saved recipe pages) | gitignored | R-40c, R-41a, R-41b; the coach (R-33b recipe pages) |
 
 - `.gitignore` gains `/.coach/`, `__pycache__/` and `*.pyc` (R-10). The
   `.coach` pattern is **root-anchored** so test fixtures under

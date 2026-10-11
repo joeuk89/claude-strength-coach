@@ -93,9 +93,9 @@ logging". If one is agreed or renewed, follow
 
 ## 8. Flag training implications
 
-Explain the phase's training implications (volume, deloads, cardio). Propose routine edits,
-show before/after, get approval, and re-check adjacent days. Search the library first;
-if no exercise fits, follow [custom exercise creation](../../../reference/custom-exercises.md).
+Say what the new phase means for the routine (volume on a cut, deload timing, cardio load);
+routine edits go through the normal flow: propose, show before/after, get approval, re-check the days either side.
+For a new exercise, search the library first; if none fits, follow [custom exercise creation](../../../reference/custom-exercises.md).
 
 ## 9. Record it
 

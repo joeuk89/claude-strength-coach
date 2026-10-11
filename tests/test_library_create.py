@@ -112,11 +112,41 @@ class CreateTest(CliMixin, unittest.TestCase):
         self.create()
         changed = copy.deepcopy(ENTRY)
         changed["increment"]["kg"] = 5
-        self.input(changed)
-        for args in ((), ("--dry-run",)):
-            error = self.fails_without_writing(*args)
-            self.assertIn("already exists", error["message"])
-            self.assertIn("cannot update", error["message"])
+        invalid = dict(ENTRY, pattern="bogus")
+        for entry in (changed, invalid):
+            self.input(entry)
+            for args in ((), ("--dry-run",)):
+                error = self.fails_without_writing(*args)
+                self.assertIn("already exists", error["message"])
+                self.assertIn("cannot update", error["message"])
+
+    def test_hevy_mapping_and_app_managed_fields_are_rejected(self):
+        write_library(self.root, {"db_curl": {"load_mode": "single_implement"}})
+        rejected = {
+            "hevy_template_id": ("FAKE0001", "Hevy mapping"),
+            "hevy_template_ids": (["FAKE0002"], "Hevy mapping"),
+            "load_mode_proposed": ("total", "library seed"),
+            "confidence": ("high", "library seed"),
+            "avoid": ({"reason": "knee pain"}, "library set-avoid"),
+        }
+        for field, (value, hint) in rejected.items():
+            with self.subTest(field=field):
+                self.input(dict(ENTRY, **{field: value}))
+                for args in ((), ("--dry-run",)):
+                    error = self.fails_without_writing(*args)
+                    self.assertIn(field, error["message"])
+                    self.assertIn(hint, error["message"])
+        self.assertEqual(read_library(self.root)["exercises"], {"db_curl": {"load_mode": "single_implement"}})
+
+    def test_library_conflicts_name_the_new_entry_not_the_existing_file(self):
+        write_library(self.root, {"db_curl": {"load_mode": "single_implement"}})
+        for field, value in (("name", "Barbell Back Squat"), ("aliases", ["Bicep Curl (Dumbbell)"])):
+            with self.subTest(field=field):
+                self.input(dict(ENTRY, **{field: value}))
+                error = self.fails_without_writing()
+                self.assertIn("conflicts with the exercise library", error["message"])
+                self.assertNotIn("not a valid exercise library", error["message"])
+                self.assertTrue(any(f"{EXERCISE_ID}.{field}" in detail["path"] for detail in error["details"]))
 
     def test_catalogue_collision_and_invalid_ids_are_rejected(self):
         for exercise_id in ("bb_back_squat", "paused_squat", "custom_bad-id", "custom_Bad"):
