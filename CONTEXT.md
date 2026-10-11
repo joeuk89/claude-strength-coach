@@ -240,6 +240,21 @@ different next week), for the athlete to answer in
 one reply. Replaces an interview.
 _Avoid_: check-in form, intake, questionnaire
 
+**Catch-up check-in**:
+The check-in after more than 10 days without one. Its Sunday message
+drops the per-session questions for one summary row per week of the gap,
+three questions (the gap, now, next week) and the proposed return week,
+which one "ok" accepts and writes. It never runs deep: a deep review that
+was due moves to the next check-in.
+_Avoid_: long check-in, gap review
+
+**Return brief**:
+The coach's brief for the week back after a gap (illness, travel, no
+kit or a plain layoff): the gap in one sentence, what the return week
+changes, each session's lines, what happens after, and the write line.
+After illness it adds the safety lines of the illness rule.
+_Avoid_: comeback plan, return plan
+
 **Hold-steady week**:
 A weekly-tier check-in week, not a deload, with no structural change, no
 new or worsening niggle, no goals or phase flag, nothing different next
