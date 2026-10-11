@@ -1275,7 +1275,9 @@ Unless stated, each is a copy of `valid/` plus what is listed.
 | `missed/` | R-22 | program with rules `miss-b` (fold row, 2 sets, into Session A), `miss-a` (shift to sat, then thu); approved overlay `2026-10-12-weekly` re-dated: Session A 2026-10-12, Session B 2026-10-14, Session A 2026-10-17; workout for Session A on 2026-10-12 only |
 | `dose/` | R-30a | program with `pt-tue` estimated at `{"chest": 3, "lats": 3}`; weekly overlays for 2026-W36 to 2026-W41; workouts and `external` annotations giving the weeks below (planned = Session A, Session B, PT = 3) |
 | `block/` | R-31 | program with `hard_weeks_ceiling` 6 and `pt-tue`; a ledger with block `b-0001` started 2026-08-31 and no closed weeks; weekly overlays for 2026-W36 to W41; workouts matching each overlay (every core session at the prescribed sets and RPE) plus `external` done annotations. Closing W36 to W41 gives six hard weeks |
-| `nohevy/` | R-40c | the valid program and overlay; `[hevy] enabled = false`; no Hevy cache; `data/log/workouts.jsonl` holding the two Session A workouts of the logged-workouts table, logged by hand (squat 3×5 @ 95 RPE 7, DB bench 3×10 @ 22.5/hand RPE 8; the same on 2026-10-05 at 97.5) |
+| `nohevy/` | R-40c | the valid program and overlay; `[hevy] enabled = false`; no Hevy cache; `data/log/workouts.jsonl` holding the two Session A workouts of the logged-workouts table, logged by hand (squat 3×5 @ 95 RPE 7, DB bench 3×10 @ 22.5/hand RPE 8; the same on 2026-10-05 at 97.5), with `overlay_id` null; `this-week-sheets.md` rendered at 2026-10-11T18:00:00Z |
+| `manual-log-invalid/` | R-40c | not a copy of `valid/`: `nohevy/`'s config, library, program and overlay, and a log whose line 2 repeats line 1's id, line 3 logs `no_such_lift` in session `session-z`, and line 4 voids `manual:2026-09-21-session-a-1`, which no line logs |
+| `sheets-stale/` | R-40c | not a copy of `valid/`: `nohevy/`'s config, library, overlay and sheets, with Session A's squat working sets hand-edited from 100 to 105 |
 | `library-seed/` | R-11 | not a copy of `valid/`: config, and a synthetic Hevy cache (C8) holding Session A and Session B with the four `valid/` exercises plus the custom template `C0000001` "Tyre Flip"; no instance library |
 | `library-unconfirmed/` | R-11 | not a copy of `valid/`: config, cached Session A, and an instance library where `db_bench_press` has a proposal but no confirmed load mode |
 | `library-invalid/` | R-11 | not a copy of `valid/`: config and an instance library with an unknown field on `db_bench_press` |
@@ -3980,8 +3982,9 @@ R-25 ships one part itself, `nutrition`: when `coach.nutrition` exists and
 `brief.lines` (once) and the phase to `brief.header.phase`; absent or
 disabled, it adds nothing. A soft dependency on R-33a, computing nothing.
 
-R-25 prints every load through one call site, so R-40c's `show_hevy`
-change (C5) is one line.
+R-25 prints every load through one call site, `_load`. R-40c gives it,
+and the two helpers that call it (`sets_text`, `_change_text`), a
+`show_hevy` argument the renderer fills from `config.hevy.enabled`.
 
 **README ownership.** `pages render` refuses (exit 3) to overwrite a
 `README.md` that does not start with the C11 header, unless
@@ -4554,22 +4557,45 @@ corrections are a `void` line plus a new entry:
 - Ids are `manual:<date>-<session_id>-<n>` (`adhoc` for no session);
   `n` counts from 1 per date and session, voided ids included.
 - `session_id` and `overlay_id` may be null (an unplanned workout).
+- Schemas: `manual_workout_line` (`kind: "workout"`) and
+  `manual_void_line` (`kind: "void"`), both claiming the file through
+  `x-coach-paths` (C7).
 - `log prefill --session S --date D` returns `data.draft`: a workout
-  line without `id` and `logged_at`, built from the overlay in force on D.
+  line without `id` and `logged_at`, built from the overlay in force on D
+  (its session S nearest to D, so a moved session prefills too; no
+  overlay, or none with S, exits 1).
   Fixed reps and loads are filled as prescribed; a `rep_range` leaves
-  `reps` null; `rpe` is null. Warm-up sets are left out.
+  `reps` null; `rpe` and `duration_minutes` are null. Warm-up sets are
+  left out.
 - `log add --input FILE [--again] [--dry-run]` validates and appends one
-  line. Exit 1 for: an unknown exercise id; a load mode different from
-  the slot's effective mode; a null `reps` on a rep-based set; a date
-  after today; a `value` on a null-load mode. Exit 3 when the date and
-  session already have a live entry, unless `--again`. Warning
-  `looks_like_total` when a per-hand `value` is exactly twice the
-  prescribed per-hand load. Returns the id and a one-line summary printed
-  with `units.format_load(..., show_hevy=False)`.
-- `log void ID --reason TEXT [--dry-run]` appends a void line. `log list
-  [--since D]` returns live entries.
+  line. Exit 1 for: an input carrying `id` or `logged_at` (`log add`
+  assigns both); a schema problem; an unknown exercise id; a load mode
+  different from the slot's effective mode (the overlay line's
+  `load_mode` when the workout's overlay session has the exercise, else
+  the library's confirmed mode; an unconfirmed one accepts any); a null
+  `reps` on a set of any mode but `duration` and `distance`; a date
+  after today; a `value` on a null-load mode; a `unit` other than
+  `[athlete] units`; a session id in neither the program nor any
+  overlay; an overlay that does not exist or lacks the session. Exit 3
+  when the date and session already have a live entry, unless `--again`
+  (a workout with no session is never refused). Warning
+  `looks_like_total` when a `per_hand_x2` `value` equals the `hevy_total`
+  of a prescribed working set (and no prescribed per-hand load), so the
+  athlete gave the pair as one number. Warnings in the envelope start
+  with their code (`looks_like_total: ...`, `hevy_enabled: ...`).
+  Returns `id`, `line`, and `summary`, one line printed with
+  `units.format_load(..., show_hevy=False)`.
+- `log void ID --reason TEXT [--dry-run]` appends a void line; an
+  unknown or already void id, or an empty reason, exits 1. `log list
+  [--since D]` returns live entries as `data.workouts`, oldest first.
+- The `manual` history source reads the live entries; no log file means
+  `None` (C17). Its `version(workout)` is the C7 canonical hash of the
+  `SourceWorkout`. A workout's `title` is its overlay session's title,
+  else its program session's, else the session id, else "Ad hoc
+  workout"; each exercise's title is its library name.
 - Check `manual_log_valid`: every line validates, ids are unique, every
-  void names a live workout, exercise and session ids exist.
+  void names a live workout, exercise and session ids exist; one `fail`
+  per problem naming its line. Skips with no log file.
 - With `[hevy] enabled = true`, `log add` still works (for a workout the
   athlete forgot to log in Hevy) and warns `hevy_enabled`.
 - With Hevy off (`[hevy] enabled = false`, which includes Hevy free),
@@ -4577,17 +4603,34 @@ corrections are a `void` line plus a new entry:
   push` exits 5 naming `[hevy] enabled`, and Hevy checks report `skip`.
 
 `sheets render [--overlay ID] [--dry-run]` writes `this-week-sheets.md`
-(C11 whole-file header) from the overlay in force today, else the next
-one. One section per session in date order, anchored by session id:
-title and date, the session focus, then one row per exercise
+(C11 whole-file header, no as-of time: the sheets read no history) from
+the brief's overlay (C38: the latest created of the overlays in force on
+the days of the week holding tomorrow), else the next to start. So on a
+Sunday after the programming pass the sheets show the coming week, as
+the brief does. `coach.sheets.current(docs, today, week_starts)` picks
+it. One section per session in date order, anchored by session id
+(`<a id="session-a"></a>`; a session id seen again in the overlay gets
+`-2`, `-3`; `coach.sheets.anchors(doc)`): title and date, the session
+focus, then one row per run of equal sets
 `| Exercise | Sets × reps | Load | RPE | Rest | Done |` with warm-ups on
-their own row, then the cues line. Loads print with
-`format_load(load, show_hevy=False)`. A footer says how to log ("reply
-with what you did; differences only"). Check `sheets_render_fresh`
-(skips when Hevy is enabled). A page-part module
+their own row and the exercise name on its first row, then one bullet
+per exercise with its focus and cues. Loads print with
+`format_load(load, show_hevy=False)`; a null load on a loaded mode
+prints "choose the load". An unapproved overlay renders with a "Not
+approved yet" line and a warning. A footer says how to log ("reply to
+the coach with what you did; differences only"). Check
+`sheets_render_fresh`: skip when Hevy is enabled or there is neither a
+file nor an overlay; warn when there is no file yet, or when the file
+shows another overlay than the current one; fail when the file has no
+C11 header or differs from a fresh render of the overlay its header
+names. A page-part module
 `coach/page_parts/sheets.py` (C38) contributes one `brief.sessions_footer`
-item when Hevy is off: "Session sheets: this-week-sheets.md", with
-per-session anchors `#<session_id>` in the sheets file.
+item when Hevy is off and the brief has an overlay: "Session sheets:
+[this-week-sheets.md](this-week-sheets.md)" followed by one link per
+session to its anchor (`this-week-sheets.md#session-a`).
+
+`pages publish` (C38) stages its five paths only, so it does not commit
+`this-week-sheets.md`.
 
 ## C47. Unused.
 

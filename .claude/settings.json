@@ -71,7 +71,12 @@
       "Bash(python3 -m coach propose week:*)",
       "Bash(python3 -m coach propose override:*)",
       "Bash(python3 -m coach propose resolve:*)",
-      "Bash(python3 -m coach propose finalize:*)"
+      "Bash(python3 -m coach propose finalize:*)",
+      "Bash(python3 -m coach log list:*)",
+      "Bash(python3 -m coach log prefill:*)",
+      "Bash(python3 -m coach log add:*)",
+      "Bash(python3 -m coach log void:*)",
+      "Bash(python3 -m coach sheets render:*)"
     ]
   },
   "hooks": {

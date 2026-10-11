@@ -58,8 +58,8 @@ _DAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 _MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
 
-def _load(load):
-    return units.format_load(load)
+def _load(load, show_hevy=True):
+    return units.format_load(load, show_hevy=show_hevy)
 
 
 def timestamp(moment):
@@ -128,19 +128,19 @@ def _reps(set_):
     return "?"
 
 
-def _set_load(line, set_):
+def _set_load(line, set_, show_hevy=True):
     load = set_.get("load")
     if load is None:
         return None
-    text = _load(load)
+    text = _load(load, show_hevy)
     return f"{text} {load['unit']}" if line["load_mode"] == "total" else text
 
 
-def sets_text(line):
+def sets_text(line, show_hevy=True):
     """A line's working sets in C12 Target form without RPE: `3×5 @ 100 kg`, `3×8–10 @ 25/hand (Hevy: 50)`."""
     groups = []
     for set_ in (s for s in line["sets"] if overlay.is_working(s)):
-        key = (_reps(set_), _set_load(line, set_))
+        key = (_reps(set_), _set_load(line, set_, show_hevy))
         if groups and groups[-1][0] == key:
             groups[-1][1] += 1
         else:
@@ -153,15 +153,15 @@ def sets_text(line):
     return text
 
 
-def _change_text(line):
-    """The line's `change`, with the Hevy value added when it ends on a bare per-hand load."""
+def _change_text(line, show_hevy=True):
+    """The line's `change`, with the Hevy value added when Hevy is on and it ends on a bare per-hand load."""
     change = line["change"]
     load = next((s["load"] for s in line["sets"] if overlay.is_working(s) and s.get("load")), None)
     if load is None:
         return change
-    full = _load(load)
+    full = _load(load, show_hevy)
     short = full.split(" (Hevy: ", 1)[0]
-    # The coach writes `22.5 → 25/hand`; a dumbbell load on the page always shows both numbers.
+    # The coach writes `22.5 → 25/hand`; with Hevy on, a dumbbell load on the page shows both numbers.
     if "/hand" in short and short != full and change.endswith(short):
         return change + full[len(short):]
     return change
@@ -198,6 +198,7 @@ class _View:
         self.week_starts = self.config.athlete.week_starts
         self.week = dates.week_span(self.today + timedelta(days=1), self.week_starts)
         self.unit = self.config.athlete.units
+        self.show_hevy = self.config.hevy.enabled
 
     @cached_property
     def program(self):
@@ -387,7 +388,7 @@ class _View:
         if not session["exercises"]:
             return ""
         first = session["exercises"][0]
-        return f"{self.short_name(first['exercise_id'])} {sets_text(first)}"
+        return f"{self.short_name(first['exercise_id'])} {sets_text(first, self.show_hevy)}"
 
     def session_rows(self):
         lines = []
@@ -416,7 +417,7 @@ class _View:
             _, session = self.session_of(row)
             for line in session["exercises"]:
                 if line.get("change"):
-                    text = f"{self.short_name(line['exercise_id'])} {_change_text(line)}"
+                    text = f"{self.short_name(line['exercise_id'])} {_change_text(line, self.show_hevy)}"
                     reason = _change_reason(line)
                     found.append(f"{text}: {reason}" if reason else text)
         return found

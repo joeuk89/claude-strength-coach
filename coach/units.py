@@ -183,8 +183,11 @@ def _text(value):
     return "0" if text in ("", "-0") else text
 
 
-def format_load(load):
-    """The text a renderer prints for a load. Never prints a unit."""
+def format_load(load, show_hevy=True):
+    """The text a renderer prints for a load. Never prints a unit.
+
+    With `show_hevy` false (an athlete without Hevy) the Hevy value is left out.
+    """
     if load is None:
         raise ValueError("no load to format")
     errors = check_load(load)
@@ -192,15 +195,16 @@ def format_load(load):
         raise ValueError(f"invalid load: {'; '.join(errors)}")
     mode = load["mode"]
     total = _text(load["hevy_total"])
+    hevy = f" (Hevy: {total})" if show_hevy else ""
     if mode == "total":
         return total
     if mode == "per_hand_x2":
-        return f"{_text(load['per_hand'])}/hand (Hevy: {total})"
+        return f"{_text(load['per_hand'])}/hand{hevy}"
     if mode == "single_implement":
-        return f"{_text(load['per_hand'])} (Hevy: {total})"
+        return f"{_text(load['per_hand'])}{hevy}"
     if mode == "bodyweight":
         return "BW" if load["hevy_total"] == 0 else f"BW+{total}"
-    return f"BW-{total} assist (Hevy: {total})"
+    return f"BW-{total} assist{hevy}"
 
 
 def round_to_increment(value, increment, direction="nearest"):

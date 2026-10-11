@@ -136,6 +136,21 @@ _Avoid_: home page, status page, session-start status (what the coach sees)
 core-complete streak, and bodyweight by week.
 _Avoid_: stats page, PR list
 
+**Session sheets**:
+`this-week-sheets.md`, rendered for an athlete without Hevy: each session
+of the week's overlay as a table of sets, reps, load, RPE and rest, with
+an empty Done column, then its cues. Loads show the athlete's number
+only (`25/hand`). What the athlete trains from when there are no Hevy
+routines.
+_Avoid_: workout card, printout, routine (Hevy's word)
+
+**Manual log**:
+`data/log/workouts.jsonl`: the workouts an athlete without Hevy reports
+in chat, one line each, written by the coach with `log add`. Append-only;
+a correction is a void line plus a new entry. History reads it like the
+Hevy log.
+_Avoid_: training diary, journal, log entry (a workout is the thing logged)
+
 **Core-complete week**:
 A week in which every planned core session was trained, logged or not,
 and no coach-led session is recorded as not having happened. Optional

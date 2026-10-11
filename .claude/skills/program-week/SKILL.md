@@ -55,8 +55,10 @@ Read recent workouts from the cache (`.coach/cache/hevy/workouts/`,
 newest first) for current working weights, turning each logged Hevy
 value into the athlete's number with `python3 -m coach units convert
 --mode <load mode> --from-hevy-kg <value>` (the load mode from `python3
--m coach library show <id>`). No Hevy → ask the athlete for their
-current weights. Read each logged workout's `description` and
+-m coach library show <id>`). No Hevy → run `python3 -m coach history
+sync`, then `python3 -m coach log list --since <date>` for the workouts
+the athlete reported; each set's `value` is already their number. Read
+each logged workout's `description` (`notes` in the manual log) and
 per-exercise `notes` too — the athlete's own account of how the sets
 felt ("target too high, did back-off sets", "wiped out after
 yesterday's run") should temper the next week's loads as much as the
@@ -372,8 +374,11 @@ what the write line named — nothing more.
    set `one_off` to null in `data/state.json` and run `python3 -m coach
    state show` to check it.
 
-**No Hevy?** Skip steps 3–5's Hevy commands — the rendered overlay is
-the deliverable, and the athlete trains from it.
+**No Hevy?** `overlay approve` is the last write of the pass: skip the
+Hevy commands in steps 3–5 (an ended one-off week still gets `one_off`
+set to null) and run `python3 -m coach sheets render`, which writes
+`this-week-sheets.md`, the per-set sheets the athlete trains from. Never
+run `routines push`: with Hevy off it exits 5.
 
 ## 6. Record the overlay
 
@@ -387,8 +392,8 @@ and every Hevy write and verification are logged in
 
 **Publish the week.** Hevy users: only once `routines verify` reports
 every routine verified; a routine left unverified means no publish, and
-the recap says why. No Hevy: once `overlay approve` has stamped the
-approval. Run `python3 -m coach pages render`, then `python3 -m coach
+the recap says why. No Hevy: once `sheets render` has written the
+sheets. Run `python3 -m coach pages render`, then `python3 -m coach
 pages publish --overlay <id>`: it commits exactly the brief
 (`this-week.md`), the dashboard (`README.md`), `progress.md`, the overlay
 and the newest check-in record, and pushes them so the athlete's phone

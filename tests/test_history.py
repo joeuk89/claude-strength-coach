@@ -219,17 +219,20 @@ MANUAL_SOURCE = textwrap.dedent('''
 
 
 class ManualSourceTest(HistoryCase):
-    """A source module dropped into coach/history_sources/ is found without editing any registry."""
+    """A source module dropped into coach/history_sources/ is found without editing any registry.
+
+    The stub is named `stub_manual` because the real `manual` source would shadow a module of that name.
+    """
 
     def setUp(self):
         super().setUp()
         self.cache()
         package_dir = self.tmp / "sources"
         package_dir.mkdir()
-        (package_dir / "manual.py").write_text(MANUAL_SOURCE, encoding="utf-8")
+        (package_dir / "stub_manual.py").write_text(MANUAL_SOURCE, encoding="utf-8")
         history_sources.__path__.append(str(package_dir))
         self.addCleanup(history_sources.__path__.remove, str(package_dir))
-        self.addCleanup(sys.modules.pop, "coach.history_sources.manual", None)
+        self.addCleanup(sys.modules.pop, "coach.history_sources.stub_manual", None)
         self.env = {"COACH_NOW": "2026-10-19T18:00:00Z"}
 
     def manual_workout(self):
@@ -261,7 +264,7 @@ class ManualSourceTest(HistoryCase):
 
     def test_a_changed_version_re_resolves_only_that_workout(self):
         self.sync()
-        module = importlib.import_module("coach.history_sources.manual")
+        module = importlib.import_module("coach.history_sources.stub_manual")
         module.VERSION = "v2"
         data = self.sync(env={"COACH_NOW": "2026-10-20T08:00:00Z"})
         self.assertEqual(data["updated"], ["manual:2026-10-12-session-a-1"])
