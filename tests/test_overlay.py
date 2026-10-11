@@ -88,7 +88,7 @@ class BuildTest(unittest.TestCase):
 
     def test_fills_every_key(self):
         built = self.build(draft())
-        self.assertEqual(built["schema_version"], 1)
+        self.assertEqual(built["schema_version"], overlay.current_version())
         self.assertEqual(built["approval"], None)
         self.assertEqual(built["flags"], [])
         self.assertEqual(built["created_at"], "2026-10-11T18:00:00Z")
@@ -97,7 +97,7 @@ class BuildTest(unittest.TestCase):
         self.assertIn("location", session)
         self.assertIsNone(session["focus"])
         row = session["exercises"][0]
-        for key in ("superset_id", "focus", "target_note", "change", "override"):
+        for key in ("superset_id", "focus", "target_note", "change", "override", "provenance"):
             self.assertIn(key, row)
             self.assertIsNone(row[key])
         self.assertEqual(jsonio.load_schema("overlay")["required"], list(built))
@@ -321,7 +321,7 @@ class ValidateTest(unittest.TestCase):
         doc["sessions"][1]["exercises"].append({
             "exercise_id": "plank", "hevy_template_id": None, "load_mode": "duration", "rest_seconds": 60,
             "superset_id": None, "cues": None, "focus": None, "target_note": None, "change": None,
-            "override": None, "sets": [{"type": "normal", "duration_seconds": 45, "load": None}],
+            "override": None, "provenance": None, "sets": [{"type": "normal", "duration_seconds": 45, "load": None}],
         })
         self.assertEqual(overlay.validate(doc, VALID), [])
         del doc["sessions"][1]["exercises"][2]["sets"][0]["duration_seconds"]

@@ -4,7 +4,7 @@
   "required": ["schema_version", "id", "kind", "created_at", "span", "supersedes", "focus", "flags", "approval", "sessions"],
   "additionalProperties": false,
   "properties": {
-    "schema_version": {"const": 1},
+    "schema_version": {"const": 2},
     "id": {"$ref": "#/$defs/overlay_id"},
     "kind": {"enum": ["weekly", "midweek", "deload", "one_off"]},
     "created_at": {"$ref": "#/$defs/timestamp"},
@@ -67,7 +67,7 @@
     "exercise": {
       "type": "object",
       "required": ["exercise_id", "hevy_template_id", "load_mode", "rest_seconds", "superset_id", "cues", "focus",
-                   "target_note", "change", "override", "sets"],
+                   "target_note", "change", "override", "provenance", "sets"],
       "additionalProperties": false,
       "properties": {
         "exercise_id": {"type": "string", "pattern": "^[a-z0-9_]+$"},
@@ -79,6 +79,7 @@
         "focus": {"$ref": "#/$defs/optional_text"},
         "target_note": {"$ref": "#/$defs/optional_text"},
         "change": {"$ref": "#/$defs/optional_text"},
+        "provenance": {"$ref": "#/$defs/provenance"},
         "override": {
           "type": ["object", "null"],
           "required": ["reason", "proposed_sets"],
@@ -89,6 +90,34 @@
           }
         },
         "sets": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/set"}}
+      }
+    },
+    "provenance": {
+      "type": ["object", "null"],
+      "required": ["scheme", "derived_from", "inferred", "decay", "rationale"],
+      "additionalProperties": false,
+      "properties": {
+        "scheme": {"type": ["string", "null"], "pattern": "^[a-z0-9_]+$"},
+        "derived_from": {
+          "type": ["object", "null"],
+          "required": ["date", "workout_id"],
+          "additionalProperties": false,
+          "properties": {"date": {"$ref": "#/$defs/date"}, "workout_id": {"$ref": "#/$defs/text"}}
+        },
+        "inferred": {"type": "boolean"},
+        "decay": {
+          "type": ["object", "null"],
+          "required": ["days_off", "band", "load_factor", "set_delta", "rpe_cap"],
+          "additionalProperties": false,
+          "properties": {
+            "days_off": {"type": "integer", "minimum": 0},
+            "band": {"enum": ["0-10", "11-21", "22-42", "43+"]},
+            "load_factor": {"type": "number", "minimum": 0, "maximum": 1},
+            "set_delta": {"type": "integer", "maximum": 0},
+            "rpe_cap": {"type": ["number", "null"], "minimum": 1, "maximum": 10}
+          }
+        },
+        "rationale": {"$ref": "#/$defs/optional_text"}
       }
     },
     "set": {

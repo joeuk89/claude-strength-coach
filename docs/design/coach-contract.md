@@ -1266,7 +1266,7 @@ Unless stated, each is a copy of `valid/` plus what is listed.
 
 | Instance | Owner | Holds |
 |---|---|---|
-| `layoff/` | R-24 | same program; last workout 2026-09-14, so 28 days off before 2026-10-12 |
+| `layoff/` | R-24 | same program and overlay (approved, null provenance); no Hevy cache; `data/history/2026-08.json` and `2026-09.json` resolved by `history sync` from synthetic workouts `...0021` to `...0025`: Session A 2026-08-31, 09-07 and 09-14 (squat 3×5 @ 95, 97.5, then 100, RPE 7; DB bench 3×10 @ Hevy 45 RPE 8), Session B 2026-09-03 and 09-10 (row 3×10 @ 30 RPE 8; pull-up 3×8 BW). Last workout 2026-09-14, so 28 days off before 2026-10-12 |
 | `slip/` | R-20 | DB bench logged Hevy 45 on 2026-09-28 and Hevy 90 on 2026-10-05 at the same reps and RPE, and DB shoulder press (template `F0000005`, confirmed `per_hand_x2`) Hevy 30 then 60 on the same dates. Not a full copy: `valid/`'s config, program, state and overlay, the library plus DB shoulder press, and `data/history/2026-09.json` and `2026-10.json` resolved by `history sync`; no Hevy cache |
 | `history-bad-schema/`, `history-unresolved/`, `annotations-invalid/` | R-20 | not copies of `valid/`: `valid/`'s config and `slip/`'s `2026-10.json`, with one fault each: a set with an unknown key `weight`; workout 3's squat as an unmatched "Mystery Lift"; an annotation discounting a workout the history lacks |
 | `flag-unknown/` | R-20 | not a copy of `valid/`: its config and its overlay, unapproved, carrying a flag with the unregistered code `no_such_code` |
@@ -1948,7 +1948,7 @@ Reserved codes:
 |---|---|---|---|---|
 | `convention_slip` | warn | R-20 | | Dumbbell exposure jumped exactly 2× or ½× at the same reps and RPE; excluded from e1RM and progression until annotated. |
 | `duration_over_cap` | info | R-20 | | A logged workout ran longer than its session cap. |
-| `stale_prescription` | block | R-24 | | Line derived from an exposure outside the validity window and not decayed to its band. |
+| `stale_prescription` | block | R-24 | | Line derived from an exposure outside the validity window and not decayed to its band, or above the RPE 7 cap on the first session after an illness. |
 | `unearned_load` | block | R-24 | | Load predicted beyond failure for the prescribed reps, or, with no e1RM, more than two increments above the last exposure. |
 | `load_cap` | block | R-24 | | Load above `[caps]` or `dumbbell_max`. |
 | `load_unrepresentable` | block | R-24 | | Load cannot be built from the available increments, dumbbells or plates. |
@@ -2004,14 +2004,19 @@ Overlay `schema_version` 2 adds one nullable object per exercise line
 }
 ```
 
+- `provenance` is a required key on every v2 line, null or an object
+  carrying all five keys above. In the draft it is optional.
 - `provenance` null: a hand-built line. The R-24 validator then infers
-  `derived_from` (latest exposure of the exercise before the overlay's
-  `created_at`); with `prescription check --write` it stores the result
-  with `inferred: true`.
+  `derived_from` (the latest exposure of the exercise neither excluded
+  nor `suspect` (C17), dated on or before the overlay's `created_at`
+  date and before the line's session date); with `prescription check --write` it stores the result
+  with `inferred: true`, and `scheme`, `decay` and `rationale` null.
 - `derived_from` null inside a non-null `provenance`: no exposure (first
   time, start load).
 - `decay` null: no decay applied. `band` is one of the C22 band ids.
 - `scheme` and `rationale` are filled by R-23a; null in hand-built lines.
+- The draft schema (`overlay_draft`) takes `schema_version` 2 with the
+  overlay, since it changed too; a draft may leave the key out.
 - Migration `overlay` 1 → 2 (R-24, through the R-17a runner) adds
   `provenance: null` to every line. It changes the document, so an
   approved overlay loses its approval; the migration's report lists
@@ -2038,34 +2043,63 @@ GRACE_DAYS = 10
 
 coach.validity.band_for(days_off) -> Band
 coach.validity.interval_days(exposures) -> int     # median of the last ≤4 gaps, clamped 7..14; 7 with <2 gaps
-coach.validity.days_off(root, exercise_id, session_date) -> int
-#   = max(layoff_days, exposure_age − interval_days)
+coach.validity.days_off(root, exercise_id, session_date) -> int | None
+#   = max(layoff_days, exposure_age − interval_days), never below 0; None with no lifting workout and no exposure
 #   layoff_days  = session_date − last_lifting_date(before=session_date)   (R-02: any lifting workout)
-#   exposure_age = session_date − date of the newest non-excluded exposure of the exercise (any slot)
-coach.validity.window_ok(...) -> bool               # exposure_age ≤ interval_days + GRACE_DAYS
+#   exposure_age = session_date − date of the newest non-excluded exposure of the exercise (any slot; suspect counts)
+coach.validity.window_ok(exposure_age, interval) -> bool   # exposure_age ≤ interval_days + GRACE_DAYS
 coach.validity.check_overlay(root, doc) -> list[flag]
+coach.validity.report(root, doc, config=None) -> {"flags": [...], "lines": [...]}   # what the command prints
+coach.validity.merge_flags(doc, flags), unresolved_blocks(doc, flags), fill_provenance(doc, lines)
 coach.validity.estimate_minutes(root, session) -> int
 ```
 
 - **Valid line**: `days_off` falls in band `0-10`, or the line's
   `provenance.decay.band` equals `band_for(days_off)` and its working
   load is at most the derived-from load × `load_factor` (plus one
-  increment for rounding). Anything else is `stale_prescription`.
+  increment for rounding). Anything else is `stale_prescription`. An
+  exercise with no exposure (first time, start load) is never stale.
+  A decayed line of an exercise that has exposures is stale when its
+  `derived_from` is null, names a workout the history doesn't hold, or
+  names a `suspect` exposure (C17): its load and sets can't be checked.
 - Days off are measured to the line's session date. The band's set and
-  RPE parts are checked as well as the load.
+  RPE parts are checked as well as the load: at most `max(1, n +
+  set_delta)` working sets, `n` being the derived-from exposure's
+  working sets, and every working set at or under `rpe_cap` when the
+  band has one. Loads compared are the coaching number (C18), the top
+  working load on each side.
+- A line with a `no_data` flag (C10) gets no R-24 flag but
+  `load_mode_mismatch`.
 - Illness (R-02): when an `ill` miss annotation or an `ill` status day
   (C50; `coach.statusdays.ill_in(root, span)`, added by R-43) falls in the
   gap, the first session of the span must cap every set at RPE 7; R-23a
-  applies it and raises `return_after_illness`; R-24 checks it.
+  applies it and raises `return_after_illness`; R-24 checks it and
+  raises `stale_prescription` on each line of that session with a
+  working set over RPE 7 or without an RPE. The gap runs from the day
+  after the last lifting workout to the day before that session.
+  R-24 reads `coach.statusdays` only once R-43 has added it.
 - **Feasibility** uses C18's `implied_rpe` with the best e1RM point in
-  the last 42 days (none older): implied RPE above 10.5 is
-  `unearned_load`; an RPE target more than 1 from the implied RPE is
-  `rpe_infeasible`.
+  the 42 days before the session date (none older): implied RPE above
+  10.5 is `unearned_load`; otherwise an RPE target more than 1 from the
+  implied RPE is `rpe_infeasible`. Only working sets of `total`,
+  `per_hand_x2` and `single_implement` lines are judged this way; a rep
+  range is judged at its start. With no e1RM point (and for
+  `bodyweight` lines, whose added load has no e1RM), a top working load
+  more than two increments (`Library.increment`, else the equipment
+  increment) above the newest exposure neither excluded nor `suspect`
+  is `unearned_load`. `assisted`
+  lines are not judged.
 - **Duration estimate** per session: Σ over sets of (reps × 4 s, or
   `duration_seconds`) + `rest_seconds` between sets, + 60 s per exercise,
   + 300 s warm-up; scaled by the median of actual ÷ estimated minutes over
   the session's last four logged workouts (when two or more exist),
-  clamped 0.7 to 1.5. Above the C19 cap is `session_over_cap`.
+  clamped 0.7 to 1.5. Above the C19 cap is `session_over_cap`. A rep
+  range counts its end. A logged workout is estimated from its logged
+  sets with the overlay session's rest for each exercise (the mean of
+  its rests for an exercise it lacks). The session's logged workouts
+  are those carrying its `session_id` or one of its routines (its
+  `hevy_routine_id`, or a routine `data/state.json` maps to it), dated
+  before it. Every constant here is a heuristic, not a measured value.
 - **Equipment** comes from `coach.config.equipment_for(config,
   location)` (C54) with the overlay session's `location`.
 - **Caps** follow the R-16 `load_caps` rule exactly: `[caps]` id first,
@@ -2073,17 +2107,28 @@ coach.validity.estimate_minutes(root, session) -> int
 - **Representable**: barbell totals have a `units.plate_breakdown`;
   per-hand loads are in `dumbbells` when that list is non-empty (C4;
   empty means not checked, since racks are not regular multiples of one
-  increment). Machine and cable loads are not checked.
+  increment). Which applies follows the library entry's `equipment`:
+  `barbell` with `total`, `dumbbell` with a per-hand mode. Other
+  equipment (machine, cable, kettlebell, other bars) is not checked. A
+  load already over its cap is flagged `load_cap` only.
 - `load_mode_mismatch` reuses R-13's `overlay.validate` and R-11's
   `effective_load_mode`; R-24 adds no new arithmetic.
 
 `prescription check (--overlay ID | --file PATH) [--write] [--dry-run]`
-returns `data.flags` and per-line `days_off`, `band`, `derived_from`.
-`--write` merges its flags into the overlay (replacing earlier R-24 flags,
-keeping `resolved` and `resolution` on identical ones) and fills inferred
-provenance; it refuses (exit 3) on an approved overlay. Check
-`prescription_valid`: overlays in force today or later have no unresolved
-R-24 `block` finding (fail).
+returns `data.flags`, `data.summary` (counts by severity) and
+`data.lines`, one per line: `session_id`, `date`, `exercise_id`,
+`days_off`, `band`, `derived_from` and `inferred`. It exits 0 whatever
+it finds. `--file` takes an overlay or an overlay draft; a draft is
+built in memory, as `overlay build` would, and never written. A schema
+problem exits 1; load arithmetic problems become `load_mode_mismatch`
+flags. `--write` takes `--overlay` only (exit 2 otherwise); it merges
+its flags into the overlay (replacing earlier R-24 flags, keeping
+`resolved` and `resolution` on identical ones, which match on code,
+severity, session, exercise and message) and fills inferred provenance;
+it refuses (exit 3) on an overlay with any `approval`. Check
+`prescription_valid`: overlays in force on some day from today on have
+no R-24 `block` finding that the overlay does not hold as an identical,
+resolved flag (fail).
 
 ## C23. Plugin contract (R-23a; R-23b, R-30a, R-31, R-41b, R-43, R-44a, R-44b read)
 

@@ -30,7 +30,7 @@ _ID = re.compile(r"^\d{4}-\d{2}-\d{2}-[a-z0-9-]+$")
 _LOAD_FIELDS = ("mode", "unit", "per_hand", "hevy_total", "hevy_kg")
 _LINE_DEFAULTS = {
     "hevy_template_id": None, "rest_seconds": None, "superset_id": None, "cues": None, "focus": None,
-    "target_note": None, "change": None,
+    "target_note": None, "change": None, "provenance": None,
 }
 
 

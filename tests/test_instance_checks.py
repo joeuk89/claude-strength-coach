@@ -148,7 +148,7 @@ class SchemaVersionsTest(unittest.TestCase):
         self.assertEqual(code, 1)
         [row] = failures(results, "schema_versions")
         self.assertEqual(row["path"], OVERLAY)
-        self.assertIn("schema_version 2", row["message"])
+        self.assertIn("schema_version 3", row["message"])
         self.assertIn("run /framework-sync", row["message"])
 
     def test_older_overlay_says_migrate_run(self):

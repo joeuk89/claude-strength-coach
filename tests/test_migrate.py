@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest import mock
 
-from coach import jsonio, migrate
+from coach import jsonio, migrate, overlay
 from tests.support import REPO_ROOT, VALID, run_cli
 from tests.test_cli import EnvelopeMixin
 from tests.test_program import Instance
@@ -17,10 +17,12 @@ from tests.test_program import Instance
 OVERLAY = "data/overlays/2026-10-12-weekly.json"
 NOW = {"COACH_NOW": "2026-10-11T18:00:00Z"}
 BACKUP = ".coach/backups/20261011T180000Z"
-ADD_NOTE = """
+CURRENT = overlay.current_version()
+NEXT = CURRENT + 1
+ADD_NOTE = f"""
     DOC = "overlay"
-    FROM = 1
-    TO = 2
+    FROM = {CURRENT}
+    TO = {NEXT}
 
 
     def migrate(doc):
@@ -29,12 +31,12 @@ ADD_NOTE = """
 
 
     def notes(before, after):
-        return [f"{before['id']}: note added"]
+        return [f"{{before['id']}}: note added"]
 """
-BREAK_KIND = """
+BREAK_KIND = f"""
     DOC = "overlay"
-    FROM = 1
-    TO = 2
+    FROM = {CURRENT}
+    TO = {NEXT}
 
 
     def migrate(doc):
@@ -44,9 +46,9 @@ BREAK_KIND = """
 
 
 class TempRegistry:
-    """A migrations package and schema directory in a temp dir, with overlay at v2."""
+    """A migrations package and schema directory in a temp dir, with overlay one version past the current."""
 
-    def __init__(self, steps=None, target=2, files=("data/overlays/*.json",)):
+    def __init__(self, steps=None, target=NEXT, files=("data/overlays/*.json",)):
         self._tmp = tempfile.TemporaryDirectory()
         base = Path(self._tmp.name)
         self.package = base / "migrations"
@@ -95,16 +97,16 @@ class DiscoveryTest(unittest.TestCase):
     def test_steps_load_from_a_package(self):
         with TempRegistry() as reg:
             steps = reg.documents["overlay"].steps
-        self.assertEqual([(s.name, s.from_version, s.to_version) for s in steps], [("overlay/0001_add_note", 1, 2)])
+        self.assertEqual([(s.name, s.from_version, s.to_version) for s in steps], [("overlay/0001_add_note", CURRENT, NEXT)])
 
-    def assert_discovery_fails(self, steps, text, target=2):
+    def assert_discovery_fails(self, steps, text, target=NEXT):
         with self.assertRaises(migrate.RegistryError) as caught:
             with TempRegistry(steps, target=target):
                 pass
         self.assertIn(text, str(caught.exception))
 
     def test_a_step_must_add_one_version(self):
-        self.assert_discovery_fails({"0001_jump.py": ADD_NOTE.replace("TO = 2", "TO = 3")}, "FROM + 1", target=3)
+        self.assert_discovery_fails({"0001_jump.py": ADD_NOTE.replace(f"TO = {NEXT}", f"TO = {NEXT + 1}")}, "FROM + 1", target=NEXT + 1)
 
     def test_doc_must_match_its_directory(self):
         self.assert_discovery_fails({"0001_x.py": ADD_NOTE.replace('DOC = "overlay"', 'DOC = "program"')},
@@ -114,7 +116,7 @@ class DiscoveryTest(unittest.TestCase):
         self.assert_discovery_fails({"0001_a.py": ADD_NOTE, "0002_b.py": ADD_NOTE}, "two steps")
 
     def test_step_past_the_schema_version(self):
-        self.assert_discovery_fails({"0001_a.py": ADD_NOTE}, "schema", target=1)
+        self.assert_discovery_fails({"0001_a.py": ADD_NOTE}, "schema", target=CURRENT)
 
     def test_step_file_name(self):
         self.assert_discovery_fails({"add_note.py": ADD_NOTE}, "NNNN_")
@@ -124,7 +126,7 @@ class StatusAndPlanTest(unittest.TestCase):
     def test_status_on_the_valid_instance(self):
         rows = migrate.status(VALID)
         paths = {row["path"]: row for row in rows}
-        expected = {"data/program.json": 1, "data/state.json": 2, "data/exercises.json": 1, OVERLAY: 1}
+        expected = {"data/program.json": 1, "data/state.json": 2, "data/exercises.json": 1, OVERLAY: 2}
         for path, version in expected.items():
             with self.subTest(path=path):
                 self.assertEqual(paths[path]["version"], version)
@@ -135,16 +137,16 @@ class StatusAndPlanTest(unittest.TestCase):
         with TempRegistry() as reg:
             entries, problems = migrate.plan(VALID, reg)
         self.assertEqual(problems, [])
-        self.assertEqual(entries, [{"path": OVERLAY, "doc": "overlay", "from": 1, "to": 2,
+        self.assertEqual(entries, [{"path": OVERLAY, "doc": "overlay", "from": CURRENT, "to": NEXT,
                                     "steps": ["overlay/0001_add_note"]}])
 
     def test_a_missing_step_is_a_problem(self):
-        step = ADD_NOTE.replace("FROM = 1", "FROM = 2").replace("TO = 2", "TO = 3")
-        with TempRegistry({"0002_later.py": step}, target=3) as reg:
+        step = ADD_NOTE.replace(f"FROM = {CURRENT}", f"FROM = {NEXT}").replace(f"TO = {NEXT}", f"TO = {NEXT + 1}")
+        with TempRegistry({"0002_later.py": step}, target=NEXT + 1) as reg:
             entries, problems = migrate.plan(VALID, reg)
         self.assertEqual(entries, [])
         self.assertEqual(problems[0]["path"], OVERLAY)
-        self.assertIn("no step from version 1", problems[0]["message"])
+        self.assertIn(f"no step from version {CURRENT}", problems[0]["message"])
 
     def test_a_newer_file_is_a_problem(self):
         with Instance() as root:
@@ -164,7 +166,7 @@ class RunTest(unittest.TestCase):
             report = migrate.run(root, dry_run=False, now=datetime(2026, 10, 11, 18, tzinfo=timezone.utc), reg=reg)
             self.assertEqual((root / BACKUP / OVERLAY).read_bytes(), original)
             upgraded = json.loads((root / OVERLAY).read_text(encoding="utf-8"))
-        self.assertEqual(upgraded["schema_version"], 2)
+        self.assertEqual(upgraded["schema_version"], NEXT)
         self.assertIsNone(upgraded["note"])
         self.assertEqual(report["backup"], BACKUP)
         self.assertEqual(report["notes"], ["2026-10-12-weekly: note added"])
@@ -186,14 +188,14 @@ class MigrateCommandTest(EnvelopeMixin, unittest.TestCase):
         data = self.run_ok("--root", str(VALID), "migrate", "status")
         listed = {row["path"]: (row["version"], row["target"]) for row in data["files"]}
         self.assertEqual(listed["data/program.json"], (1, 1))
-        self.assertEqual(listed[OVERLAY], (1, 1))
+        self.assertEqual(listed[OVERLAY], (CURRENT, CURRENT))
         self.assertEqual(data["behind"], 0)
 
     def test_status_with_a_pending_step(self):
         with TempRegistry() as reg:
             data = self.run_with(reg, 0, "--root", str(VALID), "migrate", "status")
         row = next(r for r in data["files"] if r["path"] == OVERLAY)
-        self.assertEqual((row["version"], row["target"], row["state"]), (1, 2, "behind"))
+        self.assertEqual((row["version"], row["target"], row["state"]), (CURRENT, NEXT, "behind"))
         self.assertEqual(data["behind"], 1)
 
     def test_dry_run_lists_the_step_and_changes_nothing(self):
@@ -215,7 +217,7 @@ class MigrateCommandTest(EnvelopeMixin, unittest.TestCase):
             staged = git(root, "diff", "--cached", "--name-only").split()
             commits = git(root, "rev-list", "--count", "HEAD").strip()
             self.assertEqual((root / BACKUP / OVERLAY).read_bytes(), original)
-            self.assertEqual(json.loads((root / OVERLAY).read_text(encoding="utf-8"))["schema_version"], 2)
+            self.assertEqual(json.loads((root / OVERLAY).read_text(encoding="utf-8"))["schema_version"], NEXT)
         self.assertEqual(staged, [OVERLAY])
         self.assertEqual(commits, "1")
         self.assertEqual(data["staged"], [OVERLAY])

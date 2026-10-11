@@ -27,6 +27,26 @@ One logged instance of a single exercise on a given date. Prescriptions
 are derived from exposures and go stale when the exposure is old.
 _Avoid_: attempt, data point
 
+**Validity window**:
+How long an exercise's newest exposure keeps its prescription current:
+the exercise's usual gap between exposures plus a short grace period.
+Past it, the line must step back by its return band.
+_Avoid_: freshness, expiry
+
+**Return band**:
+The step back a lift takes after time off, picked by its days off (the
+longer of the layoff and how far its newest exposure is past its usual
+gap): a load cut, one working set fewer and, after the longest gaps, an
+RPE cap. The bands are set out once, in `CLAUDE.md` "Coaching
+principles".
+_Avoid_: decay level, detraining band
+
+**Provenance**:
+What an overlay line was derived from: the exposure, the progression
+scheme, any return-band decay and the reason. A line the coach wrote by
+hand gets the exposure inferred and marked as inferred.
+_Avoid_: source, origin, derivation
+
 **Dose**:
 What was delivered, not what was planned: sets actually trained, counted
 per muscle group and per week. Programs are sized to dose.
