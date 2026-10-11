@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "annotations": [
+    {
+      "id": "a-0001",
+      "kind": "external",
+      "created_at": "2026-09-06T18:00:00Z",
+      "source": "check-in 2026-09-06",
+      "reason": null,
+      "date": "2026-09-01",
+      "external_id": "pt-tue",
+      "done": true,
+      "note": "chest and back"
+    },
+    {
+      "id": "a-0002",
+      "kind": "external",
+      "created_at": "2026-09-13T18:00:00Z",
+      "source": "check-in 2026-09-13",
+      "reason": null,
+      "date": "2026-09-08",
+      "external_id": "pt-tue",
+      "done": true,
+      "note": "chest and back"
+    },
+    {
+      "id": "a-0003",
+      "kind": "miss",
+      "created_at": "2026-09-20T18:00:00Z",
+      "source": "check-in 2026-09-20",
+      "reason": null,
+      "date": "2026-09-17",
+      "session_id": "session-b",
+      "tag": "time"
+    },
+    {
+      "id": "a-0004",
+      "kind": "external",
+      "created_at": "2026-09-20T18:00:00Z",
+      "source": "check-in 2026-09-20",
+      "reason": null,
+      "date": "2026-09-15",
+      "external_id": "pt-tue",
+      "done": false,
+      "note": "cancelled"
+    },
+    {
+      "id": "a-0005",
+      "kind": "external",
+      "created_at": "2026-09-27T18:00:00Z",
+      "source": "check-in 2026-09-27",
+      "reason": null,
+      "date": "2026-09-22",
+      "external_id": "pt-tue",
+      "done": true,
+      "note": "chest and back"
+    },
+    {
+      "id": "a-0006",
+      "kind": "external",
+      "created_at": "2026-10-04T18:00:00Z",
+      "source": "check-in 2026-10-04",
+      "reason": null,
+      "date": "2026-09-29",
+      "external_id": "pt-tue",
+      "done": false,
+      "note": "cancelled"
+    },
+    {
+      "id": "a-0007",
+      "kind": "miss",
+      "created_at": "2026-10-11T18:00:00Z",
+      "source": "check-in 2026-10-11",
+      "reason": null,
+      "date": "2026-10-08",
+      "session_id": "session-b",
+      "tag": "sleep"
+    },
+    {
+      "id": "a-0008",
+      "kind": "external",
+      "created_at": "2026-10-11T18:00:00Z",
+      "source": "check-in 2026-10-11",
+      "reason": null,
+      "date": "2026-10-06",
+      "external_id": "pt-tue",
+      "done": true,
+      "note": "chest and back"
+    }
+  ]
+}

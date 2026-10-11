@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "month": "2026-08",
+  "workouts": [
+    {
+      "workout_id": "10000000-0000-4000-8000-000000000301",
+      "source": "hevy",
+      "source_version": "2026-08-31T19:00:05Z",
+      "hevy_updated_at": "2026-08-31T19:00:05Z",
+      "resolved_at": "2026-10-11T18:00:00Z",
+      "date": "2026-08-31",
+      "start_time": "2026-08-31T18:00:00Z",
+      "end_time": "2026-08-31T19:00:00Z",
+      "duration_minutes": 60,
+      "title": "Session A",
+      "description": "",
+      "routine_id": "00000000-0000-4000-8000-000000000001",
+      "session_id": "session-a",
+      "overlay_id": "2026-08-31-weekly",
+      "exercises": [
+        {
+          "exercise_id": "bb_back_squat",
+          "title": "Squat (Barbell)",
+          "hevy_template_id": "F0000001",
+          "load_mode": "total",
+          "load_mode_source": "overlay",
+          "notes": "",
+          "sets": [
+            {
+              "index": 0,
+              "type": "normal",
+              "reps": 5,
+              "rpe": 7,
+              "weight_kg": 95.0,
+              "load": {
+                "mode": "total",
+                "unit": "kg",
+                "per_hand": null,
+                "hevy_total": 95,
+                "hevy_kg": 95
+              },
+              "duration_seconds": null,
+              "distance_meters": null
+            },
+            {
+              "index": 1,
+              "type": "normal",
+              "reps": 5,
+              "rpe": 7,
+              "weight_kg": 95.0,
+              "load": {
+                "mode": "total",
+                "unit": "kg",
+                "per_hand": null,
+                "hevy_total": 95,
+                "hevy_kg": 95
+              },
+              "duration_seconds": null,
+              "distance_meters": null
+            },
+            {
+              "index": 2,
+              "type": "normal",
+              "reps": 5,
+              "rpe": 7,
+              "weight_kg": 95.0,
+              "load": {
+                "mode": "total",
+                "unit": "kg",
+                "per_hand": null,
+                "hevy_total": 95,
+                "hevy_kg": 95
+              },
+              "duration_seconds": null,
+              "distance_meters": null
+            }
+          ]
+        },
+        {
+          "exercise_id": "db_bench_press",
+          "title": "Bench Press (Dumbbell)",
+          "hevy_template_id": "F0000002",
+          "load_mode": "per_hand_x2",
+          "load_mode_source": "overlay",
+          "notes": "",
+          "sets": [
+            {
+              "index": 0,
+              "type": "normal",
+              "reps": 10,
+              "rpe": 8,
+              "weight_kg": 45.0,
+              "load": {
+                "mode": "per_hand_x2",
+                "unit": "kg",
+                "per_hand": 22.5,
+                "hevy_total": 45,
+                "hevy_kg": 45
+              },
+              "duration_seconds": null,
+              "distance_meters": null
+            },
+            {
+              "index": 1,
+              "type": "normal",
+              "reps": 10,
+              "rpe": 8,
+              "weight_kg": 45.0,
+              "load": {
+                "mode": "per_hand_x2",
+                "unit": "kg",
+                "per_hand": 22.5,
+                "hevy_total": 45,
+                "hevy_kg": 45
+              },
+              "duration_seconds": null,
+              "distance_meters": null
+            },
+            {
+              "index": 2,
+              "type": "normal",
+              "reps": 10,
+              "rpe": 8,
+              "weight_kg": 45.0,
+              "load": {
+                "mode": "per_hand_x2",
+                "unit": "kg",
+                "per_hand": 22.5,
+                "hevy_total": 45,
+                "hevy_kg": 45
+              },
+              "duration_seconds": null,
+              "distance_meters": null
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

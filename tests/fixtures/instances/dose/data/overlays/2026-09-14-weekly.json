@@ -1,0 +1,278 @@
+{
+  "schema_version": 2,
+  "id": "2026-09-14-weekly",
+  "kind": "weekly",
+  "created_at": "2026-09-13T19:00:00Z",
+  "span": {
+    "start": "2026-09-14",
+    "end": "2026-09-20"
+  },
+  "supersedes": null,
+  "focus": "Steady week.",
+  "flags": [],
+  "approval": {
+    "approved_at": "2026-09-13T19:00:00Z",
+    "hash": "sha256:d50559d68b86f3bff4b3e1c9708bbfd418c9ed58c932f81e261efd189530e9d5"
+  },
+  "sessions": [
+    {
+      "session_id": "session-a",
+      "date": "2026-09-14",
+      "title": "Session A",
+      "hevy_routine_id": "00000000-0000-4000-8000-000000000001",
+      "temporary": false,
+      "location": null,
+      "focus": null,
+      "exercises": [
+        {
+          "exercise_id": "bb_back_squat",
+          "hevy_template_id": "F0000001",
+          "load_mode": "total",
+          "rest_seconds": 180,
+          "superset_id": null,
+          "cues": "brace · knees out",
+          "focus": null,
+          "target_note": "add 2.5 from last week",
+          "change": "97.5 → 100",
+          "provenance": null,
+          "override": null,
+          "sets": [
+            {
+              "type": "warmup",
+              "reps": 5,
+              "rpe": null,
+              "load": {
+                "mode": "total",
+                "unit": "kg",
+                "per_hand": null,
+                "hevy_total": 60,
+                "hevy_kg": 60
+              }
+            },
+            {
+              "type": "normal",
+              "reps": 5,
+              "rpe": 7,
+              "load": {
+                "mode": "total",
+                "unit": "kg",
+                "per_hand": null,
+                "hevy_total": 100,
+                "hevy_kg": 100
+              }
+            },
+            {
+              "type": "normal",
+              "reps": 5,
+              "rpe": 7,
+              "load": {
+                "mode": "total",
+                "unit": "kg",
+                "per_hand": null,
+                "hevy_total": 100,
+                "hevy_kg": 100
+              }
+            },
+            {
+              "type": "normal",
+              "reps": 5,
+              "rpe": 7,
+              "load": {
+                "mode": "total",
+                "unit": "kg",
+                "per_hand": null,
+                "hevy_total": 100,
+                "hevy_kg": 100
+              }
+            }
+          ]
+        },
+        {
+          "exercise_id": "db_bench_press",
+          "hevy_template_id": "F0000002",
+          "load_mode": "per_hand_x2",
+          "rest_seconds": 120,
+          "superset_id": null,
+          "cues": "elbows tucked · feet planted",
+          "focus": "pause 1 s on the chest",
+          "target_note": null,
+          "change": "22.5 → 25/hand",
+          "provenance": null,
+          "override": null,
+          "sets": [
+            {
+              "type": "warmup",
+              "reps": 10,
+              "rpe": null,
+              "load": {
+                "mode": "per_hand_x2",
+                "unit": "kg",
+                "per_hand": 12.5,
+                "hevy_total": 25,
+                "hevy_kg": 25
+              }
+            },
+            {
+              "type": "normal",
+              "rep_range": {
+                "start": 8,
+                "end": 10
+              },
+              "rpe": 8,
+              "load": {
+                "mode": "per_hand_x2",
+                "unit": "kg",
+                "per_hand": 25,
+                "hevy_total": 50,
+                "hevy_kg": 50
+              }
+            },
+            {
+              "type": "normal",
+              "rep_range": {
+                "start": 8,
+                "end": 10
+              },
+              "rpe": 8,
+              "load": {
+                "mode": "per_hand_x2",
+                "unit": "kg",
+                "per_hand": 25,
+                "hevy_total": 50,
+                "hevy_kg": 50
+              }
+            },
+            {
+              "type": "normal",
+              "rep_range": {
+                "start": 8,
+                "end": 10
+              },
+              "rpe": 8,
+              "load": {
+                "mode": "per_hand_x2",
+                "unit": "kg",
+                "per_hand": 25,
+                "hevy_total": 50,
+                "hevy_kg": 50
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "session_id": "session-b",
+      "date": "2026-09-17",
+      "title": "Session B",
+      "hevy_routine_id": "00000000-0000-4000-8000-000000000002",
+      "temporary": false,
+      "location": null,
+      "focus": null,
+      "exercises": [
+        {
+          "exercise_id": "db_single_arm_row",
+          "hevy_template_id": "F0000003",
+          "load_mode": "single_implement",
+          "rest_seconds": 90,
+          "superset_id": null,
+          "cues": "pull to the hip",
+          "focus": null,
+          "target_note": null,
+          "change": null,
+          "provenance": null,
+          "override": null,
+          "sets": [
+            {
+              "type": "normal",
+              "reps": 10,
+              "rpe": 8,
+              "load": {
+                "mode": "single_implement",
+                "unit": "kg",
+                "per_hand": 30,
+                "hevy_total": 30,
+                "hevy_kg": 30
+              }
+            },
+            {
+              "type": "normal",
+              "reps": 10,
+              "rpe": 8,
+              "load": {
+                "mode": "single_implement",
+                "unit": "kg",
+                "per_hand": 30,
+                "hevy_total": 30,
+                "hevy_kg": 30
+              }
+            },
+            {
+              "type": "normal",
+              "reps": 10,
+              "rpe": 8,
+              "load": {
+                "mode": "single_implement",
+                "unit": "kg",
+                "per_hand": 30,
+                "hevy_total": 30,
+                "hevy_kg": 30
+              }
+            }
+          ]
+        },
+        {
+          "exercise_id": "pull_up",
+          "hevy_template_id": "F0000004",
+          "load_mode": "bodyweight",
+          "rest_seconds": 120,
+          "superset_id": null,
+          "cues": "full hang at the bottom",
+          "focus": null,
+          "target_note": null,
+          "change": null,
+          "provenance": null,
+          "override": null,
+          "sets": [
+            {
+              "type": "normal",
+              "reps": 8,
+              "rpe": 8,
+              "load": {
+                "mode": "bodyweight",
+                "unit": "kg",
+                "per_hand": null,
+                "hevy_total": 0,
+                "hevy_kg": 0
+              }
+            },
+            {
+              "type": "normal",
+              "reps": 8,
+              "rpe": 8,
+              "load": {
+                "mode": "bodyweight",
+                "unit": "kg",
+                "per_hand": null,
+                "hevy_total": 0,
+                "hevy_kg": 0
+              }
+            },
+            {
+              "type": "normal",
+              "reps": 8,
+              "rpe": 8,
+              "load": {
+                "mode": "bodyweight",
+                "unit": "kg",
+                "per_hand": null,
+                "hevy_total": 0,
+                "hevy_kg": 0
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
