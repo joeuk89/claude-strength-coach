@@ -1,0 +1,126 @@
+{
+  "title": "Overlay: the per-exercise prescription in force for a span of days (contract C10)",
+  "type": "object",
+  "required": ["schema_version", "id", "kind", "created_at", "span", "supersedes", "focus", "flags", "approval", "sessions"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": 1},
+    "id": {"$ref": "#/$defs/overlay_id"},
+    "kind": {"enum": ["weekly", "midweek", "deload", "one_off"]},
+    "created_at": {"$ref": "#/$defs/timestamp"},
+    "span": {"$ref": "#/$defs/span"},
+    "supersedes": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}-[a-z0-9-]+$"},
+    "focus": {"$ref": "#/$defs/text"},
+    "flags": {"type": "array", "items": {"$ref": "#/$defs/flag"}},
+    "approval": {
+      "type": ["object", "null"],
+      "required": ["approved_at", "hash"],
+      "additionalProperties": false,
+      "properties": {
+        "approved_at": {"$ref": "#/$defs/timestamp"},
+        "hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "sessions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/session"}}
+  },
+  "$defs": {
+    "overlay_id": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}-[a-z0-9-]+$"},
+    "date": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+    "timestamp": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"},
+    "text": {"type": "string", "pattern": "\\S"},
+    "optional_text": {"type": ["string", "null"], "pattern": "\\S"},
+    "span": {
+      "type": "object",
+      "required": ["start", "end"],
+      "additionalProperties": false,
+      "properties": {"start": {"$ref": "#/$defs/date"}, "end": {"$ref": "#/$defs/date"}}
+    },
+    "flag": {
+      "type": "object",
+      "required": ["code", "severity", "session_id", "exercise_id", "message", "resolved", "resolution"],
+      "additionalProperties": false,
+      "properties": {
+        "code": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+        "severity": {"enum": ["info", "warn", "block"]},
+        "session_id": {"type": ["string", "null"], "pattern": "^[a-z0-9-]+$"},
+        "exercise_id": {"type": ["string", "null"], "pattern": "^[a-z0-9_]+$"},
+        "message": {"$ref": "#/$defs/text"},
+        "resolved": {"type": "boolean"},
+        "resolution": {"$ref": "#/$defs/optional_text"}
+      }
+    },
+    "session": {
+      "type": "object",
+      "required": ["session_id", "date", "title", "hevy_routine_id", "temporary", "location", "focus", "exercises"],
+      "additionalProperties": false,
+      "properties": {
+        "session_id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+        "date": {"$ref": "#/$defs/date"},
+        "title": {"$ref": "#/$defs/text"},
+        "hevy_routine_id": {"$ref": "#/$defs/optional_text"},
+        "temporary": {"type": "boolean"},
+        "location": {"type": ["string", "null"], "pattern": "^[a-z0-9-]+$"},
+        "focus": {"$ref": "#/$defs/optional_text"},
+        "exercises": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/exercise"}}
+      }
+    },
+    "exercise": {
+      "type": "object",
+      "required": ["exercise_id", "hevy_template_id", "load_mode", "rest_seconds", "superset_id", "cues", "focus",
+                   "target_note", "change", "override", "sets"],
+      "additionalProperties": false,
+      "properties": {
+        "exercise_id": {"type": "string", "pattern": "^[a-z0-9_]+$"},
+        "hevy_template_id": {"$ref": "#/$defs/optional_text"},
+        "load_mode": {"enum": ["total", "per_hand_x2", "single_implement", "bodyweight", "assisted", "band", "duration", "distance"]},
+        "rest_seconds": {"type": ["integer", "null"], "minimum": 0},
+        "superset_id": {"type": ["integer", "null"], "minimum": 0},
+        "cues": {"$ref": "#/$defs/optional_text"},
+        "focus": {"$ref": "#/$defs/optional_text"},
+        "target_note": {"$ref": "#/$defs/optional_text"},
+        "change": {"$ref": "#/$defs/optional_text"},
+        "override": {
+          "type": ["object", "null"],
+          "required": ["reason", "proposed_sets"],
+          "additionalProperties": false,
+          "properties": {
+            "reason": {"$ref": "#/$defs/text"},
+            "proposed_sets": {"type": "array", "items": {"$ref": "#/$defs/set"}}
+          }
+        },
+        "sets": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/set"}}
+      }
+    },
+    "set": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {"enum": ["normal", "warmup", "dropset", "failure"]},
+        "reps": {"type": ["integer", "null"], "minimum": 1},
+        "rep_range": {
+          "type": ["object", "null"],
+          "required": ["start", "end"],
+          "additionalProperties": false,
+          "properties": {"start": {"type": "integer", "minimum": 1}, "end": {"type": "integer", "minimum": 1}}
+        },
+        "rpe": {"type": ["number", "null"], "minimum": 1, "maximum": 10},
+        "load": {"$ref": "#/$defs/load"},
+        "duration_seconds": {"type": ["integer", "null"], "minimum": 1},
+        "distance_meters": {"type": ["number", "null"], "minimum": 0}
+      }
+    },
+    "load": {
+      "type": ["object", "null"],
+      "required": ["mode", "unit", "per_hand", "hevy_total", "hevy_kg"],
+      "additionalProperties": false,
+      "properties": {
+        "mode": {"enum": ["total", "per_hand_x2", "single_implement", "bodyweight", "assisted"]},
+        "unit": {"enum": ["kg", "lb"]},
+        "per_hand": {"type": ["number", "null"], "minimum": 0},
+        "hevy_total": {"type": "number", "minimum": 0},
+        "hevy_kg": {"type": "number", "minimum": 0}
+      }
+    }
+  }
+}
