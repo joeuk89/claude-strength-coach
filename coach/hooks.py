@@ -27,14 +27,14 @@ _ACTIVITY_CHECKS = ("activity_records_valid", "activity_wellness_location")
 _RESEARCH_CHECKS = ("research_notes", "research_render_fresh")
 
 PATH_MAP = (
-    ("config.toml", ("config",)),
+    ("config.toml", ("config", "nutrition_template")),
     ("profile.md", ("bare_hevy_values", "research_citations")),
-    ("data/exercises.json", ("library_valid", "load_modes_confirmed")),
+    ("data/exercises.json", ("library_valid", "load_modes_confirmed", "overlay_library_consistency")),
     ("data/program.json", _PROGRAM_CHECKS),
     ("data/state.json", _PROGRAM_CHECKS),
     ("routine/*.md", ("routine_render_fresh",)),
     ("data/overlays/*.json", ("overlay_schema", "overlay_arithmetic", "overlay_render_fresh", "load_caps",
-                              "dangling_exercise_ids")),
+                              "dangling_exercise_ids", "dangling_routine_ids", "overlay_library_consistency")),
     ("data/hevy/writes.jsonl", ("schema_versions",)),
     ("check-ins/*.md", ("overlay_render_fresh", "bare_hevy_values", "research_citations")),
     ("data/activity/activities.jsonl", _ACTIVITY_CHECKS),
@@ -46,7 +46,7 @@ PATH_MAP = (
     ("data/nutrition/plans/*.json", ("meal_plans", "meal_plan_render_fresh")),
     ("nutrition/plans/*.md", ("meal_plan_render_fresh",)),
     ("nutrition/menu/index.md", ("recipe_index_fresh",)),
-    ("nutrition/menu/*.md", ("recipe_cards", "recipe_render_fresh", "recipe_index_fresh")),
+    ("nutrition/menu/*.md", ("recipe_cards", "recipe_render_fresh", "recipe_index_fresh", "nutrition_template")),
     ("research/local/*.md", _RESEARCH_CHECKS + ("research_citations",)),
     ("research/*.md", _RESEARCH_CHECKS),
 )

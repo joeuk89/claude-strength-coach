@@ -4682,8 +4682,8 @@ rule (hooks run outside the permission layer); `status` gets one. R-15's
   In the template repo it prints nothing. On any failure, including
   Python older than 3.11, it prints one line saying the coach scripts
   are unavailable and why. `coach/__main__.py` answers both hook
-  commands under an old Python (sessionstart: that line; posttooluse:
-  nothing) and exits 0.
+  commands under an old Python, or when the CLI fails before the hook
+  runs (sessionstart: that line; posttooluse: nothing), and exits 0.
 - **`hooks posttooluse`** (matcher `Write|Edit`; hand edits only, since
   `coach` commands validate their own output). Reads
   `tool_input.file_path`, makes it relative to the root (it may arrive
@@ -4691,11 +4691,11 @@ rule (hooks run outside the permission layer); `status` gets one. R-15's
 
   | Path | Checks run (`check --only`) |
   |---|---|
-  | `config.toml` | config |
-  | `data/exercises.json` | R-11's library checks |
+  | `config.toml` | config, `nutrition_template` |
+  | `data/exercises.json` | R-11's library checks, `overlay_library_consistency` |
   | `data/program.json`, `data/state.json` | R-17a's program and state checks |
   | `routine/*.md` | `routine_render_fresh` |
-  | `data/overlays/*.json` | R-13's overlay checks, `load_caps`, `dangling_exercise_ids` |
+  | `data/overlays/*.json` | R-13's overlay checks, `load_caps`, `dangling_exercise_ids`, `dangling_routine_ids`, `overlay_library_consistency` |
   | `check-ins/*.md` | `overlay_render_fresh`, `bare_hevy_values`, `research_citations` |
   | `profile.md` | `bare_hevy_values`, `research_citations` |
   | `data/hevy/writes.jsonl` | `schema_versions` |
@@ -4704,13 +4704,13 @@ rule (hooks run outside the permission layer); `status` gets one. R-15's
   | `data/nutrition/plans/*.json` | `meal_plans`, `meal_plan_render_fresh` |
   | `nutrition/plans/*.md` | `meal_plan_render_fresh` |
   | `nutrition/menu/index.md` | `recipe_index_fresh` |
-  | `nutrition/menu/*.md` | `recipe_cards`, `recipe_render_fresh`, `recipe_index_fresh` |
+  | `nutrition/menu/*.md` | `recipe_cards`, `recipe_render_fresh`, `recipe_index_fresh`, `nutrition_template` |
   | `research/local/*.md` | `research_notes`, `research_render_fresh`, `research_citations` |
   | `research/*.md` | `research_notes`, `research_render_fresh` |
 
   The first matching row wins; `*` matches within one path segment.
-  R-26b added the rows after `profile.md` for the items that merged
-  before the map existed.
+  R-26b added the rows after `profile.md`, and R-16's and R-33c's checks
+  in the earlier rows, for the items that merged before the map existed.
 
   Any `fail`: `{"decision": "block", "reason": "<path> failed <id>:
   <message>. Fix the data file or re-render; don't leave it."}`, which

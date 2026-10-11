@@ -80,6 +80,18 @@ def run_hook(event, root, payload):
         return run_cli(["--root", str(root), "hooks", event], env=ENV)
 
 
+def run_entry(argv, payload=None):
+    """`coach.__main__.run`, the entry point the hook commands go through, with its stdout and stderr."""
+    from coach import __main__ as entry
+
+    stdin = io.StringIO(json.dumps(payload if payload is not None else session_input()))
+    stdout, stderr = io.StringIO(), io.StringIO()
+    with mock.patch("sys.stdin", stdin), mock.patch.dict(os.environ, ENV), \
+            contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+        code = entry.run(argv)
+    return code, stdout.getvalue(), stderr.getvalue()
+
+
 def context_of(response):
     return response["hookSpecificOutput"]["additionalContext"]
 
@@ -183,6 +195,21 @@ class SessionStartTest(unittest.TestCase):
         self.assertIn("3.11", text)
         self.assertIn("3.10.14", text)
 
+    def test_a_failure_before_the_hook_runs_still_exits_0_with_one_line(self):
+        for failure in (mock.patch("coach.commands.discover", side_effect=RuntimeError("broken command")),
+                        mock.patch("coach.cli.main", return_value=9)):
+            with self.subTest(failure=failure.attribute), failure:
+                code, stdout, _ = run_entry(["--root", str(VALID), "hooks", "sessionstart"])
+                self.assertEqual(code, 0)
+                text = context_of(json.loads(stdout))
+                self.assertEqual(len(text.splitlines()), 1)
+                self.assertIn("unavailable", text)
+
+    def test_the_entry_point_unavailable_line_matches_the_hook_module(self):
+        from coach import __main__ as entry
+
+        self.assertEqual(entry.unavailable_response("X: y"), hooks.session_response(hooks.unavailable_text("X: y")))
+
     def test_python_3_10_posttooluse_prints_nothing(self):
         from coach import __main__ as entry
 
@@ -200,6 +227,25 @@ class PostToolUseTest(unittest.TestCase):
         self.assertEqual(response["decision"], "block")
         self.assertIn("routine/session-a.md failed routine_render_fresh", response["reason"])
         self.assertTrue(response["reason"].endswith("Fix the data file or re-render; don't leave it."))
+
+    def test_overlay_template_id_the_library_gives_another_exercise_blocks(self):
+        root = copy_of(self, VALID)
+        overlay = root / "data" / "overlays" / "2026-10-12-weekly.json"
+        text = overlay.read_text(encoding="utf-8")
+        self.assertEqual(text.count('"F0000001"'), 1)
+        overlay.write_text(text.replace('"F0000001"', '"F0000002"'), encoding="utf-8")
+        code, response, _ = run_hook("posttooluse", root, edit_input(overlay))
+        self.assertEqual(code, 0)
+        self.assertEqual(response["decision"], "block")
+        self.assertIn("failed overlay_library_consistency", response["reason"])
+
+    def test_a_failure_before_the_hook_runs_prints_nothing(self):
+        root = copy_of(self, STALE)
+        with mock.patch("coach.commands.discover", side_effect=RuntimeError("broken command")):
+            code, stdout, stderr = run_entry(["--root", str(root), "hooks", "posttooluse"],
+                                             edit_input(root / "routine" / "session-a.md"))
+        self.assertEqual((code, stdout), (0, ""))
+        self.assertIn("broken command", stderr)
 
     def test_valid_instance_prints_nothing(self):
         for relative in ("routine/session-a.md", "data/program.json", "data/overlays/2026-10-12-weekly.json",
@@ -280,6 +326,11 @@ class PathMapTest(unittest.TestCase):
         self.assertEqual(hooks.checks_for("routine/sub/page.md"), ())
         self.assertEqual(hooks.checks_for("notes.txt"), ())
         self.assertEqual(hooks.checks_for("nutrition/menu/index.md"), ("recipe_index_fresh",))
+        self.assertIn("nutrition_template", hooks.checks_for("config.toml"))
+        self.assertIn("nutrition_template", hooks.checks_for("nutrition/menu/oats.md"))
+        self.assertIn("overlay_library_consistency", hooks.checks_for("data/exercises.json"))
+        for check_id in ("overlay_library_consistency", "dangling_routine_ids"):
+            self.assertIn(check_id, hooks.checks_for("data/overlays/2026-10-12-weekly.json"))
 
 
 class SubprocessTest(unittest.TestCase):
