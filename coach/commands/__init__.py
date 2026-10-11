@@ -21,7 +21,9 @@ class Command:
     writes: touches local files. hevy_write: sends a non-GET request to
     Hevy. network: calls Hevy at all. git_write: commits or pushes.
     writes_scope: "cache" when every local write lands under .coach/,
-    else "data".
+    else "data". envelope: False for a Claude Code hook command, which
+    prints the dict it returns (or nothing for None) instead of the
+    envelope and exits 0.
     """
 
     name: str
@@ -33,6 +35,7 @@ class Command:
     network: bool = False
     git_write: bool = False
     writes_scope: str = None
+    envelope: bool = True
 
     @property
     def accepts_dry_run(self):
@@ -54,7 +57,7 @@ def arg(*flags, **kwargs):
 
 
 def command(name, *, help, args=(), writes=False, hevy_write=False, network=False, git_write=False,
-            writes_scope=None):
+            writes_scope=None, envelope=True):
     """Declare a command. The function takes (args, ctx) and returns the envelope's data dict.
 
     A command that writes (locally, to Hevy or to git) gets --dry-run.
@@ -73,7 +76,7 @@ def command(name, *, help, args=(), writes=False, hevy_write=False, network=Fals
     def decorate(func):
         func.coach_command = Command(
             name=name, func=func, help=help, args=tuple(args), writes=writes, hevy_write=hevy_write,
-            network=network, git_write=git_write, writes_scope=writes_scope,
+            network=network, git_write=git_write, writes_scope=writes_scope, envelope=envelope,
         )
         return func
 

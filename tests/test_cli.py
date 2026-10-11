@@ -243,6 +243,19 @@ class DryRunTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(envelope["data"], {"dry_run": True})
 
+    def test_a_hook_command_prints_its_response_without_the_envelope(self):
+        @command("demo hook", help="hook", envelope=False, args=(arg("--quiet", action="store_true"),))
+        def hook(args, ctx):
+            return None if args.quiet else {"decision": "ask"}
+
+        stdout = io.StringIO()
+        code = cli.main(["demo", "hook"], env={}, stdout=stdout, stderr=io.StringIO(), commands=[hook.coach_command])
+        self.assertEqual((code, stdout.getvalue()), (0, '{"decision": "ask"}\n'))
+        stdout = io.StringIO()
+        code = cli.main(["demo", "hook", "--quiet"], env={}, stdout=stdout, stderr=io.StringIO(),
+                        commands=[hook.coach_command])
+        self.assertEqual((code, stdout.getvalue()), (0, ""))
+
     def test_declarations_are_checked(self):
         with self.assertRaises(ValueError):
             command("too many words here", help="x")
