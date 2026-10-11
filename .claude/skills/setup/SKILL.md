@@ -85,9 +85,8 @@ Defer bodyweight and recovery to `/check-in`; [profile-facts.md](profile-facts.m
 Map the answers onto `config.toml` and `coach` commands as
 [profile-facts.md](profile-facts.md) says, run `python3 -m coach config
 validate` until it exits 0, then create or revise `profile.md`, keeping existing
-notes. Use its skeleton only for a new profile.
-Show it in step 5's message. Apply corrections and later disclosures with
-[profile-facts.md](profile-facts.md) before proceeding or completing setup.
+notes; use its skeleton only for a new profile. Show it in step 5's message.
+Apply corrections and later disclosures the same way before proceeding or completing setup.
 
 ## 5. Program, then week one
 
