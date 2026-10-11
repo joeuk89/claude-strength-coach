@@ -200,7 +200,7 @@ Phase 2 to 4 command inventory. No command here writes to Hevy.
 | `plugins test` | R-23a | runs instance plugin tests; never allowlisted |
 | `schedule plan --week W`, `decisions list`, `propose show ID` | R-23a | |
 | `schedule confirm --position P`, `propose week`, `propose override`, `propose resolve`, `propose finalize`, `decisions withdraw ID` | R-23a | W |
-| `propose restore --proposal ID --session S --reason TEXT` | R-44b | W |
+| `propose restore --proposal ID --session S --reason TEXT [--dry-run]` | R-44b | W |
 | `followups list`, `followups render`, `niggles list`, `niggles constraints` | R-27 | |
 | `followups add\|resolve\|drop\|defer`, `niggles add\|update\|resolve\|import` | R-27 | W |
 | `checkin prepare [--until D] [--tier weekly\|deep]`, `checkin misses [--since D] [--until D]`, `checkin due` | R-21a | |
@@ -1442,12 +1442,12 @@ version bump (below).
 }
 ```
 
-- Every key shown is required except session `location`,
-  `dose_targets`, `priority` and `minimum_week` (C40). A session without
-  `location` reads as `location: null`, a program without `dose_targets`
-  reads as `{}`, without `priority` as `[]` and without `minimum_week` as
-  null; `coach.program.load(root)` fills them, so readers always see the
-  keys.
+- Every key shown is required except session `location`, session
+  `scheme` (v7, C51), `dose_targets`, `priority` and `minimum_week`
+  (C40). A session without `location` or `scheme` reads as null, a
+  program without `dose_targets` reads as `{}`, without `priority` as
+  `[]` and without `minimum_week` as null; `coach.program.load(root)`
+  fills them, so readers always see the keys.
 - `kind`: `lifting`, `conditioning`. `tier`: `core`, `optional`. `status`:
   `active`, `parked`, `standby`. A session needs at least one exercise.
 - Session ids are unique and never `program` (its page would overwrite
@@ -1516,8 +1516,9 @@ version bump (below).
   R-31 replaces `block` with the C42 shape.
 - `one_off`: null or `{"overlay_id": id, "span": span}`.
 - `scheme_state` keys are `<session_id>/<exercise_id>` and name a slot the
-  program has; values are free-form objects in v1 and v2, and take the
-  C23 shape in v3.
+  program has, or `<session_id>/_session` for a `conditioning` session's
+  density scheme (C51); values are free-form objects in v1 and v2, and
+  take the C23 shape in v3.
 - `hevy.routines` replaces `routine/hevy-map.json`; each `session_id`
   names a program session. Folder ids are Hevy's integers or null. R-14b's
   `routines create` records new routine ids here, never in the overlay.
@@ -1613,7 +1614,8 @@ to v3 (C23). R-30a took program to v3 (`dose_targets`, C40). R-22 took
 program to v4 and overlay (and its draft) to v3 (C37). R-44a took
 program to v5 (`interference`, C51). R-30b took program to v6
 (`priority`, `minimum_week`, C40) and overlay (and its draft) to v4 (a
-fold's `rule_id` may be a priority floor rule's id, C40). Every later
+fold's `rule_id` may be a priority floor rule's id, C40). R-44b took
+program to v7 (session `scheme`, C51). Every later
 bump takes the next free version when it merges and adds one step to the
 R-17a migration chain, so the chain stays linear.
 Program bumps: R-22 (executable `missed_day_rules`, C37), R-30b (`priority`, `minimum_week`, C40), R-44a
@@ -2486,7 +2488,7 @@ id follows C10. `data.lines_digest` (R-21b) is the C7 canonical hash of
   and records a C25 decision when standing.
 - `propose resolve --proposal ID --flag INDEX --resolution TEXT` resolves
   one flag on the draft.
-- `propose restore --proposal ID --session S --reason TEXT` (R-44b) puts
+- `propose restore --proposal ID --session S --reason TEXT [--dry-run]` (R-44b) puts
   a dropped conditioning session back and resolves its flag with the
   reason; finalize accepts it.
 - `propose finalize --proposal ID [--dry-run]` re-runs step 5. It exits
@@ -5662,6 +5664,76 @@ class ConditioningProposal:
   reverses one drop.
 - R-44b adds no session to any instance; adding one is a program change
   under R-02's 80 % rule.
+
+**Built with R-44b** (details the text above leaves open):
+
+- **Program v7.** Session `scheme` is optional and reads as null, like
+  `location`; the migration step writes `scheme: null` on every session.
+  `program validate` fails a session scheme on a `lifting` session
+  (`$.sessions[i].scheme`), a non-`hold` exercise under one
+  (`$.sessions[i].exercises[j].scheme.name`), an unknown density scheme,
+  params that fail its `PARAMS`, and whatever its optional
+  `problems(params, session) -> [(path, message)]` reports under
+  `$.sessions[i].scheme.params` (reps for every exercise, caps at or
+  above the start, at least one minute per exercise for an EMOM). The
+  session page names the scheme and its params.
+- **Plugin kind** `conditioning`: `propose` and `decay` required,
+  `problems` optional, `STATE` required. `exercises` are
+  `base.ExerciseInfo`. `last_prescription` is `{overlay_id, session_id,
+  date, dates, span, lines}`: every date that overlay planned the
+  session, and the newest date's sets per exercise. Helpers in
+  `coach.plugins.base`: `work_set` (reps; seconds for `duration`, metres
+  for `distance`), `density_verdict`, `stepped`, `stepped_back`,
+  `density_decay`, `RPE_LOG_HINT`, `HEURISTIC`, `AT_CAP`.
+- **State** `{"current": prescription | null, "previous": [...]}`. An
+  EMOM prescription is `{minutes, reps, turn}` (`turn`: the exercise
+  next in line for a rep), a circuit's `{rounds}`. A step up pushes the
+  current prescription onto `previous`; a step back pops it, so it
+  restores the previous prescription exactly, and at the start it holds.
+  An exercise missing from `reps_cap` gains no reps. A stored
+  prescription whose exercises no longer match the session restarts from
+  the params. Every rationale that steps or holds on a bout says "a
+  coaching heuristic".
+- **Bouts and days off.** The newest approved overlay holding the session
+  gives its dates; `coach.cardio.match` pairs them (kind `conditioning`,
+  `reconcile_move_days`) with the conditioning Activities in that
+  overlay's span. With `[activity] enabled = false` there are none and
+  the scheme holds. Days off count from the newest logged conditioning
+  Activity before the session date (0 with none); past 10 the session
+  decays and raises `return_week` at session level.
+- **Lines.** Each load is the slot's last approved top load, else its
+  `start_load`; C26 constraints, caps and the illness RPE cap still apply,
+  and nothing is rounded (the load is one the slot already knows).
+  Provenance `scheme` is the density scheme, `derived_from` and `decay`
+  are null, and every line carries the session's rationale; only the
+  first exercise carries `focus`. The scheme's `no_data` is a session
+  flag. A deload run, and the session's second date in one run, hold
+  without judging, so one bout never moves the scheme twice.
+- **Drop rule order.** Step 5b's decision is taken on the draft's
+  sessions before step 5, so the step 5a flags judge the week without a
+  dropped session; the `conditioning_dropped` flags follow 5a's. Triggers,
+  first match wins, each reported by its flag code: `sleep_debt` (the 7
+  nights ending today, `coach.cardio.sleep_judgement`), `status_active`
+  (`coach.statusdays.active` on the session's date, any kind) and
+  `quality_stack` (another quality bout within a day, from the bouts and
+  tier filter R-43's flag judges, the week's earlier logged activities
+  included; a session dropped earlier in date order no longer counts).
+  The info flag's `session_id` is null, since the overlay no longer holds
+  the session; its message names it. A draft is never emptied: when
+  every session would go, none does and each gets the warn flag.
+- **Restore.** `data.dropped` rows are `{session_id, date, trigger,
+  reason, restored}`; the run facts (`.meta.json`) also keep each dropped
+  session's draft and the scheme state it would have left pending, and
+  `propose show` lists the rows. `propose restore` puts every dropped
+  date of the session back into the draft and the `.proposed.json` copy
+  (it is what the pipeline proposed, so finalize finds no unexplained
+  change), resolves each flag with the reason, makes its scheme state
+  pending again, re-runs the R-24 check and adds any new week flag. A
+  session that was not dropped exits 1. Output `{id, session_id,
+  restored, flags, lines, written}`.
+- `state.problems` accepts `<session_id>/_session` for a `conditioning`
+  session only; `program adopt` keeps that entry when the session keeps
+  its density scheme. The flag registers in `coach/flags/conditioning.py`.
 
 ## C52. `coach status` (R-26b builds; later items add providers)
 

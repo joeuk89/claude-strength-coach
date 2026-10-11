@@ -17,6 +17,7 @@ SHIPPED = {
     "schedule": ["alternating_external_anchor", "explicit_calendar", "fixed_weekdays", "next_in_sequence"],
     "transform": ["light", "return", "scheme", "standard"],
     "interference": ["quality_before_heavy_lower", "same_day"],
+    "conditioning": ["circuit_rounds", "emom_density"],
 }
 R23A_CODES = {"no_data": ("warn",), "stalled": ("warn",), "rpe_drift": ("warn",), "return_week": ("info",),
               "return_after_illness": ("warn",), "constraint_applied": ("info",), "override_standing": ("info",),
@@ -105,7 +106,8 @@ class ShippedPluginsTest(unittest.TestCase):
     def test_kinds_declare_their_functions(self):
         found = {k.kind: k.required for k in plugins.kinds().values()}
         self.assertEqual(found, {"scheme": ("propose", "decay"), "schedule": ("plan", "positions"),
-                                 "transform": ("apply",), "interference": ("evaluate",)})
+                                 "transform": ("apply",), "interference": ("evaluate",),
+                                 "conditioning": ("propose", "decay")})
 
     def test_plugin_modules_pass_the_purity_scan(self):
         for path in sorted((REPO_ROOT / "coach" / "plugins").glob("*/*.py")):

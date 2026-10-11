@@ -272,6 +272,112 @@ def session_flag(code, message, session_id, severity=None):
     return _flags.make(code, severity, session_id=session_id, message=message)
 
 
+@dataclass(frozen=True)
+class ConditioningContext:
+    """A conditioning session's view for its density scheme (C51).
+
+    `exercises` are in program order. `bouts` are the conditioning
+    Activities matched to the session's last prescription, newest first,
+    each `{date, activity_id, duration_seconds, rpe}`. `last_prescription`
+    is `{overlay_id, session_id, date, dates, span, lines}` from the newest
+    approved overlay holding the session, or None. `days_off` counts from
+    the newest logged conditioning Activity.
+    """
+
+    today: date
+    session_date: date
+    session_id: str
+    exercises: tuple
+    params: dict
+    state: dict
+    bouts: tuple
+    last_prescription: Optional[dict]
+    days_off: int
+
+
+@dataclass(frozen=True)
+class ConditioningProposal:
+    """`lines` maps each exercise id to its sets (reps, or the duration or distance its mode logs; no load)."""
+
+    lines: dict
+    focus: str
+    rationale: str
+    state: dict
+    flags: tuple = ()
+
+
+RPE_LOG_HINT = "Put your session RPE in the workout description, e.g. 'RPE 7'."
+HEURISTIC = "a coaching heuristic"
+AT_CAP = "at cap: coach to change"
+RPE_STEP_BACK = 2
+ONE_STEP_BACK_DAYS = 11
+RESET_DAYS = 43
+
+
+def work_set(exercise, value):
+    """One working set of `value`: seconds for a duration exercise, metres for distance, else reps."""
+    if exercise.load_mode == "duration":
+        return SetSpec(duration_seconds=value)
+    if exercise.load_mode == "distance":
+        return SetSpec(distance_meters=value)
+    return SetSpec(reps=value)
+
+
+def density_verdict(ctx, rpe_target, time_cap_minutes=None):
+    """("up" | "back" | "hold", why, flags) from the newest matched bout (C51).
+
+    Up when the session RPE is at or under target (and, with a time cap,
+    the session finished inside it); back when the RPE is target + 2 or
+    more, or the session ran over the cap; hold otherwise. No bout holds;
+    no RPE, or no finish time against a cap, holds with `no_data`.
+    """
+    if not ctx.bouts:
+        return "hold", "no conditioning session was logged against the last prescription", ()
+    bout = ctx.bouts[0]
+    rpe = bout["rpe"]
+    if rpe is None:
+        message = (f"The conditioning session on {bout['date']} has no session RPE, so the scheme holds; "
+                   f"{RPE_LOG_HINT}")
+        return "hold", f"the session on {bout['date']} logged no RPE", (session_flag("no_data", message,
+                                                                                   ctx.session_id),)
+    seconds = bout.get("duration_seconds")
+    minutes = seconds / 60 if seconds else None
+    if time_cap_minutes is not None and minutes is None:
+        message = f"The conditioning session on {bout['date']} has no finish time, so the scheme holds."
+        return "hold", f"the session on {bout['date']} has no finish time", (session_flag("no_data", message,
+                                                                                         ctx.session_id),)
+    said = f"session RPE {number(rpe)} against a target of {number(rpe_target)} on {bout['date']}"
+    if time_cap_minutes is not None:
+        said += f" in {number(round(minutes, 1))} min against a {number(time_cap_minutes)}-min cap"
+    if rpe >= rpe_target + RPE_STEP_BACK or (time_cap_minutes is not None and minutes > time_cap_minutes):
+        return "back", said, ()
+    if rpe <= rpe_target:
+        return "up", said, ()
+    return "hold", said, ()
+
+
+def stepped(state, prescription):
+    """The state moved on to `prescription`, the current one kept so a step back restores it exactly."""
+    return {"current": prescription, "previous": [*state["previous"], state["current"]]}
+
+
+def stepped_back(state):
+    """The state one step back, or None when it is already at its start."""
+    if not state["previous"]:
+        return None
+    return {"current": state["previous"][-1], "previous": list(state["previous"][:-1])}
+
+
+def density_decay(state, start, days_off):
+    """(state, words) after `days_off` without conditioning: 11–42 days one step back, 43 or more the start."""
+    if days_off >= RESET_DAYS:
+        return {"current": start, "previous": []}, f"{days_off} days off, so back to the start"
+    back = stepped_back(state)
+    if back is None:
+        return state, f"{days_off} days off, already at the start"
+    return back, f"{days_off} days off, so one step back"
+
+
 def expand(groups):
     """One SetSpec per set of the program's set groups, in order."""
     found = []

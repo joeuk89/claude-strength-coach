@@ -168,6 +168,14 @@ prescription: double progression, linear, wave, RPE-anchored, assistance
 ladder, maintenance, hold. Every exercise in a program has one.
 _Avoid_: progression model, autoregulation (one kind of scheme)
 
+**Density scheme**:
+The progression scheme of a whole conditioning session: an EMOM or a
+circuit whose prescribed work is fixed and which steps up, holds or steps
+back on the athlete's session RPE (and, for a circuit, the finish time
+against its cap). Every exercise in the session holds its load. The
+steps are a coaching heuristic.
+_Avoid_: conditioning progression, density progression, finisher
+
 **Training max**:
 The load a wave's percentages are taken from: 90 % of the e1RM by
 default, or a load the program sets, raised by a fixed increment at the

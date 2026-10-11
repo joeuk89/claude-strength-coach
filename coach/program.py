@@ -23,9 +23,10 @@ EXERCISE_PROBLEM = "exercise_ids"
 RENDER_COMMAND = "program render"
 PROGRAM_PAGE = paths.ROUTINE_PROGRAM_PAGE.as_posix()
 
-_SESSION_DEFAULTS = {"location": None}
+_SESSION_DEFAULTS = {"location": None, "scheme": None}
 _FLOOR_DEFAULTS = {"sets": 2, "rpe": None}
 MINIMUM_WEEK_STATUS = "standby"
+SESSION_SCHEME_EXERCISE = "hold"
 _TIMED_MODES = ("duration", "distance")
 _WORKING_TYPES = ("normal", "dropset", "failure")
 _SET_LABELS = {"warmup": "warm-up", "dropset": "drop set", "failure": "to failure"}
@@ -174,6 +175,7 @@ def _structure(doc):
                                     "give one entry several set groups instead"))
             seen.add(exercise["exercise_id"])
             errors += _exercise_errors(exercise, line_path)
+        errors += _session_scheme_errors(session, path)
 
     external_ids = set()
     for index, external in enumerate(doc["external_sessions"]):
@@ -235,6 +237,20 @@ def _minimum_week_errors(doc):
             errors.append(Error(path, f"{session_id} is {status[session_id]}; a minimum-week session is "
                                       f"{MINIMUM_WEEK_STATUS}"))
     return errors
+
+
+def _session_scheme_errors(session, path):
+    """A session scheme needs a conditioning session whose every exercise holds (contract C51)."""
+    if session["scheme"] is None:
+        return []
+    if session["kind"] != "conditioning":
+        return [Error(f"{path}.scheme", f"a session scheme needs kind conditioning; session {session['id']} is "
+                                        f"{session['kind']}")]
+    return [Error(f"{path}.exercises[{index}].scheme.name",
+                  f"{exercise['exercise_id']} uses {exercise['scheme']['name']}; under the session scheme "
+                  f"{session['scheme']['name']} every exercise uses {SESSION_SCHEME_EXERCISE}")
+            for index, exercise in enumerate(session["exercises"])
+            if exercise["scheme"]["name"] != SESSION_SCHEME_EXERCISE]
 
 
 _ACTION_KEYS = {"fold": ("into", "exercises"), "shift": ("to_weekdays",), "skip": (), "manual": ()}
@@ -487,6 +503,9 @@ def render_session_page(session, library, unit):
         lines += ["", f"Location: {session['location']}"]
     if session["focus"]:
         lines += ["", f"Focus: {session['focus']}"]
+    if session["scheme"] is not None:
+        lines += ["", f"Session scheme: {_named(session['scheme']['name'], session['scheme']['params'])}. It sets "
+                      "every exercise's sets each week; loads hold as written."]
     lines += ["", f"Start loads in {unit}: where each exercise begins. Each week's loads come from the overlay.", ""]
     lines.append(_row(["Exercise", "Sets × reps", "RPE", "Start load", "Rest", "Progression scheme"]))
     lines.append("| --- | --- | --- | --- | --- | --- |")

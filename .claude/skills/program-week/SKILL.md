@@ -174,6 +174,14 @@ formula applied blindly is not coaching.
      moves anything. Agree with the athlete what moves — usually the
      run — or keep the plan and resolve the flag with the reason (step
      4). `python3 -m coach interference list` shows the program's rules.
+   - `conditioning_dropped` (the drop rule: sleep debt, a status day on
+     the date, or a quality activity the day either side): at info, an
+     optional conditioning session left the draft, listed in
+     `data.dropped` with its trigger. If the athlete still wants it, put
+     it back with `python3 -m coach propose restore --proposal <id>
+     --session <session> --reason "<why>"`, which resolves the flag. At
+     warn, a core conditioning session stayed: agree whether to ease or
+     move it, then resolve the flag (step 4).
    - `no_data` (set the first load with the athlete), `stalled`,
      `constraint_applied`, `override_standing`, `scheme_reset`,
      `rotation_unconfirmed` (state the position for confirmation, as

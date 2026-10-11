@@ -8,6 +8,7 @@ until `coach.overlay.build` makes load objects through `coach.units`.
 `propose finalize` turns the edited draft into the overlay R-13 approves.
 """
 
+import copy
 import json
 import re
 from dataclasses import replace
@@ -17,7 +18,7 @@ from pathlib import Path
 from coach import config as config_module
 from coach import constraints as constraints_module
 from coach import dates, decisions, flags, followups, history, jsonio, niggles, overlay, paths, patterns, plugins
-from coach import cardio, program, research, weekflags
+from coach import cardio, conditioning, program, research, weekflags
 from coach import state as state_module
 from coach import stats, units, validity
 from coach.checks.instance import cap_for
@@ -456,12 +457,7 @@ def propose_line(run, session, day, exercise, ctx_extra):
                       for e in run.exposures_of(exercise_id, day))
     active = constraints_module.active(run.root, session_id, exercise_id, day)
     days_off = validity.days_off(run.root, exercise_id, day) or 0
-    info = base.ExerciseInfo(
-        id=exercise_id, name=entry.get("name", exercise_id), pattern=entry.get("pattern"),
-        muscles=entry.get("muscles", {}), equipment=entry.get("equipment"), load_mode=mode,
-        increment=run.increment(exercise_id, location), is_compound=patterns.is_compound(entry),
-        load_direction=-1 if mode == "assisted" else 1,
-    )
+    info = _exercise_info(run, session, exercise)
     ctx = base.SchemeContext(
         today=run.today, session_date=day, unit=run.unit, week_kind=ctx_extra["kind"], exercise=info,
         slot=base.SlotInfo(session_id=session_id, sets=tuple(exercise["sets"]), rest_seconds=exercise["rest_seconds"],
@@ -555,7 +551,7 @@ def propose_line(run, session, day, exercise, ctx_extra):
     previous = ctx.last_prescription
     draft_line = {
         "exercise_id": exercise_id,
-        "hevy_template_id": entry.get("hevy_template_id") or next(iter(entry.get("hevy_template_ids") or []), None),
+        "hevy_template_id": _template_id(entry),
         "load_mode": mode, "rest_seconds": exercise["rest_seconds"], "superset_id": exercise["superset_id"],
         "cues": exercise["cues"], "focus": proposal.focus, "target_note": proposal.target_note,
         "change": change_text(previous["sets"] if previous else None, sets, mode, run.unit),
@@ -565,6 +561,122 @@ def propose_line(run, session, day, exercise, ctx_extra):
         "sets": [s.to_dict() for s in sets],
     }
     return LineResult(draft_line, line_flags, proposal.state, scheme_name)
+
+
+def _exercise_info(run, session, exercise):
+    exercise_id, mode = exercise["exercise_id"], exercise["load_mode"]
+    entry = run.library.get(exercise_id) or {}
+    return base.ExerciseInfo(
+        id=exercise_id, name=entry.get("name", exercise_id), pattern=entry.get("pattern"),
+        muscles=entry.get("muscles", {}), equipment=entry.get("equipment"), load_mode=mode,
+        increment=run.increment(exercise_id, session["location"]), is_compound=patterns.is_compound(entry),
+        load_direction=-1 if mode == "assisted" else 1,
+    )
+
+
+def _template_id(entry):
+    return entry.get("hevy_template_id") or next(iter(entry.get("hevy_template_ids") or []), None)
+
+
+def propose_conditioning(run, session, day, ctx_extra, repeat=False):
+    """A conditioning session's lines from its density scheme; every load holds as written (C51).
+
+    A deload run holds the scheme where it is. `repeat` marks a later date
+    of a session this run already proposed: its state is already judged and
+    decayed, so it holds, and a layoff never steps the scheme back twice.
+    """
+    judge = ctx_extra["kind"] != "deload" and not repeat
+    session_id, scheme = session["id"], session["scheme"]
+    plugin = run.registry.get("conditioning", scheme["name"])
+    params, _ = plugins.merged_params(plugin, scheme["params"])
+    key = conditioning.state_key(session_id)
+
+    def session_flag(code, message, severity=None):
+        return flags.make(code, severity, session_id=session_id, message=message)
+
+    state, found = _scheme_state(plugin, ctx_extra["states"].get(key), key, scheme["name"], session_flag)
+    last = conditioning.last_prescription(run.overlays, session_id)
+    days_off = conditioning.days_off(run.root, run.config, day)
+    ctx = base.ConditioningContext(
+        today=run.today, session_date=day, session_id=session_id,
+        exercises=tuple(_exercise_info(run, session, e) for e in session["exercises"]), params=params, state=state,
+        bouts=conditioning.bouts(run.root, run.config, last, run.today) if judge else (),
+        last_prescription=last, days_off=days_off,
+    )
+    proposal = plugin.module.propose(ctx)
+    _check_conditioning(plugin, proposal, session)
+    if days_off > DECAY_AFTER_DAYS and not repeat:
+        proposal = plugin.module.decay(ctx, proposal, days_off)
+        _check_conditioning(plugin, proposal, session)
+        found.append(session_flag("return_week", (
+            f"{days_off} days since the last logged conditioning session (return band "
+            f"{validity.band_for(days_off).id}): {scheme['name']} steps back")))
+    found += list(proposal.flags)
+    rationale = proposal.rationale.rstrip(". ")
+    rationale = rationale[0].upper() + rationale[1:] + "."
+    lines = []
+    for index, exercise in enumerate(session["exercises"]):
+        line, line_flags = _conditioning_line(run, session, day, exercise, proposal, index == 0, rationale, ctx_extra)
+        lines.append(line)
+        found += line_flags
+    return LineResult(lines, found, proposal.state, scheme["name"])
+
+
+def _conditioning_line(run, session, day, exercise, proposal, first, rationale, ctx_extra):
+    session_id, exercise_id, mode = session["id"], exercise["exercise_id"], exercise["load_mode"]
+    entry = run.library.get(exercise_id) or {}
+    previous = run.last_prescription(session_id, exercise_id)
+    load = None
+    if mode in units.LOADED_MODES:
+        load = base.top_load(previous["sets"]) if previous else None
+        load = exercise["start_load"] if load is None else load
+    sets = tuple(replace(s, load=load) for s in proposal.lines[exercise_id])
+    active = constraints_module.active(run.root, session_id, exercise_id, day)
+    sets, clipped, words = apply_constraints(sets, active, load, -1 if mode == "assisted" else 1)
+    if ctx_extra["illness"] is not None and day == ctx_extra["first_day"]:
+        sets = base.rpe_capped(sets, validity.ILLNESS_RPE_CAP)
+    try:
+        cap, cap_source = cap_for(run.config, exercise_id, mode, session["location"]) \
+            if mode in units.LOADED_MODES else (None, None)
+    except ConfigError:
+        cap, cap_source = None, None
+    if cap is not None:
+        sets, changed = _clip(sets, cap)
+        if changed:
+            words.append(f"{cap_source} caps the load at {units.json_number(cap)}")
+
+    def line_flag(code, message):
+        return flags.make(code, session_id=session_id, exercise_id=exercise_id, message=message)
+
+    found = [line_flag("constraint_applied", "; ".join(words))] if words else []
+    if mode in units.LOADED_MODES and load is None:
+        found.append(line_flag("no_data", f"{entry.get('name', exercise_id)}: no approved load and no start load, so "
+                                          "the load is left for the coach to set"))
+    line = {
+        "exercise_id": exercise_id, "hevy_template_id": _template_id(entry), "load_mode": mode,
+        "rest_seconds": exercise["rest_seconds"], "superset_id": exercise["superset_id"], "cues": exercise["cues"],
+        "focus": proposal.focus if first else None, "target_note": None,
+        "change": change_text(previous["sets"] if previous else None, sets, mode, run.unit), "override": None,
+        "provenance": {"scheme": session["scheme"]["name"], "derived_from": None, "inferred": False, "decay": None,
+                       "rationale": rationale},
+        "sets": [s.to_dict() for s in sets],
+    }
+    return line, found
+
+
+def _check_conditioning(plugin, proposal, session):
+    if not isinstance(proposal, base.ConditioningProposal):
+        raise ValidationError(f"Density scheme {plugin.name} returned {type(proposal).__name__}, not a "
+                              "ConditioningProposal")
+    errors = plugins.state_errors(plugin, proposal.state)
+    if errors:
+        raise ValidationError(f"Density scheme {plugin.name} returned state that fails its STATE schema",
+                              details=[e.to_json() for e in errors])
+    wanted = [e["exercise_id"] for e in session["exercises"]]
+    if sorted(proposal.lines) != sorted(wanted) or not all(proposal.lines[i] for i in wanted):
+        raise ValidationError(f"Density scheme {plugin.name} must give sets for exactly {', '.join(wanted)}")
+    if not proposal.rationale or not proposal.rationale.strip():
+        raise ValidationError(f"Density scheme {plugin.name} gave no rationale")
 
 
 def _check_proposal(plugin, proposal):
@@ -747,7 +859,7 @@ def propose_week(root, config, today, now, span, kind="weekly", transform_name=N
     ctx_extra = {"kind": kind, "transform": transform, "first_day": first_day, "illness": _illness(run, first_day),
                  "states": dict(settled_state["scheme_state"])}
 
-    draft_sessions, all_flags, scheme_state = [], list(found.flags), {}
+    draft_sessions, all_flags, scheme_state, session_keys = [], list(found.flags), {}, []
     for day, session_id in found.sessions:
         session = run.sessions[session_id]
         if ctx_extra["illness"] and day == first_day:
@@ -755,16 +867,22 @@ def propose_week(root, config, today, now, span, kind="weekly", transform_name=N
                 f"{ctx_extra['illness']} falls in the gap before this first session back: confirm "
                 f"{validity.SYMPTOM_FREE_HOURS} hours symptom-free; every set is capped at RPE "
                 f"{validity.ILLNESS_RPE_CAP}")))
-        lines = []
-        for exercise in session["exercises"]:
-            result = propose_line(run, session, day, exercise, ctx_extra)
-            lines.append(result.draft_line)
+        if conditioning.has_scheme(session):
+            repeat = session_id in {sid for _, sid in session_keys}
+            results = [(conditioning.state_key(session_id),
+                        propose_conditioning(run, session, day, ctx_extra, repeat))]
+            lines = results[0][1].draft_line
+        else:
+            results = [(f"{session_id}/{exercise['exercise_id']}", propose_line(run, session, day, exercise, ctx_extra))
+                       for exercise in session["exercises"]]
+            lines = [result.draft_line for _, result in results]
+        for key, result in results:
             all_flags += result.flags
-            key = f"{session_id}/{exercise['exercise_id']}"
             entry = ctx_extra["states"].get(key)
             ctx_extra["states"][key] = {"scheme": result.scheme, "data": result.state,
                                         "pending": entry.get("pending") if entry else None}
             scheme_state[key] = {"scheme": result.scheme, "data": result.state}
+        session_keys.append(([key for key, _ in results], session_id))
         draft_sessions.append({
             "session_id": session_id, "date": day.isoformat(),
             "title": f"Deload — {session['title']}" if kind == "deload" else session["title"],
@@ -772,6 +890,8 @@ def propose_week(root, config, today, now, span, kind="weekly", transform_name=N
             "exercises": lines,
         })
     all_flags += followups.due_flags(root, today) + niggles.week_flags(root)
+    draft_sessions, dropped, drop_flags = _drop_rule(run, span, draft_sessions, session_keys, scheme_state, all_flags)
+    all_flags = [f for f in all_flags if not any(f in entry["flags"] for entry in dropped)]
 
     draft = {
         "schema_version": overlay.current_version(), "kind": kind, "span": span.to_json(),
@@ -780,12 +900,12 @@ def propose_week(root, config, today, now, span, kind="weekly", transform_name=N
     }
     doc = overlay.build(draft, config, root=root, now=now)
     doc["flags"] = validity.merge_flags(doc, validity.check_overlay(root, doc))
-    doc["flags"] += _week_flags(root, config, today, span, doc)
+    doc["flags"] += _week_flags(root, config, today, span, doc) + drop_flags
     draft = dict(draft, id=doc["id"], flags=doc["flags"])
     meta = {
         "id": doc["id"], "kind": kind, "span": span.to_json(), "transform": transform[0].name if transform else None,
         "created_at": doc["created_at"], "rotation": found.rotation,
-        "scheme_state": {} if kind == "deload" else scheme_state,
+        "scheme_state": {} if kind == "deload" else scheme_state, "dropped": dropped,
     }
     if not dry_run:
         if settled:
@@ -797,8 +917,52 @@ def propose_week(root, config, today, now, span, kind="weekly", transform_name=N
         "id": doc["id"], "kind": kind, "span": span.to_json(), "draft": _relative(root, draft_path),
         "proposed": _relative(root, proposed_path), "overlay": doc, "lines": lines,
         "lines_digest": jsonio.canonical_hash(lines), "settled": settled, "rotation": found.rotation,
-        "written": not dry_run,
+        "dropped": [_dropped_row(entry) for entry in dropped], "written": not dry_run,
     }
+
+
+def _dropped_row(entry):
+    return {key: entry[key] for key in ("session_id", "date", "trigger", "reason", "restored")}
+
+
+def _drop_rule(run, span, draft_sessions, session_keys, scheme_state, all_flags):
+    """Step 5b: (kept sessions, dropped entries, flags) under the C51 drop rule.
+
+    A dropped entry keeps the session's draft, the flags that name it and
+    the scheme state it would have left pending, so `propose restore` can
+    put all three back. A core session is never dropped, and neither is a
+    draft's only session.
+    """
+    fired = conditioning.triggers(run.root, run.config, run.today, span, draft_sessions, run.program["sessions"])
+    leaving = {item["index"] for item in fired if item["tier"] == "optional"}
+    if leaving and len(leaving) == len(draft_sessions):
+        leaving = set()
+    found_flags, dropped = [], []
+    for item in fired:
+        if item["index"] not in leaving:
+            why = ("a core session is never dropped" if item["tier"] == "core"
+                   else "it is the only planned session in the span")
+            found_flags.append(conditioning.keep_flag(item, why))
+            continue
+        flag = conditioning.drop_flag(item)
+        found_flags.append(flag)
+        keys, _ = session_keys[item["index"]]
+        dropped.append({"session_id": item["session_id"], "date": item["date"], "trigger": item["trigger"],
+                        "reason": item["reason"], "restored": None, "message": flag["message"],
+                        "session": draft_sessions[item["index"]], "keys": keys})
+    kept = [s for index, s in enumerate(draft_sessions) if index not in leaving]
+    kept_keys = {key for index, (keys, _) in enumerate(session_keys) if index not in leaving for key in keys}
+    kept_ids = {s["session_id"] for s in kept}
+    claimed = set()
+    for entry in dropped:
+        entry["scheme_state"] = {key: scheme_state[key] for key in entry["keys"] if key in scheme_state}
+        for key in entry["keys"]:
+            if key not in kept_keys:
+                scheme_state.pop(key, None)
+        sid = entry["session_id"]
+        entry["flags"] = [f for f in all_flags if f["session_id"] == sid] if sid not in kept_ids | claimed else []
+        claimed.add(sid)
+    return kept, dropped, found_flags
 
 
 def _week_flags(root, config, today, span, doc):
@@ -905,13 +1069,52 @@ def resolve(root, proposal_id, index, resolution, dry_run):
     return {"id": proposal_id, "flag": found[index], "written": not dry_run}
 
 
+def restore(root, config, proposal_id, session_id, reason, now, today, dry_run):
+    """Put a conditioning session the drop rule removed back into a draft, resolving its flag (C24, C51).
+
+    The session goes back into the draft and the untouched proposal alike,
+    since it is what the pipeline proposed, so finalize accepts it. Its
+    scheme state is pending again, and the week flags are judged afresh.
+    """
+    if not reason or not reason.strip():
+        raise UsageError("--reason must say why the session goes back in")
+    draft, proposed, meta = load_proposal(root, proposal_id)
+    entries = [e for e in meta.get("dropped", []) if e["session_id"] == session_id and e["restored"] is None]
+    if not entries:
+        dropped = sorted({e["session_id"] for e in meta.get("dropped", []) if e["restored"] is None})
+        raise ValidationError(f"Proposal {proposal_id} has no dropped session {session_id} to restore; dropped: "
+                              f"{', '.join(dropped) or 'none'}")
+    reason = reason.strip()
+    for entry in entries:
+        for doc in (draft, proposed):
+            doc["sessions"] = sorted([*doc["sessions"], copy.deepcopy(entry["session"])], key=lambda s: s["date"])
+        entry["restored"] = {"reason": reason, "at": _timestamp(now)}
+        draft["flags"] = draft["flags"] + [f for f in entry["flags"] if f not in draft["flags"]]
+        if meta["kind"] != "deload":
+            meta["scheme_state"].update(entry["scheme_state"])
+        for flag in draft["flags"]:
+            if flag["code"] == "conditioning_dropped" and flag["message"] == entry["message"] and not flag["resolved"]:
+                flag.update(resolved=True, resolution=reason)
+    doc = overlay.build(draft, config, root=root, now=now)
+    doc["flags"] = validity.merge_flags(doc, validity.check_overlay(root, doc))
+    span = dates.Span(dates.parse_date(meta["span"]["start"]), dates.parse_date(meta["span"]["end"]))
+    known = {validity.flag_key(f) for f in doc["flags"]}
+    doc["flags"] += [f for f in _week_flags(root, config, today, span, doc) if validity.flag_key(f) not in known]
+    draft["flags"] = doc["flags"]
+    if not dry_run:
+        _write_proposal(root, proposal_id, draft, proposed, meta)
+    return {"id": proposal_id, "session_id": session_id, "restored": [_dropped_row(e) for e in entries],
+            "flags": draft["flags"], "lines": lines_of(doc, config.athlete.units), "written": not dry_run}
+
+
 def show(root, config, proposal_id, now):
     draft, proposed, meta = load_proposal(root, proposal_id)
     doc = overlay.build(draft, config, root=root, now=now)
     lines = lines_of(doc, config.athlete.units)
     return {"id": proposal_id, "kind": meta["kind"], "span": meta["span"], "overlay": doc, "lines": lines,
             "lines_digest": jsonio.canonical_hash(lines), "unexplained": unexplained_changes(draft, proposed),
-            "unresolved_blocks": overlay.unresolved_blocks(doc)}
+            "unresolved_blocks": overlay.unresolved_blocks(doc),
+            "dropped": [_dropped_row(e) for e in meta.get("dropped", [])]}
 
 
 def finalize(root, config, proposal_id, now, today, dry_run):
@@ -962,7 +1165,8 @@ def finalize(root, config, proposal_id, now, today, dry_run):
         stored = state_doc["scheme_state"].get(slot)
         plugin_name = entry["scheme"]
         if stored is None or stored["scheme"] not in (None, plugin_name):
-            plugin = plugins.load(root).get("scheme", plugin_name)
+            kind = "conditioning" if conditioning.is_state_key(slot) else "scheme"
+            plugin = plugins.load(root).get(kind, plugin_name)
             stored = {"scheme": plugin_name, "data": plugins.initial_state(plugin), "pending": None}
         state_doc["scheme_state"][slot] = dict(stored, scheme=plugin_name,
                                                pending={"overlay_id": doc["id"], "data": entry["data"]})

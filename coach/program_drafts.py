@@ -95,7 +95,7 @@ def import_hevy(root, routine_ids=None, folder_id=None, now=None):
         sessions.append({
             "id": session_id, "title": routine.get("title") or session_id,
             "kind": "conditioning" if patterns == {"conditioning"} else "lifting",
-            "tier": "core", "status": "active", "location": None, "focus": None,
+            "tier": "core", "status": "active", "location": None, "focus": None, "scheme": None,
             "exercises": exercises,
         })
         hevy_routines[routine["id"]] = session_id
@@ -435,8 +435,11 @@ def _rotation(doc, position, today, config, registry):
 
 
 def _slot_schemes(doc):
-    return {f"{session['id']}/{line['exercise_id']}": line["scheme"]["name"]
-            for _, _, session, line in program.slots(doc)}
+    found = {f"{session['id']}/{line['exercise_id']}": line["scheme"]["name"]
+             for _, _, session, line in program.slots(doc)}
+    found.update({f"{session['id']}/{state_module.SESSION_SLOT}": session["scheme"]["name"]
+                  for session in doc["sessions"] if session.get("scheme")})
+    return found
 
 
 def _scheme_state(old_state, old_program, new_program):
