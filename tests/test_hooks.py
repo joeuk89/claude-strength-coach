@@ -15,6 +15,7 @@ from unittest import mock
 
 from coach import checks, hooks
 from tests.support import INSTANCES, REPO_ROOT, VALID, run_cli
+from tests.support.git import git
 
 NOW = "2026-10-11T18:00:00Z"
 ENV = {"COACH_NOW": NOW}
@@ -142,7 +143,9 @@ class SessionStartTest(unittest.TestCase):
     def test_template_repo_prints_nothing(self):
         root = copy_of(self, VALID)
         (root / "profile.md").unlink()
-        (root / "tests").mkdir()
+        (root / "config.toml").unlink()
+        git(root, "init", "-q")
+        git(root, "config", "--local", "coach.workspace", "template")
         code, response, _ = run_hook("sessionstart", root, session_input())
         self.assertEqual((code, response), (0, None))
 

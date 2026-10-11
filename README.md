@@ -30,11 +30,18 @@ targets. With them, the loop is much tighter.
 2. Clone it and open Claude Code inside:
    ```bash
    git clone <your-repo-url> my-training && cd my-training
+   git config --local coach.workspace athlete
    claude
    ```
 3. Run **`/setup`**. It walks you through connecting Hevy (if you have
    it), building your athlete profile, setting your goals, and creating
    your program.
+
+The local Git setting marks this checkout as your training workspace before
+Claude starts, even though it includes the framework tests. Git never commits
+or clones this setting, so set it in each new clone. For a local file copy,
+run `git init` and `git config --local coach.workspace athlete` inside it
+before opening Claude. Keep the tests; setup does not require deleting them.
 
 ## The weekly rhythm
 
