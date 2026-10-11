@@ -3,9 +3,9 @@
 import copy
 import unittest
 
-from coach import history, stats
+from coach import history, research, stats
 from coach.library import Library
-from tests.support import INSTANCES, VALID
+from tests.support import INSTANCES, REPO_ROOT, VALID
 from tests.support.history import (R_A, W, HistoryCase, fixture_workouts, hevy_exercise, hevy_set, hevy_workout,
                                    read_json, write_json)
 
@@ -38,6 +38,19 @@ class SetWeightsTest(unittest.TestCase):
     def test_primary_counts_one_secondary_half(self):
         entry = Library.load(VALID).get("db_bench_press")
         self.assertEqual(stats.set_weights(entry), {"chest": 1.0, "triceps": 0.5, "front_delts": 0.5})
+
+
+class CitedThresholdsTest(unittest.TestCase):
+    def test_the_e1rm_cap_and_the_hard_set_cut_off_keep_their_values(self):
+        self.assertEqual((stats.MAX_REPS_TO_FAILURE, stats.EASY_RPE), (12, 5))
+
+    def test_each_cites_a_heuristic_claim_with_its_sources(self):
+        notes = research.load_notes(REPO_ROOT)
+        cited = {ref: research.resolve(ref, notes) for ref in stats.CITES}
+        self.assertEqual({ref: (claim.basis, claim.sources) for ref, claim in cited.items()}, {
+            "rn:autoregulation.5": ("heuristic", ("reynolds-2006", "halperin-2022")),
+            "rn:proximity-to-failure.5": ("heuristic", ("robinson-2024", "refalo-2023")),
+        })
 
 
 class E1rmSeriesTest(HistoryCase):

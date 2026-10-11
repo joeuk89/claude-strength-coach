@@ -51,6 +51,20 @@ url = "https://doi.org/10.1519/SSC.0000000000000218"
 type = "narrative-review"
 year = 2016
 
+[[sources]]
+id = "reynolds-2006"
+citation = "Reynolds JM, Gordon TJ, Robergs RA. Prediction of One Repetition Maximum Strength From Multiple Repetition Maximum Testing and Anthropometry. J Strength Cond Res. 2006;20(3):584-592."
+url = "https://doi.org/10.1519/R-15304.1"
+type = "observational"
+year = 2006
+
+[[sources]]
+id = "lesuer-1997"
+citation = "LeSuer DA, McCormick JH, Mayhew JL, Wasserstein RL, Arnold MD. The Accuracy of Prediction Equations for Estimating 1-RM Performance in the Bench Press, Squat, and Deadlift. J Strength Cond Res. 1997;11(4):211-213."
+url = "https://doi.org/10.1519/00124278-199711000-00001"
+type = "observational"
+year = 1997
+
 [[claims]]
 n = 1
 text = "RPE targets anchored to reps in reserve (RPE 10 is 0 reps in reserve, RPE 9 is 1) are a usable way to prescribe and adjust load, giving strength gains at least similar to percentage-of-1RM loading."
@@ -80,6 +94,22 @@ basis = "heuristic"
 sources = ["larsen-2021"]
 status = "current"
 confidence = "low"
+
+[[claims]]
+n = 5
+text = "An e1RM is computed only from a set of 12 or fewer reps to failure (reps, plus 10 minus RPE when one is logged): linear 1RM equations are advised up to 10 reps, but 12 matches the accuracy limit in claim 2 and keeps an e1RM for 10-rep lines at RPE 8."
+basis = "heuristic"
+sources = ["reynolds-2006", "halperin-2022"]
+status = "current"
+confidence = "low"
+
+[[claims]]
+n = 6
+text = "A prescribed load whose implied RPE at the recent e1RM is above 10.5 is unearned, and an RPE target more than 1 from the implied RPE is infeasible; Epley underestimated the deadlift 1RM in untrained lifters, so both flags can misfire on hinge lifts."
+basis = "heuristic"
+sources = ["lesuer-1997", "halperin-2022"]
+status = "current"
+confidence = "low"
 -->
 <!-- coach:begin research autoregulation -->
 
@@ -91,6 +121,8 @@ confidence = "low"
 | 2 | Reps-in-reserve ratings are more accurate close to failure and in sets of 12 reps or fewer than far from failure or in long sets. | evidence | halperin-2022, helms-2016 | current |
 | 3 | Reps-in-reserve ratings are expected to grow more accurate as a lifter gains experience with the scale, so a novice's RPE targets carry more error. | heuristic (low confidence) | zourdos-2016, helms-2016, halperin-2022 | current |
 | 4 | A compound lift drifts when logged RPE is 1 or more over target on 2 or more working sets of one exposure, and drift in two sessions running is a fatigue signal. | heuristic (low confidence) | larsen-2021 | current |
+| 5 | An e1RM is computed only from a set of 12 or fewer reps to failure (reps, plus 10 minus RPE when one is logged): linear 1RM equations are advised up to 10 reps, but 12 matches the accuracy limit in claim 2 and keeps an e1RM for 10-rep lines at RPE 8. | heuristic (low confidence) | reynolds-2006, halperin-2022 | current |
+| 6 | A prescribed load whose implied RPE at the recent e1RM is above 10.5 is unearned, and an RPE target more than 1 from the implied RPE is infeasible; Epley underestimated the deadlift 1RM in untrained lifters, so both flags can misfire on hinge lifts. | heuristic (low confidence) | lesuer-1997, halperin-2022 | current |
 
 | Source | Citation | Type | Year |
 | --- | --- | --- | --- |
@@ -100,6 +132,8 @@ confidence = "low"
 | halperin-2022 | [Halperin I, Malleron T, Har-Nir I, Androulakis-Korakakis P, Wolf M, Fisher J, Steele J. Accuracy in Predicting Repetitions to Task Failure in Resistance Exercise: A Scoping Review and Exploratory Meta-analysis. Sports Med. 2022;52(2):377-390.](<https://doi.org/10.1007/s40279-021-01559-x>) | meta-analysis | 2022 |
 | zourdos-2016 | [Zourdos MC, Klemp A, Dolan C, Quiles JM, Schau KA, Jo E, et al. Novel Resistance Training-Specific Rating of Perceived Exertion Scale Measuring Repetitions in Reserve. J Strength Cond Res. 2016;30(1):267-275.](<https://doi.org/10.1519/JSC.0000000000001049>) | observational | 2016 |
 | helms-2016 | [Helms ER, Cronin J, Storey A, Zourdos MC. Application of the Repetitions in Reserve-Based Rating of Perceived Exertion Scale for Resistance Training. Strength Cond J. 2016;38(4):42-49.](<https://doi.org/10.1519/SSC.0000000000000218>) | narrative-review | 2016 |
+| reynolds-2006 | [Reynolds JM, Gordon TJ, Robergs RA. Prediction of One Repetition Maximum Strength From Multiple Repetition Maximum Testing and Anthropometry. J Strength Cond Res. 2006;20(3):584-592.](<https://doi.org/10.1519/R-15304.1>) | observational | 2006 |
+| lesuer-1997 | [LeSuer DA, McCormick JH, Mayhew JL, Wasserstein RL, Arnold MD. The Accuracy of Prediction Equations for Estimating 1-RM Performance in the Bench Press, Squat, and Deadlift. J Strength Cond Res. 1997;11(4):211-213.](<https://doi.org/10.1519/00124278-199711000-00001>) | observational | 1997 |
 
 <!-- coach:end research autoregulation -->
 
@@ -149,6 +183,27 @@ halperin-2022, and requiring two sets and two sessions filters out a
 single misjudged set. The scope (compound lifts and sets under a recovery
 cap) is this framework's choice.
 
+**Claim 5.** reynolds-2006 tested 70 adults at 1, 5, 10 and 20RM on the
+bench press and leg press. Load fell off non-linearly as reps rose, 5RM
+sets predicted 1RM best, and the authors advise using no more than 10
+reps in linear equations; Epley is one. The framework counts reps in
+reserve as reps, so a 10-rep set at RPE 8 is 12 reps to failure. A cap
+of 10 would give those lines no e1RM, and `fixed_reps_rpe` sets loads
+only from an e1RM. The cap of 12 is the edge of claim 2's accuracy range;
+no study tests it, and points near 12 carry more error than points from
+heavy sets.
+
+**Claim 6.** No study tests either threshold. 10.5 leaves half an RPE
+beyond failure for rounding and estimate error before a load counts as
+unearned. The tolerance of 1 RPE matches claim 4's margin, just above the
+average rating error in halperin-2022. lesuer-1997 tested seven 1RM
+equations on 67 untrained college students: predictions correlated
+highly with measured 1RM, but every equation, Epley included,
+significantly underestimated the deadlift 1RM. An e1RM that is too low
+makes a sound load look heavier, so its implied RPE runs high when the
+e1RM came from longer sets than the prescription. `unearned_load` or
+`rpe_infeasible` can then fire on a hinge lift that is in fact on track.
+
 ## Applying it
 
 - Prescribe working sets with an RPE target and let the athlete adjust
@@ -161,6 +216,9 @@ cap) is this framework's choice.
   recovery-capped sets. Isolation drift is noted, not acted on.
 - With a new lifter, expect ratings to run low (more reps left than they
   think) and coach the scale before leaning on it.
+- Before lowering a deadlift or other hinge load for `unearned_load` or
+  `rpe_infeasible`, check the athlete's recent logged sets of that lift:
+  the flag may come from Epley's low estimate rather than the load.
 
 ## Open questions
 
@@ -168,3 +226,7 @@ cap) is this framework's choice.
   from years of lifting? halperin-2022 could not separate the two.
 - Is RPE drift across sessions a better fatigue signal than a drop in
   reps at a fixed load? No trial compares them.
+- Does Epley underestimate the deadlift 1RM in trained lifters who log
+  RPE, as it did in lesuer-1997's untrained students? If `unearned_load`
+  misfires on deadlifts in real check-ins, make the feasibility flags
+  lift-specific.

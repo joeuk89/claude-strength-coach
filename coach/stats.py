@@ -18,6 +18,7 @@ from coach.library import Library
 
 MAX_REPS_TO_FAILURE = 12
 EASY_RPE = 5
+CITES = ("rn:autoregulation.5", "rn:proximity-to-failure.5")
 BODYWEIGHT_WINDOW_DAYS = 14
 SERIES_MODES = ("total", "per_hand_x2", "single_implement")
 BODYWEIGHT_MODES = ("bodyweight", "assisted")

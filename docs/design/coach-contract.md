@@ -1806,8 +1806,8 @@ coach.stats.implied_rpe(e1rm, load, reps) -> float       # R-24
 
 - Reps to failure `n = reps + (10 − rpe)` when RPE is logged, else
   `n = reps`. `e1rm = load` when `n ≤ 1`, else `load × (1 + n/30)`
-  (Epley). Sets with `n > 12` give no e1RM. Method recorded per point:
-  `epley_rir` or `epley`.
+  (Epley). Sets with `n > 12` give no e1RM (rn:autoregulation.5).
+  Method recorded per point: `epley_rir` or `epley`.
 - Inverse: `load_for(e1rm, reps, rpe)` = `e1rm` when `n ≤ 1`, else
   `e1rm / (1 + n/30)`. `implied_rpe(e1rm, load, reps)` = `10 − (n − reps)`
   with `n = max(1, 30 × (e1rm/load − 1))` when `load ≤ e1rm`, and
@@ -1864,7 +1864,8 @@ come from the Hevy cache.
 **Delivered sets per muscle (dose).** `stats dose (--week W | --span A..B)`:
 
 - A hard set is a logged working set (`normal`, `failure`, `dropset`) not
-  logged at RPE 5 or below; each drop counts as one set.
+  logged at RPE 5 or below (rn:proximity-to-failure.5); each drop counts
+  as one set.
 - `coach.stats.set_weights(entry) -> dict[muscle, float]`: 1.0 for each
   primary muscle and 0.5 for each secondary muscle of an R-11 library
   entry. Delivered dose here and planned dose (C41) both call it.
@@ -2106,9 +2107,9 @@ coach.validity.estimate_minutes(root, session) -> int
 - **Feasibility** uses C18's `implied_rpe` with the best e1RM point in
   the 42 days before the session date (none older): implied RPE above
   10.5 is `unearned_load`; otherwise an RPE target more than 1 from the
-  implied RPE is `rpe_infeasible`. Only working sets of `total`,
-  `per_hand_x2` and `single_implement` lines are judged this way; a rep
-  range is judged at its start. With no e1RM point (and for
+  implied RPE is `rpe_infeasible` (rn:autoregulation.6). Only working
+  sets of `total`, `per_hand_x2` and `single_implement` lines are judged
+  this way; a rep range is judged at its start. With no e1RM point (and for
   `bodyweight` lines, whose added load has no e1RM), a top working load
   more than two increments (`Library.increment`, else the equipment
   increment) above the newest exposure neither excluded nor `suspect`
