@@ -1,6 +1,9 @@
 """`nutrition targets`: the protein reference mass, floor, target and stretch (contract C35)."""
 
 import json
+import os
+import subprocess
+import sys
 import unittest
 
 from coach import calories, protein, research
@@ -286,6 +289,23 @@ class CalorieTest(unittest.TestCase):
     def test_the_activity_levels_are_the_fao_reference_lifestyles(self):
         self.assertEqual(calories.ACTIVITY_LEVEL, {"sedentary": 1.53, "active": 1.76, "vigorous": 2.25})
         self.assertEqual(calories.KCAL_PER_KG, 7700)
+
+    def test_activity_help_names_the_lifestyles_and_judges_the_whole_day(self):
+        code, _, _ = run_cli(["--root", str(VALID), "nutrition", "targets", "--activity", "sedentary"], env=NOW)
+        self.assertEqual(code, 0)
+        proc = subprocess.run([sys.executable, "-m", "coach", "nutrition", "targets", "--help"], cwd=REPO_ROOT,
+                              capture_output=True, text=True, env=dict(os.environ, COLUMNS="2000"))
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        help_text = " ".join(proc.stdout.split())
+        self.assertIn("{sedentary,active,vigorous}", help_text)
+        for needle in ("sedentary: sedentary or lightly active", "active: active or moderately active",
+                       "vigorous: vigorously active", "two or three training sessions a week",
+                       "about an hour of moderate-to-vigorous exercise a day", "not from steps alone",
+                       "how long and how hard"):
+            self.assertIn(needle, help_text)
+        sedentary = help_text[help_text.index("sedentary: "):help_text.index("active: active")]
+        self.assertIn("walking", sedentary)
+        self.assertNotIn("walking most days", help_text)
 
     def test_method_names_the_numbers_it_uses(self):
         for needle in ("Mifflin–St Jeor", str(calories.KCAL_PER_KG), str(calories.ROUND_KCAL)):

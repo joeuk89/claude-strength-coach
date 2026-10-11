@@ -327,7 +327,8 @@ _Avoid_: perfect week, full week, completed hard week (the block's count)
 After the athlete's "go", commit and push exactly the brief, the
 dashboard, the progress page, the week's overlay and the newest check-in
 record, plus the current session sheets when Hevy is off, so the phone
-shows the week. The only push the coach makes without being asked.
+shows the week. `/goals` publishes the approved week again after a
+nutrition change. The only push the coach makes without being asked.
 _Avoid_: deploy, sync (Hevy sync and framework sync are other things)
 
 **Sunday message**:

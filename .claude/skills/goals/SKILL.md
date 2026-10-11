@@ -13,17 +13,16 @@ the protein anchors and any MacroFactor setup. The numbers go in
 **The framework rule (nutrition app users).** MacroFactor is the
 nutrition engine: it estimates expenditure from logged food and weight
 and adjusts the daily targets weekly. This repo decides the *strategy*
-(phase, trend rate, goal weight, protein numbers, anchors) and does two
-things with the app: it gets **complete logging** into the app and reads
-the app's numbers out. Complete logging means every day logged. On a day
-the athlete couldn't track, they log an estimate of the day or of the
-missed meal (a quick-add of calories and protein). This follows
-MacroFactor's own guidance: a day logged by halves is what skews its
-targets most; an estimate within about 30 % of what was eaten is
-strongly preferred to a blank day; only a day they can't guess that
-closely is better left blank (rn:protein-energy-deficit.13). The repo
-**never states its own calorie target or calorie band** for an app user
-and never runs a parallel calorie model. Any departure from the app's
+(phase, trend rate, goal weight, protein numbers, anchors), gets
+**complete logging** into the app and reads the app's numbers out.
+Complete logging means every day logged; on a day the athlete couldn't
+track, they log an estimate of the day or the missed meal (a quick-add
+of calories and protein). Per MacroFactor's own guidance, a day logged
+by halves skews its targets most; an estimate within about 30 % of what
+was eaten beats a blank day, and only a day they can't guess that
+closely stays blank (rn:protein-energy-deficit.13). The repo **never
+states its own calorie target or calorie band** for an app user and
+never runs a parallel calorie model. Any departure from the app's
 numbers is a dated nutrition override (step 7).
 
 **Without a nutrition app:** the same strategy, plus one transparent
@@ -54,9 +53,8 @@ the conversation hasn't covered:
 
 **Scope check:** even a yes/no entry point ("should the bulk still
 start?") runs the full flow if profile fields are TBD or stale. Confirming
-a planned phase change on a current plan needs only a light
-confirm-and-record pass; renewing an override needs only step 7 and the
-record.
+a planned phase change needs only a light confirm-and-record pass when the
+plan is current; renewing an override needs only step 7 and the record.
 
 ## 2. The athlete states the goal
 
@@ -88,8 +86,7 @@ calorie estimate per phase, after which only the weight trend moves it.
 Any period eating to a number other than the app's (or, without an app,
 the trend-driven calorie target on file) is a nutrition override. Push
 back first; usually the right answer is "let the app work and keep
-logging". If one is agreed or renewed, follow
-[overrides.md](overrides.md).
+logging". If one is agreed or renewed, follow [overrides.md](overrides.md).
 
 ## 8. Flag training implications
 
@@ -105,20 +102,23 @@ Two places, both with the athlete's confirmation, like any profile edit.
 changed line as it will read, and wait for approval. The keys are in the
 commented `[nutrition]`, `[nutrition.protein]`, `[[nutrition.anchors]]`
 (one per anchor) and `[nutrition.override]` tables of
-`config.example.toml`; weights are in `[athlete] bodyweight_units`.
-Write it with the Write or Edit tool and
-run `python3 -m coach config validate`; it exits 5 naming the key if
-anything is wrong (a `kcal_target` with an app, protein numbers out of
-order, an override longer than 21 days).
+`config.example.toml`; weights are in `[athlete] bodyweight_units`. Write
+it with the Write or Edit tool and run `python3 -m coach config validate`;
+it exits 5 naming the key if anything is wrong (a `kcal_target` with an
+app, protein numbers out of order, an override longer than 21 days).
 
-**What stays prose** in the **Nutrition & goals** section of
-`profile.md` is what only a human reads: the goal in the athlete's
-words, the phase sequence and its triggers, why that protein basis, how
-the anchors were chosen, the sleep-gate status and the app setup notes.
-Its shape is in `reference/record-formats.md` → "profile.md: Nutrition &
-goals".
+**What stays prose** in the **Nutrition & goals** section of `profile.md`
+is what only a human reads: the goal in the athlete's words, the phase
+sequence and its triggers, why that protein basis, how the anchors were
+chosen, the sleep-gate status and the app setup notes. Its shape is in
+`reference/record-formats.md` → "profile.md: Nutrition & goals".
 
 **If the phase is written in more than one place, sync them all in the
 same edit** (`config.toml`'s `[nutrition] phase` and `profile.md`), and
-bump `profile.md`'s `_Last reviewed_` date. Check-ins take it from here:
-weekly readings, the trend, the floor's raises, overrides expiring.
+bump `profile.md`'s `_Last reviewed_` date.
+
+## 10. Publish the pages
+
+Every pass that changes `config.toml` ends with
+[publish.md](publish.md): done when the publish pushed and `pages_fresh`
+passes, or when the close-out names what is not done.

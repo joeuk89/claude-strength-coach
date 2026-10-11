@@ -662,10 +662,16 @@ def _bodyweight(view):
 RENDERERS = {BRIEF: render_brief, DASHBOARD: render_dashboard, PROGRESS: render_progress}
 
 
-def render_all(root, now, kinds=KINDS):
+def render_all(root, now, kinds=KINDS, view=None):
     """{page path: text} for the pages, all rendered as of `now` from one read of the instance."""
-    view = _View(root, now)
+    view = view or _View(root, now)
     return {PAGE_PATHS[kind]: RENDERERS[kind](root, view.as_of, view) for kind in kinds}
+
+
+def brief_overlay(view):
+    """The overlay the brief shows, as {id, approved}, or None when no overlay covers its week."""
+    found = view.week_overlay
+    return None if found is None else {"id": found["id"], "approved": overlay.is_approved(found)}
 
 
 def readme_owner_problem(root):
@@ -686,7 +692,8 @@ def write(root, now, kinds=KINDS, replace_readme=False, dry_run=False):
         if problem and not replace_readme:
             raise RefusedError(problem)
         replaced = problem is not None
-    rendered = render_all(root, now, kinds)
+    view = _View(root, now)
+    rendered = render_all(root, now, kinds, view)
     report = []
     for path, text in rendered.items():
         target = root / path
@@ -694,7 +701,8 @@ def write(root, now, kinds=KINDS, replace_readme=False, dry_run=False):
         if not dry_run:
             target.write_text(text, encoding="utf-8")
         report.append({"path": path, "changed": before != text, "written": not dry_run, "lines": text.count("\n")})
-    return {"as_of": timestamp(as_of_moment(now)), "pages": report, "replaced_readme": replaced, "dry_run": dry_run}
+    return {"as_of": timestamp(as_of_moment(now)), "pages": report, "replaced_readme": replaced,
+            "brief_overlay": brief_overlay(view), "dry_run": dry_run}
 
 
 def freshness(root):

@@ -3820,7 +3820,10 @@ dates unique:
     method, resting_kcal, activity_level, maintenance_kcal, estimates,
     refs}`: resting rate by Mifflin–St Jeor from bodyweight, height, age
     and sex (rounded to 1 kcal), times the activity level (`sedentary`
-    1.53, `active` 1.76, `vigorous` 2.25) and rounded to the nearest
+    1.53, sedentary or lightly active; `active` 1.76, active or
+    moderately active; `vigorous` 2.25, vigorously active; `--help`
+    judges the whole day: job, walking, and each session's duration and
+    intensity) and rounded to the nearest
     50 kcal for `maintenance_kcal`, and one `{phase, rate_per_week, unit,
     adjustment_kcal, kcal, below_resting}` per phase: the adjustment is
     the rate in kg × 7700 ÷ 7 (rounded to 1 kcal) and `kcal` is
@@ -4548,6 +4551,13 @@ before its local date. Withdrawals created later do not apply.
    failed push exits 4 and keeps the commit; the message says to push by
    hand.
 5. `--dry-run` reports the paths and message and changes nothing.
+
+`pages render` reports `brief_overlay`: `{id, approved}` for the overlay
+the brief shows, or null when none covers its week. After approved
+nutrition edits, `/goals` validates the config, renders, publishes that
+overlay when it is approved and checks `pages_fresh`; a missing or
+unapproved overlay or a publish refusal leaves the close-out reported as
+not done. It never stages `config.toml` or `profile.md`.
 
 Metadata: `writes`, `git_write`. It is allowlisted (C2).
 
