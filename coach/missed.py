@@ -11,8 +11,8 @@ import copy
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from coach import checkin, dates, flags, history, jsonio, overlay, pages, paths, program, render, stats, units
-from coach import validity
+from coach import checkin, dates, flags, history, jsonio, overlay, pages, paths, program, render, stats, structure
+from coach import units, validity
 from coach import config as config_module
 from coach.errors import RefusedError, ValidationError
 from coach.library import Library
@@ -267,6 +267,15 @@ def apply_rule(root, doc, session_id, day, rule, now=None, config=None, library=
     return built
 
 
+def _floor_missed(rule, missed, day, reason, names):
+    """priority_exposures_missed for each lift a priority floor rule could not fold anywhere this week."""
+    return [flags.make("priority_exposures_missed", session_id=missed["session_id"], exercise_id=item["exercise_id"],
+                       message=f"{names.exercise(item['exercise_id'])} missed its exposure in {missed['title']} on "
+                               f"{render.day_label(day)} and no floor dose of {_sets_words(item['sets'])} replaced it "
+                               f"({reason}); the next week's own session carries it")
+            for item in rule["action"]["exercises"]]
+
+
 def _sets_text(line, with_rpe, show_hevy):
     if with_rpe and show_hevy:
         return render.target_line(line)[len("Target: "):]
@@ -346,23 +355,34 @@ def plan(root, session_id, day, now=None):
              "matched": False, "rule": None, "action": None, "description": None, "reason": None, "summary": [],
              "write_line": None, "draft": None, "flags": []}
 
-    rule = match(root, session_id, day, doc, program_doc)
+    floor_rule = structure.priority_floor(root, session_id, day, doc, program_doc)
+    floor_flags, draft = [], None
+    if floor_rule is not None:
+        try:
+            draft = apply_rule(root, doc, session_id, day, floor_rule, now, config, library)
+        except Unmatched as reason:
+            floor_flags = _floor_missed(floor_rule, missed, day, reason, names)
+    rule = floor_rule if draft is not None else match(root, session_id, day, doc, program_doc)
     try:
         if rule is None:
             raise Unmatched("no rule names this session with its condition met")
         found.update(rule=rule, action=rule["action"]["kind"],
                      description=describe(rule, program_doc=program_doc, library=library))
-        draft = apply_rule(root, doc, session_id, day, rule, now, config, library)
+        if draft is None:
+            draft = apply_rule(root, doc, session_id, day, rule, now, config, library)
     except Unmatched as reason:
         found["reason"] = str(reason)
-        found["flags"] = [flags.make("missed_rule_unmatched", session_id=session_id, message=(
+        found["flags"] = floor_flags + [flags.make("missed_rule_unmatched", session_id=session_id, message=(
             f"No missed-day rule applies to {missed['title']} on {render.day_label(day)} ({reason}); "
             f"{FALLBACK_WORDS}."))]
         found["summary"] = [f"{missed_text}; no missed-day rule applies ({reason}).",
                             f"Next: {FALLBACK_WORDS}."]
         return found
 
-    found.update(matched=True, draft=draft, write_line=write_line(config, draft))
+    if draft is not None and any(s.get("moved_from") == day.isoformat() and s["session_id"] == session_id
+                                 for s in draft["sessions"]):
+        floor_flags = []
+    found.update(matched=True, draft=draft, write_line=write_line(config, draft), flags=floor_flags)
     summary = [f"{missed_text}; rule {rule['id']} applies ({rule['action']['kind']})."]
     if draft is None:
         summary.append("Nothing else changes this week; only the miss is recorded.")

@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from coach import dates, flags, program, structure
 from coach.commands import arg, command
 from coach.config_tables import coaching
@@ -44,7 +46,10 @@ def adherence(args, ctx):
     "structure balance",
     help="Weekly sets per muscle the program plans on core and coach-led sessions, against its dose targets",
     args=(arg("--program", metavar="FILE",
-              help="a candidate program to check instead, compared with data/program.json for new sessions"),),
+              help="a candidate program to check instead, compared with data/program.json for new sessions"),
+          arg("--variant", choices=structure.VARIANTS,
+              help="minimum: check the minimum week (at most two sessions within their caps, every priority floor, "
+                   "a third of each dose target); exit 1 names each reason it fails")),
 )
 def balance(args, ctx):
     candidate = None
@@ -55,7 +60,46 @@ def balance(args, ctx):
             raise ValidationError(f"{args.program} is not a valid program ({len(errors)} problem(s))",
                                   details=[error.to_json() for error in errors])
         candidate = program.normalised(candidate)
-    return _presented(structure.balance(ctx.root, candidate, today=ctx.today(), now=ctx.now()), ctx)
+    report = _presented(structure.balance(ctx.root, candidate, args.variant, today=ctx.today(), now=ctx.now()), ctx)
+    if args.variant and not report["passed"]:
+        raise ValidationError(f"The minimum week fails: {'; '.join(report['reasons'])}",
+                              details=[{"path": "$.minimum_week", "message": reason} for reason in report["reasons"]],
+                              data=report)
+    return report
+
+
+def _week(args, ctx, default):
+    try:
+        return dates.parse_week(args.week, ctx.config.athlete.week_starts) if args.week else \
+            dates.week_span(default, ctx.config.athlete.week_starts)
+    except ValueError as exc:
+        raise UsageError(f"--week: {exc}") from None
+
+
+@command(
+    "structure priority",
+    help="Each priority lift's KPI now and its trend, and its exposures per week against plan, with "
+         "priority_exposures_missed",
+    args=(arg("--since", metavar="D", help="the first day of the trend and the week rows (default: four weeks ago)"),),
+)
+def priority(args, ctx):
+    since = _date(args.since, "--since") if args.since else None
+    return _presented(structure.priority(ctx.root, since, today=ctx.today(), now=ctx.now()), ctx)
+
+
+@command(
+    "structure minimum",
+    help="The minimum week's dated sessions for a week, as a schedule plan file for propose week --plan",
+    args=(arg("--week", metavar="W", help="a week label (YYYY-Www) or any date in it; default: the week holding "
+                                          "tomorrow"),
+          arg("--write", action="store_true", help="write the plan to .coach/plans/<week start>-minimum.json")),
+    writes=True,
+    writes_scope="cache",
+)
+def minimum(args, ctx):
+    span = _week(args, ctx, ctx.today() + timedelta(days=1))
+    return structure.minimum(ctx.root, span, write=args.write, dry_run=args.dry_run, today=ctx.today(),
+                             now=ctx.now())
 
 
 @command(
