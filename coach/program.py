@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 
 from coach import config as config_module
-from coach import jsonio, paths, units
+from coach import jsonio, paths, plugins, units
 from coach.errors import ConfigError, ValidationError
 from coach.library import MUSCLES, Library
 from coach.validate import Error
@@ -64,11 +64,13 @@ def load(root):
     return normalised(jsonio.read_doc(path, SCHEMA))
 
 
-def problems(doc, config=None, library=None):
+def problems(doc, config=None, library=None, root=None):
     """Every problem with a program, as (kind, Error) pairs: SCHEMA_PROBLEM or EXERCISE_PROBLEM.
 
     `config` resolves session locations and `library` checks exercise ids;
-    either may be None to skip that part.
+    either may be None to skip that part. Schemes, schedule and deload
+    rules are checked against the plugins of `root` (else the config's
+    instance; with neither, the framework's plugins only).
     """
     version_error = _version_error(doc)
     if version_error:
@@ -82,11 +84,15 @@ def problems(doc, config=None, library=None):
     found += [(SCHEMA_PROBLEM, error) for error in _structure(doc)]
     if config is not None:
         found += [(SCHEMA_PROBLEM, error) for error in _locations(doc, config)]
+    if root is None and config is not None and getattr(config, "path", None) is not None:
+        root = Path(config.path).parent
+    registry = plugins.load(root)
+    found += [(SCHEMA_PROBLEM, Error(path, message)) for path, message in plugins.program_problems(doc, registry)]
     return found
 
 
-def validate(doc, config=None, library=None):
-    return [error for _, error in problems(doc, config, library)]
+def validate(doc, config=None, library=None, root=None):
+    return [error for _, error in problems(doc, config, library, root)]
 
 
 def _version_error(doc):
@@ -193,7 +199,27 @@ def _exercise_errors(exercise, path):
             errors.append(Error(group_path, "a distance set group needs distance_meters"))
     if mode not in units.LOADED_MODES and exercise["start_load"] is not None:
         errors.append(Error(f"{path}.start_load", f"load mode {mode} carries no load; leave start_load null"))
+    for index, constraint in enumerate(exercise["constraints"]):
+        errors += _constraint_errors(constraint, f"{path}.constraints[{index}]")
     return errors
+
+
+def _constraint_errors(constraint, path):
+    kind, value = constraint["kind"], constraint["value"]
+    if kind == "no_added_load" and value is not None:
+        return [Error(f"{path}.value", "no_added_load takes no value; leave it null")]
+    if kind != "no_added_load" and value is None:
+        return [Error(f"{path}.value", f"{kind} needs a value")]
+    if kind == "rpe_cap" and not 1 <= value <= 10:
+        return [Error(f"{path}.value", f"an RPE cap is 1 to 10, found {value}")]
+    return []
+
+
+def constraint_text(constraint):
+    """A load constraint in words: "RPE cap 7 (left knee)"."""
+    value = units.json_number(constraint["value"]) if constraint["value"] is not None else None
+    words = {"rpe_cap": f"RPE cap {value}", "load_cap": f"load cap {value}", "no_added_load": "no added load"}
+    return f"{words[constraint['kind']]} ({constraint['reason']})"
 
 
 def _locations(doc, config):
@@ -351,7 +377,7 @@ def render_session_page(session, library, unit):
         if exercise["cues"]:
             notes.append(f"- **{name}** · cues: {exercise['cues']}")
         for constraint in exercise["constraints"]:
-            notes.append(f"- **{name}** · constraint: {constraint}")
+            notes.append(f"- **{name}** · constraint: {constraint_text(constraint)}")
     if notes:
         lines += ["", "## Cues and constraints", ""] + notes
     return "\n".join(lines) + "\n"

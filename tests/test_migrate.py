@@ -88,7 +88,8 @@ def snapshot(root):
 class DiscoveryTest(unittest.TestCase):
     def test_framework_registry_owns_the_json_documents(self):
         reg = migrate.registry()
-        self.assertEqual(sorted(reg.documents), ["annotations", "exercise_library", "history_month", "overlay", "program", "state"])
+        self.assertEqual(sorted(reg.documents), ["annotations", "decisions", "exercise_library", "history_month", "overlay",
+                                               "program", "state"])
         self.assertEqual(reg.documents["program"].files, ("data/program.json",))
         for document in reg.documents.values():
             with self.subTest(document=document.name):
@@ -126,7 +127,7 @@ class StatusAndPlanTest(unittest.TestCase):
     def test_status_on_the_valid_instance(self):
         rows = migrate.status(VALID)
         paths = {row["path"]: row for row in rows}
-        expected = {"data/program.json": 1, "data/state.json": 2, "data/exercises.json": 1, OVERLAY: 2}
+        expected = {"data/program.json": 2, "data/state.json": 3, "data/exercises.json": 1, OVERLAY: 2}
         for path, version in expected.items():
             with self.subTest(path=path):
                 self.assertEqual(paths[path]["version"], version)
@@ -187,7 +188,7 @@ class MigrateCommandTest(EnvelopeMixin, unittest.TestCase):
     def test_status_lists_each_owned_file(self):
         data = self.run_ok("--root", str(VALID), "migrate", "status")
         listed = {row["path"]: (row["version"], row["target"]) for row in data["files"]}
-        self.assertEqual(listed["data/program.json"], (1, 1))
+        self.assertEqual(listed["data/program.json"], (2, 2))
         self.assertEqual(listed[OVERLAY], (CURRENT, CURRENT))
         self.assertEqual(data["behind"], 0)
 
