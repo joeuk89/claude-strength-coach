@@ -211,7 +211,8 @@ Import is an offline draft: save the page, pass `--html`, and keep its
 The original compound ingredient line stays in `unparsed_ingredients`
 when quantities cannot be read exactly; enter each food and quantity
 explicitly. The importer strips supported comma-delimited preparation
-clauses such as `crushed` and `thinly sliced`, while retaining identity
+clauses such as `crushed`, `thinly sliced` and `deseeded and finely
+chopped`, while retaining identity
 such as red/yellow and cooked/raw.
 
 Duplicate quantities add only for the same normalized item and unit

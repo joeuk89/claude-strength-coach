@@ -3469,8 +3469,9 @@ the block after TOML parsing):
   `servings_missing`, `time_missing`, `active_time_uncertain` (with raw
   `source_times`), `aisle_guessed`, `incompatible_ingredient_units` (with
   `items` and source `lines`). Compound quantities that cannot be read
-  exactly remain in `unparsed_ingredients`; supported preparation clauses
-  leave shopping identity, while cooked/raw and colour distinctions stay.
+  exactly remain in `unparsed_ingredients`; supported preparation clauses,
+  alone or joined by "and", are removed from the item name, while
+  cooked/raw and colour distinctions stay.
   Duplicate item/unit quantities sum after supported unit normalization;
   incompatible units remain separate for review and reconciliation before
   card validation. Specific food phrases take priority over misleading
