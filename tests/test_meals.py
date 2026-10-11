@@ -193,6 +193,7 @@ class BuildTest(CliMixin, unittest.TestCase):
             self.assertEqual(snapshot(root), before)
         self.assertIs(data["written"], False)
         self.assertEqual(data["plan"]["id"], PLAN_ID)
+        self.assertEqual(data["rendered"], meals.render_plan(data["plan"]))
 
     def test_day_totals_equal_their_items(self):
         plan = build()

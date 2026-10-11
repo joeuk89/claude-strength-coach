@@ -48,7 +48,8 @@ def template(args, ctx):
 
 @command(
     "meals build",
-    help="Resolve a draft of the week's exceptions into data/nutrition/plans/<id>.json",
+    help="Resolve a draft of the week's exceptions into data/nutrition/plans/<id>.json; returns the plan "
+         "and its rendered page",
     args=(arg("--input", required=True, metavar="FILE", help="the draft (meal_plan_draft schema)"),),
     writes=True,
 )
@@ -62,7 +63,8 @@ def build(args, ctx):
             raise RefusedError(f"Meal plan {doc['id']} is approved, so it is not rebuilt; start the draft's span on "
                                "another day for a new plan.")
     jsonio.write_doc(path, doc, args.dry_run)
-    return {"id": doc["id"], "path": _relative(ctx, path), "written": not args.dry_run, "plan": doc}
+    return {"id": doc["id"], "path": _relative(ctx, path), "written": not args.dry_run, "plan": doc,
+            "rendered": meals.render_plan(doc)}
 
 
 @command("meals show", help="One meal plan and whether its approval holds", args=(_ID,))
