@@ -73,7 +73,8 @@ def flags(root, config, span, mode, bouts, today, overlay=None):
                                   "validate")
         resolved.append((plugin, plugins.merged_params(plugin, rule["params"])[0]))
     lead = _lead_span(span, [params for _, params in resolved])
-    zone = dates.zone(config["athlete"]["timezone"])
+    name = config["athlete"]["timezone"]
+    zone = dates.zone(name) if name else None
     timeline = tuple(_local(b, zone) for b in sorted(_lead_in(root, config, lead, today) + list(bouts),
                                                        key=_order))
     lines = _lift_lines(root, timeline, overlay, lead.start, span.end)
