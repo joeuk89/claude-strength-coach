@@ -52,7 +52,6 @@ class CheckinCase(HistoryCase):
 
 def stub_nutrition(status):
     module = types.ModuleType("coach.nutrition")
-    module.QUESTION_NEXT_WEEK = "food exceptions next week: who cooks which nights, office-day changes, meals out?"
     module.status = lambda root, today: status
     return module
 
@@ -110,6 +109,7 @@ class DueCommandTest(CheckinCase):
 class CardSessionsTest(CheckinCase):
     def test_window_mode_and_sessions(self):
         card = self.card()
+        self.assertEqual(card["schema_version"], 2)
         self.assertEqual(card["window"], {"start": "2026-10-05", "end": "2026-10-11"})
         self.assertEqual((card["mode"], card["days_since_last"], card["unsynced"]), ("weekly", 7, 0))
         sessions = card["sessions"]
@@ -342,7 +342,7 @@ class NutritionPartTest(CheckinCase):
             self.assertIn(question, food["ask"])
         self.assertIsNone(self.field(card, "meal_plan"))
         self.assertEqual(self.field(card, "next_week")["n"], 7)
-        self.assertIn(questions[2], card["nudge_lines"])
+        self.assertNotIn("nudge_lines", card)
 
     def test_disabled_status_brings_r01_back(self):
         with mock.patch.dict(sys.modules, {"coach.nutrition": stub_nutrition({"enabled": False})}):

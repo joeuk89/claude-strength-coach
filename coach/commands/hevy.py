@@ -23,7 +23,6 @@ def _require_enabled(ctx):
     args=(arg("--full", action="store_true", help="re-read every workout, not only the changes since the last pull"),),
     writes=True,
     network=True,
-    writes_scope="cache",
 )
 def pull(args, ctx):
     _require_enabled(ctx)

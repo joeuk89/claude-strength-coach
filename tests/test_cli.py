@@ -238,7 +238,6 @@ class DryRunTest(unittest.TestCase):
             return {"dry_run": args.dry_run}
 
         cmd = write.coach_command
-        self.assertEqual(cmd.writes_scope, "data")
         code, envelope, _ = run_cli(["demo", "write", "--dry-run"], commands=[cmd])
         self.assertEqual(code, 0)
         self.assertEqual(envelope["data"], {"dry_run": True})
@@ -261,14 +260,12 @@ class DryRunTest(unittest.TestCase):
             command("too many words here", help="x")
         with self.assertRaises(ValueError):
             command("push it", help="x", hevy_write=True)
-        with self.assertRaises(ValueError):
-            command("cache it", help="x", writes_scope="cache")
 
     def test_every_command_records_its_metadata(self):
         for cmd in commands.discover():
             with self.subTest(command=cmd.name):
                 self.assertIsInstance(cmd, Command)
-                self.assertEqual(set(cmd.metadata()), {"writes", "hevy_write", "network", "git_write", "writes_scope"})
+                self.assertEqual(set(cmd.metadata()), {"writes", "hevy_write", "network", "git_write"})
 
 
 class MainModuleTest(unittest.TestCase):

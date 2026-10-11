@@ -14,7 +14,6 @@ _REFRESH = arg("--refresh", action="store_true",
     args=(_OVERLAY, _REFRESH),
     writes=True,
     network=True,
-    writes_scope="cache",
 )
 def diff(args, ctx):
     return routines.diff_report(ctx, args.overlay, refresh=args.refresh, dry_run=args.dry_run)
@@ -26,7 +25,6 @@ def diff(args, ctx):
     args=(_OVERLAY, _REFRESH),
     writes=True,
     network=True,
-    writes_scope="cache",
 )
 def verify(args, ctx):
     return routines.verify(ctx, args.overlay, refresh=args.refresh, dry_run=args.dry_run)

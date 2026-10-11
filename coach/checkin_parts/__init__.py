@@ -29,7 +29,6 @@ class Contribution:
     facts: list = field(default_factory=list)
     flags: list = field(default_factory=list)
     tier_reasons: list = field(default_factory=list)
-    nudge_lines: list = field(default_factory=list)
 
 
 @dataclass(frozen=True)

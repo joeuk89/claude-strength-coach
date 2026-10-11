@@ -94,7 +94,6 @@ def priority(args, ctx):
                                           "tomorrow"),
           arg("--write", action="store_true", help="write the plan to .coach/plans/<week start>-minimum.json")),
     writes=True,
-    writes_scope="cache",
 )
 def minimum(args, ctx):
     span = _week(args, ctx, ctx.today() + timedelta(days=1))
