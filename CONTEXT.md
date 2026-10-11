@@ -89,6 +89,20 @@ mid-week reprogram or a one-off week is a new overlay that supersedes the
 old one for the days it covers.
 _Avoid_: weekly plan, week's targets, weekly overlay
 
+**Missed-day rule**:
+The program's standing answer to one missed session, agreed before the
+week starts: fold some of its exercises into a later session, shift the
+whole session to a free day, or skip it. It is applied as a mid-week
+overlay once the athlete says go; a miss no rule covers goes back to the
+coach to reprogram.
+_Avoid_: make-up rule, catch-up plan
+
+**Fold**:
+Sets from a missed session added to a later session in the same week,
+for that week only. The next week is built from the program again, so a
+fold never carries forward.
+_Avoid_: make-up sets, carry-over
+
 **Progression scheme**:
 The named rule that turns an exercise's recent exposures into its next
 prescription: double progression, linear, wave, RPE-anchored, assistance
