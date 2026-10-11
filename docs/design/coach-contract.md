@@ -4001,8 +4001,8 @@ changed lines and moved sessions carry `missed_day_rule` (info). It runs
 - `coach.missed.apply_rule(root, overlay, session_id, date, rule) -> draft`
   applies any rule object, including a synthetic one built by another item
   (R-30b builds a `fold` rule for a priority lift's floor dose and applies
-  it ahead of the program's rules, C40). Matching and application stay
-  separate so callers can do this without copying either.
+  it after the program's rules, as a fallback, C40). Matching and
+  application stay separate so callers can do this without copying either.
 - `missed list [--date D]`: planned sessions in the overlay in force dated
   before D with no matching workout and no `trained_unlogged` annotation (C18).
 - `missed plan --session S --date D`: read-only. `data.matched`, `data.rule`,
@@ -4074,8 +4074,9 @@ changed lines and moved sessions carry `missed_day_rule` (info). It runs
   are never a miss), reading unsynced workouts too (C17); `recorded` is
   true when a `miss` annotation names that session and date.
 - `missed plan` also returns `title`, `overlay_id`, `action`,
-  `description`, `reason` (why unmatched) and `flags` (the
-  `missed_rule_unmatched` flag when unmatched). The summary is the miss
+  `description`, `reason` (why unmatched), `floor_rule` (the priority
+  floor applied alongside a program fold, C40, else null) and `flags`
+  (the `missed_rule_unmatched` flag when unmatched). The summary is the miss
   and the rule, the change (loads in C12 Target form), the overlay and
   its span, and the prescription check's block and warn counts.
 - Write lines: as R-03 with the draft's session titles; without Hevy
@@ -4365,8 +4366,8 @@ null`:
   Loads and reps come from the approved prescription (no progression);
   `rpe` applies only when lower than the prescribed RPE.
 - R-30b applies it through `coach.missed.apply_rule(root, overlay,
-  session_id, date, rule)` ahead of the program's own rules, adding that
-  one call to R-22's plan and apply path (named in the PR). Folded lines
+  session_id, date, rule)` after the program's own rules, as a fallback
+  (see "Order in `missed plan`" below), in R-22's plan and apply path. Folded lines
   get R-22's `fold` marker (`scope: one_week`, overlay v3) and its
   `missed_day_rule` flag, five-line summary and write line.
 - When `apply_rule` returns unmatched (no later session in the span),
@@ -4394,7 +4395,8 @@ null`:
   third of each target) are not schema rules, so a program can hold a
   minimum week that fails them and the check names why.
 - **Synthetic rule id.** One rule covers every priority lift the missed
-  session carried, in `priority` order: `priority:<id>`, or
+  session carried (alongside a program fold, only those the fold leaves
+  out; see "Order in `missed plan`" below), in `priority` order: `priority:<id>`, or
   `priority:<id>+<id>` for two or more. The rule also carries
   `"text": null`, as program rules do. "Carried" means a line in the
   missed session of the overlay in force (the program session when no
@@ -4403,13 +4405,30 @@ null`:
   `^priority:[a-z0-9_]+(\+[a-z0-9_]+)*$`. The step changes no line, but
   the version is in the approval hash, so approved overlays lose their
   approval and the report lists them (as C21).
-- **Order in `missed plan`** (and so `missed apply`): the floor rule is
-  tried first. When it applies, it is the miss's rule and the program's
-  rules are not tried, as C37's first-match rule reads with the floor
-  rule at the head of the list. When it is unmatched, `data.flags` gets
-  one `priority_exposures_missed` per lift and the program's rules are
-  tried as before; the flag is dropped again when the program's rule
-  shifts the missed session itself, since the lift moves with it.
+- **Order in `missed plan`** (and so `missed apply`): the program's rules
+  are matched and applied first, as C37 reads. The floor rule is tried
+  after them, as a fallback, only when:
+  - no program rule matches the miss;
+  - the matched rule is `skip` or `manual`;
+  - the matched rule can't be applied (`apply_rule` raises `Unmatched`,
+    for example a shift with no free day);
+  - the matched rule is a fold that leaves out a priority lift the missed
+    session carried.
+
+  A shift that moves the whole session carries every lift with it, so
+  the floor is not tried and no `priority_exposures_missed` is raised.
+  In the first three cases the floor rule, when it applies, becomes the
+  miss's rule (`data.rule`). In the fourth, the floor rule covers only
+  the lifts the fold leaves out (its id names just those), it folds
+  into the week the program's fold has already changed, `data.rule`
+  stays the program's rule, and `data.floor_rule` holds the floor rule
+  (null in every other case). The summary's first line then ends
+  `, with the priority floor <id>.` and the record line reads
+  `- Rules <rule id> and <floor id>: …`. A lift the program's fold lists
+  counts as kept in the week whatever set count the fold gives it. When
+  the floor rule is tried and is unmatched, `data.flags` gets one
+  `priority_exposures_missed` per lift and the program's rule stands
+  alone (or the miss stays unmatched).
 - `structure priority [--since D]` (default: 28 days before today)
   returns `since`, `until`, `flags` and per lift `exercise_id`, `name`,
   `sessions` (program sessions holding it), `floor`, `kpi` and `weeks`.
