@@ -256,8 +256,12 @@ skeleton` as in step 6; its title says `(catch-up)`.
   you built with `overlay build`. Its `data.text` is the return
   brief: the gap, what the return week does, each session's lines,
   what happens after, and the write line; `ill` adds the illness rule's
-  safety lines from `CLAUDE.md`. Edit the words if you like, never the
-  figures. One "go" approves it and every write its last line names.
+  safety lines from `CLAUDE.md`. If it returns warnings, the lines do
+  not carry the return band's change or the illness cap, and the brief
+  leaves that claim out: fix the week as each warning says (propose it
+  again, or rebuild the overlay), then run `checkin return-brief` again
+  before presenting. Edit the words if you like, never the figures. One
+  "go" approves it and every write its last line names.
 
 ## 4. Analyze — plan vs. reality
 

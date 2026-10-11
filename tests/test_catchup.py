@@ -180,25 +180,58 @@ class ReturnBriefTest(GapCase):
     def brief(self, *argv, expect=0):
         return self.coach("checkin", "return-brief", *argv, expect=expect)
 
-    def test_illness_brief_has_the_safety_lines_band_and_write_line(self):
-        text = self.brief("--proposal", self.proposal, "--reason", "ill")["data"]["text"]
-        for words in ("48 hours", "RPE 7", "qualified professional", "22-42", "28 days off", WRITE_LINE):
-            with self.subTest(words=words):
-                self.assertIn(words, text)
-        self.assertIn("2×5 @ 90", text)
-        self.assertTrue(text.rstrip("\n").endswith(WRITE_LINE), text)
-
-    def test_travel_from_a_one_off_overlay_has_no_illness_lines(self):
+    def one_off(self):
         draft = read_json(FIXTURES / "overlay" / "draft-kg.json")
         draft["kind"] = "one_off"
         write_json(self.tmp / "one-off.json", draft)
-        overlay_id = self.coach("overlay", "build", "--input", str(self.tmp / "one-off.json"))["data"]["id"]
-        text = self.brief("--overlay", overlay_id, "--reason", "travel")["data"]["text"]
+        return self.coach("overlay", "build", "--input", str(self.tmp / "one-off.json"))["data"]["id"]
+
+    def test_illness_brief_has_the_safety_lines_band_and_write_line(self):
+        self.coach("checkin", "tag-gap", "--tag", "ill")
+        proposal = self.coach("propose", "week")["data"]["id"]
+        data = self.brief("--proposal", proposal, "--reason", "ill")["data"]
+        text = data["text"]
+        for words in ("48 hours", "caps every set at RPE 7", "Session A (RPE cap 7)", "qualified professional",
+                      "This is a return week: return band 22-42 after 28 days off", WRITE_LINE):
+            with self.subTest(words=words):
+                self.assertIn(words, text)
+        self.assertIn("2×5 @ 90", text)
+        self.assertEqual(data["warnings"], [])
+        self.assertTrue(text.rstrip("\n").endswith(WRITE_LINE), text)
+
+    def test_an_uncapped_ill_proposal_does_not_claim_the_cap(self):
+        data = self.brief("--proposal", self.proposal, "--reason", "ill")["data"]
+        self.assertNotIn("(RPE cap 7)", data["text"])
+        self.assertNotIn("caps every set", data["text"])
+        self.assertIn("48 hours", data["text"])
+        self.assertEqual(len(data["warnings"]), 1)
+        self.assertIn("checkin tag-gap --tag ill", data["warnings"][0])
+        self.assertIn("propose the week again", data["warnings"][0])
+
+    def test_travel_from_a_one_off_overlay_has_no_illness_lines(self):
+        text = self.brief("--overlay", self.one_off(), "--reason", "travel")["data"]["text"]
         for words in ("48 hours", "qualified professional"):
             with self.subTest(words=words):
                 self.assertNotIn(words, text)
         self.assertIn("travel", text)
         self.assertTrue(text.rstrip("\n").endswith(WRITE_LINE), text)
+
+    def test_a_one_off_overlay_at_full_loads_does_not_claim_the_band(self):
+        envelope = self.brief("--overlay", self.one_off(), "--reason", "travel")
+        text = envelope["data"]["text"]
+        self.assertIn("3×5 @ 100", text)
+        self.assertNotIn("This is a return week", text)
+        self.assertNotIn("so loads −10 %", text)
+        self.assertIn("28 days off puts this in return band 22-42, whose guideline is loads −10 %", text)
+        warning = envelope["data"]["warnings"][0]
+        self.assertIn("Back Squat (Barbell)", warning)
+        self.assertIn("rebuild the overlay", warning)
+        self.assertNotIn("propose the week again", warning)
+        self.assertEqual(envelope["warnings"], envelope["data"]["warnings"])
+
+    def test_an_uncapped_ill_overlay_asks_for_a_rebuild(self):
+        warnings = self.brief("--overlay", self.one_off(), "--reason", "ill")["data"]["warnings"]
+        self.assertIn("RPE 7 or below (overlay build)", warnings[-1])
 
     def test_the_brief_writes_nothing(self):
         before = {p.relative_to(self.root).as_posix(): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}

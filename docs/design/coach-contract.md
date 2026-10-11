@@ -3905,8 +3905,15 @@ as it was):
   edit the words before presenting. Exactly one of `--proposal` and
   `--overlay` (exit 2 otherwise). Output: `text`, `days_off`, `band`,
   `sessions` (as `return_week.sessions`), `reason`, `source` and
-  `warnings`; `ill` on a week whose first session is not capped at
-  `ILLNESS_RPE_CAP` warns (record the ill misses and propose again). The
+  `warnings`. The brief claims only what the lines carry. A band's change
+  is claimed when every line with an exposure to decay from is decayed to
+  its own band (`provenance.decay.band`, C22); otherwise the brief states
+  the band as the guideline and warns, naming the lines. A session's RPE
+  cap, and `ill`'s "first session back at RPE 7", are claimed only when
+  every working set in it is at or under the cap; `ill` on an uncapped
+  first session warns. Each warning names the fix for its source: propose
+  again (after `checkin tag-gap --tag ill` for illness) for `--proposal`,
+  rebuild with `overlay build` for `--overlay`. The
   48 hours is `coach.validity.SYMPTOM_FREE_HOURS`, beside
   `ILLNESS_RPE_CAP` (C22), and a test keeps it equal to `CLAUDE.md`.
 

@@ -174,7 +174,14 @@ def _names(library, doc):
             yield line["exercise_id"], (library.get(line["exercise_id"]) or {}).get("name", line["exercise_id"])
 
 
+def _capped(session, cap):
+    """Whether every working set in the session carries an RPE at or under `cap`."""
+    working = [s for line in session["exercises"] for s in line["sets"] if overlay.is_working(s)]
+    return bool(working) and all(s.get("rpe") is not None and s["rpe"] <= cap for s in working)
+
+
 def _sessions(library, doc, lines, band, illness):
+    """Each session's lines and the RPE cap its working sets actually hold (band cap, illness cap on the first)."""
     by_session = {}
     for line in lines:
         entry = library.get(line["exercise_id"]) or {}
@@ -183,7 +190,8 @@ def _sessions(library, doc, lines, band, illness):
     found = []
     for index, session in enumerate(sorted(doc["sessions"], key=lambda s: (s["date"], s["session_id"]))):
         caps = [cap for cap in (band.rpe_cap if band else None,
-                                validity.ILLNESS_RPE_CAP if illness and index == 0 else None) if cap is not None]
+                                validity.ILLNESS_RPE_CAP if illness and index == 0 else None)
+                if cap is not None and _capped(session, cap)]
         found.append({"date": session["date"], "session_id": session["session_id"], "title": session["title"],
                       "rpe_cap": min(caps) if caps else None,
                       "lines": by_session.get((session["session_id"], session["date"]), [])})
@@ -252,6 +260,25 @@ def _band_sentence(days_off, band):
     if band.id == validity.RETURN_BANDS[0].id:
         return f"{days_off} days off is inside the first return band ({band.id}), so loads carry on as planned."
     return f"return band {band.id} after {days_off} days off, so {_effects(band)}."
+
+
+def _returning(band):
+    return band is not None and band.id != validity.RETURN_BANDS[0].id
+
+
+def _undecayed(root, config, doc, library):
+    """Names of the exercises whose line is not decayed to its own return band (the C22 per-line days off)."""
+    report = validity.report(root, doc, config)
+    found = []
+    ordered = [line for session in doc["sessions"] for line in session["exercises"]]
+    for line, row in zip(ordered, report["lines"]):
+        if row["derived_from"] is None or row["band"] in (None, validity.RETURN_BANDS[0].id):
+            continue
+        decay = (line.get("provenance") or {}).get("decay") or {}
+        name = (library.get(line["exercise_id"]) or {}).get("name", line["exercise_id"])
+        if decay.get("band") != row["band"] and name not in found:
+            found.append(name)
+    return found
 
 
 def _week_line(week):
@@ -358,7 +385,11 @@ def tag_gap(root, card, tag, now, dry_run=False):
 
 
 def return_brief(root, config, now, proposal_id=None, overlay_id=None, reason="layoff"):
-    """The return template of the coach's brief, from a proposal or a coach-built overlay. Reads only."""
+    """The return template of the coach's brief, from a proposal or a coach-built overlay. Reads only.
+
+    The brief claims a band's change or the illness cap only when the lines carry it; otherwise it states
+    the band as the guideline and warns, so the coach fixes the week before presenting it.
+    """
     if reason not in REASONS:
         raise UsageError(f"--reason must be one of {', '.join(REASONS)}")
     if proposal_id is not None:
@@ -367,23 +398,43 @@ def return_brief(root, config, now, proposal_id=None, overlay_id=None, reason="l
     else:
         doc = overlay.load(root, overlay_id)
         lines = propose.lines_of(doc, config.athlete.units)
+    library = Library.load(root)
     days_off = _days_off(root, doc)
     band = validity.band_for(days_off) if days_off is not None else None
     ill = reason == "ill"
-    sessions = _sessions(Library.load(root), doc, lines, band, ill)
+    sessions = _sessions(library, doc, lines, band, ill)
     first = sessions[0]["date"]
     last = history.last_lifting_date(root, _day(first))
+    fix = ("propose the week again" if proposal_id is not None
+           else "rebuild the overlay with it applied (overlay build)")
+    warnings = []
 
     if days_off is None:
         gap = f"No lifting workout is on record before {render.day_label(first)}."
     else:
         gap = (f"{days_off} days off since your last lifting workout on {render.day_label(last)}"
                f"{_REASON_TEXT[reason]}.")
-    clause = _band_sentence(days_off, band)
-    returning = band is not None and band.id != validity.RETURN_BANDS[0].id
-    week = f"This is a return week: {clause}" if returning else clause[0].upper() + clause[1:]
-    if ill:
+    undecayed = _undecayed(root, config, doc, library) if _returning(band) else []
+    if undecayed:
+        week = f"{days_off} days off puts this in return band {band.id}, whose guideline is {_effects(band)}."
+        warnings.append(f"the lines for {', '.join(undecayed)} are not decayed to return band {band.id} "
+                        f"({_effects(band)}), so the brief states the band only as a guideline; {fix}")
+    elif _returning(band):
+        week = f"This is a return week: {_band_sentence(days_off, band)}"
+    else:
+        clause = _band_sentence(days_off, band)
+        week = clause[0].upper() + clause[1:]
+    first_capped = _capped(min(doc["sessions"], key=lambda s: (s["date"], s["session_id"])),
+                           validity.ILLNESS_RPE_CAP)
+    if ill and first_capped:
         week += f" The first session back caps every set at RPE {validity.ILLNESS_RPE_CAP}."
+    elif ill:
+        how = ("record the ill misses (checkin tag-gap --tag ill) and propose the week again"
+               if proposal_id is not None else
+               f"rebuild the overlay with every working set in the first session at RPE "
+               f"{validity.ILLNESS_RPE_CAP} or below (overlay build)")
+        warnings.append(f"the first session has working sets without an RPE at or under "
+                        f"{validity.ILLNESS_RPE_CAP}, so the brief does not claim the illness cap; {how}")
     text = [f"**The gap.** {gap}", "", f"**This week.** {week}"]
     if ill:
         text += ["", f"**Before you train.** Train only once you have been {validity.SYMPTOM_FREE_HOURS} hours "
@@ -396,17 +447,6 @@ def return_brief(root, config, now, proposal_id=None, overlay_id=None, reason="l
         text += [f"- {line}" for line in session["lines"]]
     text += ["", "**After this week.** Normal progression resumes from the loads you log this week.", "",
              write_line(config, doc)]
-    warnings = []
-    if ill and _uncapped(doc):
-        warnings.append(f"the first session has working sets without an RPE at or under "
-                        f"{validity.ILLNESS_RPE_CAP}; record the ill misses (checkin tag-gap --tag ill) and "
-                        "propose the week again")
     return {"source": {"proposal": proposal_id, "overlay": overlay_id}, "reason": reason, "days_off": days_off,
             "band": band.id if band else None, "sessions": sessions, "warnings": warnings,
             "text": "\n".join(text) + "\n"}
-
-
-def _uncapped(doc):
-    first = min(doc["sessions"], key=lambda s: (s["date"], s["session_id"]))
-    return any(s.get("rpe") is None or s["rpe"] > validity.ILLNESS_RPE_CAP
-               for line in first["exercises"] for s in line["sets"] if overlay.is_working(s))
