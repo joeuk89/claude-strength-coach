@@ -47,6 +47,16 @@ first, tables second. Every mode uses the same brief.
 
    `Reply "go" to train this. Nothing goes to Hevy (<reason>).`
 
+7. **The commit plan** ends the write line, `missed plan`'s too. Run
+   `python3 -m coach pages plan` (with `--structural` when the brief has
+   a structural change): `include` lists each changed training record.
+   A structural change adds `data/program.json` and the `routine/` page
+   of each session it edits, adds or removes. Append
+   ` Commit: <each path in full>.`, or ` Commit: no training records.`
+   when there are none. Config, profile, `.env` and other files never
+   join it. When `program_changed` is true without a structural change
+   in the brief, say `data/program.json` stays local.
+
 ## Hold-steady week: the short brief
 
 Only a normal-mode pass started by `/check-in` at the **weekly tier**
@@ -80,7 +90,9 @@ tables and the write line again; it approves nothing.
 
 Stop and wait for the athlete's reply. Never present and write in the
 same turn: the brief is a proposal, not a notification, and that holds
-on a hold-steady week too. **"go" (or a clear yes) approves the span
-and every write the line names**: don't ask again before writing to
-Hevy. Anything else is a tweak: revise, and present the brief again,
+on a hold-steady week too. **"go" (or a clear yes) approves the span,
+every write the line names and its commit plan**: don't ask again before
+writing to Hevy or committing those records. A yes that keeps the
+records local ("go, but don't commit") approves the rest: drop the
+commit plan. Anything else is a tweak: revise, and present the brief again,
 write line included. Iterate until they would train it.

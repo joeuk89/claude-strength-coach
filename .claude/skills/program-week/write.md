@@ -71,22 +71,32 @@ repository needs an agreed remote and `git push -u <remote> <branch>`
 (add the remote first if absent). Without it, publishing exits 3 before
 writing or committing. During setup, finish its approved setup commit
 first. Run `python3 -m coach pages render`, then `python3 -m coach
-pages publish --overlay <id>`: it commits exactly the brief
-(`this-week.md`), the dashboard (`README.md`), `progress.md`, the overlay
-and the newest check-in record, plus `this-week-sheets.md` when Hevy is
-off. It refreshes those sheets from the approved overlay and pushes
-them so the athlete's phone shows the week. If `pages render` exits 3 because `README.md` is still
+pages publish --overlay <id>` with `--include <path>` for each path of
+the approved commit plan (`--structural` too when it names
+`data/program.json`; no `--include` when the athlete kept the records
+local). Run it with `--dry-run` first: a path in `records.local` that
+the plan did not name changed after approval, so list those paths and
+include them only after the athlete's yes. The approved plan itself
+needs no second question. Publishing commits exactly the brief
+(`this-week.md`), the dashboard (`README.md`), `progress.md`, the overlay,
+the newest check-in record and the included records, plus
+`this-week-sheets.md` when Hevy is off. It refreshes those sheets from
+the approved overlay and pushes them so the athlete's phone shows the
+week. If `pages render` exits 3 because `README.md` is still
 the template's copy, ask once whether the dashboard may replace it, then
 run `python3 -m coach pages render --replace-readme`. A publish that
 exits 3 (overlay not approved or not the brief's overlay, missing
-upstream, another file already staged) is reported,
+upstream, another file already staged, a path outside the training
+records) is reported,
 never worked around; exit 4 means the push failed and the commit is
 kept: tell the athlete to push by hand.
 
 Recap in plain words: what changed this week and why, what was written
 to Hevy (quote `routines verify`: each routine verified, or not and
 why, plus, on a hold-steady week, any routine that was STALE before
-it), and the one thing to focus on. A one-off week says when the normal
+it), the records the commit included, each record `records.local`
+names as kept only on this computer (uncommitted), and the one thing to
+focus on. A one-off week says when the normal
 program resumes; when recovery drove it, say the next check-in wants to
 hear how the week went. If a structural change landed, note it for the
 next check-in's Decisions section.

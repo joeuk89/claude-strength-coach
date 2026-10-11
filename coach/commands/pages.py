@@ -1,6 +1,6 @@
 import os
 
-from coach import dates, pages
+from coach import closeout, dates, pages
 from coach.commands import arg, command
 from coach.errors import UsageError
 
@@ -37,7 +37,11 @@ def show(args, ctx):
     "pages publish",
     help="Re-render the pages, then commit them with the approved overlay and the newest record, and push",
     args=(arg("--overlay", required=True, metavar="ID", help="the approved overlay of the programming pass"),
-          arg("--record", metavar="D", help="the check-in record's date (default: the newest record)")),
+          arg("--record", metavar="D", help="the check-in record's date (default: the newest record)"),
+          arg("--include", action="append", default=[], metavar="PATH",
+              help="a training-record file the approved brief's commit plan named; repeat for each"),
+          arg("--structural", action="store_true",
+              help="allow data/program.json, when the brief's approved structural change named it")),
     writes=True,
     git_write=True,
 )
@@ -50,4 +54,16 @@ def publish(args, ctx):
             raise UsageError(f"--record: {exc}") from None
     env = dict(os.environ)
     env.update(ctx.env)
-    return pages.publish(ctx.root, args.overlay, ctx.now(), record, args.dry_run, env)
+    return pages.publish(ctx.root, args.overlay, ctx.now(), record, args.dry_run, env, args.include,
+                         args.structural)
+
+
+@command(
+    "pages plan",
+    help="The changed training records a programming pass's brief can name for commit with the pages",
+    args=(arg("--structural", action="store_true",
+              help="include data/program.json, for a brief with a structural change"),),
+)
+def plan(args, ctx):
+    pages.require_work_tree(ctx.root)
+    return closeout.plan(ctx.root, args.structural)

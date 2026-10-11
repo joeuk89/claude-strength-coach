@@ -8,7 +8,7 @@ and pass over rows with `recorded: true` (that miss is already on file),
 or take the session and date the athlete names; then run `python3 -m
 coach missed plan --session <id> --date <date>`. When it reports
 `matched: true`, present its `summary` lines and end with its
-`write_line`, then stop and wait for the athlete's reply. Only after
+`write_line` and the commit plan (brief.md, step 7), then stop and wait for the athlete's reply. Only after
 "go": run `python3 -m coach missed apply --session <id> --date <date>
 --tag <tag>` (the athlete's reason: `time`, `sleep`, `ill`, `family`,
 `skipped` or `other`; leave `--tag` off when they gave none), then
