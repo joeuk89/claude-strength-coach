@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "exercises": {
+    "db_bench_press": {
+      "load_mode": "per_hand_x2",
+      "colour": "blue"
+    }
+  }
+}

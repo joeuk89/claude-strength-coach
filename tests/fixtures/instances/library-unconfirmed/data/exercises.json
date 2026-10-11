@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "exercises": {
+    "bb_back_squat": {
+      "hevy_template_id": "F0000001",
+      "load_mode": "total",
+      "load_mode_proposed": "total",
+      "confidence": "high",
+      "avoid": null
+    },
+    "db_bench_press": {
+      "hevy_template_id": "F0000002",
+      "load_mode": null,
+      "load_mode_proposed": "per_hand_x2",
+      "confidence": "high",
+      "avoid": null
+    }
+  }
+}

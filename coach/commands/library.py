@@ -1,0 +1,168 @@
+import copy
+
+from coach import jsonio, library, paths, units
+from coach.commands import arg, command
+from coach.errors import ConfigError, UsageError, ValidationError
+from coach.library import Library
+
+
+def _entry(lib, exercise_id):
+    entry = lib.get(exercise_id)
+    if entry is None:
+        hits = [hit["id"] for hit in lib.search(exercise_id.replace("_", " "))[:5]]
+        hint = f"; did you mean {', '.join(hits)}?" if hits else "; see python3 -m coach library search TEXT"
+        raise ValidationError(f"no library exercise has the id {exercise_id!r}{hint}")
+    return entry
+
+
+@command(
+    "library list",
+    help="List every library exercise with its confirmed load mode",
+    args=(arg("--avoided", action="store_true", help="only the exercises the athlete avoids, with the reason"),),
+)
+def list_exercises(args, ctx):
+    rows = [library.summary(entry) for entry in Library.load(ctx.root).entries()]
+    if args.avoided:
+        rows = [row for row in rows if row["avoid"] is not None]
+    return {"exercises": rows, "count": len(rows)}
+
+
+@command("library show", help="Show one exercise: the catalogue entry merged with the instance file",
+         args=(arg("id", help="library exercise id"),))
+def show(args, ctx):
+    return {"exercise": _entry(Library.load(ctx.root), args.id)}
+
+
+@command("library search", help="Find exercises by name, alias, Hevy title or id",
+         args=(arg("text", help="words to look for"),))
+def search(args, ctx):
+    return {"query": args.text, "matches": Library.load(ctx.root).search(args.text)}
+
+
+@command("library validate", help="Validate the catalogue and data/exercises.json; exit 1 with the JSONPath of each problem")
+def validate(args, ctx):
+    lib = Library.load(ctx.root)
+    return {
+        "valid": True,
+        "path": paths.EXERCISES,
+        "instance_file": lib.path.exists(),
+        "catalogue_entries": len(library.catalogue()),
+        "instance_entries": len(lib.instance["exercises"]),
+    }
+
+
+def _write(lib, doc, args):
+    Library(doc, lib.path)
+    jsonio.write_doc(lib.path, _sorted(doc), args.dry_run)
+    return not args.dry_run
+
+
+def _sorted(doc):
+    return {"schema_version": doc["schema_version"],
+            "exercises": {key: doc["exercises"][key] for key in sorted(doc["exercises"])}}
+
+
+@command(
+    "library seed",
+    help="Match every exercise in the cached Hevy routines to the library and record a proposed load mode",
+    writes=True,
+)
+def seed(args, ctx):
+    routines = library.read_hevy_cache(ctx.root, "routines")
+    if routines is None:
+        raise ConfigError("there are no cached Hevy routines to seed from; run python3 -m coach hevy pull first")
+    templates = library.read_hevy_cache(ctx.root, "exercise_templates")
+    if templates is None:
+        ctx.warn("no cached Hevy exercise templates, so proposals use routine titles only, without Hevy's "
+                 "exercise type or equipment; run python3 -m coach hevy pull for better proposals")
+    lib = Library.load(ctx.root)
+    proposals, doc, guessed = library.seed(lib, routines, templates)
+    for line in guessed:
+        ctx.warn(line)
+    unchanged = lib.path.exists() and doc == lib.instance
+    written = False if unchanged else _write(lib, doc, args)
+    return {"proposals": proposals, "guessed": guessed, "path": paths.EXERCISES, "written": written}
+
+
+@command(
+    "library confirm",
+    help="Confirm the proposed load mode of the named exercises, or of every unconfirmed one with --all",
+    args=(
+        arg("ids", nargs="*", metavar="ID", help="library exercise ids"),
+        arg("--all", action="store_true", help="every instance entry with a proposal and no confirmed mode"),
+    ),
+    writes=True,
+)
+def confirm(args, ctx):
+    if bool(args.ids) == bool(args.all):
+        raise UsageError("give exercise ids or --all, not both")
+    lib = Library.load(ctx.root)
+    doc = copy.deepcopy(lib.instance)
+    own = doc["exercises"]
+    if args.all:
+        ids = [i for i in sorted(own) if own[i].get("load_mode") is None and own[i].get("load_mode_proposed")]
+    else:
+        ids = list(dict.fromkeys(args.ids))
+        for exercise_id in ids:
+            _entry(lib, exercise_id)
+        missing = [i for i in ids if not own.get(i, {}).get("load_mode_proposed")]
+        if missing:
+            raise ValidationError(
+                f"no proposed load mode to confirm for {', '.join(missing)}; run python3 -m coach library seed, "
+                "or set one with python3 -m coach library set-mode ID MODE"
+            )
+    confirmed = []
+    for exercise_id in ids:
+        previous = own[exercise_id].get("load_mode")
+        own[exercise_id]["load_mode"] = own[exercise_id]["load_mode_proposed"]
+        confirmed.append({"id": exercise_id, "load_mode": own[exercise_id]["load_mode"], "previous": previous})
+    unconfirmed = sorted(i for i in own if own[i].get("load_mode") is None)
+    written = _write(lib, doc, args) if confirmed else False
+    return {"confirmed": confirmed, "still_unconfirmed": unconfirmed, "written": written}
+
+
+@command(
+    "library set-mode",
+    help="Record the athlete's load mode for one exercise",
+    args=(arg("id", help="library exercise id"), arg("mode", help=f"one of {', '.join(units.LOAD_MODES)}")),
+    writes=True,
+)
+def set_mode(args, ctx):
+    if args.mode not in units.LOAD_MODES:
+        raise ValidationError(f"{args.mode!r} is not a load mode; valid modes: {', '.join(units.LOAD_MODES)}")
+    lib = Library.load(ctx.root)
+    _entry(lib, args.id)
+    doc = copy.deepcopy(lib.instance)
+    own = doc["exercises"].setdefault(args.id, {})
+    previous = own.get("load_mode")
+    own["load_mode"] = args.mode
+    written = _write(lib, doc, args) if previous != args.mode else False
+    return {"id": args.id, "load_mode": args.mode, "previous": previous, "written": written}
+
+
+@command(
+    "library set-avoid",
+    help="Record that the athlete cannot or will not do an exercise, with the reason; --clear removes it",
+    args=(
+        arg("id", help="library exercise id"),
+        arg("--reason", help="why the athlete avoids it, in plain words"),
+        arg("--clear", action="store_true", help="the athlete no longer avoids it"),
+    ),
+    writes=True,
+)
+def set_avoid(args, ctx):
+    if (args.reason is None) == (not args.clear):
+        raise UsageError("give --reason TEXT or --clear")
+    if args.reason is not None and not args.reason.strip():
+        raise ValidationError("--reason must say why the athlete avoids the exercise; it is empty")
+    lib = Library.load(ctx.root)
+    _entry(lib, args.id)
+    doc = copy.deepcopy(lib.instance)
+    avoid = None if args.clear else {"reason": args.reason.strip()}
+    if args.clear and args.id not in doc["exercises"]:
+        return {"id": args.id, "avoid": None, "previous": None, "written": False}
+    own = doc["exercises"].setdefault(args.id, {})
+    previous = own.get("avoid")
+    own["avoid"] = avoid
+    written = _write(lib, doc, args) if previous != avoid else False
+    return {"id": args.id, "avoid": avoid, "previous": previous, "written": written}
