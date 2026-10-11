@@ -110,10 +110,8 @@ class CatchUpCardTest(GapCase):
         self.assertEqual((card["mode"], card["catch_up"]), ("weekly", None))
         self.assertTrue(card["fields"])
 
-    def test_a_part_adds_facts_but_no_fields_in_catch_up(self):
-        card = self.card()
-        self.assertEqual(card["fields"], [])
-        self.assertTrue(card["nudge_lines"], "the nutrition part's food-exceptions question stays a nudge line")
+    def test_parts_add_no_fields_in_catch_up(self):
+        self.assertEqual(self.card()["fields"], [])
 
     def test_sunday_weeks(self):
         path = self.root / "config.toml"

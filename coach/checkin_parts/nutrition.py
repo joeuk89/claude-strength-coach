@@ -39,7 +39,5 @@ def contribute(ctx):
         if prefill:
             prefills.append(prefill)
         lines.append(f"{letter}. {ask}")
-    next_week = getattr(module, "QUESTION_NEXT_WEEK", None)
-    nudge = [_question(item)[1] for item in status.get("questions") or [] if _question(item)[1] == next_week]
     food = Field(prefill=" ".join(prefills) or None, ask="\n".join(lines) or None, label="Food")
-    return Contribution(fields={"nutrition": food, "meal_plan": None}, nudge_lines=nudge)
+    return Contribution(fields={"nutrition": food, "meal_plan": None})

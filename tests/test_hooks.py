@@ -47,8 +47,6 @@ NOT_MAPPED = {
     ".coach/proposals/<id>.meta.json": "gitignored drafts a command checks when it reads them",
     ".coach/plans/<week start>-<name>.json": "gitignored drafts a command checks when it reads them",
     ".coach/drafts/": "gitignored drafts a command checks when it reads them",
-    ".coach/nudge.json": "gitignored scheduler state",
-    ".coach/logs/nudge.log": "gitignored log",
 }
 
 

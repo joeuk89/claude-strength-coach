@@ -31,7 +31,7 @@ CATCH_UP_AFTER_DAYS = 10    # R-02's first return band ends at 10 days
 DEEP_AFTER_DAYS = 42        # R-02's "6+ weeks" since the last deep check-in
 E1RM_ROW_LIMIT = 8          # a heuristic: as many lifts as a message reads at a glance
 WORD_CEILINGS = {"weekly": 600, "deep": 1000, "catch-up": 600}    # heuristics, prose words outside regions
-CARD_VERSION = 1
+CARD_VERSION = 2
 TIERS = ("weekly", "deep", "catch-up")
 CARD_TIERS = ("weekly", "deep")
 CATCH_UP = "catch_up"
@@ -589,7 +589,7 @@ def _build(root, today, until=None, tier=None, now=None, live=True, parts=True, 
         "days_since_last": (end - found[-1].date).days if found else None,
         "unsynced": sum(1 for w in workouts.values() if w["unsynced"] and window.contains(dates.parse_date(w["date"]))),
         "sessions": sessions, "exercises": _exercises(inst, kept, workouts), "e1rm": _e1rm(inst, window, live, now),
-        "hevy": hevy_rows, "flags": raised, "fields": [], "facts": [], "nudge_lines": [], "misses": None,
+        "hevy": hevy_rows, "flags": raised, "fields": [], "facts": [], "misses": None,
         "catch_up": None,
     }
 
@@ -610,7 +610,6 @@ def _build(root, today, until=None, tier=None, now=None, live=True, parts=True, 
                     extra_ids.append(field_id)
             card["facts"] += list(contribution.facts)
             card["flags"] += list(contribution.flags)
-            card["nudge_lines"] += list(contribution.nudge_lines)
             part_reasons += list(contribution.tier_reasons)
         if part_reasons and tier != "weekly" and mode == CATCH_UP:
             card["deep_deferred"] = True

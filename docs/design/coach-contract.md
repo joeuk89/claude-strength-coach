@@ -70,7 +70,6 @@ coach/                       # framework: synced to instances
   pages.py                   # brief, dashboard, progress renderers, publish             (R-25)
   page_parts/__init__.py     # page part discovery                                       (R-25)
   page_parts/<topic>.py      # one module per item that adds page items                  (each item)
-  nudge.py                   # scheduled run, channels, recipes                          (R-45)
   status/__init__.py         # status provider registry + auto-discovery                 (R-26b)
   status/<topic>.py          # one module per item that adds status lines                (R-26b and later items)
   hooks.py                   # SessionStart and PostToolUse hook logic                   (R-26b)
@@ -125,22 +124,19 @@ Rules that stop parallel agents colliding:
 - Commands are declared with `coach.commands.command` (R-10):
   `@command("units format", help=..., args=(arg("--mode", ...), ...),
   writes=False, hevy_write=False, network=False, git_write=False,
-  writes_scope=None, envelope=True)` on a function `(args, ctx) -> dict` that returns the
+  envelope=True)` on a function `(args, ctx) -> dict` that returns the
   envelope's `data`. A Claude Code hook command (`gate pretooluse`, R-26b's
   `hooks` commands) declares `envelope=False`: the CLI prints the dict it
   returns as the hook response, or nothing for None, and exits 0 (C3, C53). A one-word name is a top-level command (`check`,
   `version`). The helper adds `--dry-run` to every command with `writes`,
-  `hevy_write` or `git_write`, and `Command.metadata()` gives the five
+  `hevy_write` or `git_write`, and `Command.metadata()` gives the four
   flags R-15 reads. `ctx` is `coach.context.Context`.
 - Every command module declares, per command: `writes` (touches local
   files), `hevy_write` (sends a non-GET request to Hevy), `network` (calls
-  Hevy at all), `git_write` (commits or pushes; R-25) and `writes_scope`
-  (R-45: `"cache"` when every local write lands under `.coach/`, else
-  `"data"`, the default for any command with `writes`). R-15's allowlist
+  Hevy at all) and `git_write` (commits or pushes; R-25). R-15's allowlist
   test reads this metadata. A `git_write` command stays off the allowlist
   unless it refuses to run without an approved overlay; `pages publish`
-  (C38) is the only one. R-45
-  marks `hevy pull` and `nudge run` as `"cache"`.
+  (C38) is the only one.
 - **Every command with `writes`, `hevy_write` or `git_write` accepts
   `--dry-run`.** Dry run does every read and every check, writes nothing,
   and returns what it would have done. It exits with the code the real run
@@ -151,8 +147,6 @@ Rules that stop parallel agents colliding:
   and "today") and `COACH_HEVY_FIXTURES` (one or more fixture-set
   directories joined with `os.pathsep`; makes the Hevy client replay
   fixtures instead of calling the network, R-12; C15).
-- Runtime switch: `COACH_READ_ONLY=1` refuses every data, Hevy and git
-  write (C39, R-45).
 - Each owner adds its read-only and local-write commands to the R-15
   allowlist in its own PR and says so. The allowlist is
   `permissions.allow` in `.claude/settings.json`: one prefix rule per
@@ -162,7 +156,7 @@ Rules that stop parallel agents colliding:
   `hevy_write` false and `git_write` false (`pages publish` excepted),
   and that no rule matches a `hevy_write` command. `plugins test` is never allowlisted
   (it runs instance code). `pages publish`, `program import-hevy`,
-  `program adopt`, `starters` and `nudge` are allowlisted. Commands marked
+  `program adopt` and `starters` are allowlisted. Commands marked
   H stay behind the R-15 gate.
 
 Command inventory (owner in brackets). Read-only unless marked W
@@ -213,8 +207,6 @@ Phase 2 to 4 command inventory. No command here writes to Hevy.
 | `pages show KIND` | R-25 | |
 | `pages render [--only brief\|dashboard\|progress] [--replace-readme]` | R-25 | W |
 | `pages publish --overlay ID [--record D]` | R-25 | W, G |
-| `nudge status`, `nudge recipe --kind launchd\|cron` | R-45 | |
-| `nudge run` | R-45 | W (`writes_scope` cache) |
 | `status` | R-26b | |
 | `hooks sessionstart`, `hooks posttooluse` | R-26b | |
 | `research status [--area AREA] [--kind template\|local] [--expired]`, `research show REF`, `research cites [--unresolved]`, `research validate` | R-32a | |
@@ -277,7 +269,7 @@ stderr carries human-readable diagnostics and progress, each line prefixed
 | 0 | — | Success (warnings allowed) | |
 | 1 | `validation` | Input or data failed validation; a check failed; a Hevy write did not verify | bad overlay arithmetic, `coach check` has a `fail` |
 | 2 | `usage` | Bad command line (argparse's own code) | unknown flag |
-| 3 | `refused` | A write was refused by a guard | no approval, hash mismatch, unresolved `block` flag, routine changed in the app since the diff, overlay expired, read-only run (C39) |
+| 3 | `refused` | A write was refused by a guard | no approval, hash mismatch, unresolved `block` flag, routine changed in the app since the diff, overlay expired |
 | 4 | `network` | Hevy unreachable or erroring after retries | timeout, 5xx, 429 after back-off, a failed `git push` (C38) |
 | 5 | `config` | Environment or config prevents running | Python < 3.11, `config.toml` missing or invalid (file and key named), Hevy key missing, HTTP 401/403 |
 | 9 | `internal` | Uncaught exception (traceback on stderr) | a bug |
@@ -371,7 +363,6 @@ Tables later items add, each in its own PR:
 |---|---|---|
 | `[sessions]` | R-20 | C19 |
 | `[checkin]` | R-21a | below |
-| `[nudge]` | R-45 | below |
 | `[nutrition]` and its subtables | R-33a, R-33b, R-33c | below |
 | `[coaching]` | R-40b | C44 |
 | `[activity]`, `[sources.<name>]` | R-42a; each adapter adds its own source table | C32 |
@@ -380,11 +371,6 @@ Tables later items add, each in its own PR:
 ```toml
 [checkin]                   # R-21a
 cadence_days = 7            # days between check-ins; the due date is the last record's date + this
-
-[nudge]                     # R-45; optional; absent = no scheduled run configured
-channel = "none"            # "none" | "macos" | "github_issue"
-time = "18:00"              # local time the recipe runs, daily
-after_days = 2              # first nudge when days since the last check-in reach cadence_days + after_days
 ```
 
 **Nutrition keys** (R-33a, R-33b, R-33c). Nutrition is enabled only by
@@ -709,9 +695,7 @@ none and `bodyweight`, `assisted`, `duration` or `distance`; band and
 | `.coach/backups/<UTC timestamp>/` | pre-migration copies; old recipe cards and index before conversion | gitignored | R-17a; R-33b (`recipes convert --apply`) |
 | `.coach/proposals/<id>.json`, `<id>.proposed.json`, `<id>.meta.json` | editable proposal draft (an overlay draft, C10), its untouched original, and the run's facts (kind, span, transform, rotation, each slot's proposed scheme state) | gitignored | R-23a |
 | `.coach/plans/<week start>-<name>.json` | schedule plans handed to `propose week --plan` | gitignored | R-30b; R-22 may |
-| `.coach/drafts/` | drafts the coach edits before a command applies them (program drafts, log drafts, recipe drafts and saved recipe pages), and the scheduled run's `checkin-<date>.md` | gitignored | R-40c, R-41a, R-41b, R-45; the coach (R-33b recipe pages) |
-| `.coach/nudge.json` | nudge state | gitignored | R-45 |
-| `.coach/logs/nudge.log` | scheduled run output | gitignored | the recipe (R-45) |
+| `.coach/drafts/` | drafts the coach edits before a command applies them (program drafts, log drafts, recipe drafts and saved recipe pages) | gitignored | R-40c, R-41a, R-41b; the coach (R-33b recipe pages) |
 
 - `.gitignore` gains `/.coach/`, `__pycache__/` and `*.pyc` (R-10). The
   `.coach` pattern is **root-anchored** so test fixtures under
@@ -1802,7 +1786,7 @@ coach.history.annotations(root, kind=None) -> list[dict]
 `include_unsynced=True` (on `workouts` and every `coach.stats` function)
 resolves source workouts not yet in a month file in memory, by the same
 rules as `history sync`, and returns them with `unsynced: true`; nothing is
-written. `checkin prepare` and the scheduled run use it to read fresh data
+written. `checkin prepare` uses it to read fresh data
 without touching committed files.
 
 ## C18. Derived stats (R-20; R-21a, R-23a, R-24, R-25, R-30a, R-31, R-43 read)
@@ -2448,7 +2432,7 @@ and `plugins test` runs them. Loaded with
 - No new flag codes, no change to the loader, pipeline, contexts,
   decisions or constraints.
 
-## C24. Proposal pipeline and `coach propose` (R-23a; R-21b, R-22, R-25, R-26, R-30b, R-31, R-40a, R-41a, R-43, R-44a, R-44b, R-45 read)
+## C24. Proposal pipeline and `coach propose` (R-23a; R-21b, R-22, R-25, R-26, R-30b, R-31, R-40a, R-41a, R-43, R-44a, R-44b read)
 
 ```
 propose week  ──►  .coach/proposals/<id>.json (+ .proposed.json)  ──►  coach edits / propose override / propose resolve
@@ -2987,8 +2971,8 @@ R-32 and is registered in `coach/flags/research.py`.
 - Readers: R-43 (activities, planned, wellness for `sleep_debt`), R-44b
   (conditioning Activities), R-46 (writes planned records with `source:
   "coach"`; reads run history), R-31 (`sleep_summary` through R-43's
-  `sleep_debt`), R-21a and R-45 (`activity sync` and `activity status` for
-  the card's runs and sleep lines).
+  `sleep_debt`), R-21a (activity records for the card's runs and sleep
+  lines).
 - With `[activity] enabled = false`, the activity, wellness and planned
   commands exit 5 naming the key, and activity checks report `skip`.
 
@@ -3395,7 +3379,7 @@ the block after TOML parsing):
 - An old YAML card fails `recipe_cards` with a message that names
   `recipes convert`.
 
-## C34. Meal plan (R-33c owns; R-25 and R-45 read)
+## C34. Meal plan (R-33c owns; R-25 reads)
 
 The coach writes a draft, the exceptions to the standing template plus its
 picks for open slots:
@@ -3608,10 +3592,9 @@ dates unique:
   `plan`, the line ends ` · plan: <path>` (R-33c).
 - Readers: R-25 reads C4 `phase` and may read C35 weights for
   `progress.md`'s bodyweight trend; R-40a reads `[nutrition] enabled` and
-  writes the table at setup; R-45 reads the card's nutrition question and
-  whether a template exists.
+  writes the table at setup.
 
-## C36. Check-in records, the card, catch-up mode (R-21a, R-21b; R-25, R-26, R-30a, R-31, R-33a, R-42a, R-43, R-45 read)
+## C36. Check-in records, the card, catch-up mode (R-21a, R-21b; R-25, R-26, R-30a, R-31, R-33a, R-42a, R-43 read)
 
 The card is the scripted Sunday message: the week as data, then the
 questions the data cannot answer, numbered so the athlete answers in one
@@ -3667,7 +3650,7 @@ record gives the same card:
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "date": "2026-10-11",
   "window": {"start": "2026-10-05", "end": "2026-10-11"},
   "mode": "weekly", "tier_reasons": [], "deep_deferred": false,
@@ -3691,7 +3674,7 @@ record gives the same card:
             "summary": "Bench Press (Dumbbell) added"}],
   "flags": [],
   "fields": [{"id": "sessions", "n": 1, "label": "Sessions", "prefill": "…", "ask": "…"}],
-  "facts": [], "nudge_lines": [],
+  "facts": [],
   "misses": null,
   "catch_up": null
 }
@@ -3735,9 +3718,7 @@ record gives the same card:
   span, by its tag or `untagged`) and each `miss` annotation in the span
   that no planned session's overlay span could match, so a tagged miss is
   counted once. A session the program marks `optional` is never counted.
-- `facts` and `nudge_lines` collect the parts' contributions. Facts print
-  above the fields; nudge lines are for a short reminder (R-45) and never
-  print in the card.
+- `facts` collects the parts' contributions; facts print above the fields.
 
 **Fields.** Ids and order are R-01's Sunday message: `sessions`,
 `coach_led`, `runs`, `sleep`, `niggles`, `nutrition`, `meal_plan`,
@@ -3769,7 +3750,7 @@ def contribute(ctx: CardContext) -> Contribution | None
 # Field(prefill=None, ask=None, label=None)
 # Contribution(fields: dict[str, Field | None] = {},   # None = omit that field
 #              facts: list[str] = [], flags: list[dict] = [],
-#              tier_reasons: list[str] = [], nudge_lines: list[str] = [])
+#              tier_reasons: list[str] = [])
 ```
 
 - Two parts owning the same field id is an error at discovery (exit 1,
@@ -3780,11 +3761,9 @@ def contribute(ctx: CardContext) -> Contribution | None
 - Parts are pure reads and run in a fixed order (module name).
 - R-21a ships one part itself, `nutrition`: when `coach.nutrition` exists
   and `nutrition status` says enabled, it replaces `nutrition` with
-  `data.questions` (pre-fills included), labelled `Food`, omits
-  `meal_plan`, and passes the food-exceptions question
-  (`coach.nutrition.QUESTION_NEXT_WEEK`) as a `nudge_lines` entry. When the module is
-  absent or reports `{"enabled": false}`, it returns None and R-01's
-  builtin fields stay. A soft dependency on R-33a: nothing is computed
+  `data.questions` (pre-fills included), labelled `Food`, and omits
+  `meal_plan`. When the module is absent or reports `{"enabled": false}`,
+  it returns None and R-01's builtin fields stay. A soft dependency on R-33a: nothing is computed
   from nutrition data here.
 - Expected parts from later items: R-27 (`niggles` field from `niggles
   list`; due follow-ups as facts; `niggle_escalate`), R-30a and R-31
@@ -3906,7 +3885,7 @@ as it was):
 - The card ends with the write line (R-03's shape) and "Reply ok to accept
   all of this, or answer 1–3." "ok" alone means: misses stay untagged,
   nothing new to report, the return week as shown, written to Hevy.
-- Parts contribute `facts` and `nudge_lines` in catch-up mode; their
+- Parts contribute `facts` in catch-up mode; their
   fields are ignored.
 - `checkin tag-gap --tag T [--dry-run]` writes one `miss` annotation per
   untagged missed planned core session in the window (`source` "checkin
@@ -4085,7 +4064,7 @@ changed lines and moved sessions carry `missed_day_rule` (info). It runs
 - `overlay_folds_expired` reads overlays whose span ends today or later
   (C13), and skips when there are none.
 
-## C38. Standing pages and publishing (R-25; R-22, R-23b, R-26, R-27, R-30a, R-31, R-33a, R-40c, R-45 read)
+## C38. Standing pages and publishing (R-25; R-22, R-23b, R-26, R-27, R-30a, R-31, R-33a, R-40c read)
 
 Three pages at the instance root, rendered whole, each with the C11 header
 carrying its as-of time. Nothing writes them but `pages render`.
@@ -4282,7 +4261,7 @@ before its local date. Withdrawals created later do not apply.
 **Publishing** (roadmap decision 1). `pages publish --overlay ID [--record D]`:
 
 1. Refuses (exit 3) unless the overlay is approved with a matching hash
-   (C10), or in read-only mode (C39).
+   (C10).
 2. Refuses (exit 3) outside a git work tree, on a branch with no upstream
    (or a detached HEAD), when the git index already holds staged changes
    to any other path (naming them), and when `README.md` is not coach's
@@ -4301,68 +4280,9 @@ before its local date. Withdrawals created later do not apply.
 
 Metadata: `writes`, `git_write`. It is allowlisted (C2).
 
-## C39. Scheduled run and read-only mode (R-45; R-26, R-40a read)
+## C39. Removed: scheduled run, not built
 
-**Read-only mode.** With `COACH_READ_ONLY=1` in the environment:
-
-- the CLI refuses (exit 3, `refused`, "read-only run") any command whose
-  metadata has `hevy_write` or `git_write`, or `writes` with
-  `writes_scope` `"data"`, before it does anything;
-- `HevyClient.put` and `post` raise the refusal whatever the caller (R-45
-  adds this to R-12's client);
-- commands with `writes_scope` `"cache"` run normally.
-
-**`nudge run`** sets read-only mode on itself, then:
-
-1. `hevy pull` (incremental; skipped when `[hevy] enabled` is false; on a
-   network failure it continues from the cache and says so in the draft
-   and the envelope's warnings, exit 0).
-2. Builds the card with `include_unsynced=True` (C17) and writes
-   `.coach/drafts/checkin-<today>.md`: a first line "Draft from the
-   scheduled run at <time>; not a check-in record. Run /check-in.", then
-   the card text. Overwrites today's draft; keeps the last 8 drafts.
-3. Decides whether to nudge from `.coach/nudge.json`
-   (`{"schema_version":1,"window_start":date,"sent":[{"at":ts,"kind":"overdue|catch_up|repeat","channel":"…"}]}`):
-   - `overdue` once per window when `days_since ≥ cadence_days + after_days`;
-   - `catch_up` once per window when `days_since > 10` (C36);
-   - `repeat` every 7 days after the last nudge while no new record exists;
-   - a new record resets the window.
-4. Sends through `[nudge] channel`:
-   - `none`: records the decision only;
-   - `macos`: `osascript -e 'display notification …'`, text at most 200
-     characters: days since the last check-in, sessions trained and
-     missed, the mode, and the first card part `nudge_lines` entry;
-   - `github_issue`: through `gh` in the instance root. One open issue
-     labelled `coach-nudge` at a time: created with title
-     `Check-in due: week of <window start>` and the draft as body, or
-     commented on when open. A missing or unauthenticated `gh` is a
-     warning, not a failure.
-
-Output: `data` = `{"due", "days_since", "mode", "nudged", "kind", "channel", "draft", "unsynced", "warnings"}`.
-The run writes only under `.coach/`; the working tree's tracked files are
-never touched, and it never calls Claude.
-
-**`nudge recipe --kind launchd|cron`** prints, and writes nothing:
-
-- launchd: a user agent plist, label `coach.nudge.<instance dir name>`,
-  `ProgramArguments` `[<sys.executable>, "-m", "coach", "nudge", "run"]`,
-  `WorkingDirectory` the instance root, `EnvironmentVariables`
-  `{"COACH_READ_ONLY": "1"}`, `StartCalendarInterval` from `[nudge] time`,
-  stdout and stderr to `.coach/logs/nudge.log`;
-- cron: one crontab line with the same command, `COACH_READ_ONLY=1`, and
-  the log redirect.
-
-**`nudge status`**: config, last run time (from the log's last envelope),
-the nudge state and whether a recipe looks installed (launchd: the plist
-exists in `~/Library/LaunchAgents`; cron: not detected).
-
-`reference/scheduled-checkin.md` (framework doc) holds the install,
-uninstall and log steps for a human, and states what the run never does:
-write to Hevy, commit, push, or start Claude.
-
-The `check-in` skill reads the athlete's comment on an open `coach-nudge`
-issue as the reply to the Sunday message and closes the issue after the
-record (R-45).
+R-45 was not built; see `.out-of-scope/scheduled-checkin-nudge.md`.
 
 ## C40. Dose targets, priority lifts and the minimum week (R-30a, R-30b; R-31, R-41b read)
 
@@ -6041,8 +5961,6 @@ athlete's instance, a real key, a live session or a purchase):
 | R-43b (#55) | R-43, R-42c, R-32a | needs-info. Resting-HR trend flag. |
 | R-44a (#32) | R-17a, R-23a, R-43 | Interference rules (C51). Before R-44b. |
 | R-44b (#56) | R-44a, R-43, R-42a, R-23a | Conditioning sessions and density schemes (C51). |
-| R-45 (#33) | R-12, R-15, R-21a, R-21b | Scheduled draft and nudge, read-only mode (C39). |
-| R-45 follow-up (#50) | R-45, #35 | Human: install and verify the scheduled run. |
 | R-40b (#58) | R-23a, R-26a, R-30a, R-31 | Run mode (C44). |
 | R-40c (#59) | R-13, R-20, R-25, R-26a | Training without Hevy (C46). Can land before Phase 3. |
 | R-41a (#29) | R-11, R-12, R-14b, R-17a, R-23a, R-26a | Program drafts, adoption, Hevy import (C45). |

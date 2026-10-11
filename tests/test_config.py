@@ -82,6 +82,9 @@ class StrictnessTest(unittest.TestCase):
         self.assert_names(MINIMAL_CONFIG + "[session]\n", "[session]")
         self.assert_names("colour = 1\n" + MINIMAL_CONFIG, '"colour"')
 
+    def test_a_nudge_table_is_unknown(self):
+        self.assert_names(MINIMAL_CONFIG + '[nudge]\nchannel = "none"\n', "unknown table [nudge]")
+
     def test_type_errors_name_the_expected_type(self):
         self.assert_names(MINIMAL_CONFIG + "[equipment]\ndumbbell_max = \"40\"\n", "dumbbell_max", "a number")
         self.assert_names(MINIMAL_CONFIG + "session_minutes = 45.5\n", "session_minutes", "whole number")
