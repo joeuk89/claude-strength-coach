@@ -1,4 +1,5 @@
 {
+  "x-coach-paths": ["data/overlays/*.json"],
   "title": "Overlay: the per-exercise prescription in force for a span of days (contract C10)",
   "type": "object",
   "required": ["schema_version", "id", "kind", "created_at", "span", "supersedes", "focus", "flags", "approval", "sessions"],

@@ -1,4 +1,5 @@
 {
+  "x-coach-paths": ["data/exercises.json"],
   "title": "The instance exercise library, data/exercises.json: overrides, custom entries, confirmed load modes, avoided exercises (R-11)",
   "description": "Keys of `exercises` are library ids; an id the catalogue lacks starts custom_.",
   "type": "object",

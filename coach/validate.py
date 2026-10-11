@@ -14,7 +14,8 @@ _KEYWORDS = {
     "type", "enum", "const", "required", "properties", "additionalProperties", "items",
     "minItems", "minimum", "maximum", "pattern", "$ref",
 }
-_ANNOTATIONS = {"$schema", "$id", "$defs", "title", "description", "default", "examples", "$comment"}
+_ANNOTATIONS = {"$schema", "$id", "$defs", "title", "description", "default", "examples", "$comment",
+                "x-coach-paths"}
 _IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 

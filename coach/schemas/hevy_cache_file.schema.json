@@ -1,4 +1,7 @@
 {
+  "x-coach-paths": [".coach/cache/hevy/routines.json", ".coach/cache/hevy/routine_folders.json",
+                    ".coach/cache/hevy/exercise_templates.json", ".coach/cache/hevy/body_measurements.json",
+                    ".coach/cache/hevy/workouts/*.json"],
   "title": "One file in .coach/cache/hevy/: the raw Hevy payload, unchanged, in data (contract C8)",
   "type": "object",
   "required": ["schema_version", "fetched_at", "source", "data"],
