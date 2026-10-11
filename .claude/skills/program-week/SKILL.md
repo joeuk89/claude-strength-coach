@@ -92,9 +92,9 @@ Work through every session in the span, every exercise in each:
 - **Load** — from the log and the program's progression rules: top of
   the rep range at or under target RPE → add load (the program's
   increment); reps missed → hold; RPE drift (logged RPE 1 or more over
-  the target on 2 or more working sets) on a compound lift or a set
-  carrying a **recovery cap** → hold or back off. Compound means a
-  multi-joint squat, hinge, lunge, press or pull pattern. RPE drift
+  the target on 2 or more working sets of one exposure) on a compound
+  lift or a set carrying a **recovery cap** → hold or back off. Compound
+  means a multi-joint squat, hinge, lunge, press or pull pattern. RPE drift
   alone never holds back isolation work: it progresses on reps as the
   scheme says, unless the athlete's notes report pain or form breakdown.
   Reason per lift — a formula applied blindly is not coaching. Display

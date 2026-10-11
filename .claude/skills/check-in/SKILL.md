@@ -179,9 +179,9 @@ concrete: did the athlete hit the prescribed load × reps @ RPE?
 - RPE drift: check only **compound lifts** (multi-joint squat, hinge,
   lunge, press and pull patterns) and sets carrying a **recovery cap**.
   An exercise drifts when logged RPE is 1 or more over the target on 2
-  or more working sets. Drift on isolation work gets one summary line in
-  the record ("isolation RPE ran about 1 high on curls and raises") and
-  never drives a decision.
+  or more working sets of one exposure. Drift on isolation work gets one
+  summary line in the record ("isolation RPE ran about 1 high on curls
+  and raises") and never drives a decision.
 - Priority work: if `routine/program.md` names priority lifts or
   protocols, did they happen as written? Watch for this athlete's known
   drift patterns (Coach's notes).
@@ -202,10 +202,11 @@ concrete: did the athlete hit the prescribed load × reps @ RPE?
   See `reference/hevy-api.md` → "Dumbbell loads".
 - Exercise drift vs. the plan — structural drift means `/hevy-sync` is
   due; offer it (Hevy users only).
-- Intensity honesty: the RPE drift check across the whole window, same
-  scope — compound lifts and recovery-capped sets, 1 or more over the
-  target on 2 or more working sets. Isolation drift stays one summary
-  line, not a decision.
+- Intensity honesty: the RPE drift check on each exposure in the
+  window, same scope and threshold — compound lifts and recovery-capped
+  sets, 1 or more over the target on 2 or more working sets of one
+  exposure. Sustained drift means drift in consecutive exposures of the
+  same lift. Isolation drift stays one summary line, not a decision.
 - Session durations vs. the time limits in `profile.md`, junk volume.
 - Weekly balance: does the program's balance picture still match what's
   actually being trained?
@@ -286,13 +287,14 @@ composition applies (step 3), Block planning ends with one line that
 says when the next reading is due — the next check-in reads it:
 
 ```markdown
-**Body composition:** waist <reading or "not supplied"> · body fat <reading or "not supplied"> · photos: "<athlete's one-line read>" · **Last reading:** <date> · **Next reading due:** first deep check-in on or after <last reading + 4 weeks>
+**Body composition:** waist <reading, "not supplied" or "not due"> · body fat <reading, "not supplied" or "not due"> · photos: <"athlete's one-line read", "not supplied" or "not due"> · **Last reading:** <date> · **Next reading due:** first deep check-in on or after <last reading + 4 weeks>
 ```
 
-A reading taken today makes today the **Last reading** date. Nothing
-supplied, or not asked because it wasn't due, carries the previous
-**Last reading** date forward; with no reading ever, write "none" and
-make the next deep check-in the due one.
+A reading taken today makes today the **Last reading** date. "Not
+supplied" means it was asked and the reply left it out; "not due" means
+it wasn't asked (step 3). Either way, carry the previous **Last reading**
+date forward; with no reading ever, write "none" and make the next deep
+check-in the due one.
 
 ## 7. Act on it
 
