@@ -232,7 +232,7 @@ class MigrateCommandTest(EnvelopeMixin, unittest.TestCase):
         with Instance() as root, TempRegistry({"0001_break.py": BREAK_KIND}) as reg:
             before = snapshot(root)
             envelope = self.run_with(reg, 1, "--root", str(root), "migrate", "run")
-            after = {k: v for k, v in snapshot(root).items() if not k.startswith(".coach/")}
+            after = {k: v for k, v in snapshot(root).items() if not k.startswith(".coach/backups/")}
             backup = (root / BACKUP / OVERLAY).read_bytes()
             self.assertEqual(after, before)
             self.assertEqual((root / OVERLAY).read_bytes(), backup)
@@ -255,7 +255,7 @@ class MigrateCommandTest(EnvelopeMixin, unittest.TestCase):
             with mock.patch.object(jsonio, "write_doc", side_effect=half_write):
                 with self.assertRaises(OSError):
                     migrate.run(root, dry_run=False, now=datetime(2026, 10, 11, 18, tzinfo=timezone.utc), reg=reg)
-            after = {k: v for k, v in snapshot(root).items() if not k.startswith(".coach/")}
+            after = {k: v for k, v in snapshot(root).items() if not k.startswith(".coach/backups/")}
         self.assertEqual(after, before)
 
 

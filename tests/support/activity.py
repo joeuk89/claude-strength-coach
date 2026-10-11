@@ -1,5 +1,6 @@
-"""Helpers for activity-source tests: a Hevy cache built from a synthetic fixture set (C8, C15)."""
+"""Helpers for activity-source tests: a Hevy cache from a synthetic fixture set (C8, C15), and routine mappings (C16)."""
 
+import copy
 import json
 
 from coach.hevy.cache import HevyCache
@@ -23,17 +24,19 @@ def write_hevy_cache(root, fixture_dir, pulled_at="2026-10-11T12:00:00Z"):
     return cache
 
 
-def write_program_state(root, routine_kinds):
-    """A minimal C16 program and state mapping each Hevy routine id to a session of the given kind."""
-    sessions, routines = [], {}
-    for number, (routine_id, kind) in enumerate(sorted(routine_kinds.items()), start=1):
-        session_id = f"session-{number}"
-        sessions.append({"id": session_id, "title": session_id, "kind": kind, "tier": "core", "status": "active",
-                         "location": None, "focus": None, "exercises": []})
-        routines[routine_id] = {"session_id": session_id}
-    data = root / "data"
-    data.mkdir(parents=True, exist_ok=True)
-    (data / "program.json").write_text(json.dumps({"schema_version": 1, "name": "test", "sessions": sessions}),
-                                       encoding="utf-8")
-    (data / "state.json").write_text(json.dumps({"schema_version": 1, "hevy": {"routines": routines}}),
-                                     encoding="utf-8")
+def map_routines(root, routine_kinds):
+    """Map each Hevy routine id to a session of the given kind in the instance's C16 program and state.
+
+    A kind the program lacks gets a copy of its last session under the id `<kind>-session`.
+    """
+    program_path, state_path = root / "data" / "program.json", root / "data" / "state.json"
+    program = json.loads(program_path.read_text(encoding="utf-8"))
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    for routine_id, kind in sorted(routine_kinds.items()):
+        session = next((s for s in program["sessions"] if s["kind"] == kind), None)
+        if session is None:
+            session = dict(copy.deepcopy(program["sessions"][-1]), id=f"{kind}-session", title=kind, kind=kind)
+            program["sessions"].append(session)
+        state["hevy"]["routines"][routine_id] = {"session_id": session["id"]}
+    program_path.write_text(json.dumps(program, indent=2) + "\n", encoding="utf-8")
+    state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")

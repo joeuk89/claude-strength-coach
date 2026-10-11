@@ -77,5 +77,6 @@ dedup_window_minutes = 15     # records of one kind starting this close are one 
 precedence = ["manual", "apple_health", "hevy_conditioning"]  # which source wins each field; list "manual" and every enabled source once
 gap_warn_days = 3             # `coach check` warns when an enabled source's newest day is older than this
 
-[sources.hevy_conditioning]   # Hevy workouts made only of conditioning exercises; reads the Hevy cache, never the API
+[sources.hevy_conditioning]   # Hevy conditioning workouts (all-conditioning exercises, or a routine mapped to a
+                              # conditioning session); reads the Hevy cache, never the API
 enabled = true                # also needs [hevy] enabled = true

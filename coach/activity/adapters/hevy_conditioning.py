@@ -1,9 +1,8 @@
 """Hevy conditioning workouts as Activities (contract C31). Reads the local Hevy cache; never calls the API."""
 
-import json
 import re
 
-from coach import dates, paths
+from coach import dates, program, state
 from coach.activity import records
 from coach.activity.adapters import Drop, FetchResult
 from coach.config import Key
@@ -109,19 +108,15 @@ def _exercise(lib, templates, exercise):
 
 
 def _session_kinds(root):
-    """{Hevy routine id: program session kind}, from data/state.json and data/program.json when both exist."""
-    state, program = _read(root / paths.STATE), _read(root / paths.PROGRAM)
-    if state is None or program is None:
+    """{Hevy routine id: program session kind}, from the state and program when both exist.
+
+    Raises ValidationError when either is malformed, so a broken file never voids routine-mapped Activities.
+    """
+    if not (state.exists(root) and program.exists(root)):
         return {}
-    kinds = {s.get("id"): s.get("kind") for s in program.get("sessions") or []}
-    routines = (state.get("hevy") or {}).get("routines") or {}
-    return {routine_id: kinds.get((entry or {}).get("session_id")) for routine_id, entry in routines.items()}
-
-
-def _read(path):
-    if not path.is_file():
-        return None
-    return json.loads(path.read_text(encoding="utf-8"))
+    kinds = {s["id"]: s["kind"] for s in program.load(root)["sessions"]}
+    routines = state.load(root)["hevy"]["routines"]
+    return {routine_id: kinds.get(entry["session_id"]) for routine_id, entry in routines.items()}
 
 
 def normalise(item, ctx):

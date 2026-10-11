@@ -2396,7 +2396,10 @@ R-32 and is registered in `coach/flags/research.py`.
 | `data/activity/sync.json` | per-source sync map (C31) | committed | R-42a |
 
 - Every line is one record with `schema_version` (C7). Lines are only ever
-  appended. For each `id`, the last line wins. `op` is `upsert` or `void`;
+  appended, and each keeps the version it was written at: `migrate run`
+  never touches these files. A version bump keeps a reader for every
+  older line version; a line newer than the coach reads fails with "run
+  /framework-sync". For each `id`, the last line wins. `op` is `upsert` or `void`;
   a `void` line carries `id`, `source`, `recorded_at`, a non-empty
   `reason` and `by` (`athlete` from a `void` command, `sync` from an
   adapter), and removes the record from every view. Schema:
@@ -2611,8 +2614,10 @@ def normalise(item, ctx) -> list[dict]: ...
     Hevy" when it left the cache, "no longer a conditioning workout in
     Hevy" when it is still there. With no cache at all it warns and
     changes nothing.
-  - It reads `data/state.json` and `data/program.json` as plain JSON
-    when both exist; once R-17a merges, the adapter moves to its loaders.
+  - It reads `data/state.json` and `data/program.json` through R-17a's
+    loaders when both exist, and applies no routine rule when either is
+    absent. A malformed one fails the source, so it never voids the
+    routine-mapped Activities.
   - Lifting workouts are dropped with the reason "lifting workout; Hevy is
     the lifting logbook".
   - `FRESH_BY = "sync"`: its freshness is the last sync, since a week

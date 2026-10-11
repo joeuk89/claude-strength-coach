@@ -10,7 +10,7 @@ from pathlib import Path
 from coach.activity import adapters
 from coach.activity.adapters import hevy_conditioning
 from tests.support import FIXTURES
-from tests.support.activity import write_hevy_cache, write_program_state
+from tests.support.activity import map_routines, write_hevy_cache
 from tests.test_activity_commands import ACTIVITIES, ActivityCase
 
 CONDITIONING = FIXTURES / "hevy" / "conditioning"
@@ -87,8 +87,8 @@ class HevySyncTest(SyncCase):
         self.assertEqual(by_id[hevy_id("c1")]["distance_meters"], 2000)
 
     def test_routine_mapped_to_a_conditioning_session_is_an_activity(self):
-        write_program_state(self.root, {"00000000-0000-4000-8000-000000000003": "conditioning",
-                                        "00000000-0000-4000-8000-000000000001": "lifting"})
+        map_routines(self.root, {"00000000-0000-4000-8000-000000000003": "conditioning",
+                                 "00000000-0000-4000-8000-000000000001": "lifting"})
         self.sync()
         by_id = {line["id"]: line for line in self.hevy_lines()}
         self.assertEqual(by_id[hevy_id("c3")]["kind"], "conditioning")
@@ -96,8 +96,23 @@ class HevySyncTest(SyncCase):
         self.assertNotIn(hevy_id("c4"), by_id)
 
     def test_without_state_the_hinge_workout_is_no_activity(self):
-        self.sync()
+        (self.root / "data" / "state.json").unlink()
+        report, _ = self.sync()
+        self.assertTrue(report[0]["ok"], report)
         self.assertNotIn(hevy_id("c3"), [line["id"] for line in self.hevy_lines()])
+
+    def test_a_malformed_state_fails_the_source_and_voids_nothing(self):
+        map_routines(self.root, {"00000000-0000-4000-8000-000000000003": "conditioning"})
+        self.sync()
+        before = self.lines(ACTIVITIES)
+        state_path = self.root / "data" / "state.json"
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        del state["hevy"]
+        state_path.write_text(json.dumps(state), encoding="utf-8")
+        report, _ = self.sync()
+        self.assertFalse(report[0]["ok"])
+        self.assertIn("data/state.json is not a valid state document", report[0]["error"])
+        self.assertEqual(self.lines(ACTIVITIES), before)
 
     def test_sync_map_records_state_and_holds_no_health_values(self):
         self.sync()

@@ -79,13 +79,9 @@ def line_errors(line, kind):
     if not isinstance(line, dict):
         return [Error("$", "expected an object")]
     version = line.get("schema_version")
-    if isinstance(version, int) and not isinstance(version, bool):
-        if version > VERSION:
-            return [Error("$.schema_version", f"version {version} is newer than this coach reads ({VERSION}); "
-                                              "run /framework-sync")]
-        if version < VERSION:
-            return [Error("$.schema_version", f"version {version} is older than the current {VERSION}; "
-                                              "run python3 -m coach migrate run")]
+    if isinstance(version, int) and not isinstance(version, bool) and version > VERSION:
+        return [Error("$.schema_version", f"version {version} is newer than this coach reads ({VERSION}); "
+                                          "run /framework-sync")]
     schema = VOID_SCHEMA if line.get("op") == "void" else SCHEMAS[kind]
     errors = validate(line, jsonio.load_schema(schema))
     if errors:
