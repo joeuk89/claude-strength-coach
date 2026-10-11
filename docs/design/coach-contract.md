@@ -2346,6 +2346,71 @@ and `plugins test` runs them. Loaded with
   approved load, else the start load, else 0). A load clipped by a cap or
   a load constraint is not rounded up, and no rounding goes past the cap.
 
+**Built with R-23b** (the remaining schemes and schedule rules):
+
+- `coach.plugins.base` gains three public helpers, so a scheme with its
+  own `decay` reads C22's numbers without importing `coach.validity`:
+  `return_band(days_off)` (the band), `bands_back(days_off)` (0 for
+  `0-10`, 1 for `11-21`, and so on) and `return_set_count(proposal,
+  set_delta)` (the `max(1, min(proposal, derived-from) + set_delta)`
+  rule `default_decay` also uses).
+- `rpe_anchored` params: `top_reps`, `top_rpe`, `backoff_sets`,
+  `backoff_reps` (each null by default: the program's first working set
+  is the top set, its other working sets the back-offs, their reps those
+  of a second working set group, else the top set's), `backoff_pct` 0.9.
+  The e1RM comes from the newest valid exposure's heaviest working set
+  when it logged reps and an RPE (C18 `e1rm`), else `ctx.e1rm`. The top
+  set is `load_for(e1rm, top_reps, top_rpe)` floored to the increment;
+  back-offs are `backoff_pct` of that floored load with no RPE target.
+  `round_down` is set. State is empty. `LOAD_MODES` is `E1RM_MODES`.
+- `wave_531` params: `training_max` (null: `training_max_pct`, 0.9, of
+  `ctx.e1rm`), `increment_upper` and `increment_lower` (null: 2.5 and 5
+  in kg, 5 and 10 in lb), `region` (null: lower for the squat, hinge,
+  lunge, knee, calf and hip patterns, else upper), `amrap` (true: the
+  last set of each wave week is type `failure`, its `reps` the minimum).
+  State `{wave_week 0..3, training_max, proposed_for}`. Each weekly
+  proposal advances one wave week, except a second proposal for a
+  session under 7 days after `proposed_for`, which repeats the week.
+  After week 3 the next proposal starts week 1 with the training max
+  raised. A deload run (`scheme` transform) calls its `deload`: 40/50/60 %
+  × 5 of the lower of the stored and the proposed training max, so the
+  raise waits for the next wave. Its `decay` lowers the training max by
+  the band's `load_factor` (kept in state), rebuilds the week without a
+  `failure` set, keeps `return_set_count` sets, caps each load at the
+  derived-from load × `load_factor` and applies the band's RPE cap, so
+  the line passes R-24's decay check. With no training max and no
+  e1RM it holds the program's sets at the last or start load.
+  `LOAD_MODES` is `E1RM_MODES`.
+- `assistance_ladder` params: `rungs` (ordered easiest first, each
+  `{name, load}`; `load` is the assistance for `assisted`, the added load
+  for `bodyweight`, where null means 0, and null for `band`), `reps`,
+  `sets`, `rpe` (null: the program's). State `{rung, through}`. Every
+  valid exposure after `through` (only the newest when `through` is
+  null) that logged every target set at its target reps (the top of a
+  range) at or under the target RPE moves up one rung, to the top rung
+  at most. `target_note` names the rung. `decay` steps back
+  `bands_back(days_off)` rungs (never below the first), with the band's set cut
+  and RPE cap and no load cut. `LOAD_MODES` is `bodyweight`, `assisted`
+  and `band`.
+- `maintenance` repeats the newest valid exposure's top load with the
+  fewest reps logged at that load, at the program's working set count
+  and RPE targets; with none, the start load. State is empty.
+- `next_in_sequence`: `rotation.position` is the session last trained
+  before the week `rotation.week` starts, and `positions` is the
+  sequence. A span week `n` weeks after `rotation.week` assumes every
+  slot in between was trained (`n × len(days)` sessions on) and raises
+  `rotation_unconfirmed`, as does a missing or unknown position (the
+  sequence then starts at its first session). Slots run in calendar
+  order from the week start; a midweek span keeps the week's earlier
+  slots. `schedule confirm --position S --week W` records S as the last
+  session trained before W (the week holding tomorrow by default).
+  `problems` reports unknown and repeated sessions and repeated days.
+- `explicit_calendar` plans exactly its `dates` inside the span, has no
+  positions, and its `problems` report keys that are not
+  `YYYY-MM-DD` dates and unknown sessions.
+- No new flag codes, no change to the loader, pipeline, contexts,
+  decisions or constraints.
+
 ## C24. Proposal pipeline and `coach propose` (R-23a; R-21b, R-22, R-25, R-26, R-30b, R-31, R-40a, R-41a, R-43, R-44a, R-44b, R-45 read)
 
 ```

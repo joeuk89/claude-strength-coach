@@ -77,8 +77,15 @@ _Avoid_: weekly plan, week's targets, weekly overlay
 **Progression scheme**:
 The named rule that turns an exercise's recent exposures into its next
 prescription: double progression, linear, wave, RPE-anchored, assistance
-ladder, hold. Every exercise in a program has one.
+ladder, maintenance, hold. Every exercise in a program has one.
 _Avoid_: progression model, autoregulation (one kind of scheme)
+
+**Training max**:
+The load a wave's percentages are taken from: 90 % of the e1RM by
+default, or a load the program sets, raised by a fixed increment at the
+start of each wave and lowered by a return band after time off. It is
+kept in the exercise's scheme state, never in the program.
+_Avoid_: TM, working max, 1RM (the training max sits below it)
 
 **Standing override**:
 A coach's change to one exercise's proposed prescription that holds in
