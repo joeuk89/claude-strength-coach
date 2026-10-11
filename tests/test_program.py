@@ -146,8 +146,8 @@ class ProblemsTest(unittest.TestCase):
 
     def test_missed_day_rule_names_a_session(self):
         doc = valid_doc()
-        doc["missed_day_rules"] = [{"id": "miss-c", "session_id": "session-c", "condition": "missed",
-                                    "action": "skip it"}]
+        doc["missed_day_rules"] = [{"id": "miss-c", "session_id": "session-c", "text": None, "when": {},
+                                    "action": {"kind": "skip"}}]
         self.assert_problem(doc, "$.missed_day_rules[0].session_id", "session-c")
 
     def test_unknown_scheme_name(self):

@@ -102,14 +102,14 @@ class ProposeCase(HistoryCase):
 
 
 class ValidWeekTest(ProposeCase):
-    def test_dry_run_proposes_a_valid_v2_overlay_and_writes_nothing(self):
+    def test_dry_run_proposes_a_valid_current_overlay_and_writes_nothing(self):
         before = self.snapshot()
         data = self.propose("--dry-run")
         self.assertEqual(self.snapshot(), before)
         doc = data["overlay"]
         self.assertEqual(validate_schema(doc, jsonio.load_schema("overlay")), [])
         self.assertEqual(overlay.validate(doc, self.root), [])
-        self.assertEqual(doc["schema_version"], 2)
+        self.assertEqual(doc["schema_version"], overlay.current_version())
         self.assertEqual([(s["date"], s["session_id"]) for s in doc["sessions"]],
                          [("2026-10-12", "session-a"), ("2026-10-15", "session-b")])
         self.assertEqual(data["id"], FIRST_ID)

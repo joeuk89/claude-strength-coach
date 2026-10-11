@@ -7,7 +7,7 @@ import unittest
 from datetime import date
 from pathlib import Path
 
-from coach import flags, units, validity
+from coach import flags, overlay, units, validity
 from tests.support import INSTANCES, REPO_ROOT, VALID, run_cli
 from tests.support.history import (R_A, W, HistoryCase, hevy_exercise, hevy_set, hevy_workout, read_json,
                                    write_json)
@@ -568,7 +568,7 @@ class MigrationTest(unittest.TestCase):
     def test_dry_run_lists_the_overlays_that_lose_approval(self):
         before = (self.root / OVERLAY).read_bytes()
         data = self.migrate("--dry-run")
-        self.assertEqual(data["files"][0]["steps"], ["overlay/0001_line_provenance"])
+        self.assertEqual(data["files"][0]["steps"][0], "overlay/0001_line_provenance")
         self.assertEqual(len(data["notes"]), 1)
         self.assertIn("2026-10-12-weekly loses its approval", data["notes"][0])
         self.assertEqual((self.root / OVERLAY).read_bytes(), before)
@@ -576,7 +576,7 @@ class MigrationTest(unittest.TestCase):
     def test_run_adds_null_provenance_to_every_line(self):
         self.migrate()
         doc = read_json(self.root / OVERLAY)
-        self.assertEqual(doc["schema_version"], 2)
+        self.assertEqual(doc["schema_version"], overlay.current_version())
         lines = [line for session in doc["sessions"] for line in session["exercises"]]
         self.assertEqual(len(lines), 4)
         self.assertEqual({repr(line["provenance"]) for line in lines}, {"None"})

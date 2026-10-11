@@ -4,7 +4,7 @@
   "required": ["schema_version", "id", "kind", "created_at", "span", "supersedes", "focus", "flags", "approval", "sessions"],
   "additionalProperties": false,
   "properties": {
-    "schema_version": {"const": 2},
+    "schema_version": {"const": 3},
     "id": {"$ref": "#/$defs/overlay_id"},
     "kind": {"enum": ["weekly", "midweek", "deload", "one_off"]},
     "created_at": {"$ref": "#/$defs/timestamp"},
@@ -51,7 +51,8 @@
     },
     "session": {
       "type": "object",
-      "required": ["session_id", "date", "title", "hevy_routine_id", "temporary", "location", "focus", "exercises"],
+      "required": ["session_id", "date", "title", "hevy_routine_id", "temporary", "location", "focus",
+                   "moved_from", "exercises"],
       "additionalProperties": false,
       "properties": {
         "session_id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
@@ -61,13 +62,14 @@
         "temporary": {"type": "boolean"},
         "location": {"type": ["string", "null"], "pattern": "^[a-z0-9-]+$"},
         "focus": {"$ref": "#/$defs/optional_text"},
+        "moved_from": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
         "exercises": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/exercise"}}
       }
     },
     "exercise": {
       "type": "object",
       "required": ["exercise_id", "hevy_template_id", "load_mode", "rest_seconds", "superset_id", "cues", "focus",
-                   "target_note", "change", "override", "provenance", "sets"],
+                   "target_note", "change", "override", "provenance", "fold", "sets"],
       "additionalProperties": false,
       "properties": {
         "exercise_id": {"type": "string", "pattern": "^[a-z0-9_]+$"},
@@ -80,6 +82,7 @@
         "target_note": {"$ref": "#/$defs/optional_text"},
         "change": {"$ref": "#/$defs/optional_text"},
         "provenance": {"$ref": "#/$defs/provenance"},
+        "fold": {"$ref": "#/$defs/fold"},
         "override": {
           "type": ["object", "null"],
           "required": ["reason", "proposed_sets"],
@@ -90,6 +93,17 @@
           }
         },
         "sets": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/set"}}
+      }
+    },
+    "fold": {
+      "type": ["object", "null"],
+      "required": ["rule_id", "from_session_id", "from_date", "scope"],
+      "additionalProperties": false,
+      "properties": {
+        "rule_id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+        "from_session_id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+        "from_date": {"$ref": "#/$defs/date"},
+        "scope": {"const": "one_week"}
       }
     },
     "provenance": {

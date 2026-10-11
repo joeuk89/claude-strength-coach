@@ -321,7 +321,8 @@ class ValidateTest(unittest.TestCase):
         doc["sessions"][1]["exercises"].append({
             "exercise_id": "plank", "hevy_template_id": None, "load_mode": "duration", "rest_seconds": 60,
             "superset_id": None, "cues": None, "focus": None, "target_note": None, "change": None,
-            "override": None, "provenance": None, "sets": [{"type": "normal", "duration_seconds": 45, "load": None}],
+            "override": None, "provenance": None, "fold": None,
+            "sets": [{"type": "normal", "duration_seconds": 45, "load": None}],
         })
         self.assertEqual(overlay.validate(doc, VALID), [])
         del doc["sessions"][1]["exercises"][2]["sets"][0]["duration_seconds"]
