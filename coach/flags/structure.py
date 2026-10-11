@@ -14,4 +14,5 @@ register("volume_undershoot", owner=OWNER, severities=("warn",), structural=True
          summary="A muscle below its dose target, planned on core plus coach-led, or delivered in three of four "
                  "ordinary weeks.")
 register("session_volume_high", owner=OWNER, severities=("warn", "info"), structural=True,
-         summary="More than 11 fractional sets for one muscle in one session (warn planned, info logged).")
+         summary="More than 11 fractional sets for one muscle in one session (warn planned, info logged) "
+                 "(rn:volume-frequency.3).")

@@ -2007,7 +2007,7 @@ Reserved codes:
 | `add_session_type_blocked` | warn | R-30a | yes | Adherence below 80 %: no new recurring session without a recorded override. |
 | `restructure_required` | warn | R-30a | yes | Adherence below 70 % and no decision in effect: the check-in presents a smaller schedule. |
 | `volume_undershoot` | warn | R-30a | yes | A muscle below its dose target, planned on core plus coach-led, or delivered in three of four ordinary weeks. |
-| `session_volume_high` | warn, info | R-30a | yes | More than 11 fractional sets for one muscle in one session (warn planned, info logged). |
+| `session_volume_high` | warn, info | R-30a | yes | More than 11 fractional sets for one muscle in one session (warn planned, info logged) (rn:volume-frequency.3). |
 | `priority_exposures_missed` | warn | R-30b | | A priority lift missed its planned exposure in a week and no floor dose replaced it. |
 | `light_week_due` | warn | R-31 | | Ceiling reached, or two fatigue triggers with three or more hard weeks; names the reason and proposed type. |
 | `light_week_skipped` | info | R-31 | | Two triggers fired below three hard weeks; light week skipped with the count. |
@@ -3971,10 +3971,11 @@ R-22's program bump (C16 schema versions) replaces C16's free-text
 - **`fold`**: copies the listed exercises from the missed session's lines
   in the overlay in force into the next planned date of `into` in the
   span, after its last exercise, with `sets` working sets (default 2,
-  never more than prescribed) at the prescribed reps and load, and at the
-  prescribed RPE or the item's optional `rpe` if lower. `into` is a
-  session id, or `"next"` for the next planned session of any kind. No
-  such later date in the span: unmatched.
+  never more than prescribed; rn:minimum-effective-dose.5) at the
+  prescribed reps and load, and at the prescribed RPE or the item's
+  optional `rpe` if lower. `into` is a session id, or `"next"` for the
+  next planned session of any kind. No such later date in the span:
+  unmatched.
 - **`shift`**: moves the whole session to the first weekday in
   `to_weekdays`, in list order, that falls after the missed date, inside
   the span, with no session already planned, and on a day in `[athlete]
@@ -4034,7 +4035,8 @@ changed lines and moved sessions carry `missed_day_rule` (info). It runs
 
 - Rule shape (program v4): `when` is `{}` or `{"min_days_left": n}`;
   `action.kind` is one of the four kinds; `fold` takes `into` and
-  `exercises` (each `{exercise_id, sets?, rpe?}`, `sets` ≥ 1, default 2),
+  `exercises` (each `{exercise_id, sets?, rpe?}`, `sets` ≥ 1, default 2;
+  rn:minimum-effective-dose.5),
   `shift` takes `to_weekdays` (weekday ids), and `skip` and `manual` take
   neither. A `manual` rule needs its `text`. `program validate` reports a
   kind's missing or extra keys and an exercise listed twice in one rule;
@@ -4325,9 +4327,9 @@ an optional top-level object; migration adds `{}`:
 ```
 
 - Keys are R-11 muscle names; values are fractional hard sets per week,
-  0 to 40. A muscle with no key gets the default 10 when it is a primary
-  muscle of any exercise in an active core session, and no target
-  otherwise.
+  0 to 40. A muscle with no key gets the default 10 (rn:volume-frequency.1)
+  when it is a primary muscle of any exercise in an active core session,
+  and no target otherwise.
 - `coach.structure.targets(program, library=None) -> dict[muscle, float]`
   returns the effective targets (`library` None: the catalogue alone).
   Nothing else applies the default. A "core session" here is an active
@@ -4559,11 +4561,10 @@ rule `add_session` and outcome `adopted` was made in the last 28 days.
 Exercise swaps are not affected.
 
 - `session_volume_high`: more than 11.0 fractional sets for one muscle in
-  one session, the per-session figure from Remmert, Pelland et al. 2025
-  (SportRxiv preprint, doi 10.51224/SRXIV.537). Warn on a planned session:
-  each active lifting program session in `structure balance`, and each
-  lifting session an overlay plans in `structure week`. Info on a logged
-  workout in `structure week`.
+  one session, the per-session figure (rn:volume-frequency.3). Warn on a
+  planned session: each active lifting program session in `structure
+  balance`, and each lifting session an overlay plans in `structure
+  week`. Info on a logged workout in `structure week`.
 - `structure decide` appends the C25 `adherence_trigger` decision and
   prints R-02's line ("Adherence trigger: 58 % over 4 weeks: deferred to
   2026-11-02") for the check-in record.
