@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "id": "2026-10-12-weekly",
   "kind": "weekly",
   "created_at": "2026-10-11T18:00:00Z",
@@ -12,7 +12,7 @@
   "flags": [],
   "approval": {
     "approved_at": "2026-10-11T19:00:00Z",
-    "hash": "sha256:b8878e48f67f0d6cf7987ce3db6be62ae6d1d52467c6cb18ca250a826add4065"
+    "hash": "sha256:3b2e3f42dcb54552ca8d227c423a0c73bbd98141f73e9ada2c0c18fb7213f1c7"
   },
   "sessions": [
     {
@@ -84,7 +84,8 @@
                 "hevy_kg": 100
               }
             }
-          ]
+          ],
+          "provenance": null
         },
         {
           "exercise_id": "db_bench_press",
@@ -155,7 +156,8 @@
                 "hevy_kg": 50
               }
             }
-          ]
+          ],
+          "provenance": null
         }
       ]
     },
@@ -216,7 +218,8 @@
                 "hevy_kg": 30
               }
             }
-          ]
+          ],
+          "provenance": null
         },
         {
           "exercise_id": "pull_up",
@@ -266,7 +269,8 @@
                 "hevy_kg": 0
               }
             }
-          ]
+          ],
+          "provenance": null
         }
       ]
     }
