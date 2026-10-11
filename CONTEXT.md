@@ -86,6 +86,27 @@ on a capped set counts like drift on a compound lift, whatever the
 exercise.
 _Avoid_: RPE ceiling, cap (ambiguous with a load cap)
 
+**Niggle**:
+An ache or minor injury worth watching for recurrence, logged in
+`data/niggles.json` with the movement patterns and exercises it affects
+and its status: aggravated, watching, easing, resolved, or **chronic**
+for a lasting limitation. While it is aggravated or watching (always,
+when chronic) its load limits (a recovery cap, no added load, a load
+cap) apply to every matching line the proposal step writes. A niggle is
+never deleted, never diagnosed, and one reported three check-ins
+running, or worsening to aggravated, means recommending a qualified
+professional.
+_Avoid_: injury (a diagnosis the coach does not make), limitation (use
+chronic niggle), pain point
+
+**Follow-up**:
+A question to come back to later, with the date it was raised, where it
+came from and a review date, kept in `data/followups.json`. It stays
+open until it is resolved or dropped with a reason; every deep check-in
+settles each open one, keeping it open with a new review date if need
+be.
+_Avoid_: todo, action item, open question, revisit (a decision's revisit date)
+
 **Schedule rule**:
 The named rule that decides which session lands on which day: fixed
 weekdays, alternating templates anchored to an external session,
