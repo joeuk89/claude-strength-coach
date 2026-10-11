@@ -330,6 +330,25 @@ def rpe_capped(sets, cap):
     return tuple(replace(s, rpe=cap if s.rpe is None else min(s.rpe, cap)) if s.working else s for s in sets)
 
 
+def return_band(days_off):
+    """C22's return band for these days off: `id`, `load_factor`, `set_delta`, `rpe_cap` and `retest`."""
+    return _validity.band_for(days_off)
+
+
+def bands_back(days_off):
+    """How many return bands past `0-10` these days off fall: 0 for `0-10`, 1 for `11-21`, and so on."""
+    return _validity.RETURN_BANDS.index(_validity.band_for(days_off))
+
+
+def return_set_count(proposal, set_delta):
+    """The working sets a return week keeps: `max(1, min(proposal, derived-from) + set_delta)` (C23)."""
+    count = len(working(proposal.sets))
+    source = proposal.derived_from
+    if source is not None and working(source.sets):
+        count = min(count, len(working(source.sets)))
+    return max(1, count + set_delta)
+
+
 def default_decay(ctx, proposal, days_off):
     """C22's return band: load × its factor from the pre-layoff load, one working set fewer, RPE capped for 43+.
 
@@ -343,10 +362,7 @@ def default_decay(ctx, proposal, days_off):
     if band.load_factor != 1:
         sets = scaled(sets, band.load_factor, ceiling)
     if band.set_delta:
-        count = len(working(sets))
-        if source is not None and working(source.sets):
-            count = min(count, len(working(source.sets)))
-        sets = keep_working(sets, max(1, count + band.set_delta))
+        sets = keep_working(sets, return_set_count(proposal, band.set_delta))
     if band.rpe_cap is not None:
         sets = rpe_capped(sets, band.rpe_cap)
     return replace(proposal, sets=sets, round_down=True)
