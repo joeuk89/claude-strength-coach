@@ -82,6 +82,7 @@ coach/                       # framework: synced to instances
   nutrition.py               # nutrition config, readings, status                        (R-33a)
   protein.py                 # protein reference mass, floor, target, stretch            (R-33a)
   calories.py                # no-app starting calorie estimate per phase                (R-33a)
+  load_statements.py         # load-figure parser, statements, bare-load diagnostics     (R-16)
   recipes.py                 # recipe cards, index, import                               (R-33b)
   meals.py                   # meal plans, shopping list                                 (R-33c)
   log.py, sheets.py          # manual log and session sheets                             (R-40c)
@@ -1339,8 +1340,9 @@ load, weight, kg or lb (and not Hevy), or a number in an arrow chain
 (`45 → 50`). Its interpretation is explicit when it, or another figure
 in its chain, says per hand (`/hand`, `per hand`, `each`) or gives the
 Hevy value (`(Hevy: 50)`). Per-hand-only wording is valid whether Hevy
-is enabled or disabled. Diagnostics request per-hand wording; with Hevy
-enabled they may also show the optional Hevy form.
+is enabled or disabled. With Hevy enabled, diagnostics show the
+two-number form first and per-hand wording as the minimum; with Hevy
+disabled they request per-hand wording only.
 In a table, a figure is also explicit when its column header says per
 hand (`Per hand (kg)`, `Load/hand (kg)`), when it sits in a Hevy-headed
 column, or, in a load column, when the same row has a number in a
@@ -1358,20 +1360,29 @@ The check reads a `per_hand_x2` overlay line's `target_note`, `change`,
 `cues`, `focus` and `override.reason`, and the prose of `profile.md` and
 `check-ins/*.md` outside rendered regions. Overlay text and override
 authoring use the same load-figure parser. In free prose a figure
-belongs to an exercise named before it in its clause or sentence.
-Punctuation and conjunctions delimit new subjects, including unmatched
-exercises (`DB bench 20/hand and leg curl 25 kg`). A comma or
-conjunction before a load instruction (`DB bench, move to 20 kg`)
-continues the same prescription. A numbered exercise clause such as
-`3 sets of leg curl at 25 kg` does not.
+belongs to an exercise named before it in its statement. Punctuation and
+conjunctions (`and`, `but`, `then`, `plus`, `while`, `whereas`, alone or
+combined, as in `, and then`) end a clause. A clause starts a new
+statement, so an unmatched exercise does not inherit the one before it
+(`DB bench 20/hand and leg curl 25 kg`). A clause on the same line that
+opens with a load instruction continues the statement before it, across
+commas, conjunctions and sentence ends: a weight (`, 22 kg if fresh`),
+a load verb with its weight (`, then move to 22.5 kg`, `, aim for 22 kg`),
+either after a time anchor (`, next week 22.5 kg`), or a bodyweight
+measurement. A clause that opens with anything else, such as a numbered
+exercise clause (`3 sets of leg curl at 25 kg`), does not.
 Equipment names alone do not identify an exercise prescription.
-Library names, aliases, Hevy titles and ids identify exercises; movement
-names shared by equipment variants require an unambiguous load mode,
-and equipment modifiers attached to that exercise select the matching
-variant. Equipment words belonging to another exercise or a bodyweight
-measurement do not change its mode. An
-unresolved or unmatched exercise never inherits an earlier exercise's
-mode. No library load modes are changed to interpret prose.
+Library names, aliases, Hevy titles and ids identify exercises, and so
+does an entry's name without its parenthetical equipment (`Lateral Raise
+(Cable)` gives `lateral raise`). An entry that lists the phrase as its
+own name, alias, Hevy title or id owns it; a phrase only derived for
+variants with different load modes is ambiguous and is not checked.
+Equipment modifiers attached to the exercise (`cable lateral raise`,
+`lateral raise on the cable machine`) select the matching variant; a
+modifier that matches no variant leaves the owner in place. Equipment
+words belonging to another exercise or a bodyweight measurement do not
+change its mode. An unresolved or unmatched exercise never inherits an
+earlier exercise's mode. No library load modes are changed to interpret prose.
 
 A table row's figures belong to the exercise named before them on the
 row, else to the exercise in the row's exercise cell (the column headed

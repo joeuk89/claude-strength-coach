@@ -238,7 +238,11 @@ class PostToolUseTest(unittest.TestCase):
 
     def test_comma_load_context_blocks_only_the_actual_dumbbell_prescription(self):
         for text, blocked in (("DB bench, move to 20 kg.", True),
-                              ("DB bench 20/hand, 3 sets of leg curl at 25 kg.", False)):
+                              ("DB bench 20/hand, then move to 25 kg.", True),
+                              ("DB bench 20/hand, and move to 25 kg.", True),
+                              ("DB bench 3x10 at 20/hand, next week 22.5 kg.", True),
+                              ("DB bench 20/hand, 3 sets of leg curl at 25 kg.", False),
+                              ("DB bench 20/hand, and leg curl 25 kg.", False)):
             with self.subTest(text=text):
                 root = copy_of(self, VALID)
                 profile = root / "profile.md"

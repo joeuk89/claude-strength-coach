@@ -73,7 +73,8 @@ _EQUIPMENT_CAPACITY_BEFORE = re.compile(
     r"\s+(?:(?:go\s+)?up\s+(?:to|in)|to|down\s+to)\s*$", re.IGNORECASE,
 )
 _WEIGHT = r"\d+(?:\.\d+)?\s*(?:kgs?|lbs?|kilos?|pounds?)(?![A-Za-z])"
-_MEASUREMENT_SUBJECT = re.compile(r"\b(?:body\s*weight|body mass|goal weight|goal plan current)\b", re.IGNORECASE)
+_MEASUREMENT_SUBJECT_WORDS = r"(?:body\s*weight|body mass|goal\s+(?:weight|plan)|weight\s+goal)"
+_MEASUREMENT_SUBJECT = re.compile(rf"\b{_MEASUREMENT_SUBJECT_WORDS}\b", re.IGNORECASE)
 _CLAUSE_SEPARATOR = re.compile(
     r"(,|[;!?\n]|\.(?!\d)|\b(?:(?:and|but)\s+then|and|but|then|plus|while|whereas)\b)", re.IGNORECASE,
 )
@@ -118,8 +119,8 @@ def bare_figures(text, load_column=False):
     """Load figures whose per-hand interpretation is not explicit.
 
     A load figure carries a weight unit, sits in a load column, or is part
-    of an arrow chain (`45 → 50`). It is in the two-number form when it, or
-    another figure in its chain, says per hand or gives the Hevy value.
+    of an arrow chain (`45 → 50`). It is explicit when it, or another figure
+    in its chain, says per hand or gives the Hevy value.
     """
     bare = []
     measurements = measurement_spans(text)
@@ -131,32 +132,46 @@ def bare_figures(text, load_column=False):
     return bare
 
 
-def bare_message(rel, where, figures, exercise, text, hevy_enabled=True):
+def bare_message(rel, where, figures, exercise, text, hevy_enabled):
     listed = ", ".join(repr(figure.text) for figure in figures)
     what = "is a bare dumbbell number" if len(figures) == 1 else "are bare dumbbell numbers"
-    guidance = "write the per-hand load, as in 25 kg per hand"
     if hevy_enabled:
-        guidance += "; optionally include the Hevy value, as in 25/hand (Hevy: 50)"
+        guidance = ("write the per-hand load and the Hevy value, as in 25/hand (Hevy: 50), "
+                    "or at least the per-hand load, as in 25 kg per hand")
+    else:
+        guidance = "write the per-hand load, as in 25 kg per hand"
     return (f"{rel} {where}: {listed} for {exercise} {what} in {text.strip()!r}; "
             f"{guidance}")
 
 
 _LOAD_CONTINUATION = re.compile(
-    r"^\s*(?:(?:move|go|work|increase|reduce|hold|stay|add|drop|raise|lower)\s+"
-    r"(?:(?:up|down)\s+)?(?:(?:to|at|by)\s+)?)?"
-    r"\d+(?:\.\d+)?\s*(?:kgs?|lbs?|kilos?|pounds?|/\s*hand|per\s+hand|each|→|->|=>|⇒)(?![A-Za-z])",
+    r"\s*(?:(?:next|this|last|following)\s+(?:week|session|time|block|workout)|today|tomorrow)?[\s:]*"
+    r"(?:(?:move|go|work|increase|reduce|hold|stay|add|drop|raise|lower|bump|build|aim|target|try|use|keep)\s+)?"
+    r"(?:(?:up|down|back)\s+)?(?:(?:to|at|by|for|with)\s+)?"
+    r"\d+(?:\.\d+)?\s*(?:kgs?|lbs?|kilos?|pounds?|/\s*hand|per\s+hand|each|→|->|=>|⇒)(?![A-Za-z])"
+    rf"|\s*(?:at\s+)?{_MEASUREMENT_SUBJECT_WORDS}\b",
     re.IGNORECASE,
 )
 
 
 def statements(text):
-    """Separate subjects at punctuation or conjunctions, retaining explicit load continuations."""
+    """Split text into one statement per subject.
+
+    Punctuation and conjunctions start a new subject. A clause that opens
+    with a load instruction or a bodyweight measurement continues the
+    statement before it, so its figures keep that statement's exercise.
+    """
     parts = _CLAUSE_SEPARATOR.split(text)
     found = [parts[0]]
+    joint = ""
     for separator, following in zip(parts[1::2], parts[2::2]):
-        if (separator == "," or separator[0].isalpha()) \
-                and _LOAD_CONTINUATION.match(following):
-            found[-1] += separator + following
+        joint += separator
+        if not following.strip():
+            joint += following
+            continue
+        if _LOAD_CONTINUATION.match(following):
+            found[-1] += joint + following
         else:
             found.append(following)
+        joint = ""
     return found

@@ -347,7 +347,12 @@ def _overlay_text(line):
 
 
 class _Mentions:
-    """Exercise mentions resolved only when their load mode is unambiguous."""
+    """Exercise mentions resolved only when their load mode is unambiguous.
+
+    A movement name derived from an entry's name ("Lateral Raise (Cable)"
+    gives "lateral raise") also matches, but an entry that lists the phrase
+    as its own name or alias owns it unless equipment wording picks another.
+    """
 
     _EQUIPMENT = {"db": "dumbbell", "dbs": "dumbbell", "dumbbells": "dumbbell",
                   "bb": "barbell", "kb": "kettlebell", "cables": "cable",
@@ -363,9 +368,10 @@ class _Mentions:
     def __init__(self, lib):
         candidates = {}
         for entry in lib.entries():
-            name = re.sub(r"\s*\([^)]*\)", "", entry["name"])
-            for phrase in (entry["name"], name, *entry["aliases"], *entry["hevy_titles"], entry["id"]):
-                candidates.setdefault(self._key(phrase), {})[entry["id"]] = entry
+            movement = re.sub(r"\s*\([^)]*\)", "", entry["name"])
+            own = (entry["name"], *entry["aliases"], *entry["hevy_titles"], entry["id"])
+            for phrase, owned in [(phrase, True) for phrase in own] + [(movement, False)]:
+                candidates.setdefault(self._key(phrase), {}).setdefault(entry["id"], (entry, owned))
         self._candidates = candidates
         alternatives = sorted(candidates, key=len, reverse=True)
         body = "|".join(r"[\s-]+".join(re.escape(token) for token in phrase.split()) for phrase in alternatives)
@@ -375,7 +381,7 @@ class _Mentions:
     def _key(phrase):
         return " ".join(phrase.lower().replace("-", " ").split())
 
-    def _equipment(self, text, match, end, ambiguous):
+    def _equipment(self, text, match, end, measurements, ambiguous):
         words = re.findall(r"[a-z]+", match.group(0).lower())
         named = {self._EQUIPMENT.get(word, word) for word in words}
         named &= {"dumbbell", "barbell", "kettlebell", "cable", "machine", "band", "bodyweight"}
@@ -388,23 +394,23 @@ class _Mentions:
                       if m.group(1).lower() != "bodyweight"]
         if ambiguous:
             modifiers += [(m, match.end()) for m in self._EQUIPMENT_STEP.finditer(after)]
-        measurements = measurement_spans(text)
         return {self._EQUIPMENT.get(m.group(1).lower(), m.group(1).lower()) for m, offset in modifiers
                 if not any(start <= offset + m.start(1) < stop for start, stop in measurements)}
 
     def find(self, text):
+        """[(start, end, exercise, mode)] in order; mode is None when the mention is ambiguous."""
         found = []
+        measurements = measurement_spans(text)
         matches = list(self._pattern.finditer(text))
         for index, match in enumerate(matches):
             end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
-            entries = list(self._candidates[self._key(match.group(0))].values())
-            equipment = self._equipment(text, match, end, ambiguous=len(entries) > 1)
-            if equipment:
-                entries = [e for e in entries if e["equipment"] in equipment]
+            candidates = list(self._candidates[self._key(match.group(0))].values())
+            owners = [entry for entry, owned in candidates if owned] or [entry for entry, _ in candidates]
+            equipment = self._equipment(text, match, end, measurements, ambiguous=len(candidates) > 1)
+            entries = [entry for entry, _ in candidates if entry["equipment"] in equipment] or owners
             modes = {e["effective_load_mode"] or e["load_mode_default"] for e in entries}
             mode = next(iter(modes)) if len(modes) == 1 else None
-            exercise = entries[0]["id"] if entries else match.group(0)
-            found.append((match.start(), match.end(), exercise, mode))
+            found.append((match.start(), match.end(), entries[0]["id"], mode))
         return found
 
 
@@ -462,7 +468,7 @@ def _row_figures(line, table):
     return found
 
 
-def _prose_results(rel, text, mentions, hevy_enabled=True):
+def _prose_results(rel, text, mentions, hevy_enabled):
     results = []
     lines = _without_regions(text).split("\n")
     table, carried = None, None
@@ -506,7 +512,8 @@ def _prose_results(rel, text, mentions, hevy_enabled=True):
             if mention and mention[3] == PER_HAND_X2:
                 bare.setdefault(mention[2], []).append(figure)
         for exercise, listed in bare.items():
-            results.append(Result("fail", bare_message(rel, f"line {number}", listed, exercise, line, hevy_enabled), rel))
+            results.append(Result("fail", bare_message(rel, f"line {number}", listed, exercise, line,
+                                                       hevy_enabled), rel))
     return results
 
 

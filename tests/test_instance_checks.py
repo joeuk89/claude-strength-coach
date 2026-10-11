@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from coach import overlay
+from coach import load_statements, overlay
 from coach.checks import instance
 from tests.support import INSTANCES, REPO_ROOT, VALID, run_cli, run_module
 
@@ -427,12 +427,13 @@ class BareHevyValuesTest(unittest.TestCase):
                 self.assertIn(": '20 kg' for db_arnold_press", failed["message"])
 
     def test_conjunctions_separate_exercises_and_preserve_load_instructions(self):
-        for conjunction in ("and", "and then", "but", "but then", "then", "plus", "while"):
+        for joint in (" and", " and then", " but", " but then", " then", " plus", " while",
+                      ",", ", and", ", then", ", and then", ", but", "; then", ". Then"):
             for following, expected in (("leg curl 25 kg", 0),
                                         ("3 sets of leg curl at 25 kg", 0),
                                         ("move to 25 kg", 1),
                                         ("dumbbell RDL 25 kg", 1)):
-                text = f"DB bench 20/hand {conjunction} {following}."
+                text = f"DB bench 20/hand{joint} {following}."
                 with self.subTest(text=text), TempCopy() as tmp:
                     tmp.write("profile.md", text)
                     code, results, _ = check(tmp.root, "bare_hevy_values")
@@ -447,6 +448,25 @@ class BareHevyValuesTest(unittest.TestCase):
                 code, results, _ = check(tmp.root, "bare_hevy_values")
                 self.assertEqual(code, expected, results)
                 self.assertTrue(all("'25 kg'" not in r["message"] for r in failures(results, "bare_hevy_values")))
+
+    def test_a_clause_that_starts_with_a_load_instruction_keeps_its_exercise(self):
+        for text, flagged in (("DB bench 3x10 at 20/hand, next week 22.5 kg.", ["22.5 kg"]),
+                              ("DB bench: last week 20/hand, this week 22.5 kg.", ["22.5 kg"]),
+                              ("DB bench 3x10 at 20/hand and next week 22.5 kg.", ["22.5 kg"]),
+                              ("DB bench 20 kg per hand, and then 22 kg.", ["22 kg"]),
+                              ("DB bench 20/hand, then add 2 kg", ["2 kg"]),
+                              ("DB bench at 20 kg, then 22 kg next week", ["20 kg", "22 kg"]),
+                              ("DB bench 20/hand, but 22 kg if fresh", ["22 kg"]),
+                              ("DB bench 20/hand, aim for 22 kg", ["22 kg"]),
+                              ("DB bench 20/hand. Next week 22.5 kg.", ["22.5 kg"]),
+                              ("Arnold press, bodyweight 73 kg, move to 15 kg", ["15 kg"])):
+            with self.subTest(text=text), TempCopy() as tmp:
+                tmp.write("profile.md", text)
+                code, results, _ = check(tmp.root, "bare_hevy_values")
+                self.assertEqual(code, 1, results)
+                [failed] = failures(results, "bare_hevy_values")
+                listed = failed["message"].split(" for ")[0].split(": ", 1)[1]
+                self.assertEqual(listed, ", ".join(repr(figure) for figure in flagged))
 
     def test_measurement_exemption_does_not_hide_a_later_prescription(self):
         with TempCopy() as tmp:
@@ -485,11 +505,28 @@ class BareHevyValuesTest(unittest.TestCase):
                                ("lateral raise with 10 kg dumbbells", 1),
                                ("lateral raise 10 kg using dumbbells", 1),
                                ("dumbbells for lateral raise 10 kg", 1),
-                               ("lateral raise 10 kg", 0)):
+                               ("lateral raise 10 kg", 1),
+                               ("rear delt fly 8 kg", 1),
+                               ("rear delt fly on the machine 30 kg", 0)):
             with self.subTest(text=text), TempCopy() as tmp:
                 tmp.write("profile.md", text)
                 code, results, _ = check(tmp.root, "bare_hevy_values")
                 self.assertEqual(code, expected, failures(results, "bare_hevy_values"))
+
+    def test_an_unmatched_equipment_word_does_not_hide_a_single_variant_load(self):
+        with TempCopy() as tmp:
+            tmp.write("profile.md", "Arnold press 20 kg on the machine days")
+            code, results, _ = check(tmp.root, "bare_hevy_values")
+            self.assertEqual(code, 1, results)
+            self.assertIn("for db_arnold_press", failures(results, "bare_hevy_values")[0]["message"])
+
+    def test_hevy_on_diagnostic_shows_both_numbers_first(self):
+        with TempCopy() as tmp:
+            tmp.write("profile.md", "DB bench 20 kg")
+            _, results, _ = check(tmp.root, "bare_hevy_values")
+            [failed] = failures(results, "bare_hevy_values")
+            message = failed["message"]
+            self.assertLess(message.index("25/hand (Hevy: 50)"), message.index("25 kg per hand"))
 
     def test_overlay_ignores_measurements_but_still_checks_its_load(self):
         with TempCopy() as tmp:
@@ -640,6 +677,17 @@ class LoadFigureTest(unittest.TestCase):
         for text, expected in cases.items():
             with self.subTest(text):
                 self.assertEqual(self.bare(text), expected)
+
+    def test_statements_keep_load_instructions_with_their_exercise(self):
+        cases = {
+            "DB bench 20/hand, then move to 22.5 kg. Leg curl 25 kg":
+                ["DB bench 20/hand, then move to 22.5 kg", " Leg curl 25 kg"],
+            "DB bench 20/hand, and leg curl 25 kg": ["DB bench 20/hand", " leg curl 25 kg"],
+            "Arnold press, bodyweight 73 kg, move to 15 kg": ["Arnold press, bodyweight 73 kg, move to 15 kg"],
+        }
+        for text, expected in cases.items():
+            with self.subTest(text):
+                self.assertEqual([s for s in load_statements.statements(text) if s.strip()], expected)
 
     def test_load_column_cells(self):
         self.assertEqual(self.bare("45", load_column=True), ["45"])

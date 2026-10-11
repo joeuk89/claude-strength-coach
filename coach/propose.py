@@ -21,7 +21,7 @@ from coach import dates, decisions, flags, followups, history, jsonio, niggles, 
 from coach import cardio, conditioning, external, program, research, weekflags
 from coach import state as state_module
 from coach import stats, units, validity
-from coach.checks.instance import cap_for
+from coach.checks.instance import PER_HAND_X2, cap_for
 from coach.errors import ConfigError, RefusedError, UsageError, ValidationError
 from coach.library import Library, e1rm_supported
 from coach.load_statements import bare_figures, bare_message
@@ -1098,7 +1098,7 @@ def override(root, config, proposal_id, session_id, exercise_id, new_sets, load,
     draft, proposed, _ = load_proposal(root, proposal_id)
     selected = _locate(draft, session_id, exercise_id)
     figures = bare_figures(reason)
-    if figures and any(line["load_mode"] == "per_hand_x2" for _, line in selected):
+    if figures and any(line["load_mode"] == PER_HAND_X2 for _, line in selected):
         raise ValidationError(bare_message("override", "reason", figures, exercise_id, reason, config.hevy.enabled))
     originals = _lines_by_key(proposed)
     unit = config.athlete.units
