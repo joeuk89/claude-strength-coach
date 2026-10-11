@@ -27,7 +27,7 @@ from coach.validate import Error
 from coach.validate import validate as validate_schema
 
 SCHEMA = "blocks"
-CLASSES = ("hard", "partial", "low", "light", "return", "one_off")
+CLASSES = ("hard", "partial", "low", "light", "return", "one_off", "minimum")
 ENDS_BLOCK = ("light", "return", "low")
 TRIGGERS = ("readiness", "rpe_drift", "niggle", "sleep")
 TRIGGER_NAMES = {"readiness": "readiness", "rpe_drift": "RPE drift", "niggle": "niggle", "sleep": "sleep"}
@@ -249,7 +249,7 @@ def _facts(inst, span):
     planned, trained = report["planned"], report["trained"]
     as_prescribed = sum(1 for row in report["sessions"] if _row_as_prescribed(inst, row))
     ill = any(row.get("status") == "missed" and row.get("tag") == "ill" for row in report["sessions"])
-    if report["kind"] in ("light", "one_off"):
+    if report["kind"] in ("light", "one_off", "minimum"):
         found = report["kind"]
     elif _is_return(inst, span):
         found = "return"
@@ -263,7 +263,7 @@ def _facts(inst, span):
 
 
 def classify(root, week_start, *, today=None, now=None):
-    """The week's class (C42): hard, partial, low, light, return or one_off. Reads only."""
+    """The week's class (C42): hard, partial, low, light, return, one_off or minimum. Reads only."""
     inst = _Instance.load(root, today, now)
     return _facts(inst, inst.week(_as_date(week_start)))["class"]
 

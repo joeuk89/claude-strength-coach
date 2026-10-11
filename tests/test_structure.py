@@ -75,6 +75,9 @@ class StructureCase(unittest.TestCase):
         old.unlink()
         write_json(self.root / "data" / "overlays" / f"{doc['id']}.json", doc)
 
+    def write_minimum_plan(self, week_start):
+        write_json(self.root / structure.minimum_plan_path(week_start), {"variant": "minimum"})
+
     def drop_workouts(self, start, end):
         for path in (self.root / "data" / "history").glob("2026-*.json"):
             doc = read_json(path)
@@ -170,6 +173,14 @@ class AdherenceTest(StructureCase):
         data = self.adherence()
         self.assertEqual([w["label"] for w in data["weeks"]], ["2026-W36", "2026-W37", "2026-W38", "2026-W41"])
         self.assertEqual({s["label"]: s["kind"] for s in data["skipped"]}, {"2026-W39": "light", "2026-W40": "one_off"})
+
+    def test_a_minimum_week_is_skipped(self):
+        self.write_minimum_plan("2026-09-28")
+        data = self.adherence()
+        self.assertEqual([w["label"] for w in data["weeks"]], ["2026-W37", "2026-W38", "2026-W39", "2026-W41"])
+        self.assertEqual(data["skipped"], [{"week": "2026-09-28", "label": "2026-W40", "kind": "minimum"}])
+        self.assertEqual(structure.ordinary_weeks(self.root, date(2026, 10, 11), today=date(2026, 10, 11)),
+                         ["2026-09-07", "2026-09-14", "2026-09-21", "2026-10-05"])
 
     def test_two_weeks_without_training_are_a_layoff(self):
         self.drop_workouts("2026-09-21", "2026-10-04")
@@ -282,6 +293,19 @@ class WeekTest(StructureCase):
         self.assertEqual(data["muscles"]["chest"]["planned"], 3)
         self.assertEqual(data["muscles"]["chest"]["delivered"], 3)
         self.assertEqual(data["muscles"]["lats"]["delivered"], 0)
+
+    def test_a_week_with_a_minimum_plan_is_a_minimum_week(self):
+        self.write_minimum_plan("2026-10-05")
+        self.assertEqual(self.data("structure", "week", "--week", "2026-W41")["kind"], "minimum")
+        self.assertEqual(self.data("structure", "week", "--week", "2026-W40")["kind"], "ordinary")
+
+    def test_light_wins_over_a_minimum_plan_and_a_minimum_plan_over_one_off(self):
+        self.make_kind("2026-09-21", "deload")
+        self.make_kind("2026-09-28", "one_off")
+        for start in ("2026-09-21", "2026-09-28"):
+            self.write_minimum_plan(start)
+        self.assertEqual(self.data("structure", "week", "--week", "2026-W39")["kind"], "light")
+        self.assertEqual(self.data("structure", "week", "--week", "2026-W40")["kind"], "minimum")
 
     def test_by_session_holds_each_logged_session(self):
         data = self.data("structure", "week", "--week", "2026-W40")

@@ -251,6 +251,31 @@ class WeekClassTest(BlockCase):
         self.assertEqual(data["block"]["hard_weeks_completed"], 5)
         self.assertEqual(data["ended"], [])
 
+    def test_a_minimum_week_neither_counts_nor_resets(self):
+        self.assertEqual(block.classify(self.root, "2026-09-14", today=date(2026, 10, 11)), "hard")
+        write_json(self.root / structure.minimum_plan_path("2026-09-14"), {"variant": "minimum"})
+        self.assertEqual(block.classify(self.root, "2026-09-14", today=date(2026, 10, 11)), "minimum")
+        data = self.close()
+        week = data["weeks"][2]
+        self.assertEqual((week["class"], week["planned"], week["as_prescribed"]), ("minimum", 3, 3))
+        self.assertEqual([w["count_after"] for w in data["weeks"]], [1, 2, 2, 3, 4, 5])
+        self.assertEqual(data["ended"], [])
+        self.assertTrue(data["status_line"].startswith("Block 1 · 5 of 6 hard weeks"))
+
+    def test_a_deload_week_with_a_minimum_plan_is_light(self):
+        self.close()
+        self.data("block", "decide", "--outcome", "adopted", "--type", "deload", "--week", "2026-W42")
+        proposal = self.data("propose", "week", "--week", "2026-W42", "--kind", "deload")
+        self.data("propose", "finalize", "--proposal", proposal["overlay"]["id"])
+        write_json(self.root / structure.minimum_plan_path("2026-10-12"), {"variant": "minimum"})
+        closed = self.close("2026-W42", now=NEXT_SUNDAY)
+        self.assertEqual(closed["weeks"][-1]["class"], "light")
+        self.assertEqual(closed["ended"], ["b-0001"])
+
+    def test_the_ledger_schema_lists_every_class(self):
+        schema = jsonio.load_schema(block.SCHEMA)
+        self.assertEqual(tuple(schema["$defs"]["week"]["properties"]["class"]["enum"]), block.CLASSES)
+
     def kind_for(self, week, kind):
         from coach import structure
         real = structure.week

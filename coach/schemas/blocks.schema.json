@@ -31,7 +31,7 @@
       "additionalProperties": false,
       "properties": {
         "week": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
-        "class": {"enum": ["hard", "partial", "low", "light", "return", "one_off"]},
+        "class": {"enum": ["hard", "partial", "low", "light", "return", "one_off", "minimum"]},
         "planned": {"type": "integer", "minimum": 0},
         "trained": {"type": "integer", "minimum": 0},
         "as_prescribed": {"type": "integer", "minimum": 0},

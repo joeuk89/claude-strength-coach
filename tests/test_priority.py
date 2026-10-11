@@ -522,6 +522,11 @@ class MinimumPlanTest(MinimumCase):
         self.assertEqual([(s["date"], s["session_id"]) for s in doc["sessions"]],
                          [("2026-10-13", "min-a"), ("2026-10-16", "min-b")])
 
+    def test_the_written_plan_makes_the_week_a_minimum_week(self):
+        self.assertNotEqual(self.data("structure", "week", "--week", "2026-W42")["kind"], "minimum")
+        self.data("structure", "minimum", "--week", "2026-W42", "--write")
+        self.assertEqual(self.data("structure", "week", "--week", "2026-W42")["kind"], "minimum")
+
     def test_without_write_or_with_dry_run_nothing_is_written(self):
         self.assertFalse(self.data("structure", "minimum", "--week", "2026-W42")["written"])
         self.assertFalse(self.data("structure", "minimum", "--week", "2026-W42", "--write", "--dry-run")["written"])
