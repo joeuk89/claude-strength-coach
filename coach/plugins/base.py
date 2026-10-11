@@ -279,9 +279,9 @@ class ConditioningContext:
     `exercises` are in program order. `bouts` are the conditioning
     Activities matched to the session's last prescription, newest first,
     each `{date, activity_id, duration_seconds, rpe}`. `last_prescription`
-    is `{overlay_id, session_id, date, lines}` from the newest approved
-    overlay holding the session, or None. `days_off` counts from the newest
-    logged conditioning Activity.
+    is `{overlay_id, session_id, date, dates, span, lines}` from the newest
+    approved overlay holding the session, or None. `days_off` counts from
+    the newest logged conditioning Activity.
     """
 
     today: date

@@ -578,12 +578,14 @@ def _template_id(entry):
     return entry.get("hevy_template_id") or next(iter(entry.get("hevy_template_ids") or []), None)
 
 
-def propose_conditioning(run, session, day, ctx_extra, judge=True):
+def propose_conditioning(run, session, day, ctx_extra, repeat=False):
     """A conditioning session's lines from its density scheme; every load holds as written (C51).
 
-    `judge` false holds the scheme where it is: a deload run, or the
-    session's second date in one run, which must not step twice on one bout.
+    A deload run holds the scheme where it is. `repeat` marks a later date
+    of a session this run already proposed: its state is already judged and
+    decayed, so it holds, and a layoff never steps the scheme back twice.
     """
+    judge = ctx_extra["kind"] != "deload" and not repeat
     session_id, scheme = session["id"], session["scheme"]
     plugin = run.registry.get("conditioning", scheme["name"])
     params, _ = plugins.merged_params(plugin, scheme["params"])
@@ -603,7 +605,7 @@ def propose_conditioning(run, session, day, ctx_extra, judge=True):
     )
     proposal = plugin.module.propose(ctx)
     _check_conditioning(plugin, proposal, session)
-    if days_off > DECAY_AFTER_DAYS:
+    if days_off > DECAY_AFTER_DAYS and not repeat:
         proposal = plugin.module.decay(ctx, proposal, days_off)
         _check_conditioning(plugin, proposal, session)
         found.append(session_flag("return_week", (
@@ -866,9 +868,9 @@ def propose_week(root, config, today, now, span, kind="weekly", transform_name=N
                 f"{validity.SYMPTOM_FREE_HOURS} hours symptom-free; every set is capped at RPE "
                 f"{validity.ILLNESS_RPE_CAP}")))
         if conditioning.has_scheme(session):
-            judge = kind != "deload" and session_id not in {sid for _, sid in session_keys}
+            repeat = session_id in {sid for _, sid in session_keys}
             results = [(conditioning.state_key(session_id),
-                        propose_conditioning(run, session, day, ctx_extra, judge))]
+                        propose_conditioning(run, session, day, ctx_extra, repeat))]
             lines = results[0][1].draft_line
         else:
             results = [(f"{session_id}/{exercise['exercise_id']}", propose_line(run, session, day, exercise, ctx_extra))

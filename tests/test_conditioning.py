@@ -4,6 +4,7 @@ import copy
 import json
 import unittest
 from datetime import date
+from unittest import mock
 
 from coach import history, jsonio, overlay, render, state
 from coach.plugins import base
@@ -373,6 +374,45 @@ class ActivityTest(CircuitCase):
         lines = self.circuit_lines(doc)
         self.assertEqual([s["reps"] for s in lines["kb_swing"]["sets"]], [11] * 5)
         self.assertIn("RPE 7", lines["kb_swing"]["provenance"]["rationale"])
+
+
+class LayoffTest(CircuitCase):
+    """The Circuit on Wednesday and Saturday after 30 days without conditioning."""
+
+    def setUp(self):
+        super().setUp()
+        self.edit_json("data/program.json", lambda doc: doc["schedule"]["params"]["days"].update(wed="circuit"))
+        stored = emom_state(10, 11, 6, previous=[emom_state(10, 10, 5)["current"],
+                                                  emom_state(10, 11, 5, turn=1)["current"]])
+        self.edit_json("data/state.json", lambda doc: doc["scheme_state"].update(
+            {"circuit/_session": {"scheme": "emom_density", "data": stored, "pending": None}}))
+
+    def propose_after_layoff(self, *extra):
+        with mock.patch("coach.conditioning.days_off", return_value=30):
+            return self.propose(*extra)
+
+    def reps_by_date(self, doc):
+        return {s["date"]: {line["exercise_id"]: line["sets"][0]["reps"] for line in s["exercises"]}
+                for s in doc["sessions"] if s["session_id"] == "circuit"}
+
+    def test_every_date_steps_back_once(self):
+        doc = self.propose_after_layoff("--dry-run")["overlay"]
+        once = {"kb_swing": 11, "burpee": 5}
+        self.assertEqual(self.reps_by_date(doc), {"2026-10-14": once, "2026-10-17": once})
+        self.assertEqual(len([f for f in doc["flags"] if f["code"] == "return_week"
+                              and f["session_id"] == "circuit"]), 1)
+
+    def test_the_pending_state_is_one_step_back(self):
+        proposal = self.propose_after_layoff()["id"]
+        self.data("propose", "finalize", "--proposal", proposal)
+        entry = json.loads((self.root / "data" / "state.json").read_text(encoding="utf-8"))["scheme_state"][
+            "circuit/_session"]
+        self.assertEqual(entry["pending"]["data"]["current"]["reps"], {"kb_swing": 11, "burpee": 5})
+
+    def test_a_deload_steps_back_once(self):
+        doc = self.propose_after_layoff("--kind", "deload", "--dry-run")["overlay"]
+        once = {"kb_swing": 11, "burpee": 5}
+        self.assertEqual(self.reps_by_date(doc), {"2026-10-14": once, "2026-10-17": once})
 
 
 class DropCase(CircuitCase):

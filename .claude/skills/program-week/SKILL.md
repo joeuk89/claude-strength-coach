@@ -175,7 +175,7 @@ formula applied blindly is not coaching.
      run — or keep the plan and resolve the flag with the reason (step
      4). `python3 -m coach interference list` shows the program's rules.
    - `conditioning_dropped` (the drop rule: sleep debt, a status day on
-     the date, or a quality bout the day either side): at info, an
+     the date, or a quality activity the day either side): at info, an
      optional conditioning session left the draft, listed in
      `data.dropped` with its trigger. If the athlete still wants it, put
      it back with `python3 -m coach propose restore --proposal <id>
