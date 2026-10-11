@@ -19,6 +19,15 @@ becomes the program only by being adopted, which validates it, archives
 any old program and stages the files.
 _Avoid_: proposal (a week's proposed prescriptions), candidate program, import file
 
+**Starter**:
+A tested program that ships with the framework for an athlete who has no
+program of their own: full body, upper/lower, push/pull/legs, a 3-week
+wave or full body by RPE. Drafting one fits it to the athlete's days,
+equipment and avoided exercises, and its lines without a known load run
+a **calibration week**: no load, and the athlete chooses one they could
+lift for the target reps at the target RPE.
+_Avoid_: template (the repo itself), preset, stock program
+
 **Run mode**:
 The coaching mode for an athlete who wants their own program run as
 written (`[coaching] mode = "run"`). Loads still progress and every

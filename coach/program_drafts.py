@@ -48,11 +48,11 @@ _WAVE_KEYWORDS = ("TM", "training max", "5/3/1", "531")
 _MIN_ROUTINES_FOR_LOADS = 3
 
 
-def _row(kind, message, session_id=None, exercise_id=None):
+def report_row(kind, message, session_id=None, exercise_id=None):
     return {"kind": kind, "session_id": session_id, "exercise_id": exercise_id, "message": message}
 
 
-def _timestamp(now):
+def timestamp(now):
     if now is None:
         now = datetime.now(timezone.utc)
     if isinstance(now, str):
@@ -101,14 +101,14 @@ def import_hevy(root, routine_ids=None, folder_id=None, now=None):
         hevy_routines[routine["id"]] = session_id
 
     detected = _detect(routines, top_loads, library, config.athlete.units)
-    report += [_row("percentage_evidence", item["message"], exercise_id=item["exercise_id"])
+    report += [report_row("percentage_evidence", item["message"], exercise_id=item["exercise_id"])
                for item in detected["evidence"]]
-    report.append(_row("schedule_missing", SCHEDULE_MISSING))
+    report.append(report_row("schedule_missing", SCHEDULE_MISSING))
     folder = folder_id if folder_id is not None else _shared_folder(routines)
     return {
         "schema_version": jsonio.current_version(jsonio.load_schema(SCHEMA)),
         "source": SOURCE,
-        "created_at": _timestamp(now),
+        "created_at": timestamp(now),
         "program": {
             "schema_version": jsonio.current_version(jsonio.load_schema(program.SCHEMA)),
             "name": _program_name(cache.folders(), folder),
@@ -228,7 +228,7 @@ def _exercise(items, exercise_id, mode, session_id, library, config):
     rows = []
     cues = next((found for found in (_cues(item.get("notes")) for item in items) if found), None)
     if cues:
-        rows.append(_row("cues_from_notes", f"Cues from the Hevy note: {cues}", session_id, exercise_id))
+        rows.append(report_row("cues_from_notes", f"Cues from the Hevy note: {cues}", session_id, exercise_id))
     sets = [entry for item in items for entry in item.get("sets") or []]
     start_load, top = _start_load(sets, exercise_id, mode, session_id, library, config, rows)
     line = {
@@ -254,10 +254,10 @@ def _start_load(sets, exercise_id, mode, session_id, library, config, rows):
     unit = config.athlete.units
     top = min(weights) if mode == "assisted" else max(weights)
     value, message = _converted(top, exercise_id, mode, library, config)
-    rows.append(_row("converted_load", message, session_id, exercise_id))
+    rows.append(report_row("converted_load", message, session_id, exercise_id))
     if len(set(weights)) > 1:
         loads = ", ".join(_as_text(units.from_hevy_kg(weight, mode, unit), mode, unit) for weight in weights)
-        rows.append(_row("mixed_loads", f"Working sets at {loads}; the start load is the top set, "
+        rows.append(report_row("mixed_loads", f"Working sets at {loads}; the start load is the top set, "
                                         f"{_as_text(value, mode, unit)}", session_id, exercise_id))
     return value, units.from_hevy_kg(top, mode, unit)
 

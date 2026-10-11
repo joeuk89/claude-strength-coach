@@ -20,7 +20,7 @@ migration onto `data/program.json` first, and stop. When a command
 fails, tell the athlete what its exit code means, as `CLAUDE.md` "The
 coach scripts" sets out.
 
-## Output contract (both paths)
+## Output contract (every path)
 
 - `data/program.json` (schema `coach/schemas/program.schema.json`) —
   every session concrete enough to train directly: exercises by
@@ -34,7 +34,7 @@ coach scripts" sets out.
   `external_sessions`, the light-week policy in `blocks` (a hard-week
   ceiling within the allowed range and a deload rule) and any
   missed-day rules.
-- **Every new program goes through a program draft.** Both paths end
+- **Every new program goes through a program draft.** Every path ends
   with a draft at `.coach/drafts/program.json` (schema
   `coach/schemas/program_draft.schema.json`: the complete program under
   `program`, plus `source`, `hevy_routines` and a `report`). Show the
@@ -194,6 +194,38 @@ and `config.toml` (units, equipment and its increments).
    program folder and records its id in `data/state.json`. Without Hevy
    (`[hevy] enabled = false`) skip this step.
 
+## Path C — Starter (a tested program to begin from)
+
+For an athlete with no program of their own who would rather start from
+a tested one than design one from scratch.
+
+1. **Pick a starter with the athlete:** run `python3 -m coach starters
+   list` (`--days N` for their training days; equipment defaults to
+   `[equipment] available`). Show each one's title, summary, days,
+   minutes and required equipment. `recommended` marks the starters that
+   suit `[athlete] experience`: advice, not a filter. `python3 -m coach
+   starters show <id>` prints a starter's session pages.
+2. **Ask once whether they know their working weights** for the main
+   lifts (the starter's priority lifts). Any they give become start
+   loads, in their units and per hand for dumbbells. Every other loaded
+   line runs a calibration week with no load: its note asks them to
+   choose a load they could lift for the target reps at the target RPE.
+3. **Draft:** run `python3 -m coach starters draft <id>`, with `--days
+   mon,wed,fri` when they train on days other than `[athlete]
+   available_days`, and `--start-load <exercise id>=<load>` for each
+   known weight. It writes `.coach/drafts/program.json`. It exits 1 when
+   the day count is outside the starter's range or the kit lacks the
+   equipment its main lifts need: pick other days or another starter.
+4. **Show the draft's report as one table** (kind, session, exercise,
+   message). A `swapped_exercise` row is an exercise the kit cannot
+   support, or one the athlete avoids, swapped for its first fitting
+   library substitute: agree its cues. A `no_substitute` row has no
+   fitting substitute: agree a swap or drop it, and edit the draft.
+5. **Adopt:** run `python3 -m coach program adopt --input
+   .coach/drafts/program.json --dry-run`, then without `--dry-run`, as
+   the output contract sets out; then Path B step 5 for the Hevy
+   routines.
+
 ## Close out
 
 - Recap the program in one paragraph: structure, rotation, progression,
@@ -202,7 +234,8 @@ and `config.toml` (units, equipment and its increments).
   skill (`/program-week`) to set concrete starting loads, rep targets,
   RPE, and notes for week one. It writes the first check-in record to
   hold the overlay, so the first `/check-in` has a prescription
-  to judge against. Applies to both paths — imported and designed
+  to judge against. Applies to every path — imported, designed and
+  starter
   programs.
 - Point at the rhythm: train it, log it, `/check-in` weekly — the first
   check-in after a new program pays extra attention to whether the
