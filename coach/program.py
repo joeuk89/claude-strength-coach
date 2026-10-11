@@ -179,6 +179,29 @@ def _structure(doc):
         rule_ids.add(rule["id"])
         if rule["session_id"] not in session_ids:
             errors.append(Error(f"{path}.session_id", f"no program session {rule['session_id']}"))
+        errors += _rule_shape_errors(rule, path)
+    return errors
+
+
+_ACTION_KEYS = {"fold": ("into", "exercises"), "shift": ("to_weekdays",), "skip": (), "manual": ()}
+
+
+def _rule_shape_errors(rule, path):
+    """What each action kind needs and allows (contract C37); references are `missed_rules_valid`'s."""
+    action = rule["action"]
+    kind = action["kind"]
+    needed = _ACTION_KEYS[kind]
+    errors = [Error(f"{path}.action", f"a {kind} rule needs {key}") for key in needed if key not in action]
+    errors += [Error(f"{path}.action.{key}", f"a {kind} rule takes no {key}")
+               for key in ("into", "exercises", "to_weekdays") if key in action and key not in needed]
+    if kind == "manual" and rule["text"] is None:
+        errors.append(Error(f"{path}.text", "a manual rule needs its text: it is the rule"))
+    seen = set()
+    for index, item in enumerate(action.get("exercises", [])):
+        if item["exercise_id"] in seen:
+            errors.append(Error(f"{path}.action.exercises[{index}].exercise_id",
+                                f"{item['exercise_id']} appears twice in this rule"))
+        seen.add(item["exercise_id"])
     return errors
 
 
@@ -284,7 +307,7 @@ def render_all(root):
 
 def render_doc(doc, library, unit):
     """{relative path: text} for a valid, normalised program document."""
-    pages = {PROGRAM_PAGE: render_program_page(doc)}
+    pages = {PROGRAM_PAGE: render_program_page(doc, library)}
     for session in doc["sessions"]:
         pages[page_path(session["id"])] = render_session_page(session, library, unit)
     return pages
@@ -432,7 +455,7 @@ def _sets_by_muscle(estimated):
     return ", ".join(f"{muscle.replace('_', ' ')} {estimated[muscle]}" for muscle in MUSCLES if muscle in estimated)
 
 
-def render_program_page(doc):
+def render_program_page(doc, library=None):
     lines = [header(), f"# {doc['name']}", "", "## Sessions", ""]
     lines.append(_row(["Session", "Id", "Kind", "Tier", "Status", "Location"]))
     lines.append("| --- | --- | --- | --- | --- | --- |")
@@ -462,8 +485,10 @@ def render_program_page(doc):
 
     lines += ["", "## If a day is missed", ""]
     if doc["missed_day_rules"]:
+        from coach import missed
+
         for rule in doc["missed_day_rules"]:
-            lines.append(f"- `{rule['id']}` ({rule['session_id']}): {rule['condition']} → {rule['action']}")
+            lines.append(f"- `{rule['id']}`: {missed.describe(rule, program_doc=doc, library=library)}")
     else:
         lines.append("No rules yet.")
     return "\n".join(lines) + "\n"

@@ -92,8 +92,21 @@ athlete, not from logs.
 and stop.
 
 **Mid-week?** Invoked standalone partway through a trained week, first
-ask what prompted it (missed session, easy/hard day, schedule change),
-then reprogram only the remaining days.
+ask what prompted it (missed session, easy/hard day, schedule change).
+For a missed session, run `python3 -m coach missed list` and pass over
+rows with `recorded: true` (that miss is already on file), or take the
+session and date the athlete names; then run `python3 -m coach missed
+plan --session <id> --date <date>`. When it reports `matched: true`, present
+its `summary` lines and end with its `write_line`, then stop and wait
+for the athlete's reply. Only after "go": run `python3 -m coach missed
+apply --session <id> --date <date> --tag <tag>` (the athlete's reason:
+`time`, `sleep`, `ill`, `family`, `skipped` or `other`; leave `--tag`
+off when they gave none), then `python3 -m coach overlay approve
+<overlay_id>` with the `overlay_id` it reports and, for Hevy users,
+`python3 -m coach routines push --overlay <overlay_id>`. A `skip` rule
+writes no overlay, so stop after `missed apply`. When it reports `matched: false`
+(`missed_rule_unmatched`), or for any other reason, reprogram only the
+remaining days: step 2's mid-week reprogram, then the steps after it.
 
 **Hevy freshness (Hevy users).** With an overlay in force, run
 `python3 -m coach routines verify --overlay <its id>` after the pull; no

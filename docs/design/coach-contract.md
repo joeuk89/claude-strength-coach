@@ -1273,7 +1273,8 @@ Unless stated, each is a copy of `valid/` plus what is listed.
 | `flag-unknown/` | R-20 | not a copy of `valid/`: its config and its overlay, unapproved, carrying a flag with the unregistered code `no_such_code` |
 | `checkin/` | R-21a | external session `pt-tue` (Tue) in the program; approved overlay `2026-10-05-weekly` (span 2026-10-05..2026-10-11: Session A 2026-10-05 squat 3×5 @ 97.5 RPE 7.5, DB bench 3×10 @ 22.5/hand (Hevy: 45) RPE 8; Session B 2026-10-08 row 3×10 @ 30 RPE 8, pull-up 3×8 BW; Session A 2026-10-10 as on 10-05); `valid/`'s two records replaced by `check-ins/2026-09-06.md` (deep) and `check-ins/2026-10-04.md` (weekly, holding its week-review region); `[sessions.cap_minutes] session-a = 45`; `writes.jsonl` verify lines for both routines, `2026-10-05-weekly` and its approval hash, at 2026-10-04T19:00:00Z; a Hevy cache holding the four C14 workouts and the two routines as that overlay writes them, `...0002` with `updated_at` 2026-10-07T07:00:00Z and one extra exercise (DB bench); `data/history/2026-09.json` and `2026-10.json` from `history sync`; `miss` annotations 2026-09-14 Session A `sleep`, 2026-09-17 Session B `sleep`, 2026-09-21 Session A `time` |
 | `gap/` | R-21b | same program as `checkin/`; record `check-ins/2026-09-13.md` (weekly); last workout 2026-09-14 (squat 3×5 @ 100), none after; no overlay after 2026-09-20 |
-| `missed/` | R-22 | program with rules `miss-b` (fold row, 2 sets, into Session A), `miss-a` (shift to sat, then thu); approved overlay `2026-10-12-weekly` re-dated: Session A 2026-10-12, Session B 2026-10-14, Session A 2026-10-17; workout for Session A on 2026-10-12 only |
+| `missed/` | R-22 | program with rules `miss-b` (fold row, 2 sets, into Session A, `min_days_left` 1), `miss-a` (shift to sat, then thu); the library names `db_single_arm_row` "Single-arm row"; approved overlay `2026-10-12-weekly` re-dated: Session A 2026-10-12, Session B 2026-10-14, Session A 2026-10-17; `data/history/` as in `pages/`, so the workout for Session A on 2026-10-12 is the only one in that week; the record's overlay region and `routine/` re-rendered |
+| `missed-bad-rule/`, `missed-weekly-fold/` | R-22 | not copies of `valid/`: `missed/`'s config and library, with one fault each: `miss-b` folding into `session-z`; the weekly overlay holding a folded row on Session A 2026-10-17 |
 | `dose/` | R-30a | program with `pt-tue` estimated at `{"chest": 3, "lats": 3}`; approved weekly overlays for 2026-W36 to 2026-W41 built from `tests/fixtures/overlay/draft-kg.json` re-dated (Session A Monday, Session B Thursday, each created the Sunday before at 19:00Z); `data/history/2026-08.json` to `2026-10.json` from `history sync` of synthetic workouts `...0301` to `...0309` (Session A squat 3×5 @ 95 RPE 7, DB bench 3×10 @ Hevy 45 RPE 8; Session B row 3×10 @ 30 RPE 8, pull-up 3×8 BW), no Hevy cache; `miss` and `external` annotations made at each week's Sunday check-in, giving the weeks below (planned = Session A, Session B, PT = 3) |
 | `block/` | R-31 | program with `hard_weeks_ceiling` 6 and `pt-tue`; a ledger with block `b-0001` started 2026-08-31 and no closed weeks; weekly overlays for 2026-W36 to W41; workouts matching each overlay (every core session at the prescribed sets and RPE) plus `external` done annotations. Closing W36 to W41 gives six hard weeks |
 | `nohevy/` | R-40c | the valid program and overlay; `[hevy] enabled = false`; no Hevy cache; `data/log/workouts.jsonl` holding the two Session A workouts of the logged-workouts table, logged by hand (squat 3×5 @ 95 RPE 7, DB bench 3×10 @ 22.5/hand RPE 8; the same on 2026-10-05 at 97.5), with `overlay_id` null; `this-week-sheets.md` rendered at 2026-10-11T18:00:00Z |
@@ -1595,7 +1596,8 @@ skip when there is no `data/program.json` (`state_schema`: no
 
 **Schema versions.** R-17a ships program and state v1. R-14b takes state
 to v2 (`temporary_routines` entries). R-23a took program to v2 and state
-to v3 (C23). R-30a took program to v3 (`dose_targets`, C40). Every later
+to v3 (C23). R-30a took program to v3 (`dose_targets`, C40). R-22 took
+program to v4 and overlay (and its draft) to v3 (C37). Every later
 bump takes the next free version when it merges and adds one step to the
 R-17a migration chain, so the chain stays linear.
 Program bumps: R-22 (executable `missed_day_rules`, C37), R-30b (`priority`, `minimum_week`, C40), R-44a
@@ -3940,6 +3942,70 @@ changed lines and moved sessions carry `missed_day_rule` (info). It runs
   (fail: a `weekly` or `deload` overlay holds a `fold` line, or a fold's
   `from_date` is more than 6 days before the overlay's span start).
 
+**Built with R-22** (details the text above leaves open):
+
+- Rule shape (program v4): `when` is `{}` or `{"min_days_left": n}`;
+  `action.kind` is one of the four kinds; `fold` takes `into` and
+  `exercises` (each `{exercise_id, sets?, rpe?}`, `sets` ≥ 1, default 2),
+  `shift` takes `to_weekdays` (weekday ids), and `skip` and `manual` take
+  neither. A `manual` rule needs its `text`. `program validate` reports a
+  kind's missing or extra keys and an exercise listed twice in one rule;
+  `missed_rules_valid` reports the references (a missing or non-active
+  session, an `into` that is no session, an exercise its session lacks).
+  The v2 → v3 migration writes each free-text rule's text as
+  `<condition> → <action>`.
+- `describe(rule, root=None, program_doc=None, library=None)`: the
+  rule's `text` when set; otherwise written from the action with session
+  titles from the program and exercise names from the library (ids when
+  neither is given). `min_days_left` shows only above 1, since a fold or
+  shift already needs a later day. `routine/program.md` lists each rule
+  as `` `<id>`: <describe> ``, and the `missed` page part fills
+  `brief.if_you_miss` the same way (nothing when there are no rules).
+- `match(root, session_id, date, doc=None, program_doc=None)` takes the
+  overlay in force when `doc` is None. `apply_rule(root, doc, session_id,
+  date, rule, now=None, config=None, library=None)` returns the built,
+  unwritten midweek overlay with its R-24 flags merged, None for `skip`,
+  and raises `coach.missed.Unmatched` (its message is the reason) for
+  `manual`, a fold with no later target or a line the missed session
+  lacks, and a shift with no free day. The missed session must be dated
+  `date` in `doc` (else exit 1).
+- The midweek overlay holds `doc`'s sessions dated after the miss, plus
+  a moved session. Its span starts at the earliest of them (a shift can
+  land before the next planned date) and ends with `doc`'s; `focus` is
+  `doc`'s. It carries `doc`'s non-R-24 flags on the sessions it holds,
+  and a folded line's flags move with it to the target session.
+- A folded line is a copy of the missed line with its first `sets`
+  working sets (warm-ups dropped), `superset_id`, `override` and
+  `change` cleared, provenance kept. A shift's candidate for a weekday is
+  the first date with that weekday after the miss.
+- A day before today (the athlete's time zone, C2 `COACH_NOW`) is never
+  a fold target or a free shift day, so a miss planned once those days
+  have passed is unmatched and falls back to the mid-week reprogram.
+- `missed list` returns `data.missed`: `{date, session_id, title,
+  overlay_id, recorded, tag}` per missed core session (optional sessions
+  are never a miss), reading unsynced workouts too (C17); `recorded` is
+  true when a `miss` annotation names that session and date.
+- `missed plan` also returns `title`, `overlay_id`, `action`,
+  `description`, `reason` (why unmatched) and `flags` (the
+  `missed_rule_unmatched` flag when unmatched). The summary is the miss
+  and the rule, the change (loads in C12 Target form), the overlay and
+  its span, and the prescription check's block and warn counts.
+- Write lines: as R-03 with the draft's session titles; without Hevy
+  `Reply "go" to train this. Nothing goes to Hevy (no Hevy).`; for
+  `skip` `Reply "go" to train this. Nothing goes to Hevy (no change).`
+- `missed apply` refuses (exit 3) before writing anything when a `miss`
+  annotation already names that session and date, then re-plans, refuses
+  (exit 3) an unmatched miss before writing anything, and writes the `miss` annotation with source
+  `missed apply`. `skip` writes no overlay. Record lines for the other
+  cases: `- Rule miss-a: Session A moved from Mon 12 Oct to Thu 15 Oct,
+  this week only.`, `- Rule miss-c: nothing changes this week.`, `- No
+  overlay; nothing goes to Hevy.`, and `- Overlay <id>; no Hevy.` without
+  Hevy; an untagged miss reads `(untagged)`. A second apply adds its
+  lines to the same `## Mid-week` section, which goes at the end of the
+  record when absent. With no record it warns and writes the rest.
+- `overlay_folds_expired` reads overlays whose span ends today or later
+  (C13), and skips when there are none.
+
 ## C38. Standing pages and publishing (R-25; R-22, R-23b, R-26, R-27, R-30a, R-31, R-33a, R-40c, R-45 read)
 
 Three pages at the instance root, rendered whole, each with the C11 header
@@ -4027,8 +4093,9 @@ these headings:
   (priority 20), then unresolved `warn` flags (30) on the overlays behind
   the week's sessions, then part items (default 50). R-40a routes them
   through `coach.flags.for_mode` (C44).
-- If you miss a day: one line per `program.missed_day_rules` entry (v1:
-  `condition → action`); R-22's part replaces the slot with `describe`.
+- If you miss a day: R-22's `missed` part fills the slot with one line
+  per `program.missed_day_rules` entry, in `describe`'s words; with no
+  rules, one line saying so.
 - Wins: at most three, by priority: a new best e1RM in the last seven
   days (20; `total`, `per_hand_x2` and `single_implement` lifts only, a
   point strictly above every earlier one); a core-complete streak of two

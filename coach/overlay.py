@@ -30,7 +30,7 @@ _ID = re.compile(r"^\d{4}-\d{2}-\d{2}-[a-z0-9-]+$")
 _LOAD_FIELDS = ("mode", "unit", "per_hand", "hevy_total", "hevy_kg")
 _LINE_DEFAULTS = {
     "hevy_template_id": None, "rest_seconds": None, "superset_id": None, "cues": None, "focus": None,
-    "target_note": None, "change": None, "provenance": None,
+    "target_note": None, "change": None, "provenance": None, "fold": None,
 }
 
 
@@ -371,6 +371,7 @@ def build(draft, config, *, root=None, now=None):
             "temporary": draft_session.get("temporary", False),
             "location": draft_session.get("location", locations.get(session_id)),
             "focus": draft_session.get("focus"),
+            "moved_from": draft_session.get("moved_from"),
             "exercises": [
                 _build_line(line, unit, f"$.sessions[{s_index}].exercises[{e_index}]", load_errors)
                 for e_index, line in enumerate(draft_session["exercises"])

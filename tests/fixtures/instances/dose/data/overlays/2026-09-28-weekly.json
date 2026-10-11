@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "id": "2026-09-28-weekly",
   "kind": "weekly",
   "created_at": "2026-09-27T19:00:00Z",
@@ -12,7 +12,7 @@
   "flags": [],
   "approval": {
     "approved_at": "2026-09-27T19:00:00Z",
-    "hash": "sha256:3bd5e213eea845dc04932f7fdc851c9445ee28caf48eb6f8bc55132e6d2e2e6c"
+    "hash": "sha256:58b0e0e12364bd28d38f0460bfff47c9f9cec3f3fe76804f584c70fa414b3c85"
   },
   "sessions": [
     {
@@ -23,6 +23,7 @@
       "temporary": false,
       "location": null,
       "focus": null,
+      "moved_from": null,
       "exercises": [
         {
           "exercise_id": "bb_back_squat",
@@ -36,6 +37,7 @@
           "change": "97.5 → 100",
           "provenance": null,
           "override": null,
+          "fold": null,
           "sets": [
             {
               "type": "warmup",
@@ -99,6 +101,7 @@
           "change": "22.5 → 25/hand",
           "provenance": null,
           "override": null,
+          "fold": null,
           "sets": [
             {
               "type": "warmup",
@@ -169,6 +172,7 @@
       "temporary": false,
       "location": null,
       "focus": null,
+      "moved_from": null,
       "exercises": [
         {
           "exercise_id": "db_single_arm_row",
@@ -182,6 +186,7 @@
           "change": null,
           "provenance": null,
           "override": null,
+          "fold": null,
           "sets": [
             {
               "type": "normal",
@@ -233,6 +238,7 @@
           "change": null,
           "provenance": null,
           "override": null,
+          "fold": null,
           "sets": [
             {
               "type": "normal",
