@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "name": "Two-session fixture program",
   "sessions": [
     {
@@ -85,5 +85,9 @@
      "action": {"kind": "fold", "into": "session-a", "exercises": [{"exercise_id": "db_single_arm_row", "sets": 2}]}},
     {"id": "miss-a", "session_id": "session-a", "text": null, "when": {},
      "action": {"kind": "shift", "to_weekdays": ["sat", "thu"]}}
+  ],
+  "interference": [
+    {"name": "same_day", "params": {"min_gap_hours": 6, "lift_first": true}},
+    {"name": "quality_before_heavy_lower", "params": {"hours": 24, "heavy_rpe": 7, "heavy_max_reps": 6}}
   ]
 }

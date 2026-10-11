@@ -6,7 +6,7 @@ from coach import paths, plugins, units
 from coach.commands import arg, command
 from coach.errors import ValidationError
 
-_KINDS = ("scheme", "schedule", "transform")
+_KINDS = ("scheme", "schedule", "transform", "interference")
 
 
 @command("plugins list", help="Every plugin, framework and instance, by kind",

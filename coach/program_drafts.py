@@ -13,7 +13,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from coach import config as config_module
-from coach import dates, jsonio, migrate, paths, plugins, program, stats, units
+from coach import dates, interference, jsonio, migrate, paths, plugins, program, stats, units
 from coach import state as state_module
 from coach.checks.instance import cap_for
 from coach.errors import ConfigError, RefusedError, ValidationError
@@ -117,6 +117,7 @@ def import_hevy(root, routine_ids=None, folder_id=None, now=None):
             "schedule": copy.deepcopy(PLACEHOLDER_SCHEDULE),
             "blocks": copy.deepcopy(DEFAULT_BLOCKS),
             "missed_day_rules": [],
+            "interference": interference.default_rules(),
         },
         "position": None,
         "hevy_routines": hevy_routines,

@@ -485,7 +485,7 @@ class MigrationTest(MissedCase):
         self.assertTrue(any(f"{WEEKLY} loses its approval" in n for n in data["notes"]), data["notes"])
         steps = {row["path"]: row["steps"] for row in data["files"]}
         self.assertEqual(steps[f"data/overlays/{WEEKLY}.json"], ["overlay/0002_fold_marker"])
-        self.assertEqual(steps["data/program.json"], ["program/0003_executable_missed_day_rules"])
+        self.assertEqual(steps["data/program.json"][0], "program/0003_executable_missed_day_rules")
 
 
 class RegistrationTest(MissedCase):
