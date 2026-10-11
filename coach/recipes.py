@@ -485,6 +485,11 @@ _THOUSANDS = r"\d{1,3}(?:,\d{3})+(?![\d,])(?:\.\d+)?"
 _DECIMAL = r"\d+(?:[.,]\d+)?"
 _QTY = re.compile(rf"(\d+\s+\d+/\d+|\d+/\d+|(?:{_THOUSANDS}|{_DECIMAL})\s*[½¼¾⅓⅔]?|[½¼¾⅓⅔])")
 _MULTIPLIER = re.compile(r"^[x×]\s*\d", re.I)
+_COMPOUND_QTY = re.compile(r"(?:\b(?:and|or|plus)\b|[&+;,])\s*(?:\d|[½¼¾⅓⅔])", re.I)
+_PREPARATION = re.compile(
+    r"(?:(?:finely|roughly|thinly|thickly) )?"
+    r"(?:chopped|diced|sliced|crushed|minced|grated|halved|quartered|peeled|deseeded)"
+)
 _UNITS = {
     "g": ("g", 1), "gr": ("g", 1), "gram": ("g", 1), "grams": ("g", 1),
     "kg": ("g", 1000), "kilogram": ("g", 1000), "kilograms": ("g", 1000),
@@ -505,7 +510,7 @@ _CONTAINERS = {
 _AISLE_KEYWORDS = (
     ("frozen", ("frozen",)),
     ("tins-jars-dry", ("stock", "paste", "sauce", "powder", "tinned", "tin", "can", "jar", "dried", "ground",
-                       "peanut butter", "cube")),
+                       "peanut butter", "egg noodles", "egg noodle", "cube")),
     ("meat-fish", ("chicken", "beef", "pork", "lamb", "turkey", "mince", "bacon", "ham", "sausage", "sausages",
                    "chorizo", "salmon", "cod", "haddock", "tuna", "prawn", "prawns", "fish", "steak", "duck")),
     ("dairy-eggs", ("milk", "yoghurt", "yogurt", "cheese", "egg", "eggs", "butter", "cream", "feta", "mozzarella",
@@ -574,7 +579,8 @@ def parse_ingredient(line):
         return None
     qty = _qty_value(match.group(1))
     rest = text[match.end():].lstrip()
-    if re.match(r"^(?:-|–|to\s)\s*\d", rest) or _MULTIPLIER.match(rest):
+    if (re.match(r"^(?:-|–|to\s)\s*\d", rest) or _MULTIPLIER.match(rest)
+            or _COMPOUND_QTY.search(rest)):
         return None
     unit, container = "each", None
     word = re.match(r"^([A-Za-z]+)\.?(?=\s|\(|$)", rest)
@@ -587,7 +593,9 @@ def parse_ingredient(line):
         rest = rest[word.end():]
     rest = re.sub(r"^\s*\([^)]*\)", "", rest).strip()
     rest = re.sub(r"^of\s+", "", rest)
-    item = rest.lower().strip(" ,.;:")
+    parts = rest.lower().strip(" ,.;:").split(",")
+    item = ", ".join(part.strip() for i, part in enumerate(parts)
+                     if i == 0 or not _PREPARATION.fullmatch(part.strip()))
     if not item or qty <= 0:
         return None
     if container:
@@ -766,13 +774,18 @@ def import_jsonld(page_html, url=None):
         flags.append({"code": "servings_missing", "message": "the page gives no yield; servings = 1 is a guess"})
     draft["servings"] = servings
     draft["prep"] = "cook"
-    total = _iso_minutes(recipe.get("totalTime"))
-    if total is None:
-        parts = [_iso_minutes(recipe.get(key)) for key in ("prepTime", "cookTime")]
-        total = sum(p for p in parts if p) if any(parts) else None
-    if total is None:
-        flags.append({"code": "time_missing", "message": "the page gives no time; time_min = 0 until you set it"})
-    draft["time_min"] = total or 0
+    source_times = {key: recipe[key] for key in ("prepTime", "cookTime", "totalTime") if key in recipe}
+    prep_minutes = _iso_minutes(recipe.get("prepTime"))
+    draft["time_min"] = prep_minutes or 0
+    if source_times:
+        proposed = (f"time_min = {prep_minutes} uses prepTime as a starting estimate"
+                    if prep_minutes is not None else "time_min = 0 is a placeholder")
+        flags.append({"code": "active_time_uncertain", "source_times": source_times,
+                      "message": f"{proposed}; confirm total active minutes from the method, including active "
+                                 "cooking. prepTime does not prove cooking is passive and totalTime is elapsed time"})
+    else:
+        flags.append({"code": "time_missing",
+                      "message": "the page gives no time; set active minutes before accepting time_min = 0"})
     draft["status"] = "active"
 
     nutrition = recipe.get("nutrition") or {}
@@ -817,7 +830,8 @@ def import_jsonld(page_html, url=None):
     elif ambiguous:
         flags.append({"code": "per_serving_doubt", "message": f"the yield is ambiguous ({recipe.get('recipeYield')!r})"})
 
-    ingredients, unparsed, guessed = [], [], []
+    ingredients, unparsed, guessed = {}, [], []
+    item_units, source_lines = {}, {}
     lines = recipe.get("recipeIngredient") or recipe.get("ingredients") or []
     for line in lines if isinstance(lines, list) else [lines]:
         text = _clean(line)
@@ -825,11 +839,24 @@ def import_jsonld(page_html, url=None):
         if ingredient is None:
             unparsed.append(text)
             continue
-        ingredients.append(ingredient)
-        if not matched:
-            guessed.append(ingredient["item"])
+        item, unit = ingredient["item"], ingredient["unit"]
+        key = (item, unit)
+        if key in ingredients:
+            ingredients[key]["qty"] = _tidy_number(ingredients[key]["qty"] + ingredient["qty"])
+        else:
+            ingredients[key] = ingredient
+        item_units.setdefault(item, set()).add(unit)
+        source_lines.setdefault(item, []).append(text)
+        if not matched and item not in guessed:
+            guessed.append(item)
     if ingredients:
-        draft["ingredients"] = ingredients
+        draft["ingredients"] = list(ingredients.values())
+    mixed = [item for item, units in item_units.items() if len(units) > 1]
+    if mixed:
+        flags.append({"code": "incompatible_ingredient_units", "items": mixed,
+                      "lines": [line for item in mixed for line in source_lines[item]],
+                      "message": "same-food quantities use incompatible units and remain separate; reconcile "
+                                 "them into one exact unit per item before validating the card"})
     if unparsed:
         flags.append({"code": "unparsed_ingredients",
                       "message": f"{len(unparsed)} ingredient line(s) need an exact qty, unit and item",

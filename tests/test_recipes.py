@@ -1,4 +1,5 @@
 import copy
+import json
 import re
 import tempfile
 import tomllib
@@ -308,6 +309,12 @@ class IngredientParseTest(unittest.TestCase):
             "1.5 kg potatoes": (1500, "g", "potatoes"),
             "2 Tbsp. Olive Oil": (2, "tbsp", "olive oil"),
             "4 garlic cloves": (4, "each", "garlic cloves"),
+            "3 garlic cloves, crushed": (3, "each", "garlic cloves"),
+            "1 onion, thinly sliced": (1, "each", "onion"),
+            "100 g chicken breast, cooked": (100, "g", "chicken breast, cooked"),
+            "100 g chicken breast, raw, diced": (100, "g", "chicken breast, raw"),
+            "2 red peppers, deseeded": (2, "each", "red peppers"),
+            "2 yellow peppers": (2, "each", "yellow peppers"),
             "1,000 g flour": (1000, "g", "flour"),
             "1,250g beef mince": (1250, "g", "beef mince"),
             "12,5 g butter": (12.5, "g", "butter"),
@@ -318,7 +325,9 @@ class IngredientParseTest(unittest.TestCase):
 
     def test_unreadable_lines(self):
         for line in ("Salt and pepper, to taste", "1-2 tbsp honey", "2 to 3 eggs", "a handful of spinach", "0 g x",
-                     "2 x 400g tins chopped tomatoes", "2x400g tins chopped tomatoes", "3 × 25 g sachets oats"):
+                     "2 x 400g tins chopped tomatoes", "2x400g tins chopped tomatoes", "3 × 25 g sachets oats", "2 red and 2 yellow peppers",
+                     "2 red & 2 yellow peppers", "2 red peppers or 3 green peppers",
+                     "2 red peppers, 2 yellow peppers", "2 tbsp oil plus 1 tbsp butter"):
             with self.subTest(line=line):
                 self.assertIsNone(recipes.parse_ingredient(line))
 
@@ -333,7 +342,7 @@ class IngredientParseTest(unittest.TestCase):
     def test_aisle_guesses(self):
         cases = {"chicken stock": "tins-jars-dry", "frozen peas": "frozen", "0% greek yoghurt": "dairy-eggs",
                  "cherry tomatoes": "produce", "tomato paste": "tins-jars-dry", "white tortilla wraps": "bakery",
-                 "peanut butter": "tins-jars-dry"}
+                 "peanut butter": "tins-jars-dry", "egg noodles": "tins-jars-dry"}
         for item, aisle in cases.items():
             with self.subTest(item=item):
                 self.assertEqual(recipes.guess_aisle(item), (aisle, True))
@@ -352,7 +361,8 @@ class ImportTest(RoundTripMixin, unittest.TestCase):
         self.assertEqual(draft["per_serving"], {"kcal": 450, "protein_g": 38, "carbs_g": 40, "fat_g": 15})
         self.assertEqual(draft["nutrition"], "published")
         self.assertEqual(draft["slots"], ["dinner"])
-        self.assertEqual(draft["time_min"], 60)
+        self.assertEqual(draft["time_min"], 15)
+        self.assertIn("active_time_uncertain", [f["code"] for f in flags])
         recipe = recipes.extract_recipe(page)
         lines = recipe["recipeIngredient"]
         unparsed = next(f for f in flags if f["code"] == "unparsed_ingredients")["lines"]
@@ -385,6 +395,53 @@ class ImportTest(RoundTripMixin, unittest.TestCase):
         by_code = {f["code"]: f for f in flags}
         self.assertEqual(by_code["macro_sum"]["severity"], "fail")
         self.assert_round_trip(draft)
+
+    def test_review_fixture_preserves_quantities_identity_and_provenance(self):
+        draft, flags = recipes.import_jsonld(self.page("jsonld-review.html"))
+        by_item = {item["item"]: item for item in draft["ingredients"]}
+        self.assertEqual(len(by_item), len(draft["ingredients"]))
+        self.assertEqual(by_item["garlic cloves"]["qty"], 3)
+        self.assertEqual(by_item["onion"]["qty"], 1)
+        self.assertEqual(by_item["olive oil"]["qty"], 6)
+        self.assertEqual(by_item["olive oil"]["unit"], "tbsp")
+        self.assertEqual(by_item["egg noodles"]["aisle"], "tins-jars-dry")
+        self.assertIn("chicken breast, cooked", by_item)
+        self.assertIn("chicken breast, raw", by_item)
+        by_code = {flag["code"]: flag for flag in flags}
+        self.assertEqual(by_code["unparsed_ingredients"]["lines"], ["2 red and 2 yellow peppers"])
+        self.assertEqual(by_code["aisle_guessed"]["items"], ["zaatar"])
+        self.assertEqual(draft["source"], "https://recipes.example.com/vegetable-noodles")
+        self.assertEqual(draft["time_min"], 15)
+        self.assertEqual(by_code["active_time_uncertain"]["source_times"],
+                         {"prepTime": "PT15M", "cookTime": "PT30M", "totalTime": "PT45M"})
+        self.assert_round_trip(draft)
+
+    def test_duplicate_ingredients_only_sum_compatible_units(self):
+        recipe = recipes.extract_recipe(self.page("jsonld-review.html"))
+        recipe["recipeIngredient"] = ["4 tbsp olive oil", "2 tbsp olive oil", "100 ml olive oil",
+                                      "1 kg rice", "500 g rice"]
+        page = '<script type="application/ld+json">' + json.dumps(recipe) + '</script>'
+        draft, flags = recipes.import_jsonld(page)
+        self.assertEqual([(i["item"], i["qty"], i["unit"]) for i in draft["ingredients"]],
+                         [("olive oil", 6, "tbsp"), ("olive oil", 100, "ml"), ("rice", 1500, "g")])
+        flag = next(f for f in flags if f["code"] == "incompatible_ingredient_units")
+        self.assertEqual(flag["items"], ["olive oil"])
+        self.assertEqual(flag["lines"], recipe["recipeIngredient"][:3])
+        self.assertTrue(any(r.status == "fail" for r in recipes.validate_card(card_with(draft), config_from())))
+
+    def test_active_time_is_always_reviewed_even_with_only_prep_time(self):
+        for source_times, proposed in (({"prepTime": "PT15M"}, 15), ({"totalTime": "PT45M"}, 0),
+                                       ({"cookTime": "PT30M"}, 0), ({}, 0)):
+            with self.subTest(source_times=source_times):
+                recipe = {"@type": "Recipe", **source_times}
+                page = '<script type="application/ld+json">' + json.dumps(recipe) + '</script>'
+                draft, flags = recipes.import_jsonld(page)
+                self.assertEqual(draft["time_min"], proposed)
+                code = "active_time_uncertain" if source_times else "time_missing"
+                flag = next(f for f in flags if f["code"] == code)
+                self.assertIn("active", flag["message"])
+                if source_times:
+                    self.assertEqual(flag["source_times"], source_times)
 
     def test_no_recipe(self):
         with self.assertRaises(recipes.ValidationError):

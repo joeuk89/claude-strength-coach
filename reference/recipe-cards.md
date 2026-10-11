@@ -204,6 +204,33 @@ is written or edited, run `recipes render`, then `recipes validate`.
 `python3 -m coach check` runs the same checks as `recipe_cards`,
 `recipe_render_fresh` and `recipe_index_fresh`.
 
+## Reviewing an import
+
+Import is an offline draft: save the page, pass `--html`, and keep its
+`source` URL. Resolve every flag before presenting the card for approval.
+The original compound ingredient line stays in `unparsed_ingredients`
+when quantities cannot be read exactly; enter each food and quantity
+explicitly. The importer strips supported comma-delimited preparation
+clauses such as `crushed` and `thinly sliced`, while retaining identity
+such as red/yellow and cooked/raw.
+
+Duplicate quantities add only for the same normalized item and unit
+(including supported kg-to-g and litre-to-ml conversions). Incompatible
+units stay as separate entries with `incompatible_ingredient_units`;
+reconcile them to one exact unit per item before validation. Do not add
+millilitres to tablespoons as if they were equal. `aisle_guessed` names
+items whose aisle needs checking; supported food phrases such as egg
+noodles take precedence over misleading tokens.
+
+`time_min` is always **active minutes**. JSON-LD `totalTime` is elapsed
+time, and `prepTime` does not establish how much cooking is active. The
+importer proposes `prepTime` only as a starting estimate, or zero as a
+placeholder when it is absent, with `active_time_uncertain` and the source
+time fields. Review the method and set the actual active minutes; zero
+is not a claim that the recipe takes no work. `time_missing` means the
+page supplies no time at all. Draft generation validates card structure;
+it does not resolve these import flags for the coach.
+
 ## Converting old cards
 
 Cards written before this format open with YAML front matter (`---`) and

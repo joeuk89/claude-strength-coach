@@ -3466,7 +3466,18 @@ the block after TOML parsing):
   `prose` is the method as `## Method` steps. Flag codes:
   `unparsed_ingredients` (with `lines`), `missing_nutrition`,
   `per_serving_doubt`, `macro_sum` (with `severity`), `slot_guessed`,
-  `servings_missing`, `time_missing`, `aisle_guessed`. A draft without
+  `servings_missing`, `time_missing`, `active_time_uncertain` (with raw
+  `source_times`), `aisle_guessed`, `incompatible_ingredient_units` (with
+  `items` and source `lines`). Compound quantities that cannot be read
+  exactly remain in `unparsed_ingredients`; supported preparation clauses
+  leave shopping identity, while cooked/raw and colour distinctions stay.
+  Duplicate item/unit quantities sum after supported unit normalization;
+  incompatible units remain separate for review and reconciliation before
+  card validation. Specific food phrases take priority over misleading
+  aisle tokens. `time_min` means active minutes: prepTime is only a flagged
+  starting estimate (zero if absent), never proven total active time;
+  totalTime is not imported as active time. Resolve flags before athlete
+  approval and writing a card. A draft without
   all four macros leaves out `per_serving`. A page host of a known meal
   kit (`gousto`, `hellofresh`) adds the tags `meal-kit` and the provider.
 - `recipes draft --input FILE` takes `{slug, card, prose}` (the import
