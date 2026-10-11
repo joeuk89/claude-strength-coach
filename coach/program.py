@@ -50,8 +50,9 @@ def read_json(path):
 
 
 def normalised(doc):
-    """A copy of a schema-valid program with absent optional keys filled (session `location` is null)."""
+    """A copy of a schema-valid program with absent optional keys filled (session `location` null, `dose_targets` {})."""
     doc = copy.deepcopy(doc)
+    doc.setdefault("dose_targets", {})
     for session in doc["sessions"]:
         for key, default in _SESSION_DEFAULTS.items():
             session.setdefault(key, default)

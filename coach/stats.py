@@ -247,10 +247,17 @@ def adherence(root, overlay_id=None, span=None, include_unsynced=False, today=No
     """
     if (overlay_id is None) == (span is None):
         raise ValueError("give an overlay id or a span, not both")
+    planned, window = _planned(root, overlay.list(root), overlay_id, _span(span))
+    return dict(adherence_of(root, planned, window, include_unsynced, today, now, as_of), overlay_id=overlay_id)
+
+
+def adherence_of(root, planned, window, include_unsynced=False, today=None, now=None, as_of=None):
+    """`adherence` over given (overlay, session) pairs; a pair's overlay supplies the span its workouts match in.
+
+    A session the schedule rule planned with no overlay in force comes paired with a stand-in overlay whose id is None.
+    """
     config = config_module.load(root)
     today = _as_date(today) or _today(config, now)
-    overlays = overlay.list(root)
-    planned, window = _planned(root, overlays, overlay_id, _span(span))
     state_doc, program_doc = history.load_optional(state, root), history.load_optional(program, root)
     library = Library.load(root)
 
@@ -342,7 +349,7 @@ def adherence(root, overlay_id=None, span=None, include_unsynced=False, today=No
             summary["missed"][row["tag"]] = summary["missed"].get(row["tag"], 0) + 1
         for line in row["exercises"]:
             summary["exercises"][line["status"]] += 1
-    return {"overlay_id": overlay_id, "span": window.to_json(), "today": today.isoformat(), "sessions": sessions,
+    return {"overlay_id": None, "span": window.to_json(), "today": today.isoformat(), "sessions": sessions,
             "extra": sorted(extra, key=lambda w: (w["date"], w["workout_id"])), "summary": summary}
 
 

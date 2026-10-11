@@ -324,6 +324,8 @@ planned over the **trailing four ordinary weeks**:
   layoff of 11+ days. Skip those and reach further back, at most 12
   weeks. Fewer than four ordinary weeks in that span → no trigger yet.
 
+`python3 -m coach structure adherence` works this out and raises the flags below; `python3 -m coach structure decide` records the athlete's answer and prints the decision line.
+
 Adherence thresholds are coaching heuristics, not research cut-offs:
 
 - **Under 80 %:** propose no new recurring session — no new session or

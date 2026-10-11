@@ -7,7 +7,7 @@ import textwrap
 import unittest
 from pathlib import Path
 
-from coach import flags, plugins
+from coach import flags, jsonio, plugins
 from tests.support import INSTANCES, REPO_ROOT, VALID, run_cli
 
 NOW = {"COACH_NOW": "2026-10-11T18:00:00Z"}
@@ -248,7 +248,7 @@ class MigrationTest(InstanceCase):
 
         data = self.coach("migrate", "run")["data"]
         steps = {row["path"]: (row["from"], row["to"]) for row in data["files"]}
-        self.assertEqual(steps["data/program.json"], (1, 2))
+        self.assertEqual(steps["data/program.json"], (1, jsonio.current_version(jsonio.load_schema("program"))))
         self.assertEqual(steps["data/state.json"], (1, 3))
         self.assertTrue(any("left knee: no deep flexion" in note for note in data["notes"]))
         program = json.loads(program_path.read_text(encoding="utf-8"))

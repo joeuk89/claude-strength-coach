@@ -58,8 +58,23 @@ _Avoid_: source, origin, derivation
 
 **Dose**:
 What was delivered, not what was planned: sets actually trained, counted
-per muscle group and per week. Programs are sized to dose.
+per muscle group and per week. Programs are sized to dose. The same count
+over the sets a program prescribes is the **planned dose**, so the two
+compare like for like.
 _Avoid_: volume (ambiguous between planned and delivered)
+
+**Dose target**:
+The weekly dose a program aims each muscle at, in fractional hard sets
+(an indirect set counts as half). The program declares it; a muscle with
+none declared defaults to 10 when a core session trains it as a primary
+muscle.
+_Avoid_: volume target, set goal, MEV
+
+**Ordinary week**:
+A week adherence is judged on: not a deload or other light week, not a
+one-off week, and not inside a layoff of 11+ days. Adherence looks at the
+last four, reaching back at most 12 weeks.
+_Avoid_: regular week, counted week
 
 **Block**:
 The stretch of hard training between one light week and the next,

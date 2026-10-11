@@ -18,6 +18,7 @@ OVERLAY = "data/overlays/2026-10-12-weekly.json"
 NOW = {"COACH_NOW": "2026-10-11T18:00:00Z"}
 BACKUP = ".coach/backups/20261011T180000Z"
 CURRENT = overlay.current_version()
+PROGRAM = jsonio.current_version(jsonio.load_schema("program"))
 NEXT = CURRENT + 1
 ADD_NOTE = f"""
     DOC = "overlay"
@@ -127,7 +128,7 @@ class StatusAndPlanTest(unittest.TestCase):
     def test_status_on_the_valid_instance(self):
         rows = migrate.status(VALID)
         paths = {row["path"]: row for row in rows}
-        expected = {"data/program.json": 2, "data/state.json": 3, "data/exercises.json": 1, OVERLAY: 2}
+        expected = {"data/program.json": PROGRAM, "data/state.json": 3, "data/exercises.json": 1, OVERLAY: 2}
         for path, version in expected.items():
             with self.subTest(path=path):
                 self.assertEqual(paths[path]["version"], version)
@@ -188,7 +189,7 @@ class MigrateCommandTest(EnvelopeMixin, unittest.TestCase):
     def test_status_lists_each_owned_file(self):
         data = self.run_ok("--root", str(VALID), "migrate", "status")
         listed = {row["path"]: (row["version"], row["target"]) for row in data["files"]}
-        self.assertEqual(listed["data/program.json"], (2, 2))
+        self.assertEqual(listed["data/program.json"], (PROGRAM, PROGRAM))
         self.assertEqual(listed[OVERLAY], (CURRENT, CURRENT))
         self.assertEqual(data["behind"], 0)
 
