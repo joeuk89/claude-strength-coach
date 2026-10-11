@@ -106,6 +106,13 @@ that sum and fails above 20 % (`macro_sum_warn_pct` and
 A card outside the bands is nearly always a typo or a per-recipe figure
 copied as per-serving.
 
+Both bands are data-entry checks, not coaching numbers. The 20 % fail
+line is about as wide as label tolerances: US rules let a food hold up to
+20 % more calories than its label declares (21 CFR 101.9(g)(5)), and EU
+guidance allows ±20 % on protein, carbohydrate and fat at 10–40 g per
+100 g (European Commission tolerance guidance, December 2012). The 10 %
+warn line is a heuristic.
+
 ### Protein density
 
 `recipes validate` warns when a card has less protein per 100 kcal than

@@ -126,6 +126,7 @@ mode = "coach"                # "coach" | "run"
 #     per 100 kcal; 0 = not checked. A heuristic, not an evidence-based cut-off.
 #   macro_sum_*_pct: how far a card's kcal may sit from 4 x protein +
 #     4 x carbs + 9 x fat (grams) before `recipes validate` warns or fails.
+#     Data-entry heuristics that catch typos, not coaching numbers.
 #   slot_notes: one line printed under each slot in nutrition/menu/index.md.
 #
 # [nutrition.bank]
