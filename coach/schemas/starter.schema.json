@@ -1,0 +1,36 @@
+{
+  "title": "Starter program: a tested program a new athlete can begin from (contract C45)",
+  "description": "Framework data in coach/starters/<id>.json. `program` is a complete program document with the default days; `starters draft` remaps it to the athlete's days and equipment and writes a program draft.",
+  "type": "object",
+  "required": ["schema_version", "id", "title", "summary", "level", "days", "minutes_per_session", "equipment_required",
+               "cites", "program"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": 1},
+    "id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+    "title": {"$ref": "#/$defs/text"},
+    "summary": {"$ref": "#/$defs/text"},
+    "level": {"type": "array", "minItems": 1, "items": {"enum": ["beginner", "intermediate", "advanced"]}},
+    "days": {
+      "type": "object",
+      "required": ["min", "max", "default"],
+      "additionalProperties": false,
+      "properties": {
+        "min": {"type": "integer", "minimum": 1, "maximum": 7},
+        "max": {"type": "integer", "minimum": 1, "maximum": 7},
+        "default": {"type": "array", "minItems": 1, "items": {"enum": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]}}
+      }
+    },
+    "minutes_per_session": {"type": "integer", "minimum": 1},
+    "equipment_required": {
+      "type": "array",
+      "items": {"enum": ["barbell", "ez_bar", "trap_bar", "dumbbell", "kettlebell", "machine", "smith_machine", "cable",
+                         "plate", "band", "suspension", "bodyweight", "cardio_machine", "other"]}
+    },
+    "cites": {"type": "array", "items": {"type": "string", "pattern": "^rn:[a-z0-9]+(-[a-z0-9]+)*\\.[0-9]+$"}},
+    "program": {"type": "object"}
+  },
+  "$defs": {
+    "text": {"type": "string", "pattern": "\\S"}
+  }
+}

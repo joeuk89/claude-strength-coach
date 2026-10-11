@@ -1,0 +1,1201 @@
+{
+  "schema_version": 1,
+  "id": "upper-lower-4",
+  "title": "Upper/lower, 4 days",
+  "summary": "Two upper-body and two lower-body sessions a week, every muscle trained twice, with reps added inside a range before the load goes up.",
+  "level": [
+    "beginner",
+    "intermediate"
+  ],
+  "days": {
+    "min": 4,
+    "max": 4,
+    "default": [
+      "mon",
+      "tue",
+      "thu",
+      "fri"
+    ]
+  },
+  "minutes_per_session": 60,
+  "equipment_required": [],
+  "cites": [
+    "rn:progression-training-age.2",
+    "rn:progression-training-age.4",
+    "rn:volume-frequency.1",
+    "rn:volume-frequency.2",
+    "rn:volume-frequency.3",
+    "rn:volume-frequency.5",
+    "rn:proximity-to-failure.1",
+    "rn:proximity-to-failure.4",
+    "rn:minimum-effective-dose.1",
+    "rn:minimum-effective-dose.4"
+  ],
+  "program": {
+    "schema_version": 7,
+    "name": "Upper/lower, 4 days",
+    "sessions": [
+      {
+        "id": "upper-a",
+        "title": "Upper A",
+        "kind": "lifting",
+        "tier": "core",
+        "status": "active",
+        "location": null,
+        "focus": null,
+        "exercises": [
+          {
+            "exercise_id": "bb_bench_press",
+            "load_mode": "total",
+            "sets": [
+              {
+                "count": 4,
+                "type": "normal",
+                "rep_range": {
+                  "start": 6,
+                  "end": 8
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 180,
+            "superset_id": null,
+            "cues": "shoulder blades back and down · bar to lower chest · feet planted · ramp up over 2–3 lighter sets",
+            "constraints": [],
+            "scheme": {
+              "name": "double_progression",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "bb_bent_over_row",
+            "load_mode": "total",
+            "sets": [
+              {
+                "count": 4,
+                "type": "normal",
+                "rep_range": {
+                  "start": 6,
+                  "end": 10
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 120,
+            "superset_id": null,
+            "cues": "hinge to about 45° · pull to the lower ribs · no hip swing",
+            "constraints": [],
+            "scheme": {
+              "name": "double_progression",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "db_shoulder_press",
+            "load_mode": "per_hand_x2",
+            "sets": [
+              {
+                "count": 2,
+                "type": "normal",
+                "rep_range": {
+                  "start": 8,
+                  "end": 12
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 90,
+            "superset_id": null,
+            "cues": "ribs down · press straight up · control the lowering",
+            "constraints": [],
+            "scheme": {
+              "name": "double_progression",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "lat_pulldown",
+            "load_mode": "total",
+            "sets": [
+              {
+                "count": 3,
+                "type": "normal",
+                "rep_range": {
+                  "start": 8,
+                  "end": 12
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 90,
+            "superset_id": null,
+            "cues": "chest up · pull the bar to the upper chest · elbows down and back",
+            "constraints": [],
+            "scheme": {
+              "name": "double_progression",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "db_lateral_raise",
+            "load_mode": "per_hand_x2",
+            "sets": [
+              {
+                "count": 4,
+                "type": "normal",
+                "rep_range": {
+                  "start": 12,
+                  "end": 15
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 60,
+            "superset_id": null,
+            "cues": "lead with the elbows · stop at shoulder height · no swing",
+            "constraints": [],
+            "scheme": {
+              "name": "double_progression",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "cable_triceps_pushdown",
+            "load_mode": "total",
+            "sets": [
+              {
+                "count": 2,
+                "type": "normal",
+                "rep_range": {
+                  "start": 10,
+                  "end": 15
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 60,
+            "superset_id": null,
+            "cues": "elbows pinned at the sides · lock out fully",
+            "constraints": [],
+            "scheme": {
+              "name": "double_progression",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "db_curl",
+            "load_mode": "per_hand_x2",
+            "sets": [
+              {
+                "count": 3,
+                "type": "normal",
+                "rep_range": {
+                  "start": 10,
+                  "end": 15
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 60,
+            "superset_id": null,
+            "cues": "elbows still at the sides · full stretch at the bottom · no swing",
+            "constraints": [],
+            "scheme": {
+              "name": "double_progression",
+              "params": {}
+            },
+            "start_load": null
+          }
+        ],
+        "scheme": null
+      },
+      {
+        "id": "lower-a",
+        "title": "Lower A",
+        "kind": "lifting",
+        "tier": "core",
+        "status": "active",
+        "location": null,
+        "focus": null,
+        "exercises": [
+          {
+            "exercise_id": "bb_back_squat",
+            "load_mode": "total",
+            "sets": [
+              {
+                "count": 3,
+                "type": "normal",
+                "rep_range": {
+                  "start": 6,
+                  "end": 8
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 180,
+            "superset_id": null,
+            "cues": "brace before you descend · knees track over toes · hips and chest rise together · ramp up over 2–3 lighter sets",
+            "constraints": [],
+            "scheme": {
+              "name": "double_progression",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "bb_romanian_deadlift",
+            "load_mode": "total",
+            "sets": [
+              {
+                "count": 3,
+                "type": "normal",
+                "rep_range": {
+                  "start": 8,
+                  "end": 10
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 120,
+            "superset_id": null,
+            "cues": "soft knees · push the hips back · bar stays on the thighs",
+            "constraints": [],
+            "scheme": {
+              "name": "double_progression",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "machine_leg_extension",
+            "load_mode": "total",
+            "sets": [
+              {
+                "count": 2,
+                "type": "normal",
+                "rep_range": {
+                  "start": 10,
+                  "end": 15
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 60,
+            "superset_id": null,
+            "cues": "pause at the top · control the lowering",
+            "constraints": [],
+            "scheme": {
+              "name": "double_progression",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "machine_seated_leg_curl",
+            "load_mode": "total",
+            "sets": [
+              {
+                "count": 3,
+                "type": "normal",
+                "rep_range": {
+                  "start": 10,
+                  "end": 15
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 60,
+            "superset_id": null,
+            "cues": "hips down on the seat · full range · control the return",
+            "constraints": [],
+            "scheme": {
+              "name": "double_progression",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "machine_standing_calf_raise",
+            "load_mode": "total",
+            "sets": [
+              {
+                "count": 3,
+                "type": "normal",
+                "rep_range": {
+                  "start": 10,
+                  "end": 15
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 60,
+            "superset_id": null,
+            "cues": "full stretch at the bottom · pause at the top",
+            "constraints": [],
+            "scheme": {
+              "name": "double_progression",
+              "params": {}
+            },
+            "start_load": null
+          }
+        ],
+        "scheme": null
+      },
+      {
+        "id": "upper-b",
+        "title": "Upper B",
+        "kind": "lifting",
+        "tier": "core",
+        "status": "active",
+        "location": null,
+        "focus": null,
+        "exercises": [
+          {
+            "exercise_id": "bb_overhead_press",
+            "load_mode": "total",
+            "sets": [
+              {
+                "count": 3,
+                "type": "normal",
+                "rep_range": {
+                  "start": 6,
+                  "end": 8
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 180,
+            "superset_id": null,
+            "cues": "glutes and abs tight · bar close to the face · finish with the head through · ramp up over 2–3 lighter sets",
+            "constraints": [],
+            "scheme": {
+              "name": "double_progression",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "db_incline_bench_press",
+            "load_mode": "per_hand_x2",
+            "sets": [
+              {
+                "count": 4,
+                "type": "normal",
+                "rep_range": {
+                  "start": 8,
+                  "end": 12
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 90,
+            "superset_id": null,
+            "cues": "bench at about 30° · elbows at about 45° · full stretch at the bottom",
+            "constraints": [],
+            "scheme": {
+              "name": "double_progression",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "cable_seated_row",
+            "load_mode": "total",
+            "sets": [
+              {
+                "count": 3,
+                "type": "normal",
+                "rep_range": {
+                  "start": 8,
+                  "end": 12
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 90,
+            "superset_id": null,
+            "cues": "tall chest · pull to the lower ribs · shoulder blades together",
+            "constraints": [],
+            "scheme": {
+              "name": "double_progression",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "lat_pulldown",
+            "load_mode": "total",
+            "sets": [
+              {
+                "count": 2,
+                "type": "normal",
+                "rep_range": {
+                  "start": 10,
+                  "end": 15
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 60,
+            "superset_id": null,
+            "cues": "chest up · pull the bar to the upper chest · elbows down and back",
+            "constraints": [],
+            "scheme": {
+              "name": "double_progression",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "cable_fly",
+            "load_mode": "total",
+            "sets": [
+              {
+                "count": 2,
+                "type": "normal",
+                "rep_range": {
+                  "start": 12,
+                  "end": 15
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 60,
+            "superset_id": null,
+            "cues": "slight bend in the elbows · hands meet in front of the chest",
+            "constraints": [],
+            "scheme": {
+              "name": "double_progression",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "cable_lateral_raise",
+            "load_mode": "total",
+            "sets": [
+              {
+                "count": 4,
+                "type": "normal",
+                "rep_range": {
+                  "start": 12,
+                  "end": 15
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 60,
+            "superset_id": null,
+            "cues": "lead with the elbow · stop at shoulder height",
+            "constraints": [],
+            "scheme": {
+              "name": "double_progression",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "face_pull",
+            "load_mode": "total",
+            "sets": [
+              {
+                "count": 2,
+                "type": "normal",
+                "rep_range": {
+                  "start": 12,
+                  "end": 15
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 60,
+            "superset_id": null,
+            "cues": "pull to the eyes · elbows high · rotate the hands back",
+            "constraints": [],
+            "scheme": {
+              "name": "double_progression",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "db_overhead_triceps_extension",
+            "load_mode": "single_implement",
+            "sets": [
+              {
+                "count": 2,
+                "type": "normal",
+                "rep_range": {
+                  "start": 10,
+                  "end": 15
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 60,
+            "superset_id": null,
+            "cues": "elbows point up · full stretch behind the head",
+            "constraints": [],
+            "scheme": {
+              "name": "double_progression",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "db_hammer_curl",
+            "load_mode": "per_hand_x2",
+            "sets": [
+              {
+                "count": 2,
+                "type": "normal",
+                "rep_range": {
+                  "start": 10,
+                  "end": 15
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 60,
+            "superset_id": null,
+            "cues": "neutral grip · elbows still · control the lowering",
+            "constraints": [],
+            "scheme": {
+              "name": "double_progression",
+              "params": {}
+            },
+            "start_load": null
+          }
+        ],
+        "scheme": null
+      },
+      {
+        "id": "lower-b",
+        "title": "Lower B",
+        "kind": "lifting",
+        "tier": "core",
+        "status": "active",
+        "location": null,
+        "focus": null,
+        "exercises": [
+          {
+            "exercise_id": "bb_deadlift",
+            "load_mode": "total",
+            "sets": [
+              {
+                "count": 3,
+                "type": "normal",
+                "rep_range": {
+                  "start": 4,
+                  "end": 6
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 180,
+            "superset_id": null,
+            "cues": "bar over mid-foot · flat back, lats tight · push the floor away · ramp up over 2–3 lighter sets",
+            "constraints": [],
+            "scheme": {
+              "name": "double_progression",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "db_bulgarian_split_squat",
+            "load_mode": "per_hand_x2",
+            "sets": [
+              {
+                "count": 3,
+                "type": "normal",
+                "rep_range": {
+                  "start": 8,
+                  "end": 12
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 90,
+            "superset_id": null,
+            "cues": "front foot far enough to keep the heel down · drop the back knee straight down",
+            "constraints": [],
+            "scheme": {
+              "name": "double_progression",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "leg_press",
+            "load_mode": "total",
+            "sets": [
+              {
+                "count": 2,
+                "type": "normal",
+                "rep_range": {
+                  "start": 10,
+                  "end": 15
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 90,
+            "superset_id": null,
+            "cues": "feet shoulder width · knees track the toes · lower back stays on the pad",
+            "constraints": [],
+            "scheme": {
+              "name": "double_progression",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "machine_lying_leg_curl",
+            "load_mode": "total",
+            "sets": [
+              {
+                "count": 3,
+                "type": "normal",
+                "rep_range": {
+                  "start": 10,
+                  "end": 15
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 60,
+            "superset_id": null,
+            "cues": "hips pressed down · full range · control the return",
+            "constraints": [],
+            "scheme": {
+              "name": "double_progression",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "machine_standing_calf_raise",
+            "load_mode": "total",
+            "sets": [
+              {
+                "count": 3,
+                "type": "normal",
+                "rep_range": {
+                  "start": 10,
+                  "end": 15
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 60,
+            "superset_id": null,
+            "cues": "full stretch at the bottom · pause at the top",
+            "constraints": [],
+            "scheme": {
+              "name": "double_progression",
+              "params": {}
+            },
+            "start_load": null
+          }
+        ],
+        "scheme": null
+      },
+      {
+        "id": "min-a",
+        "title": "Minimum week A",
+        "kind": "lifting",
+        "tier": "core",
+        "status": "standby",
+        "location": null,
+        "focus": null,
+        "exercises": [
+          {
+            "exercise_id": "bb_back_squat",
+            "load_mode": "total",
+            "sets": [
+              {
+                "count": 2,
+                "type": "normal",
+                "rep_range": {
+                  "start": 6,
+                  "end": 8
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 180,
+            "superset_id": null,
+            "cues": "brace before you descend · knees track over toes · hips and chest rise together · ramp up over 2–3 lighter sets",
+            "constraints": [],
+            "scheme": {
+              "name": "maintenance",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "bb_bench_press",
+            "load_mode": "total",
+            "sets": [
+              {
+                "count": 2,
+                "type": "normal",
+                "rep_range": {
+                  "start": 6,
+                  "end": 8
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 180,
+            "superset_id": null,
+            "cues": "shoulder blades back and down · bar to lower chest · feet planted · ramp up over 2–3 lighter sets",
+            "constraints": [],
+            "scheme": {
+              "name": "maintenance",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "bb_bent_over_row",
+            "load_mode": "total",
+            "sets": [
+              {
+                "count": 2,
+                "type": "normal",
+                "rep_range": {
+                  "start": 6,
+                  "end": 10
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 120,
+            "superset_id": null,
+            "cues": "hinge to about 45° · pull to the lower ribs · no hip swing",
+            "constraints": [],
+            "scheme": {
+              "name": "maintenance",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "bb_romanian_deadlift",
+            "load_mode": "total",
+            "sets": [
+              {
+                "count": 2,
+                "type": "normal",
+                "rep_range": {
+                  "start": 8,
+                  "end": 10
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 120,
+            "superset_id": null,
+            "cues": "soft knees · push the hips back · bar stays on the thighs",
+            "constraints": [],
+            "scheme": {
+              "name": "maintenance",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "db_lateral_raise",
+            "load_mode": "per_hand_x2",
+            "sets": [
+              {
+                "count": 2,
+                "type": "normal",
+                "rep_range": {
+                  "start": 12,
+                  "end": 15
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 60,
+            "superset_id": null,
+            "cues": "lead with the elbows · stop at shoulder height · no swing",
+            "constraints": [],
+            "scheme": {
+              "name": "maintenance",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "cable_triceps_pushdown",
+            "load_mode": "total",
+            "sets": [
+              {
+                "count": 2,
+                "type": "normal",
+                "rep_range": {
+                  "start": 10,
+                  "end": 15
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 60,
+            "superset_id": null,
+            "cues": "elbows pinned at the sides · lock out fully",
+            "constraints": [],
+            "scheme": {
+              "name": "maintenance",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "face_pull",
+            "load_mode": "total",
+            "sets": [
+              {
+                "count": 2,
+                "type": "normal",
+                "rep_range": {
+                  "start": 12,
+                  "end": 15
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 60,
+            "superset_id": null,
+            "cues": "pull to the eyes · elbows high · rotate the hands back",
+            "constraints": [],
+            "scheme": {
+              "name": "maintenance",
+              "params": {}
+            },
+            "start_load": null
+          }
+        ],
+        "scheme": null
+      },
+      {
+        "id": "min-b",
+        "title": "Minimum week B",
+        "kind": "lifting",
+        "tier": "core",
+        "status": "standby",
+        "location": null,
+        "focus": null,
+        "exercises": [
+          {
+            "exercise_id": "bb_deadlift",
+            "load_mode": "total",
+            "sets": [
+              {
+                "count": 2,
+                "type": "normal",
+                "rep_range": {
+                  "start": 4,
+                  "end": 6
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 180,
+            "superset_id": null,
+            "cues": "bar over mid-foot · flat back, lats tight · push the floor away · ramp up over 2–3 lighter sets",
+            "constraints": [],
+            "scheme": {
+              "name": "maintenance",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "bb_overhead_press",
+            "load_mode": "total",
+            "sets": [
+              {
+                "count": 2,
+                "type": "normal",
+                "rep_range": {
+                  "start": 6,
+                  "end": 8
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 180,
+            "superset_id": null,
+            "cues": "glutes and abs tight · bar close to the face · finish with the head through · ramp up over 2–3 lighter sets",
+            "constraints": [],
+            "scheme": {
+              "name": "maintenance",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "lat_pulldown",
+            "load_mode": "total",
+            "sets": [
+              {
+                "count": 2,
+                "type": "normal",
+                "rep_range": {
+                  "start": 8,
+                  "end": 12
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 90,
+            "superset_id": null,
+            "cues": "chest up · pull the bar to the upper chest · elbows down and back",
+            "constraints": [],
+            "scheme": {
+              "name": "maintenance",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "db_bulgarian_split_squat",
+            "load_mode": "per_hand_x2",
+            "sets": [
+              {
+                "count": 2,
+                "type": "normal",
+                "rep_range": {
+                  "start": 8,
+                  "end": 12
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 90,
+            "superset_id": null,
+            "cues": "front foot far enough to keep the heel down · drop the back knee straight down",
+            "constraints": [],
+            "scheme": {
+              "name": "maintenance",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "db_incline_bench_press",
+            "load_mode": "per_hand_x2",
+            "sets": [
+              {
+                "count": 2,
+                "type": "normal",
+                "rep_range": {
+                  "start": 8,
+                  "end": 12
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 90,
+            "superset_id": null,
+            "cues": "bench at about 30° · elbows at about 45° · full stretch at the bottom",
+            "constraints": [],
+            "scheme": {
+              "name": "maintenance",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "machine_standing_calf_raise",
+            "load_mode": "total",
+            "sets": [
+              {
+                "count": 2,
+                "type": "normal",
+                "rep_range": {
+                  "start": 10,
+                  "end": 15
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 60,
+            "superset_id": null,
+            "cues": "full stretch at the bottom · pause at the top",
+            "constraints": [],
+            "scheme": {
+              "name": "maintenance",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "db_lateral_raise",
+            "load_mode": "per_hand_x2",
+            "sets": [
+              {
+                "count": 2,
+                "type": "normal",
+                "rep_range": {
+                  "start": 12,
+                  "end": 15
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 60,
+            "superset_id": null,
+            "cues": "lead with the elbows · stop at shoulder height · no swing",
+            "constraints": [],
+            "scheme": {
+              "name": "maintenance",
+              "params": {}
+            },
+            "start_load": null
+          },
+          {
+            "exercise_id": "db_curl",
+            "load_mode": "per_hand_x2",
+            "sets": [
+              {
+                "count": 2,
+                "type": "normal",
+                "rep_range": {
+                  "start": 10,
+                  "end": 15
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 60,
+            "superset_id": null,
+            "cues": "elbows still at the sides · full stretch at the bottom · no swing",
+            "constraints": [],
+            "scheme": {
+              "name": "maintenance",
+              "params": {}
+            },
+            "start_load": null
+          }
+        ],
+        "scheme": null
+      }
+    ],
+    "external_sessions": [],
+    "dose_targets": {
+      "biceps": 10,
+      "calves": 6,
+      "chest": 10,
+      "front_delts": 10,
+      "glutes": 10,
+      "hamstrings": 10,
+      "lats": 10,
+      "lower_back": 6,
+      "quadriceps": 10,
+      "rear_delts": 5,
+      "side_delts": 10,
+      "triceps": 10,
+      "upper_back": 10
+    },
+    "schedule": {
+      "rule": "fixed_weekdays",
+      "params": {
+        "days": {
+          "mon": "upper-a",
+          "tue": "lower-a",
+          "thu": "upper-b",
+          "fri": "lower-b"
+        }
+      }
+    },
+    "blocks": {
+      "hard_weeks_ceiling": 6,
+      "deload_rule": {
+        "name": "standard",
+        "params": {}
+      }
+    },
+    "missed_day_rules": [],
+    "interference": [
+      {
+        "name": "same_day",
+        "params": {
+          "min_gap_hours": 6,
+          "lift_first": true
+        }
+      },
+      {
+        "name": "quality_before_heavy_lower",
+        "params": {
+          "hours": 24,
+          "heavy_rpe": 7,
+          "heavy_max_reps": 6
+        }
+      }
+    ],
+    "priority": [
+      {
+        "exercise_id": "bb_bench_press",
+        "kpi": {
+          "kind": "e1rm",
+          "target": null,
+          "by": null
+        },
+        "floor": {
+          "sets": 2,
+          "rpe": null
+        }
+      },
+      {
+        "exercise_id": "bb_back_squat",
+        "kpi": {
+          "kind": "e1rm",
+          "target": null,
+          "by": null
+        },
+        "floor": {
+          "sets": 2,
+          "rpe": null
+        }
+      },
+      {
+        "exercise_id": "bb_deadlift",
+        "kpi": {
+          "kind": "e1rm",
+          "target": null,
+          "by": null
+        },
+        "floor": {
+          "sets": 2,
+          "rpe": null
+        }
+      }
+    ],
+    "minimum_week": {
+      "sessions": [
+        "min-a",
+        "min-b"
+      ],
+      "schedule": {
+        "rule": "fixed_weekdays",
+        "params": {
+          "days": {
+            "mon": "min-a",
+            "thu": "min-b"
+          }
+        }
+      }
+    }
+  }
+}

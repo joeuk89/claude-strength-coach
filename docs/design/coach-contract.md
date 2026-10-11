@@ -5128,6 +5128,65 @@ R-14b's `routines create`; adopt itself never calls Hevy.
 - `cites` holds template research claim refs (C28); empty until the notes
   exist.
 
+**Built with R-41b** (details the text above leaves open):
+
+- Schema `starter.schema.json` v1: `level` items `beginner`,
+  `intermediate`, `advanced`; `days.default` lists weekday ids;
+  `equipment_required` items are R-11 equipment ids; `cites` items are
+  `rn:<note>.<n>`. Every shipped starter cites current template claims.
+- `coach.starters.load(id)` takes the starter's `program` through the
+  program migration chain in memory, so a later program bump never
+  leaves a starter behind; the files are updated when convenient.
+- Major muscles, for the weekly-dose test: chest, upper_back, lats,
+  front_delts, side_delts, quadriceps, hamstrings, glutes, biceps,
+  triceps. Each full starter gives each 10 to 20 fractional sets a week
+  (`structure balance` average at the default days) and every muscle at
+  most 11 in one session. `dose_targets` sets 10 for each major muscle
+  and, for any other primary muscle of an active exercise, the planned
+  weekly sets capped at 6, so no muscle falls back to the default 10.
+- Minimum-week sessions are `min-a` and `min-b`, standby, on scheme
+  `maintenance`. Loaded lines start at null (a calibration line) except
+  `bodyweight` lines, which start at 0 added load.
+- `starters list` returns `starters` (rows: `id`, `title`, `summary`,
+  `level`, `days`, `minutes`, `equipment_required`, `recommended`),
+  `days`, `equipment` (the filter used; empty means every piece),
+  `experience` and `recommended_id`. Rows sort by default day count,
+  then id. `recommended` is true when `level` holds `[athlete]
+  experience`; `recommended_id` is the first such row. `--days N` keeps
+  starters with `min <= N <= max`; `--equipment` keeps starters whose
+  `equipment_required` it covers (an unknown id is exit 2).
+- `starters show ID` returns `starter` and `pages` (`program
+  render`'s pages for the starter's program with its default days).
+- `starters draft`:
+  - Days sort into week order. A `fixed_weekdays` schedule gives its
+    sessions, in default-day order, to the chosen days in order; a
+    `next_in_sequence` schedule takes the days as `params.days`, and the
+    draft's `position` is the sequence's last session, so week one opens
+    on its first. The minimum week moves to the first chosen day and the
+    one at index `(n + 1) div 2`. A day count outside `days` exits 1
+    naming the allowed range and where the days came from.
+  - A line is swapped when its exercise is avoided (C54) or its
+    equipment is missing from a non-empty `available`, in every session,
+    standby ones included. The substitute is the first of the library
+    entry's `substitutes` that is not avoided, whose equipment is
+    available, that the session does not already hold, and whose load
+    mode the line's scheme accepts (`LOAD_MODES`). The line takes its
+    load mode (confirmed, else the catalogue default), `cues` null, and
+    a start load of 0 for `bodyweight`, else null. One `swapped_exercise`
+    row per line names the reason (the avoid reason, or the missing
+    equipment). With none that fits, the line stays and gets one
+    `no_substitute` row. A priority lift follows its first swap in an
+    active session.
+  - `--start-load EXERCISE=VALUE` applies after the swaps to every line
+    of that exercise. An exercise the draft lacks, a line that is not on
+    a loaded mode, or a malformed pair exits 1.
+  - Output: `draft`, `days`, `path`, `written` and `problems` (as
+    `program import-hevy`). `program_drafts.report_row` and
+    `program_drafts.timestamp` are public for it.
+- Catalogue: `bb_back_squat` gains `goblet_squat` and `bb_deadlift`
+  gains `db_romanian_deadlift` as last substitutes, so a dumbbell kit
+  can run upper/lower.
+
 ## C46. Training without Hevy: manual log and session sheets (R-40c; R-20, R-21a, R-25 read)
 
 `data/log/workouts.jsonl`, one JSON object per line, append-only;
