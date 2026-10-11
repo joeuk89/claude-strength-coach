@@ -285,6 +285,15 @@ athlete confirmed for each exercise, and exercises they avoid). Exercises
 in a program, an overlay or a Hevy routine are named by library id.
 _Avoid_: exercise database, exercise list, catalogue (only the builtin part)
 
+**Managed routine**:
+A Hevy routine the coach created, imported or reused for a session, so
+that `data/state.json`, now or in a program archive, maps it to a
+session. Sharing a folder with managed routines does not make a routine
+managed. An **orphan routine** is a managed routine no current session
+or temporary-routine entry uses; the coach offers to leave, reuse or
+retire it, and does none of them without approval.
+_Avoid_: old routine, unused routine (a retired routine is titled `(unused)`)
+
 **Programming pass**:
 One run of `/program-week` in one mode (normal, midweek, light, minimum,
 constrained or reshuffle): it builds one overlay for a span of days and

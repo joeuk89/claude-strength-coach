@@ -1,4 +1,4 @@
-"""External identities and exact housekeeping writes, using only synthetic caches and clients."""
+"""Hevy mapping requirements and exact housekeeping writes, using only synthetic caches and clients."""
 
 import copy
 import json
@@ -11,8 +11,10 @@ from coach.library import Library
 from tests.test_library import CliMixin, Instance, read_library, write_library
 from tests.test_library_seed import template
 from tests.test_program_drafts import AdoptCase, SYNTHETIC, init_repo, snapshot
-from tests.test_routines import ENV, R1, R2, WEEKLY, read_overlay
-from tests.test_routines_create import CreateCase, read_state, write_state
+from tests.test_routines import ENV, R1, R2, WEEKLY, read_overlay, write_overlay
+from tests.test_routines_create import (CREATE, ONE_OFF, T1, T2, CreateCase, GateMixin, OneOffCase, read_state,
+                                        write_state)
+from tests.test_starters import Case as StarterCase
 
 
 class TemplateCacheTest(CliMixin, unittest.TestCase):
@@ -71,6 +73,16 @@ class TemplateCacheTest(CliMixin, unittest.TestCase):
             self.run_ok(root, "library", "seed")
             self.assertIsNone(Library.load(root).get("db_bench_press")["hevy_template_id"])
 
+    def test_set_template_refuses_an_id_another_exercise_owns_and_changes_nothing(self):
+        with Instance() as root:
+            write_library(root, {"db_curl": {"hevy_template_id": "CHOSEN"}})
+            self.cache(root, [template("Bench Press (Dumbbell)", tid="CHOSEN")])
+            before = snapshot(root)
+            with mock.patch("coach.hevy.client.HevyClient.from_context", side_effect=AssertionError("network")):
+                envelope = self.run_fail(1, root, "library", "set-template", "db_bench_press", "CHOSEN")
+            self.assertIn("already belongs to db_curl", envelope["error"]["message"])
+            self.assertEqual(snapshot(root), before)
+
     def test_multiple_verified_ids_without_primary_require_choice_even_with_one_cached(self):
         entry = Library({"schema_version": 1, "exercises": {
             "db_bench_press": {"hevy_template_ids": ["B1", "B2"]}}}).get("db_bench_press")
@@ -79,7 +91,7 @@ class TemplateCacheTest(CliMixin, unittest.TestCase):
         self.assertIsNone(result["template_id"])
 
 
-class ReadinessTest(CreateCase):
+class RequirementsTest(CreateCase):
     def test_all_missing_templates_and_missing_session_are_reported_together(self):
         self.forget_session_b(approve=False)
         self.edit_overlay(lambda doc: [e.update(hevy_template_id=None) for s in doc["sessions"]
@@ -90,6 +102,7 @@ class ReadinessTest(CreateCase):
         self.assertEqual(len(result["templates"]), sum(len(s["exercises"]) for s in doc["sessions"]))
         self.assertEqual(result["sessions"][0]["session_id"], "session-b")
         self.assertTrue(all("set-template" in row["repair"] for row in result["templates"]))
+        self.assertFalse(any("hevy pull" in row["repair"] for row in result["templates"]))
         self.cli("overlay", "approve", WEEKLY, expect=3)
         self.assertEqual(snapshot(self.root), before)
         self.assertEqual(self.fake.writes, [])
@@ -124,8 +137,9 @@ class ReadinessTest(CreateCase):
         self.assertEqual(len(self.fake.writes), 1)
 
 
-class OrphanTest(CreateCase):
+class RedesignCase(CreateCase):
     def redesign(self):
+        """Session A/B lose their mappings; the archive keeps them, and an unrelated routine sits in folder 9."""
         old = read_state(self.root)
         archive = self.root / "data/archive/programs/2026-10-10/state.json"
         jsonio.write_doc(archive, old, False)
@@ -137,6 +151,8 @@ class OrphanTest(CreateCase):
         self.fake.collection("routines").append(unrelated)
         HevyCache(self.root).upsert_routine(unrelated)
 
+
+class OrphanTest(RedesignCase):
     def test_preview_identifies_orphans_and_new_routines_but_never_unrelated_folder(self):
         self.redesign()
         before = snapshot(self.root)
@@ -195,75 +211,157 @@ class AdoptionOrphanTest(AdoptCase):
         self.assertEqual({row["routine_id"] for row in external.orphan_routines(root)}, {R1, R2})
 
 
-class StarterReadinessTest(unittest.TestCase):
+class StarterRequirementsTest(StarterCase):
     def test_first_starter_bench_and_create_preview_use_full_cache_without_old_routines(self):
-        from tests.test_starters import AdoptedStarterTest
-
-        helper = AdoptedStarterTest()
-        self.addCleanup(helper.doCleanups)
-        root, draft = helper.adopted("full-body-3")
-        proposal = helper.ok(root, "propose", "week", "--week", "2026-W42")
+        root, _ = self.adopted("full-body-3")
+        proposal = self.ok(root, "propose", "week", "--week", "2026-W42")
         doc = proposal["overlay"]
         bench = next(e for s in doc["sessions"] for e in s["exercises"] if "bench_press" in e["exercise_id"])
         self.assertTrue(bench["hevy_template_id"].startswith("STARTER-"))
         self.assertEqual(HevyCache(root).routines(), [])
-        helper.ok(root, "propose", "finalize", "--proposal", doc["id"])
+        self.ok(root, "propose", "finalize", "--proposal", doc["id"])
         before = snapshot(root)
         with mock.patch("coach.hevy.client.HevyClient.from_context", side_effect=AssertionError("network")):
-            report = helper.ok(root, "routines", "preflight", "--overlay", doc["id"])
-            preview = helper.ok(root, "routines", "create", "--overlay", doc["id"], "--dry-run")
+            report = self.ok(root, "routines", "preflight", "--overlay", doc["id"])
+            preview = self.ok(root, "routines", "create", "--overlay", doc["id"], "--dry-run")
         self.assertTrue(report["ready"])
         self.assertTrue(report["sessions"])
         self.assertTrue(all(r["status"] == "would_create" for r in preview["routines"]))
         self.assertEqual(snapshot(root), before)
 
     def test_proposal_flags_every_missing_template_even_without_a_routine(self):
-        from tests.test_starters import AdoptedStarterTest
-
-        helper = AdoptedStarterTest()
-        self.addCleanup(helper.doCleanups)
-        root, draft = helper.adopted("full-body-3")
+        root, _ = self.adopted("full-body-3")
         HevyCache(root).path("exercise_templates.json").unlink()
         own = read_library(root)["exercises"]
         for entry in own.values():
             entry.pop("hevy_template_id", None)
             entry.pop("hevy_template_ids", None)
         write_library(root, own)
-        result = helper.ok(root, "propose", "week", "--week", "2026-W42", "--dry-run")
+        result = self.ok(root, "propose", "week", "--week", "2026-W42", "--dry-run")
         doc = result["overlay"]
         expected = {(s["session_id"], e["exercise_id"]) for s in doc["sessions"] for e in s["exercises"]}
-        found = {(f["session_id"], f["exercise_id"]) for f in doc["flags"] if f["code"] == "hevy_template_unresolved"}
-        self.assertEqual(found, expected)
+        unresolved = [f for f in doc["flags"] if f["code"] == "hevy_template_unresolved"]
+        self.assertEqual({(f["session_id"], f["exercise_id"]) for f in unresolved}, expected)
+        self.assertTrue(all("hevy pull" in f["message"] for f in unresolved))
         self.assertIn("hevy_routine_unmapped", {f["code"] for f in doc["flags"]})
 
 
-class TemporaryPlanTest(unittest.TestCase):
-    def fixture(self):
-        from tests.test_routines_create import OneOffCreateTest
-
-        helper = OneOffCreateTest()
-        self.addCleanup(helper.doCleanups)
-        helper.setUp()
-        return helper
-
+class TemporaryPlanTest(OneOffCase):
     def test_a_changed_spare_cannot_replace_the_reviewed_action(self):
-        from tests.test_routines_create import ONE_OFF, T1
-
-        helper = self.fixture()
-        preview = helper.create("--dry-run", overlay_id=ONE_OFF)["data"]
-        before = state.path_for(helper.root).read_bytes()
-        spare = next(r for r in helper.fake.collection("routines") if r["id"] == T1)
-        spare["title"] = "Changed after preview"
-        helper.create("--expect-plan", preview["plan_hash"], overlay_id=ONE_OFF, expect=3)
-        self.assertEqual(helper.fake.writes, [])
-        self.assertEqual(state.path_for(helper.root).read_bytes(), before)
+        preview = self.create("--dry-run", overlay_id=ONE_OFF)["data"]
+        before = state.path_for(self.root).read_bytes()
+        spare = next(r for r in self.fake.collection("routines") if r["id"] == T1)
+        spare.update(title="Changed after preview", updated_at="2026-10-11T19:00:00Z")
+        self.create("--expect-plan", preview["plan_hash"], overlay_id=ONE_OFF, expect=3)
+        self.assertEqual(self.fake.writes, [])
+        self.assertEqual(state.path_for(self.root).read_bytes(), before)
 
     def test_explicit_later_reuse_is_reserved_before_automatic_selection(self):
-        from tests.test_routines_create import ONE_OFF, T1, T2
-
-        helper = self.fixture()
         args = ("--reuse", f"travel-c={T1}")
-        preview = helper.create(*args, "--dry-run", overlay_id=ONE_OFF)["data"]
+        preview = self.create(*args, "--dry-run", overlay_id=ONE_OFF)["data"]
         self.assertEqual([r["routine_id"] for r in preview["routines"]], [T2, None, T1])
-        helper.create(*args, "--expect-plan", preview["plan_hash"], overlay_id=ONE_OFF)
-        self.assertEqual(helper.put_paths, [f"/v1/routines/{T2}", f"/v1/routines/{T1}"])
+        self.create(*args, "--expect-plan", preview["plan_hash"], overlay_id=ONE_OFF)
+        self.assertEqual(self.put_paths, [f"/v1/routines/{T2}", f"/v1/routines/{T1}"])
+
+    def test_the_plan_hash_is_the_canonical_hash(self):
+        preview = self.create("--dry-run", overlay_id=ONE_OFF)["data"]
+        self.assertRegex(preview["plan_hash"], r"^sha256:[0-9a-f]{64}$")
+
+    def test_a_by_id_read_with_extra_fields_still_matches_the_reviewed_plan(self):
+        preview = self.create("--dry-run", overlay_id=ONE_OFF)["data"]
+        for routine in self.fake.collection("routines"):
+            routine["only_on_get"] = "field the list endpoint leaves out"
+        self.create("--expect-plan", preview["plan_hash"], overlay_id=ONE_OFF)
+        self.assertEqual(self.put_paths, [f"/v1/routines/{T1}", f"/v1/routines/{T2}"])
+
+    def test_an_orphan_reused_for_a_temporary_session_is_no_longer_reported_unmapped(self):
+        old = read_state(self.root)
+        jsonio.write_doc(self.root / "data/archive/programs/2026-10-10/state.json", old, False)
+        old["hevy"]["routines"].pop(R1)
+        write_state(self.root, old)
+        self.assertIn(R1, {r["routine_id"] for r in external.orphan_routines(self.root)})
+        args = ("--reuse", f"travel-a={R1}")
+        preview = self.create(*args, "--dry-run", overlay_id=ONE_OFF)["data"]
+        self.create(*args, "--expect-plan", preview["plan_hash"], overlay_id=ONE_OFF)
+        self.assertNotIn(R1, {r["routine_id"] for r in external.orphan_routines(self.root)})
+        again = self.create("--dry-run", overlay_id=ONE_OFF)["data"]
+        self.assertEqual(again["orphan_routines"], [])
+        self.assertNotIn("now unmapped", again["summary"])
+
+
+class ReuseRefusalTest(OneOffCase):
+    """Every malformed, unrelated, busy or duplicate --reuse refuses before any file or Hevy change."""
+
+    def setUp(self):
+        super().setUp()
+        old = read_state(self.root)
+        jsonio.write_doc(self.root / "data/archive/programs/2026-10-10/state.json", old, False)
+        old["hevy"]["routines"].pop(R2)
+        old["hevy"]["temporary_routines"][1].update(overlay_id="2026-10-05-one-off", session_id="other")
+        write_state(self.root, old)
+        live = read_overlay(self.root, ONE_OFF)
+        live.update(id="2026-10-05-one-off", span={"start": "2026-10-05", "end": "2026-10-13"},
+                    created_at="2026-10-04T08:00:00Z", approval=None)
+        live["sessions"] = [dict(live["sessions"][0], session_id="other", date="2026-10-13")]
+        write_overlay(self.root, live)
+        unrelated = copy.deepcopy(self.fake.collection("routines")[0])
+        unrelated.update(id="unrelated", folder_id=9, title="Unrelated")
+        self.fake.collection("routines").append(unrelated)
+        HevyCache(self.root).upsert_routine(unrelated)
+
+    def test_each_bad_choice_refuses_with_no_change(self):
+        cases = {
+            "malformed": (["travel-a"], "Cannot reuse"),
+            "unknown session": ([f"travel-z={T1}"], "Cannot reuse"),
+            "unrelated routine": (["travel-a=unrelated"], "Cannot reuse"),
+            "actively mapped routine": ([f"travel-a={R1}"], "Cannot reuse"),
+            "busy in another live overlay": ([f"travel-a={T2}"], "Cannot reuse"),
+            "duplicate routine": ([f"travel-a={T1}", f"travel-b={T1}"], "distinct"),
+            "duplicate session": ([f"travel-a={T1}", f"travel-a={R2}"], "distinct"),
+        }
+        self.assertEqual({r["routine_id"] for r in external.orphan_routines(self.root)}, {R2})
+        before = snapshot(self.root)
+        for name, (choices, message) in cases.items():
+            args = [arg for choice in choices for arg in ("--reuse", choice)]
+            with self.subTest(name):
+                for extra in (("--dry-run",), ("--expect-plan", "sha256:any")):
+                    envelope = self.create(*args, *extra, overlay_id=ONE_OFF, expect=3)
+                    self.assertIn(message, envelope["error"]["message"])
+                self.assertEqual(snapshot(self.root), before)
+                self.assertEqual(self.fake.writes, [])
+
+
+class PlanGateTest(GateMixin, RedesignCase):
+    """The gate denies an approved create or retire unless --expect-plan names the reviewed plan."""
+
+    def assert_denied(self, decision):
+        self.assertEqual(decision["permissionDecision"], "deny")
+        self.assertIn("--expect-plan", decision["permissionDecisionReason"])
+
+    def test_an_approved_create_without_or_with_a_wrong_hash_is_denied(self):
+        self.forget_session_b()
+        for command in (CREATE, CREATE + " --expect-plan sha256:wrong"):
+            with self.subTest(command=command):
+                self.assert_denied(self.decide(command))
+                self.assert_denied(self.pipe(command))
+        self.assertEqual(self.fake.writes, [])
+
+    def test_an_orphan_retire_without_or_with_a_wrong_hash_is_denied(self):
+        self.redesign()
+        retire = f"python3 -m coach routines retire --overlay {WEEKLY} --routine {R1}"
+        for command in (retire, retire + " --expect-plan sha256:wrong"):
+            with self.subTest(command=command):
+                self.assert_denied(self.decide(command))
+                self.assert_denied(self.pipe(command))
+        preview = self.cli("routines", "retire", "--overlay", WEEKLY, "--routine", R1, "--dry-run")["data"]
+        self.assertEqual(self.decide(f"{retire} --expect-plan {preview['plan_hash']}")["permissionDecision"], "ask")
+        self.assertEqual(self.fake.writes, [])
+
+    def test_a_retire_with_nothing_to_retire_needs_no_hash_in_the_cli_or_the_gate(self):
+        ended = dict(ENV, COACH_NOW="2026-10-19T08:00:00Z")
+        envelope = self.cli("routines", "retire", "--overlay", WEEKLY, env=ended)
+        self.assertEqual(envelope["data"]["routines"], [])
+        self.assertNotIn("plan_hash", envelope["data"])
+        decision = self.decide(f"python3 -m coach routines retire --overlay {WEEKLY}", env=ended)
+        self.assertEqual(decision["permissionDecision"], "ask")
+        self.assertEqual(self.fake.writes, [])

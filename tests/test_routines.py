@@ -385,7 +385,7 @@ class RetireTest(RoutinesCase):
         if not extra and expect == 0:
             preview = self.cli("routines", "retire", "--overlay", ONE_OFF, "--dry-run",
                                env=dict(ENV, COACH_NOW=now))["data"]
-            extra = ("--expect-plan", preview["plan_hash"])
+            extra = ("--expect-plan", preview["plan_hash"]) if preview.get("plan_hash") else ()
         return self.cli("routines", "retire", "--overlay", ONE_OFF, *extra, expect=expect,
                         env=dict(ENV, COACH_NOW=now))
 

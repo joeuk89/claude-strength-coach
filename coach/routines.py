@@ -7,11 +7,11 @@ session's routine is the overlay's `hevy_routine_id`, else the one
 overlay that is unapproved, edited after approval, blocked, ended or
 superseded, and a routine edited in the app since the cache was read. It
 writes each changed routine once, reads it back and logs whether the
-read-back matches. `create` gives a session with no routine one, under the
-same refusals, and records the new id in state.json only.
+read-back matches. `create` previews, from the cache, the routine each
+session without one would get, and writes only the plan the athlete
+approved (`--expect-plan`), recording new ids in state.json only.
 """
 
-import hashlib
 import json
 
 from coach import dates, external, jsonio
@@ -255,7 +255,8 @@ def _require_mapped(doc, ids):
         names = ", ".join(f"{s['session_id']} ({s['date']})" for s in unmapped)
         raise ValidationError(
             f"Overlay {doc['id']} has session(s) with no Hevy routine: {names}; "
-            f"run python3 -m coach routines create --overlay {doc['id']} first"
+            f"run python3 -m coach routines create --overlay {doc['id']} --dry-run and name its plan in "
+            "the write brief first"
         )
 
 
@@ -569,7 +570,7 @@ def push(ctx, overlay_id, dry_run, refresh=False):
     return _report("push", doc, ctx, entries, writes=writes)
 
 
-def retire(ctx, overlay_id, dry_run, refresh=False, routine_ids=(), expect_plan=None):
+def retire(ctx, overlay_id, dry_run, routine_ids=(), expect_plan=None):
     """Retire only the named managed orphans, or an ended overlay's temporary routines."""
     _require_hevy(ctx)
     doc = _load(ctx, overlay_id)
@@ -620,10 +621,12 @@ def retire(ctx, overlay_id, dry_run, refresh=False, routine_ids=(), expect_plan=
         entry.update(changes=diff(body, live), status="would_retire")
         planned.append((entry, body, live))
     report = _report("retire", doc, ctx, entries, dry_run=dry_run)
-    report["plan_hash"] = _plan_hash(doc, "retire", [
-        {"routine_id": entry["routine_id"], "body": body, "before": live} for entry, body, live in planned])
-    if planned and (expect_plan is not None or not dry_run):
-        _require_plan(report["plan_hash"], expect_plan)
+    if planned:
+        report["plan_hash"] = _plan_hash(doc, "retire", [
+            {"routine_id": entry["routine_id"], "body": body, "before": _version(live)}
+            for entry, body, live in planned])
+        if expect_plan is not None or not dry_run:
+            _require_plan(report["plan_hash"], expect_plan)
     if dry_run:
         return report
     writes = 0
@@ -670,10 +673,10 @@ def create(ctx, overlay_id, dry_run, reuse_choices=(), expect_plan=None):
     reasons = push_refusals(ctx.root, doc, today, planned, require_approval=not dry_run)
     if reasons:
         raise _refused(doc, reasons, outcome="gets no new routines")
-    readiness = external.readiness(ctx.root, doc)
-    if not readiness["ready"]:
+    requirements = external.hevy_requirements(ctx.root, doc)
+    if not requirements["ready"]:
         raise RefusedError("Hevy templates remain unresolved; repair every line before the write brief",
-                           data={"external_readiness": readiness})
+                           data={"hevy_requirements": requirements})
     overlay_hash = overlay_module.approval_hash(doc)
     needed = [(key, session, carries) for key, session, carries in plan(doc, today, planned) if key.startswith(_NEW)]
     folder = {"title": ONE_OFF_FOLDER_TITLE, "id": None, "status": "not_needed"}
@@ -696,7 +699,7 @@ def create(ctx, overlay_id, dry_run, reuse_choices=(), expect_plan=None):
             raise RefusedError(f"Chosen routine {reuse} is not cached; pull and review again")
         if reuse and client:
             fresh = _get_routine(client, reuse)
-            if fresh != live:
+            if _version(fresh) != _version(live):
                 raise RefusedError(f"Chosen routine {reuse} changed in Hevy; pull and review again")
         while session.get("temporary") and spare and live is None:
             reuse = spare.pop(0)
@@ -725,7 +728,7 @@ def create(ctx, overlay_id, dry_run, reuse_choices=(), expect_plan=None):
         entries.append(entry)
     report = _create_report(doc, ctx, entries, folder, dry_run, 0, stale)
     report["plan_hash"] = _plan_hash(doc, "create", [
-        {"session_id": s["session_id"], "routine_id": rid, "body": body, "before": live}
+        {"session_id": s["session_id"], "routine_id": rid, "body": body, "before": _version(live)}
         for (s, _, rid, live), body in zip(work, bodies)],
         folder["status"] in ("would_create", "pending"))
     if expect_plan is not None or not dry_run:
@@ -833,7 +836,7 @@ def _create_body(doc, session, live, folders, one_off_folder):
 
 def _record(hevy, doc, session, routine_id):
     if not session.get("temporary"):
-        hevy["temporary_routines"] = [entry for entry in hevy["temporary_routines"] if entry["routine_id"] != routine_id]
+        hevy["temporary_routines"] = [e for e in hevy["temporary_routines"] if e["routine_id"] != routine_id]
         hevy["routines"][routine_id] = {"session_id": session["session_id"]}
         return
     hevy["routines"].pop(routine_id, None)
@@ -1091,9 +1094,15 @@ def _orphan_summary(report):
 
 
 def _plan_hash(doc, action, writes, create_folder=False):
-    payload = {"overlay_hash": overlay_module.approval_hash(doc), "action": action,
-               "writes": writes, "create_folder": create_folder}
-    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    return jsonio.canonical_hash({"overlay_hash": overlay_module.approval_hash(doc), "action": action,
+                                  "writes": writes, "create_folder": create_folder})
+
+
+def _version(routine):
+    """What push's stale check compares, so a by-id GET matches the routine the list pull cached."""
+    if routine is None:
+        return None
+    return {"id": routine.get("id"), "updated_at": routine.get("updated_at")}
 
 
 def _require_plan(actual, expected):

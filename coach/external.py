@@ -1,4 +1,4 @@
-"""Local Hevy readiness and managed-routine housekeeping facts."""
+"""Local Hevy mapping requirements and managed-routine housekeeping facts."""
 
 import json
 from pathlib import Path
@@ -10,7 +10,9 @@ from coach.library import Library, template_resolution
 
 def template_requirements(root, doc):
     lib = Library.load(root)
-    templates = HevyCache(root).exercise_templates()
+    cache = HevyCache(root)
+    templates = cache.exercise_templates()
+    pull_first = "" if cache.read("exercise_templates") is not None else "python3 -m coach hevy pull; then "
     found = []
     for session in doc["sessions"]:
         for line in session["exercises"]:
@@ -19,12 +21,13 @@ def template_requirements(root, doc):
             entry = lib.get(line["exercise_id"])
             resolution = template_resolution(entry, templates, lib.template_owners())
             found.append({"session_id": session["session_id"], "exercise_id": line["exercise_id"],
-                          **resolution, "repair": f"python3 -m coach library set-template {line['exercise_id']} ID; "
-                          "then rebuild the proposal/overlay so it carries the chosen template"})
+                          **resolution, "repair": f"{pull_first}python3 -m coach library set-template "
+                          f"{line['exercise_id']} ID; then rebuild the proposal/overlay so it carries "
+                          "the chosen template"})
     return found
 
 
-def readiness(root, doc, enabled=True):
+def hevy_requirements(root, doc, enabled=True):
     from coach.routines import session_routines
 
     if not enabled:
@@ -35,8 +38,8 @@ def readiness(root, doc, enabled=True):
     return {"enabled": True, "ready": not templates, "templates": templates, "sessions": sessions}
 
 
-def readiness_flags(root, doc, enabled):
-    report = readiness(root, doc, enabled)
+def requirement_flags(root, doc, enabled):
+    report = hevy_requirements(root, doc, enabled)
     found = [flags.make("hevy_template_unresolved", session_id=row["session_id"],
                         exercise_id=row["exercise_id"],
                         message=f"Hevy template {row['status']}: {row['repair']}") for row in report["templates"]]
@@ -47,28 +50,17 @@ def readiness_flags(root, doc, enabled):
 
 
 def orphan_routines(root, active=None, previous=None):
-    cache = HevyCache(root)
+    """Managed routines no active mapping uses: a session mapping or a temporary-routine entry."""
     if active is None:
-        current = state.load(root)["hevy"] if state.exists(root) else {"routines": {}}
-        active = set(current["routines"])
+        current = state.load(root)["hevy"] if state.exists(root) else {}
+        active = set(current.get("routines", {}))
     else:
-        current = (previous or {}).get("hevy", {"routines": {}})
+        current = (previous or {}).get("hevy", {})
         active = set(active)
-    managed = dict(current["routines"])
-    if previous:
-        managed.update(previous["hevy"]["routines"])
-    # Adoption archives mapping provenance; folder membership alone does not establish ownership.
-    archive = Path(root) / paths.PROGRAM_ARCHIVE_DIR
-    for path in sorted(archive.glob("*/state.json")):
-        try:
-            old = json.loads(path.read_text(encoding="utf-8"))
-            if isinstance(old, dict) and isinstance(old.get("hevy"), dict):
-                mappings = old["hevy"].get("routines")
-                if isinstance(mappings, dict):
-                    managed.update({rid: row for rid, row in mappings.items()
-                                    if isinstance(row, dict) and isinstance(row.get("session_id"), str)})
-        except (ValueError, OSError):
-            continue
+    active |= {entry["routine_id"] for entry in current.get("temporary_routines", [])}
+    managed = _archived_mappings(root)
+    managed.update(current.get("routines", {}))
+    cache = HevyCache(root)
     rows = []
     for rid in sorted(set(managed) - active):
         routine = cache.routine(rid)
@@ -78,3 +70,18 @@ def orphan_routines(root, active=None, previous=None):
                      "previous_session_id": managed[rid]["session_id"],
                      "choices": ["leave", "reuse", "retire"]})
     return rows
+
+
+def _archived_mappings(root):
+    # Ownership comes from mappings adoption archived; folder membership alone does not establish it.
+    found = {}
+    for path in sorted((Path(root) / paths.PROGRAM_ARCHIVE_DIR).glob("*/state.json")):
+        try:
+            old = json.loads(path.read_text(encoding="utf-8"))
+        except (ValueError, OSError):
+            continue
+        mappings = (old.get("hevy") or {}).get("routines") if isinstance(old, dict) else None
+        if isinstance(mappings, dict):
+            found.update({rid: row for rid, row in mappings.items()
+                          if isinstance(row, dict) and isinstance(row.get("session_id"), str)})
+    return found

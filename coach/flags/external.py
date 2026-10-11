@@ -1,4 +1,4 @@
-"""External identity readiness is separate from the local prescription."""
+"""Hevy mapping requirements, kept apart from the local prescription."""
 
 from coach.flags import register
 

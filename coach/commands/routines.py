@@ -1,4 +1,4 @@
-"""`routines` commands: diff, verify, push, create and retire an overlay's Hevy routines (contract C2, C3, C9)."""
+"""`routines` commands for an overlay's Hevy routines (contract C2, C3, C9)."""
 
 from coach import routines
 from coach.commands import arg, command
@@ -46,7 +46,6 @@ def push(args, ctx):
     "routines retire",
     help='Retitle named managed orphans or an ended overlay\'s temporary routines "(unused)"',
     args=(_OVERLAY,
-          arg("--refresh", action="store_true", help="compatibility option; pull first to refresh the local preview"),
           arg("--routine", action="append", default=[], help="managed orphan or ended temporary routine id"),
           arg("--expect-plan", help="hash of the exact retirement dry-run approved in the brief")),
     writes=True,
@@ -54,8 +53,7 @@ def push(args, ctx):
     network=True,
 )
 def retire(args, ctx):
-    return routines.retire(ctx, args.overlay, args.dry_run, refresh=args.refresh,
-                           routine_ids=args.routine, expect_plan=args.expect_plan)
+    return routines.retire(ctx, args.overlay, args.dry_run, routine_ids=args.routine, expect_plan=args.expect_plan)
 
 
 @command(
@@ -75,9 +73,9 @@ def create(args, ctx):
 @command("routines preflight", help="List every local Hevy mapping requirement before the write brief",
          args=(_OVERLAY,))
 def preflight(args, ctx):
-    from coach.external import orphan_routines, readiness
+    from coach.external import hevy_requirements, orphan_routines
 
     doc = routines._load(ctx, args.overlay)
-    report = readiness(ctx.root, doc, ctx.config.hevy.enabled)
+    report = hevy_requirements(ctx.root, doc, ctx.config.hevy.enabled)
     report["orphan_routines"] = orphan_routines(ctx.root) if ctx.config.hevy.enabled else []
     return report

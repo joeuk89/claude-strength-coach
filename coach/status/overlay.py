@@ -146,7 +146,7 @@ def _describe(summary, with_first=False):
         NOT_APPROVED: "not approved",
         EDITED: "edited after approval, so not approved",
         APPROVED: "approved",
-        NO_ROUTINES: "approved, but no session has a Hevy routine yet (python3 -m coach routines create)",
+        NO_ROUTINES: "approved, but no session has a Hevy routine yet (python3 -m coach routines create --dry-run)",
         NOT_PUSHED: "approved, not pushed to Hevy",
         UNVERIFIED: "approved, pushed but not verified",
         PARTLY: f"approved, {summary['routines_verified']} of {summary['routines']} Hevy routines verified",

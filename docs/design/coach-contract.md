@@ -45,6 +45,7 @@ coach/                       # framework: synced to instances
   hevy/{client,transport,cache,ratelimit,anonymise,envfile,pull,record}.py              (R-12)
   overlay.py, render.py                                                                  (R-13)
   routines.py                # diff, push, verify, retire; create                        (R-14, R-14b)
+  external.py                # Hevy mapping requirements, managed orphan routines        (R-14)
   gate.py                    # PreToolUse hook logic                                     (R-15)
   program.py, state.py, migrate.py, migrations/<doc>/{__init__,NNNN_<slug>}.py           (R-17a)
   program_drafts.py          # import_hevy and adopt; reads stats and routines, which import program.py (R-41a)
@@ -183,15 +184,16 @@ Command inventory (owner in brackets). Read-only unless marked W
 | `version` | R-10 | |
 | `library list [--avoided]`, `library show`, `library search`, `library validate` | R-11 | |
 | `library seed`, `library confirm`, `library set-mode`, `library set-avoid`, `library create ID --input FILE [--dry-run]`, `library set-template ID TEMPLATE_ID` | R-11 | W |
-| `routines preflight --overlay ID` | R-14 | R |
+| `routines preflight --overlay ID` | R-14 | |
 | `hevy status` | R-12 | |
 | `hevy pull [--full]` | R-12 | W (gitignored cache only) |
 | `hevy record-fixtures --out DIR` | R-12 | W (GET only, needs a real key) |
 | `overlay list`, `overlay current [--date D]`, `overlay validate [ID \| --file PATH]` (no argument: every overlay), `overlay notes ID [--session S]` | R-13 | |
 | `overlay build --input FILE`, `overlay render ID [--into FILE]`, `overlay approve ID` | R-13 | W |
 | `routines diff --overlay ID [--refresh]`, `routines verify --overlay ID [--refresh]` | R-14 | W with `--refresh` (gitignored cache only) |
-| `routines push --overlay ID [--refresh]`, `routines retire --overlay ID [--refresh]` | R-14 | H |
-| `routines create --overlay ID [--reuse SESSION=ROUTINE] [--expect-plan HASH] [--dry-run]` | R-14b | H |
+| `routines push --overlay ID [--refresh]` | R-14 | H |
+| `routines retire --overlay ID [--routine ROUTINE]... [--expect-plan HASH] [--dry-run]` | R-14 | H |
+| `routines create --overlay ID [--reuse SESSION=ROUTINE]... [--expect-plan HASH] [--dry-run]` | R-14b | H |
 | `gate pretooluse` | R-15 | |
 | `program show`, `program validate`, `state show`, `migrate status` | R-17a | |
 | `program render`, `migrate run`, `program reconcile-mode ID --basis old\|confirmed [--input FILE]` | R-17a | W |
@@ -1180,54 +1182,94 @@ Cues: <cues>
   routine and overall.
 - **External preflight.** `routines preflight --overlay ID` reads local
   files only and returns `enabled`, `ready`, every unresolved `templates`
-  row (session, exercise, status, candidates and local repair route), every
+  row (session, exercise, status, candidates and local repair route; the
+  route starts with `hevy pull` when no template cache exists), every
   unmapped `sessions` row, and `orphan_routines`. It checks exercises even
   when their sessions have no routine. Hevy off: ready, with no external
   requirements. Proposals emit `hevy_template_unresolved` block flags and
   `hevy_routine_unmapped` info flags; `overlay approve` independently
-  refuses any missing template. Repair requires rebuilding the overlay;
-  an approved prescription is never silently remapped.
-- **`routines create --overlay ID`** (H). The dry-run is read-only and
-  uses only cached routines, so it works before approval without a key.
-  It previews each missing session's new routine, or the free temporary
-  routine it would reuse, plus a one-off folder when needed. Program
-  sessions use the program folder; temporary ones the one-off folder.
-  `--reuse SESSION=ROUTINE` explicitly selects an unmapped managed routine
-  or a free temporary routine; unrelated, busy or duplicate choices refuse.
-  Explicit selections are reserved before automatic spare selection.
-  The reused routine takes the session title and keeps its folder.
-  Unknown non-temporary program sessions refuse. Other push refusals apply;
-  only absent approval is allowed during the preview. Missing templates
-  refuse with all external requirements. A missing cached spare is listed
-  as stale, and any changed live plan requires a fresh preview.
-- **`routines retire --overlay ID [--routine ROUTINE]`** (H). Without
-  `--routine`, only temporary routines from an ended overlay are eligible.
-  Repeated `--routine` selects exactly those managed orphans against the
-  current approved overlay, or specific temporary leftovers from an ended
-  overlay. A routine selected for reuse is excluded from retirement;
-  reuse replaces its content directly. Active mappings and routines in
-  other unended overlays are left alone; unrelated routines refuse.
-  Retirement retitles `(unused)`, preserving exercises and folder. Its
-  dry-run reads the cache only. Pull first to refresh either preview.
-- **Exact action approval.** Create and retire previews return `plan_hash`
-  over the overlay approval hash, action, selected routine IDs, previous
-  routine content, intended bodies, and any new folder. Execution requires
-  `--expect-plan HASH` from the preview named in the approved write brief;
-  the gate also checks it. A changed choice or live routine refuses before
-  any external write. No hash is an approval by itself: the named brief,
-  overlay approval and permission gate still apply. An empty action is a
-  no-op. A structural program adoption approves no external housekeeping.
-- Each successful create/reuse POST or PUT records its ID in state only
-  afterwards, then reads back, caches and verifies it. A failed external
-  operation leaves its mapping alone; a read-back mismatch retains the
-  successful operation's ID and stops subsequent writes. A successful
-  folder creation similarly records the folder. Retirements never remove
-  mapping provenance or delete routines. Managed orphan discovery uses
-  current and archived adoption mappings, never folder membership alone,
-  and reports leave/reuse/retire choices without taking an action.
-- Create reports add `folder`, `stale`, `orphan_routines`, and per routine
-  `reuse`, `folder_id`, `targets`; new routine IDs are null before creation.
-  Both action summaries name exact targets; create includes folder writes.
+  refuses any missing template (exit 3, the rows under
+  `hevy_requirements`). Repair requires rebuilding the overlay; an
+  approved prescription is never silently remapped.
+- **`routines create --overlay ID`** (R-14b; H, gated like push). It gives
+  every session with no routine one, one routine per session id. It needs
+  `data/state.json` (exit 1 when absent), and a non-temporary session must
+  be a session of `data/program.json` when one exists (exit 1). The
+  push refusals apply before any request, with the sessions to be created
+  counted in the supersession check; only absent approval is allowed, and
+  only under `--dry-run`. Missing templates refuse (exit 3) with every
+  requirement under `hevy_requirements`.
+  - **Preview.** `--dry-run` is read-only and uses only cached routines,
+    so it works before approval and without a key. It shows each missing
+    session's new routine, or the routine it would reuse, and the one-off
+    folder when one is needed.
+  - **Reuse.** `--reuse SESSION=ROUTINE` (repeatable) names an unmapped
+    managed routine or a free temporary routine for a session this run
+    creates; a malformed, unknown-session, unrelated, busy or duplicate
+    choice refuses (exit 3) before any request. Named routines are
+    reserved first. Each other `temporary` session then reuses the first
+    `hevy.temporary_routines` entry, in state order, that carries no
+    session of this overlay and no session dated today or later of
+    another overlay in force that day. A reused routine takes the session
+    title and keeps its folder (`intended_body` with the routine). A spare
+    the cache lacks (preview) or GET answers 404 (execution) is skipped,
+    listed in `stale`, and dropped from `temporary_routines` (not under
+    `--dry-run`).
+  - **New routines.** With no spare left, a temporary session gets a new
+    routine in `hevy.folders.one_off`, POSTing the folder `One-off weeks`
+    first when that is null. Any other session gets a new routine in
+    `hevy.folders.program` (no `folder_id` when null). The folder follows
+    the session's `temporary` flag rather than the overlay kind, so a
+    deload overlay of program sessions files a missing program routine
+    with the program.
+  - **Recording.** Each id goes into state.json only after its POST or PUT
+    succeeds (the folder in `folders.one_off`, a program routine in
+    `hevy.routines`, a temporary one as its `temporary_routines` entry with
+    this overlay and session), never into the overlay, so the approval
+    hash holds. A failed request leaves the mapping alone. Each routine is
+    then read back, cached and verified as push does; a read-back that
+    differs exits 1 with the report, keeping the ids already recorded and
+    writing no later routine. A second run finds every session and writes
+    nothing.
+  - **Report.** It adds `folder` (`title`, `id`, `status`: `not_needed`,
+    `exists`, `would_create`, `created`), `stale`, `orphan_routines` and,
+    per routine, `reuse` (null or the reused routine's old `title`),
+    `folder_id` and `targets` (each exercise's C12 Target line);
+    `routine_id` is null for a routine not yet created. Statuses:
+    `would_create`, `would_reuse`, `created`, `reused`, `failed`,
+    `not_reached`. The summary names every routine, reuse and folder
+    write, then the managed routines now unmapped.
+- **`routines retire --overlay ID [--routine ROUTINE]...`** (H). Without
+  `--routine` it refuses (exit 3) unless the overlay's span ended before
+  today, and takes that overlay's temporary routines. Each `--routine`
+  names exactly one managed orphan, checked against the current approved
+  overlay, or one temporary routine of the ended overlay; any other
+  routine refuses. For each it PUTs the routine back titled `(unused)`
+  with its exercises and folder as they are, then reads it back. It skips
+  a routine already titled `(unused)` and a routine that any overlay
+  whose span has not ended still names, or that this overlay maps. The
+  dry-run reads the cache only; pull first to refresh it. Statuses:
+  `would_retire`, `retired`, `failed`, `in_use`, `already_retired`,
+  `not_reached`. Retirement never deletes a routine or removes mapping
+  provenance.
+- **Exact action approval.** A create or retire preview with something to
+  write returns `plan_hash`: the C7 canonical hash (`sha256:<hex>`) of the
+  overlay approval hash, the action, each target routine id with its
+  `id` and `updated_at` before the write (the stale check push uses, so the
+  list and by-id endpoints agree), each intended body, and any new
+  folder. Execution requires `--expect-plan HASH` from the preview named
+  in the approved write brief, and the R-15 gate denies the command
+  without it. A changed choice or a routine changed in Hevy refuses
+  (exit 3) before any write. The hash approves nothing by itself: the
+  named brief, the overlay approval and the gate still apply. With
+  nothing to write there is no `plan_hash`, and the command needs none
+  and writes nothing. Adopting a program approves no Hevy housekeeping.
+- **Managed orphans.** A managed routine is one a current or archived
+  (C45 adoption) `hevy.routines` mapping names; folder membership alone
+  never makes one. It is an orphan when no current session mapping or
+  `temporary_routines` entry uses it and its cached title is not
+  `(unused)`. Reports list orphans with the `leave`, `reuse` and `retire`
+  choices and take no action.
 - The report (`data`) holds `action`, `overlay_id`, `overlay_hash`,
   `approved`, `unit`, `dry_run`, `routines` (per routine: `routine_id`,
   `session_id`, `date`, `carries`, `title`, `temporary`, `status`,

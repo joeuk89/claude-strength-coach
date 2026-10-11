@@ -91,10 +91,9 @@ class CreateTest(CreateCase):
     def test_unapproved_exits_3_with_no_writes(self):
         self.forget_session_b(approve=False)
         state_before = state.path_for(self.root).read_bytes()
-        for extra in ((),):
-            envelope = self.create(*extra, expect=3)
-            self.assertEqual(envelope["error"]["code"], "refused")
-            self.assertIn("not approved", envelope["error"]["message"])
+        envelope = self.create(expect=3)
+        self.assertEqual(envelope["error"]["code"], "refused")
+        self.assertIn("not approved", envelope["error"]["message"])
         self.assertEqual(self.fake.writes, [])
         self.assertEqual(audit_lines(self.root), [])
         self.assertEqual(state.path_for(self.root).read_bytes(), state_before)
@@ -160,7 +159,9 @@ class CreateTest(CreateCase):
         self.assertEqual(envelope["data"]["routines"][0]["status"], "failed")
 
 
-class OneOffCreateTest(CreateCase):
+class OneOffCase(CreateCase):
+    """A one-off overlay of three temporary travel sessions, with spare temporary routines T1 and T2."""
+
     def setUp(self):
         super().setUp()
         doc = read_overlay(self.root)
@@ -185,6 +186,8 @@ class OneOffCreateTest(CreateCase):
         ]
         write_state(self.root, doc)
 
+
+class OneOffCreateTest(OneOffCase):
     def test_creates_the_folder_once_reuses_two_and_creates_one(self):
         data = self.create(overlay_id=ONE_OFF)["data"]
         self.assertEqual([path for path, _ in self.posts], ["/v1/routine_folders", "/v1/routines"])
@@ -269,9 +272,23 @@ class OneOffCreateTest(CreateCase):
         self.assertEqual([r["status"] for r in data["routines"]], ["retired"] * 3)
 
 
-class CreateGateTest(CreateCase):
-    def decide(self, command, mode="default"):
-        return output(gate.decide(hook_input(command, self.root, mode), env=ENV))
+class GateMixin:
+    """The permission gate in process (`decide`) and as Claude Code runs it (`pipe`)."""
+
+    def decide(self, command, mode="default", env=None):
+        return output(gate.decide(hook_input(command, self.root, mode), env=env or ENV))
+
+    def pipe(self, command):
+        env = {k: v for k, v in os.environ.items() if not k.startswith("COACH_") and k != "HEVY_API_KEY"}
+        env.update(COACH_NOW=NOW, COACH_HEVY_FIXTURES=str(SYNTHETIC))
+        proc = subprocess.run([sys.executable, "-m", "coach", "gate", "pretooluse"],
+                              input=json.dumps(hook_input(command, self.root)), cwd=str(REPO_ROOT), env=env,
+                              capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        return output(json.loads(proc.stdout))
+
+
+class CreateGateTest(GateMixin, CreateCase):
 
     def test_an_approved_create_asks_with_the_summary(self):
         self.forget_session_b()
@@ -294,17 +311,8 @@ class CreateGateTest(CreateCase):
         self.assertEqual(self.decide(CREATE, mode="bypassPermissions")["permissionDecision"], "deny")
 
 
-class CreateHookProcessTest(CreateCase):
+class CreateHookProcessTest(GateMixin, CreateCase):
     """`python3 -m coach gate pretooluse` as Claude Code runs it, replaying the synthetic fixtures."""
-
-    def pipe(self, command):
-        env = {k: v for k, v in os.environ.items() if not k.startswith("COACH_") and k != "HEVY_API_KEY"}
-        env.update(COACH_NOW=NOW, COACH_HEVY_FIXTURES=str(SYNTHETIC))
-        proc = subprocess.run([sys.executable, "-m", "coach", "gate", "pretooluse"],
-                              input=json.dumps(hook_input(command, self.root)), cwd=str(REPO_ROOT), env=env,
-                              capture_output=True, text=True)
-        self.assertEqual(proc.returncode, 0, proc.stderr)
-        return output(json.loads(proc.stdout))
 
     def test_ask_with_the_summary_when_approved_and_deny_when_not(self):
         self.forget_session_b()

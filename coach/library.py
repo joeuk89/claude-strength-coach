@@ -114,15 +114,12 @@ class Library:
         return lib
 
     def resolve_templates(self, templates):
-        resolutions = {}
         claimed = self.template_owners()
         for entry in self._entries.values():
             resolution = template_resolution(entry, templates, claimed)
-            resolutions[entry["id"]] = resolution
             if resolution["status"] == "matched":
                 entry["hevy_template_id"] = resolution["template_id"]
                 entry["hevy_template_ids"] = [resolution["template_id"]]
-        return resolutions
 
     def template_owners(self):
         return {tid: entry["id"] for entry in self._entries.values() for tid in entry["hevy_template_ids"]}

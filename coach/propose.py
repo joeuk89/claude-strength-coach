@@ -951,7 +951,7 @@ def propose_week(root, config, today, now, span, kind="weekly", transform_name=N
     doc = overlay.build(draft, config, root=root, now=now)
     doc["flags"] = validity.merge_flags(doc, validity.check_overlay(root, doc))
     doc["flags"] += _week_flags(root, config, today, span, doc) + drop_flags
-    doc["flags"] += external.readiness_flags(root, doc, config.hevy.enabled)
+    doc["flags"] += external.requirement_flags(root, doc, config.hevy.enabled)
     draft = dict(draft, id=doc["id"], flags=doc["flags"])
     meta = {
         "id": doc["id"], "kind": kind, "span": span.to_json(), "transform": transform[0].name if transform else None,
