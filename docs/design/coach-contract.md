@@ -447,6 +447,94 @@ files to it; nobody edits another item's files.
   - asserts the output contains none of: the API key, any original id, any
     original title or note text.
 
+## C16. Program and state documents (R-17a owns; R-22, R-23, R-31 read)
+
+A starting design, not a fixed one. The R-17a builder may change or improve
+it where building it shows a better shape; the change goes in this section in
+the same PR and is listed in the PR description under "Schema changes".
+
+`data/program.json`:
+
+```json
+{
+  "schema_version": 1,
+  "name": "Upper/lower, 4 days",
+  "sessions": [
+    {
+      "id": "session-a",
+      "title": "Mon — Lower",
+      "kind": "lifting",
+      "tier": "core",
+      "status": "active",
+      "focus": null,
+      "exercises": [
+        {
+          "exercise_id": "bb_back_squat",
+          "load_mode": "total",
+          "sets": [
+            {"count": 1, "type": "normal", "reps": 5, "rpe": 8},
+            {"count": 3, "type": "normal", "reps": 5, "rpe": 7}
+          ],
+          "rest_seconds": 180,
+          "superset_id": null,
+          "cues": "brace · knees out",
+          "constraints": [],
+          "scheme": {"name": "double_progression", "params": {}},
+          "start_load": 100
+        }
+      ]
+    }
+  ],
+  "external_sessions": [
+    {"id": "pt-tue", "title": "PT", "weekday": "tue", "estimated_sets": {"chest": 3}}
+  ],
+  "schedule": {"rule": "fixed_weekdays", "params": {}},
+  "blocks": {"hard_weeks_ceiling": 6, "deload_rule": {"name": "standard", "params": {}}},
+  "missed_day_rules": [
+    {"id": "miss-a", "session_id": "session-a", "condition": "...", "action": "..."}
+  ]
+}
+```
+
+- `kind`: `lifting`, `conditioning`. `tier`: `core`, `optional`. `status`:
+  `active`, `parked`, `standby`.
+- `sets` is a list of set groups. Each group has `count`, `type` (as in
+  C10), exactly one of `reps` or `rep_range`, and optional `rpe`,
+  `duration_seconds`, `distance_meters`. A plain 3×5 is one group.
+- `start_load` is in athlete units and per hand for per-hand modes, like
+  every load a human writes; code builds load objects from it (C5).
+- `schedule.rule`: `fixed_weekdays`, `alternating_external_anchor`,
+  `next_in_sequence`, `explicit_calendar`.
+- Scheme, schedule and deload names are checked against a fixed list; their
+  `params` are free-form objects in v1. R-23 adds a schema per plugin and
+  bumps the version.
+- Missed-day rules are free text in v1; R-22 makes them executable.
+
+`data/state.json`:
+
+```json
+{
+  "schema_version": 1,
+  "rotation": {"position": "week-a", "confirmed": true, "confirmed_at": "2026-10-11"},
+  "block": {
+    "started": "2026-09-01",
+    "hard_weeks_completed": 3,
+    "deload": {"status": "not_due", "since": null}
+  },
+  "one_off": null,
+  "scheme_state": {"session-a/bb_back_squat": {}},
+  "hevy": {
+    "routines": {"00000000-0000-4000-8000-000000000001": {"session_id": "session-a"}},
+    "folders": {"program": null, "one_off": null},
+    "temporary_routines": []
+  }
+}
+```
+
+- `deload.status`: `not_due`, `due`, `in_progress`, `done`, `skipped`.
+- `one_off`: null or `{"overlay_id": id, "span": span}`.
+- `hevy.routines` replaces `routine/hevy-map.json`.
+
 ---
 
 ## Build order and ownership
