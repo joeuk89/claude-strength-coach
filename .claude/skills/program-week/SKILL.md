@@ -119,45 +119,69 @@ program validate` and `python3 -m coach program render`.
 
 ## 2. Compute the week — per session, per exercise
 
-Work through every session in the span, every exercise in each:
+The scripts compute each line; you coach it. Reason per lift — a
+formula applied blindly is not coaching.
 
-- **Load** — from the log and the program's progression rules: top of
-  the rep range at or under target RPE → add load (the program's
-  increment); reps missed → hold; RPE drift (logged RPE 1 or more over
-  the target on 2 or more working sets of one exposure) on a compound
-  lift or a set carrying a **recovery cap** → hold or back off. Compound
-  means a multi-joint squat, hinge, lunge, press or pull pattern. RPE drift
-  alone never holds back isolation work: it progresses on reps as the
-  scheme says, unless the athlete's notes report pain or form breakdown.
-  Reason per lift — a formula applied blindly is not coaching. Work in
-  the athlete's units and the load mode's own number — per hand for
-  dumbbell work — taken from `units convert`, so the increment lands on
-  the right number; snap a new load to the kit with `python3 -m coach
-  units round --value <load> --increment <step>`. If the log shows an
-  exact 2× jump at unchanged reps and RPE, that's a convention slip,
-  not progress — don't progress off it, raise it with the athlete.
-- **Rep target / RPE** — move them where the block's scheme calls for
-  it.
-- **Focus** — one per-exercise emphasis where warranted, drawn from
-  check-in findings ("slow the eccentric", "depth fades when tired").
-  Most exercises most weeks won't have one — that's fine.
-- **Return week** — when step 1 found a return week, the matching
-  return band sets this week's loads, set counts and any RPE
-  cap instead of the progression scheme, measured from the pre-layoff
-  working loads; with illness, the first session back carries the
-  illness cap. Name the band in the week focus. The next pass
-  progresses from what the return week logged.
-- **Structural changes** — swaps or additions agreed at the check-in,
-  or proposed now with rationale. These are plan changes: mark them
-  separately, they land in `data/program.json` too. Under 80 % adherence (as
-  `/check-in` step 4 defines it), propose no new recurring session —
-  no new session or weekly slot, conditioning and optional ones
-  included — and push back if the athlete asks; exercise swaps within a
-  session are fine. An override goes in the next check-in's adherence
-  decision line.
-
-Active niggles constrain everything: no added load on an aggravated
-pattern.
+1. **Propose.** Run `python3 -m coach history sync`, then `python3 -m
+   coach propose week --week <label>` (a mid-week reprogram: `--kind
+   midweek`, which re-proposes only the remaining days). It plans the
+   span's dated sessions with the program's schedule rule and asks each
+   exercise's progression scheme for its line, working in the athlete's
+   units and the load mode's own number. Each scheme reads the log: top
+   of the rep range at or under target RPE adds the increment, missed
+   reps hold, and loads never derive from an open convention slip. The
+   core then decays a lift past its validity window to its return band,
+   caps every set of the first session after illness at RPE 7, applies
+   the slot's load constraints and the caps and kit at the session's
+   location, and rounds each load to the kit. It writes an editable
+   draft (`.coach/proposals/<id>.json`) and prints `data.lines`: per
+   line its sets (loads through `units format`), the `change`, a
+   one-sentence `rationale` and its flags.
+2. **Read every line against the check-in** — the athlete's notes on
+   how sets felt, niggles, the rotation position — and settle its flags:
+   - `rpe_drift` (logged RPE 1 or more over target on 2 or more working
+     sets of a compound lift or a set carrying a **recovery cap**): hold
+     or back off. RPE drift alone never holds back isolation work: it
+     progresses on reps as the scheme says, unless the athlete's notes
+     report pain or form breakdown.
+   - `convention_slip`: an exact 2× jump at unchanged reps and RPE is a
+     convention slip, not progress — raise it with the athlete.
+   - `return_week`, `return_after_illness`: name the band in the week
+     focus; with illness, confirm 48 hours symptom-free. The next pass
+     progresses from what the return week logged.
+   - `no_data` (set the first load with the athlete), `stalled`,
+     `constraint_applied`, `override_standing`, `scheme_reset`,
+     `rotation_unconfirmed` (state the position for confirmation, as
+     step 1 says); step 3's check settles its own flags.
+3. **Change a line** with `python3 -m coach propose override
+   --proposal <id> --session <session> --exercise <exercise> (--sets
+   "3x5@95 rpe7" | --load <n>) --reason "<why>"`. Add `--standing`
+   (and `--until <date>`, eight weeks at most; four by default) when the
+   change should hold in later weeks — a niggle, an agreed hold — so the
+   scheme stops proposing it away. A per-exercise **focus** drawn from
+   check-in findings ("slow the eccentric") may be written into the
+   draft line, with an `override` reason saying why; any line changed
+   without a reason is refused. Active niggles constrain everything: no
+   added load on an aggravated pattern.
+4. **Keep a flag** you and the athlete decide to accept with `python3 -m
+   coach propose resolve --proposal <id> --flag <index> --resolution
+   "<why>"`.
+5. **Structural changes** — swaps or additions agreed at the check-in,
+   or proposed now with rationale. These are plan changes: mark them
+   separately, they land in `data/program.json` too. Under 80 %
+   adherence (as `/check-in` step 4 defines it), propose no new
+   recurring session — no new session or weekly slot, conditioning and
+   optional ones included — and push back if the athlete asks; exercise
+   swaps within a session are fine. An override goes in the next
+   check-in's adherence decision line.
+6. **Finalize.** `python3 -m coach propose finalize --proposal <id>`
+   writes `data/overlays/<id>.json`. Exit 1 names each line changed
+   without an override reason; exit 3 names each unresolved `block`
+   flag. Then go to step 3 with that id: its draft and `overlay build`
+   items are already done, so start at "Where it renders" and then
+   validate, check and render the overlay. A tweak to the coach's brief
+   later means: override or resolve in the draft, finalize again, then
+   check and render again.
 
 ## 3. Build the overlay
 
