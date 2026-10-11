@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from coach import datablock
+from coach import recipes
 from tests.support import FIXTURES, INSTANCES, VALID, run_cli, run_module
 
 YAML_CARDS = INSTANCES / "yaml-cards"
@@ -34,7 +34,7 @@ def menu(root):
 
 
 def edit(path, old, new):
-    text = datablock.read_text(path)
+    text = recipes.read_text(path)
     assert old in text, (path, old)
     path.write_text(text.replace(old, new, 1), encoding="utf-8")
 
@@ -121,7 +121,7 @@ class RenderCommandTest(CliMixin, unittest.TestCase):
     def test_render_rewrites_only_the_stale_region(self):
         with InstanceCopy(VALID) as root:
             card = menu(root) / "chicken-rice-bowl.md"
-            original = datablock.read_text(card)
+            original = recipes.read_text(card)
             edit(card, "| **Slot** | lunch |", "| **Slot** | brunch |")
             edit(menu(root) / "index.md", "## Dinners", "## Suppers")
             before = snapshot(root)
@@ -133,7 +133,7 @@ class RenderCommandTest(CliMixin, unittest.TestCase):
             self.assertTrue(data["index"]["changed"])
 
             self.run_ok(root, "recipes", "render")
-            after = datablock.read_text(card)
+            after = recipes.read_text(card)
             self.assertEqual(after, original)
             block_end = original.index("-->\n") + 4
             self.assertEqual(after[:block_end], original[:block_end])
@@ -149,11 +149,11 @@ class RenderCommandTest(CliMixin, unittest.TestCase):
     def test_render_adds_a_missing_region(self):
         with InstanceCopy(VALID) as root:
             card = menu(root) / "whey-shake.md"
-            text = datablock.read_text(card)
+            text = recipes.read_text(card)
             card.write_text(text[:text.index("<!-- coach:begin")], encoding="utf-8")
             self.run_code(1, root, "check", "--only", "recipe_render_fresh")
             self.run_ok(root, "recipes", "render", "whey-shake")
-            self.assertEqual(datablock.read_text(card), text)
+            self.assertEqual(recipes.read_text(card), text)
 
     def test_render_refuses_a_broken_bank(self):
         with InstanceCopy(VALID) as root:
@@ -266,7 +266,7 @@ class ConvertCommandTest(CliMixin, unittest.TestCase):
 
     def test_apply_then_validate(self):
         with InstanceCopy(YAML_CARDS) as root:
-            originals = {p.name: datablock.read_text(p) for p in menu(root).glob("*.md")}
+            originals = {p.name: recipes.read_text(p) for p in menu(root).glob("*.md")}
             data = self.run_ok(root, "recipes", "convert", "--parse")["data"]
             input_file = root / "reviewed.json"
             input_file.write_text(json.dumps(reviewed(data)), encoding="utf-8")
@@ -282,16 +282,16 @@ class ConvertCommandTest(CliMixin, unittest.TestCase):
             self.assertTrue(out["index"]["changed"])
             backup = root / out["backup_dir"] / "nutrition" / "menu"
             for name, text in originals.items():
-                self.assertEqual(datablock.read_text(backup / name), text)
+                self.assertEqual(recipes.read_text(backup / name), text)
 
             self.run_ok(root, "recipes", "validate")
             self.run_ok(root, "check", "--only", "recipe_cards,recipe_render_fresh,recipe_index_fresh")
 
-            chicken = datablock.read_text(menu(root) / "chicken-rice-bowl.md")
+            chicken = recipes.read_text(menu(root) / "chicken-rice-bowl.md")
             method = originals["chicken-rice-bowl.md"].split("## Method")[1].split("## Variations")[0].rstrip("\n")
             self.assertIn("## Method" + method + "\n", chicken)
             self.assertIn('changes = [{item = "microwave basmati rice pouch", qty = -0.5, unit = "each"}]', chicken)
-            burger = datablock.read_text(menu(root) / "pub-burger.md")
+            burger = recipes.read_text(menu(root) / "pub-burger.md")
             self.assertIn("## What to order\n- Single beef burger", burger)
 
             again = self.run_code(1, root, "recipes", "convert", "--apply", "--input", str(input_file), env=NOW)
@@ -313,10 +313,10 @@ class ConvertCommandTest(CliMixin, unittest.TestCase):
             data["cards"] = [c for c in data["cards"] if c["slug"] == "chicken-rice-bowl"]
             input_file = root / "reviewed.json"
             input_file.write_text(json.dumps(data), encoding="utf-8")
-            index = datablock.read_text(menu(root) / "index.md")
+            index = recipes.read_text(menu(root) / "index.md")
             out = self.run_ok(root, "recipes", "convert", "--apply", "--input", str(input_file), env=NOW)["data"]
             self.assertEqual(sorted(out["still_old_format"]), ["pub-burger", "yoghurt-honey-nuts"])
-            self.assertEqual(datablock.read_text(menu(root) / "index.md"), index)
+            self.assertEqual(recipes.read_text(menu(root) / "index.md"), index)
 
     def test_usage(self):
         self.run_code(2, YAML_CARDS, "recipes", "convert")

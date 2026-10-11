@@ -85,17 +85,17 @@ class Bank:
         return next((card for card in self.cards if card.slug == slug), None)
 
 
-def card_from_text(slug, text, path):
-    _, end = datablock.split(text, KIND, path)
-    data, _ = datablock.parse(text, KIND, path)
-    return Card(slug=slug, path=Path(path), text=text, data=data, body_start=end)
+def read_text(path):
+    return Path(path).read_text(encoding="utf-8")
 
 
 def load_card(path):
     path = Path(path)
     if not SLUG.fullmatch(path.stem):
         raise ValidationError(f"{path}: a card's file name must be its slug, matching {SLUG.pattern}")
-    return card_from_text(path.stem, datablock.read_text(path), path)
+    data, rest = datablock.read(path, KIND)
+    text = read_text(path)
+    return Card(slug=path.stem, path=path, text=text, data=data, body_start=len(text) - len(rest))
 
 
 def card_paths(root):
@@ -116,7 +116,7 @@ def load_bank(root):
         try:
             bank.cards.append(load_card(path))
         except ValidationError as exc:
-            if is_legacy(datablock.read_text(path)):
+            if is_legacy(read_text(path)):
                 message = f"{rel} is an old YAML card; convert it with python3 -m coach recipes convert --parse"
                 bank.broken.append((rel, message))
             else:
@@ -483,7 +483,7 @@ def card_toml(draft):
 
 def compose_card(slug, draft, prose=""):
     """A whole card file: data block, fresh region, then the prose."""
-    block = f"{datablock.OPENER_PREFIX}{KIND}\n{card_toml(draft)}{datablock.CLOSER}\n"
+    block = f"<!-- coach:{KIND}\n{card_toml(draft)}{datablock.CLOSER}\n"
     card = Card(slug=slug, path=paths.MENU_DIR / f"{slug}.md", text=block, data=draft, body_start=len(block))
     text = block + render_card_region(card)
     prose = prose.strip("\r\n")

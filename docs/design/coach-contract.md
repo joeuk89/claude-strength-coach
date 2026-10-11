@@ -926,11 +926,8 @@ and `retire` line schemas). The API key never appears.
   (data: dict, rest: str)`, raising a validation error that names the file
   for a missing opener, a missing closer, a wrong kind, a `-->` inside the
   block, or invalid TOML. Whichever of R-32a and R-33b merges first adds
-  it; the other reuses it. R-33b added it with two helpers a renderer
-  needs to keep the block's bytes: `datablock.split(text, kind, path) ->
-  (toml_text, end)` (`text[end:]` is everything after the closer line)
-  and `datablock.parse(text, kind, path) -> (data, rest)`; `read_text(path)`
-  reads a file with its line endings untouched.
+  it; the other reuses it. (R-32a added it; R-33b reuses it unchanged and
+  finds where a card's block ends as `len(text) - len(rest)`.)
 - Scripts never rewrite a hidden data block (ADR-0001: scripts don't write
   TOML). A command that needs one prints its text for the coach to write.
   The exceptions are named in the owning section.

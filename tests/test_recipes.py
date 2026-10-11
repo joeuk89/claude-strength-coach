@@ -1,5 +1,6 @@
 import copy
 import re
+import tempfile
 import tomllib
 import unittest
 from pathlib import Path
@@ -25,6 +26,14 @@ def valid_card(slug="chicken-rice-bowl"):
 
 def card_with(data, slug="test-card"):
     return recipes.Card(slug=slug, path=Path(f"{slug}.md"), text="", data=data, body_start=0)
+
+
+def card_from_text(slug, text):
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / f"{slug}.md"
+        path.write_text(text, encoding="utf-8")
+        card = recipes.load_card(path)
+    return card
 
 
 def statuses(results):
@@ -99,7 +108,7 @@ class CardTomlTest(RoundTripMixin, unittest.TestCase):
     def test_composed_card_reads_back(self):
         card = valid_card()
         text = recipes.compose_card("chicken-rice-bowl", card.data, "## Method\n1. Eat.\n")
-        again = recipes.card_from_text("chicken-rice-bowl", text, "x.md")
+        again = card_from_text("chicken-rice-bowl", text)
         self.assertEqual(again.data, card.data)
         self.assertTrue(text.endswith("<!-- coach:end card chicken-rice-bowl -->\n\n## Method\n1. Eat.\n"))
 
@@ -237,18 +246,18 @@ class RenderTest(unittest.TestCase):
     def test_missing_region_is_inserted_after_the_block(self):
         card = valid_card()
         start, stop = recipes.find_region(card)
-        bare = recipes.card_from_text(card.slug, card.text[:start] + card.text[stop:], "x.md")
+        bare = card_from_text(card.slug, card.text[:start] + card.text[stop:])
         self.assertIsNone(recipes.find_region(bare))
         once = recipes.rendered_text(bare)
         self.assertTrue(once.startswith(card.text[:card.body_start] + recipes.render_card_region(card)))
-        again = recipes.rendered_text(recipes.card_from_text(card.slug, once, "x.md"))
+        again = recipes.rendered_text(card_from_text(card.slug, once))
         self.assertEqual(again, once)
 
     def test_mismatched_region_marker_is_an_error(self):
         card = valid_card()
         text = card.text.replace("coach:end card chicken-rice-bowl", "coach:end card other")
         with self.assertRaises(recipes.ValidationError):
-            recipes.find_region(recipes.card_from_text(card.slug, text, "x.md"))
+            recipes.find_region(card_from_text(card.slug, text))
 
     def test_index_sections_notes_and_benched_last(self):
         bank = recipes.load_bank(VALID)
@@ -411,7 +420,7 @@ class ReferenceDocTest(unittest.TestCase):
     def test_example_card_is_valid_and_fresh(self):
         text = self.DOC.read_text(encoding="utf-8")
         example = re.search(r"```markdown\n(<!-- coach:card\n.*?)```", text, re.S).group(1)
-        card = recipes.card_from_text("chicken-rice-bowl", example, "reference/recipe-cards.md")
+        card = card_from_text("chicken-rice-bowl", example)
         self.assertEqual(recipes.validate_card(card, config_from()), [])
         self.assertEqual(recipes.rendered_text(card), example)
 

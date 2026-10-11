@@ -4,7 +4,7 @@ import tempfile
 from datetime import timezone
 from pathlib import Path
 
-from coach import datablock, paths, recipes
+from coach import paths, recipes
 from coach.checks import Result
 from coach.commands import arg, command
 from coach.errors import UsageError, ValidationError
@@ -174,7 +174,7 @@ def render(args, ctx):
     index_path = ctx.root / paths.MENU_INDEX
     if bank.cards or index_path.exists():
         text = recipes.render_index(bank, ctx.config)
-        old = datablock.read_text(index_path) if index_path.exists() else None
+        old = recipes.read_text(index_path) if index_path.exists() else None
         changed = text != old
         if changed and not args.dry_run:
             write_text(index_path, text)
@@ -252,7 +252,7 @@ def draft(args, ctx):
 def _legacy_cards(ctx):
     found = []
     for path in recipes.card_paths(ctx.root):
-        text = datablock.read_text(path)
+        text = recipes.read_text(path)
         if recipes.is_legacy(text):
             found.append((path, text))
     return found
@@ -317,7 +317,7 @@ def _convert_apply(ctx, args):
         path = menu / f"{slug}.md"
         if not path.is_file():
             raise ValidationError(f"{_rel(paths.MENU_DIR / path.name)}: no such card to convert")
-        old = datablock.read_text(path)
+        old = recipes.read_text(path)
         if not recipes.is_legacy(old):
             raise ValidationError(f"{_rel(paths.MENU_DIR / path.name)} is not an old YAML card")
         planned.append((slug, path, old, recipes.compose_card(slug, card, recipes.legacy_prose(old))))
@@ -339,7 +339,7 @@ def _convert_apply(ctx, args):
     for _, path, old, _ in planned:
         write_text(backup / paths.MENU_DIR / path.name, old)
     if index_path.exists():
-        write_text(backup / paths.MENU_INDEX, datablock.read_text(index_path))
+        write_text(backup / paths.MENU_INDEX, recipes.read_text(index_path))
     for _, path, _, text in planned:
         write_text(path, text)
     if remaining:
@@ -352,7 +352,7 @@ def _convert_apply(ctx, args):
             if text != card.text:
                 write_text(card.path, text)
         text = recipes.render_index(bank, ctx.config)
-        old_index = datablock.read_text(index_path) if index_path.exists() else None
+        old_index = recipes.read_text(index_path) if index_path.exists() else None
         if text != old_index:
             write_text(index_path, text)
         out["index"] = {"path": _rel(paths.MENU_INDEX), "changed": text != old_index}

@@ -1,6 +1,6 @@
 """Recipe bank checks (contract C33)."""
 
-from coach import datablock, paths, recipes
+from coach import paths, recipes
 from coach.checks import Result, check
 from coach.errors import ValidationError
 
@@ -44,7 +44,7 @@ def recipe_index_fresh(ctx):
         if bank.cards:
             return [Result("fail", f"{where} is missing; run python3 -m coach recipes render", where)]
         return []
-    if datablock.read_text(path) != recipes.render_index(bank, ctx.config):
+    if recipes.read_text(path) != recipes.render_index(bank, ctx.config):
         return [Result("fail", f"{where} differs from a fresh render; it is never hand-edited. "
                                "Run python3 -m coach recipes render", where)]
     return []
