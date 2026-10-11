@@ -298,6 +298,11 @@ stderr carries human-readable diagnostics and progress, each line prefixed
   adds a table adds its own module; it does not edit `config.py`. A table
   marked `optional=True` stays absent when the file leaves it out, so
   `"nutrition" in config` tells a reader whether nutrition is enabled.
+- **Rules across keys** (R-42a): a `config_tables` module may also export
+  `RULES`, a list of functions that take the validated config and return
+  `[(key path, message)]`. They run once every table is valid, and their
+  problems exit 5 like any other. R-42a's rule checks `[activity]
+  precedence` against the enabled sources (C32).
 - `coach.config.load(root) -> Config`. `Config` is a dict with attribute
   access (`config.athlete.units`, `config["equipment"]`) and a `path`.
 - `plates` lists the plate sizes the athlete has in pairs, one per side;
@@ -1080,8 +1085,8 @@ files to it; nobody edits another item's files.
 | overlay | `2026-10-12-weekly`, span 2026-10-12 to 2026-10-18, approved; Session A 2026-10-12 (squat 100, DB bench 25/hand (Hevy: 50)), Session B 2026-10-15 (row 30 (Hevy: 30), pull-up BW); built from `tests/fixtures/overlay/draft-kg.json` |
 | check-in (R-13) | `check-ins/2026-10-11.md` holding the rendered region of `2026-10-12-weekly` |
 | `COACH_NOW` | `2026-10-11T18:00:00Z` |
-| activities (R-42a) | `manual:2026-10-08-run-1` run 5 km, 30 min, RPE 6; Hevy workout `00000000-0000-4000-8000-0000000000c1` "Conditioning", all-conditioning, starting 6 min after `manual:2026-10-10-conditioning-1` (the dedup pair) |
-| wellness (R-42a) | daily device-style records 2026-10-05 to 2026-10-10 with sleep; one manual span record 2026-10-05 to 2026-10-11 at 7.0 h |
+| activities (R-42a) | `manual:2026-10-08-run-1` run 5 km, 30 min, RPE 6; Hevy workout `00000000-0000-4000-8000-0000000000c1` "Conditioning", all-conditioning, starting 6 min after `manual:2026-10-10-conditioning-1` (the dedup pair); `[activity] enabled = true` in `config.toml`; `data/activity/sync.json` with the Hevy workout seen at 2026-10-11T12:00:00Z. The Hevy workout lives in `tests/fixtures/hevy/conditioning/` (below), not in a cache in `valid/` |
+| wellness (R-42a) | in `.coach/activity/wellness.jsonl`: daily `apple_health` records 2026-10-05 to 2026-10-10 with sleep; one manual span record `manual:2026-10-05..2026-10-11-wellness` at 7.0 h |
 | planned (R-42a) | `manual:2026-10-14-run-1` "Easy 5 km", `manual:2026-10-16-run-1` "Intervals" `quality: true` |
 | nutrition (R-33a) | `[nutrition]` app macrofactor, phase recomp, reference mass 80, floor 110, target 128, stretch 176, `floor_since` 2026-09-28, one anchor "Whey shake" 150 kcal / 30 g daily snack |
 | readings (R-33a) | 2026-09-28 (avg protein 104), 2026-10-04 (112), 2026-10-11 (115), app target protein 110 |
@@ -1119,6 +1124,8 @@ Unless stated, each is a copy of `valid/` plus what is listed.
 | `hevy-fresh/` | R-12 | `valid/`'s `config.toml` and a cache `meta.json` with the last pull at 2026-10-11T12:00:00Z (6 hours before `COACH_NOW`) |
 | `hevy-stale/` | R-12 | the same with the last pull at 2026-10-09T12:00:00Z (54 hours) |
 | `cardio/` | R-43 | see C50 |
+| `activity-bad-record/` | R-42a | not a copy of `valid/`: the valid config and an `activities.jsonl` whose line 2 has an unknown field `heart_zone` |
+| `activity-wellness-misplaced/` | R-42a | not a copy of `valid/`: the valid config (`wellness_in_git` left false) and the wellness file at `data/activity/wellness.jsonl` |
 | `research-bad/` | R-32a | not a copy of `valid/`: the valid config; `fixture-dose` with a hand-edited claims table; `fixture-broken` with two claims numbered 1; `fixture-old` expired 2026-10-01 (area `sleep`); `reference/fixture-guide.md` citing a missing claim |
 | `interference/` | R-44a | a planned quality run on 2026-10-11 and Session A (squat at RPE 7) on 2026-10-12 |
 | `overlay-bad-schema/`, `overlay-bad-arithmetic/`, `overlay-stale-render/` | R-13 | `config.toml` plus the valid overlay with one fault each: Session B dated outside the span; DB bench working sets at `hevy_total` 25 for 25/hand; a hand-edited check-in region |
@@ -1137,6 +1144,17 @@ Unless stated, each is a copy of `valid/` plus what is listed.
 | W41 | 2 | Session B missed, tag `sleep` |
 
 Trailing four ordinary weeks to 2026-10-11 (W38–W41): 7 of 12 = 58 %.
+
+Synthetic Hevy fixture set `tests/fixtures/hevy/conditioning/` (R-42a; a
+complete set, not layered): the C14 routines plus "Conditioning" `...0003`
+(kettlebell swing, burpee); conditioning exercise templates (`F00000A1`
+Rowing Machine, `F00000A2` Burpee, `F00000A3` Kettlebell Swing, `F00000A4`
+Treadmill, custom `C00000A1` "Bike Erg Sprints" with primary muscle
+`cardio`); workouts `...0c1` (the C14 conditioning workout: rower and
+burpees), `...0c2` (a lifting workout with a rower finisher), `...0c3`
+(swings and burpees from routine `...0003`, "EMOM 12 min, RPE 7"), `...0c4`
+(the same from Session A), `...0c5` (the custom cardio template) and `...0c6`
+(a treadmill run). `tests/support/activity.py` writes it as a C8 cache.
 
 Synthetic Hevy fixture set `tests/fixtures/hevy/wave/` (R-41a; its
 `routines.json`, layered over `synthetic/`, C15): four routines "W1
@@ -2379,22 +2397,36 @@ R-32 and is registered in `coach/flags/research.py`.
 
 - Every line is one record with `schema_version` (C7). Lines are only ever
   appended. For each `id`, the last line wins. `op` is `upsert` or `void`;
-  a `void` line carries `id`, `source`, `recorded_at` and a non-empty
-  `reason`, and removes the record from every view.
+  a `void` line carries `id`, `source`, `recorded_at`, a non-empty
+  `reason` and `by` (`athlete` from a `void` command, `sync` from an
+  adapter), and removes the record from every view. Schema:
+  `activity_void`, shared by all three files.
 - `id` is `<source>:<source-specific id>`, pattern
   `^[a-z_]+:[A-Za-z0-9._:-]+$`. Source names match the `[sources.<name>]`
   tables (C32) plus `manual` and, for planned activities, `coach`. Manual
-  ids are deterministic: `manual:<local_date>-<kind>-<n>`.
+  ids are deterministic: `manual:<local_date>-<kind>-<n>` for activities
+  and planned activities (`n` is the next number never used for that date
+  and kind), and `manual:<date>-wellness` or
+  `manual:<start>..<end>-wellness` for wellness. `wellness add` for a day
+  or span that already has a manual record updates it, keeping the
+  readings it was not given.
 - `recorded_at` is when the line was written (UTC). `content_hash` is the
   canonical hash (C7) of the record without `op`, `recorded_at` and
   `content_hash`. A sync appends only when it differs from the last line
-  for that id.
+  for that id. When that last line is a void, an athlete's void stands
+  until the source changes the record (the hash differs from the last
+  upsert before the void), and a sync's void gives way as soon as the
+  record comes back. A sync appends a void only for a live record.
 - Dedup and precedence are a read-time view, never a rewrite: records of
-  the same kind whose starts lie within `dedup_window_minutes` form one
-  Activity; the highest-precedence source (C32) supplies each field, and
-  lower ones fill fields it lacks. Wellness resolves per day and per field
-  by the same precedence; a span record fills only days with no daily
-  value.
+  the same kind whose starts lie within `dedup_window_minutes` of the
+  group's earliest start form one Activity, and one source never merges
+  with itself (two manual runs ten minutes apart stay two). The
+  highest-precedence source (C32) supplies each field, and lower ones fill
+  fields it lacks; sources not in `precedence` rank last, and within one
+  source the newest `recorded_at` wins. Wellness resolves per day and per
+  field by the same precedence; `sleep` is one field (an object with
+  either hours set counts as a value); a span record fills only days with
+  no daily value.
 - Readers never parse the files themselves. They use
   `coach.activity.store.ActivityStore(root, config)`:
   - `activities(span, kinds=None) -> list[dict]`: resolved Activities
@@ -2405,7 +2437,12 @@ R-32 and is registered in `coach/flags/research.py`.
   - `sleep_summary(span) -> {"avg_asleep_hours": float|null, "nights": int,
     "nights_in_span": int, "sources": [str]}`, averaged over nights with a
     value (a span record counts once per covered day without a daily value).
-  - `records(kind, include_void=False)`: raw lines, for audits and tests.
+  - `records(kind, include_void=False)`: the last raw line per id, voided
+    ids left out unless `include_void`; `lines(kind)` gives every line
+    in file order and `history(kind, id)` one id's lines, for audits and
+    tests. `kind` is `activity`, `wellness` or `planned`.
+- A file that fails validation makes every reader exit 1, naming the
+  file, the line number and the JSONPath.
 - Readers: R-43 (activities, planned, wellness for `sleep_debt`), R-44b
   (conditioning Activities), R-46 (writes planned records with `source:
   "coach"`; reads run history), R-31 (`sleep_summary` through R-43's
@@ -2473,6 +2510,11 @@ Wellness record (`wellness_record.schema.json`):
 Resolved wellness day: `{"date", "sleep", "resting_hr_bpm", "hrv_ms",
 "steps", "body_mass_kg", "body_fat_pct", "field_sources": {field: source}}`.
 
+- Readers get records without `schema_version`, `op`, `recorded_at` and
+  `content_hash`; resolved Activities and wellness days are built from
+  those fields only. `field_sources` leaves out `id`, `source` and
+  `source_id`, which are the winner's.
+
 Planned-activity record (`planned_record.schema.json`):
 
 ```json
@@ -2497,20 +2539,38 @@ Planned-activity record (`planned_record.schema.json`):
 NAME = "apple_health"            # matches [sources.<NAME>], or "manual"
 KINDS = ("activity", "wellness") # which files it writes: activity | wellness | planned
 NETWORK = False                  # True only for adapters that fetch over HTTP
+CONFIG = {"enabled": Key("boolean", default=False), "path": Key("string", default="")}
+                                 # the [sources.<NAME>] keys; absent only for "manual"
+FRESH_BY = "records"             # optional: "sync" judges freshness by the last sync
+def is_enabled(config) -> bool: ...  # optional: when the source needs more than its own switch
 
 def fetch(ctx, sync_state: dict) -> FetchResult: ...
-    # reads the source; never writes. FetchResult(items, sync_state, warnings)
+    # reads the source; never writes. FetchResult(items, sync_state, warnings),
+    # from coach.activity.adapters.
 def normalise(item, ctx) -> list[dict]: ...
-    # pure: one raw item -> zero or more C30 records (without content_hash/recorded_at).
-    # Drops are returned as warnings with a reason, never silently.
+    # pure: one raw item -> zero or more C30 records (without content_hash/recorded_at),
+    # or a void {"op": "void", "id", "source", "reason"}.
+    # A drop raises coach.activity.adapters.Drop(reason), never passes silently.
 ```
+
+- `coach/config_tables/activity.py` builds `[sources.<NAME>]` from every
+  adapter's `CONFIG`, so a new adapter is one new file: its config table,
+  sync and status come with it.
+- A normalised record goes to the file its shape names: `span` is
+  wellness, `date` is planned, anything else is an activity. A void goes
+  to whichever of the adapter's `KINDS` files holds the id. Every line is
+  validated before anything is appended; an invalid record, or a file
+  outside `KINDS`, fails that adapter.
+- `activity sync` reports, per source, `appended`, `voided`, `dropped`
+  (`{reason: count}`) and `last_sync_at`, and warns once per drop reason
+  with its count.
 
 - `activity sync` runs every enabled adapter: `fetch`, `normalise`, hash,
   append changed records, then write the adapter's returned `sync_state`
   into the sync map. One adapter failing reports a warning and leaves the
   others' results and its own previous sync state untouched. It writes
   local files only; it never stages or commits.
-- `data/activity/sync.json`:
+- `data/activity/sync.json` (schema `activity_sync`):
 
 ```json
 {"schema_version": 1,
@@ -2523,9 +2583,12 @@ def normalise(item, ctx) -> list[dict]: ...
 
   `state` is the adapter's own object; nothing else reads it. The file
   holds file names, hashes and cursors, no health values.
-- Gaps are reported, not filled: `activity status` lists, per enabled source,
-  `last_sync_at`, record counts, the newest dated record, and the days in the
-  last 14 with no wellness record from that source.
+- Gaps are reported, not filled: `activity status` lists `manual` and each
+  enabled source with `last_sync_at` (null for `manual`), live record
+  counts per file it writes, the newest dated record (activity
+  `local_date` or wellness `span.end`), and the days in the last 14 with
+  no wellness record from that source (`missing_days`, null for a source
+  that writes no wellness).
 - **`hevy_conditioning` adapter** (R-42a). It reads the C8 cache only and
   never calls the API; `activity sync` warns when the cache is older than
   `[hevy] cache_max_age_hours`. A Hevy workout is an Activity when every
@@ -2539,7 +2602,21 @@ def normalise(item, ctx) -> list[dict]: ...
   `rpe` is parsed from `RPE n` in the workout description (first match,
   0–10, halves allowed). A workout that disappears from the cache gets a
   `void` line ("deleted in Hevy"). R-42a builds the routine rule and the
-  `RPE n` parsing; R-44b adds them if R-42a has not.
+  `RPE n` parsing.
+  - Library match is by Hevy template id, then by title. A workout's
+    kind comes from the table only when every exercise maps to the same
+    kind; the routine rule always gives `conditioning`.
+  - Its sync state is `seen_workout_ids`, the workouts that are
+    Activities now. A seen id that stops being one is voided: "deleted in
+    Hevy" when it left the cache, "no longer a conditioning workout in
+    Hevy" when it is still there. With no cache at all it warns and
+    changes nothing.
+  - It reads `data/state.json` and `data/program.json` as plain JSON
+    when both exist; once R-17a merges, the adapter moves to its loaders.
+  - Lifting workouts are dropped with the reason "lifting workout; Hevy is
+    the lifting logbook".
+  - `FRESH_BY = "sync"`: its freshness is the last sync, since a week
+    without conditioning is not a broken source.
 
 ## C32. Activity config (R-42a defines; each adapter adds its source table)
 
@@ -2564,12 +2641,22 @@ enabled = false
 ```
 
 - `precedence` must list every enabled source plus `manual`, each once;
-  otherwise `config validate` exits 5 naming the key.
+  otherwise `config validate` exits 5 naming the key. The rule (a C4
+  `RULES` entry) applies only while `[activity] enabled = true`; a
+  repeat is always an error. Names of sources this install does not have
+  yet (`apple_health` before R-42b) are allowed.
 - `manual` is always available and has no table.
 - Each later adapter adds its own `[sources.<name>]` table in its PR.
 - Moving the wellness file when `wellness_in_git` flips is a manual step:
   the check fails and names the exact `mv` (and `git rm --cached` when
-  moving out of git).
+  moving out of git), or `cat src >> dst && rm src` when both files exist.
+- Checks (R-42a): `activity_records_valid` (every line of the activity,
+  planned and both wellness files, and `sync.json`; one `fail` per
+  problem, naming file, line and JSONPath), `activity_wellness_location`,
+  `activity_source_fresh` (`warn` per enabled source past
+  `gap_warn_days`). All three `skip` while `[activity] enabled = false`.
+- `activity list`, `wellness list|summary` and `planned list` take
+  `--from`/`--to`; either left out falls back to the week holding today.
 
 ## C33. Recipe card (R-33b owns; R-33c reads)
 
