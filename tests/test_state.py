@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from datetime import datetime, timezone
 
-from coach import migrate, program, state
+from coach import jsonio, migrate, program, state
 from coach.errors import ValidationError
 from tests.support import INSTANCES, VALID
 from tests.test_cli import EnvelopeMixin
@@ -68,11 +68,13 @@ class TemporaryRoutineMigrationTest(unittest.TestCase):
         doc["rotation"].pop("week")
         doc["scheme_state"] = {slot: entry["data"] for slot, entry in doc["scheme_state"].items()}
         doc["hevy"]["temporary_routines"] = ["t-1", "t-2"]
+        doc["block"] = {"started": "2026-09-28", "hard_weeks_completed": 2,
+                        "deload": {"status": "not_due", "since": None}}
         with Instance() as root:
             (root / "data" / "state.json").write_text(json.dumps(doc), encoding="utf-8")
             migrate.run(root, dry_run=False, now=datetime(2026, 10, 11, 18, tzinfo=timezone.utc))
             upgraded = state.load(root)
-        self.assertEqual(upgraded["schema_version"], 3)
+        self.assertEqual(upgraded["schema_version"], jsonio.current_version(jsonio.load_schema("state")))
         self.assertEqual(upgraded["hevy"]["temporary_routines"],
                          [{"routine_id": "t-1", "overlay_id": None, "session_id": None},
                           {"routine_id": "t-2", "overlay_id": None, "session_id": None}])
@@ -82,11 +84,11 @@ class StateShowTest(EnvelopeMixin, unittest.TestCase):
     def test_show(self):
         data = self.run_ok("--root", str(VALID), "state", "show")
         self.assertEqual(data["path"], "data/state.json")
-        self.assertEqual(data["state"]["block"]["deload"]["status"], "not_due")
+        self.assertEqual(data["state"]["block"]["light_week"]["status"], "not_due")
 
     def test_invalid_state_exits_1(self):
         envelope, _ = self.run_fail(1, "--root", str(INSTANCES / "state-bad-schema"), "state", "show")
-        self.assertIn("$.block.deload.status", [d["path"] for d in envelope["error"]["details"]])
+        self.assertIn("$.block.light_week.status", [d["path"] for d in envelope["error"]["details"]])
 
     def test_cross_reference_problem_exits_1(self):
         doc = valid_state()

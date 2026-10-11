@@ -454,6 +454,14 @@ def _scheme_state(old_state, old_program, new_program):
     return kept, sorted(kept), sorted(dropped)
 
 
+def _status_line(root, new_state, doc):
+    from coach import block, decisions
+    try:
+        return block.status_line_for(new_state["block"], block.ceiling_of(doc), block.load(root), decisions.load(root))
+    except ValidationError:
+        return None
+
+
 def _new_state(draft, doc, old_state, old_program, rotation, today):
     scheme_state, kept, dropped = _scheme_state(old_state, old_program, doc)
     old_hevy = (old_state or {}).get("hevy") or {}
@@ -462,8 +470,10 @@ def _new_state(draft, doc, old_state, old_program, rotation, today):
     state = {
         "schema_version": jsonio.current_version(jsonio.load_schema(state_module.SCHEMA)),
         "rotation": rotation,
-        "block": {"started": today.isoformat(), "hard_weeks_completed": 0,
-                  "deload": {"status": "not_due", "since": None}},
+        "block": copy.deepcopy(old_state["block"]) if old_state else {
+            "id": "b-0001", "started": today.isoformat(), "hard_weeks_completed": 0, "last_closed_week": None,
+            "last_deep_review": None,
+            "light_week": {"status": "not_due", "type": None, "reason": None, "week": None, "decision_id": None}},
         "one_off": copy.deepcopy((old_state or {}).get("one_off")),
         "scheme_state": scheme_state,
         "hevy": {
@@ -557,7 +567,7 @@ def adopt(root, draft, replace=False, position=None, dry_run=False, today=None):
     archived = [] if archive is None else [
         (archive / source.name).relative_to(root).as_posix()
         for source in (program.path_for(root), state_module.path_for(root)) if source.is_file()]
-    pages = program.render_doc(doc, library, config.athlete.units)
+    pages = program.render_doc(doc, library, config.athlete.units, _status_line(root, new_state, doc))
     result = {
         "program": paths.PROGRAM.as_posix(), "sessions": [s["id"] for s in doc["sessions"]],
         "rotation": rotation, "scheme_state": scheme_report,

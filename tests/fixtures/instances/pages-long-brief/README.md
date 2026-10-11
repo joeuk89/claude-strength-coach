@@ -2,7 +2,7 @@
 # Training dashboard
 
 - **Week of 12 Oct** · Check-in due Sun 18 Oct (deep)
-- Block: 2 hard weeks done · deload not due
+- Block 1 · 2 of 6 hard weeks · triggers 0 of 4 · light week: not due
 - Last check-in: [Sun 11 Oct (weekly)](check-ins/2026-10-11.md)
 - Open flags: none
 - Updated Wed 14 Oct 18:00 (UTC)

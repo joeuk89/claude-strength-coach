@@ -1,11 +1,12 @@
-"""Rotation position from `coach.pages.header_facts`, block state from data/state.json (contract C16, C38, C52)."""
+"""Rotation position from `coach.pages.header_facts`, the block status line from `coach.block` (contract C16, C38, C43, C52)."""
 
+from coach import block as block_module
 from coach import pages
 from coach import state as state_module
 from coach.errors import ValidationError
 from coach.status import Section, provider
 
-DELOAD_ATTENTION = ("due", "in_progress")
+LIGHT_WEEK_ATTENTION = ("proposed", "agreed")
 
 
 @provider(id="program", owner="R-26b", order=40)
@@ -27,13 +28,13 @@ def program_status(ctx):
             lines.append(f"Rotation: {rotation['position']}, not confirmed; state it for the athlete to confirm "
                          "before programming.")
             attention = True
-    deload = block["deload"]["status"]
-    started = f" (block started {block['started']})" if block.get("started") else ""
-    lines.append(f"Hard weeks completed: {block['hard_weeks_completed']}{started}; deload {deload.replace('_', ' ')}.")
-    if deload in DELOAD_ATTENTION:
+    line = block_module.status_line(ctx.root)
+    started = f" (started {block['started']})" if block.get("started") else ""
+    lines.append(f"{line or 'Block ' + block['id']}{started}.")
+    if block["light_week"]["status"] in LIGHT_WEEK_ATTENTION:
         attention = True
     if doc.get("one_off"):
         lines.append("A one-off week is active; see data/state.json.")
-    data = {"rotation": rotation, "hard_weeks_completed": block["hard_weeks_completed"], "deload": block["deload"],
-            "one_off": doc.get("one_off")}
+    data = {"rotation": rotation, "hard_weeks_completed": block["hard_weeks_completed"],
+            "light_week": block["light_week"], "status_line": line, "one_off": doc.get("one_off")}
     return Section("program", lines, data, "attention" if attention else "info")

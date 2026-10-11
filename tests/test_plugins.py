@@ -15,7 +15,7 @@ SHIPPED = {
     "scheme": ["assistance_ladder", "double_progression", "fixed_reps_rpe", "hold", "linear", "maintenance",
                "rpe_anchored", "wave_531"],
     "schedule": ["alternating_external_anchor", "explicit_calendar", "fixed_weekdays", "next_in_sequence"],
-    "transform": ["scheme", "standard"],
+    "transform": ["light", "return", "scheme", "standard"],
 }
 R23A_CODES = {"no_data": ("warn",), "stalled": ("warn",), "rpe_drift": ("warn",), "return_week": ("info",),
               "return_after_illness": ("warn",), "constraint_applied": ("info",), "override_standing": ("info",),
@@ -244,12 +244,14 @@ class MigrationTest(InstanceCase):
         state.update(schema_version=1, scheme_state={"session-a/bb_back_squat": {"sets_done": 3}})
         state["rotation"].pop("week")
         state["hevy"]["temporary_routines"] = []
+        state["block"] = {"started": "2026-09-28", "hard_weeks_completed": 2,
+                          "deload": {"status": "not_due", "since": None}}
         state_path.write_text(json.dumps(state), encoding="utf-8")
 
         data = self.coach("migrate", "run")["data"]
         steps = {row["path"]: (row["from"], row["to"]) for row in data["files"]}
         self.assertEqual(steps["data/program.json"], (1, jsonio.current_version(jsonio.load_schema("program"))))
-        self.assertEqual(steps["data/state.json"], (1, 3))
+        self.assertEqual(steps["data/state.json"], (1, jsonio.current_version(jsonio.load_schema("state"))))
         self.assertTrue(any("left knee: no deep flexion" in note for note in data["notes"]))
         program = json.loads(program_path.read_text(encoding="utf-8"))
         self.assertEqual(program["sessions"][0]["exercises"][0]["constraints"], [])

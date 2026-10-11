@@ -4,7 +4,7 @@
   "required": ["schema_version", "rotation", "block", "one_off", "scheme_state", "hevy"],
   "additionalProperties": false,
   "properties": {
-    "schema_version": {"const": 3},
+    "schema_version": {"const": 4},
     "rotation": {
       "type": "object",
       "required": ["position", "confirmed", "confirmed_at", "week"],
@@ -18,18 +18,24 @@
     },
     "block": {
       "type": "object",
-      "required": ["started", "hard_weeks_completed", "deload"],
+      "required": ["id", "started", "hard_weeks_completed", "last_closed_week", "last_deep_review", "light_week"],
       "additionalProperties": false,
       "properties": {
+        "id": {"type": "string", "pattern": "^b-\\d{4,}$"},
         "started": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
         "hard_weeks_completed": {"type": "integer", "minimum": 0},
-        "deload": {
+        "last_closed_week": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+        "last_deep_review": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+        "light_week": {
           "type": "object",
-          "required": ["status", "since"],
+          "required": ["status", "type", "reason", "week", "decision_id"],
           "additionalProperties": false,
           "properties": {
-            "status": {"enum": ["not_due", "due", "in_progress", "done", "skipped"]},
-            "since": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"}
+            "status": {"enum": ["not_due", "watch", "skipped", "proposed", "agreed", "declined"]},
+            "type": {"enum": ["deload", "light", "return", null]},
+            "reason": {"enum": ["ceiling", "triggers", "illness", "coach", null]},
+            "week": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+            "decision_id": {"type": ["string", "null"], "pattern": "^d-\\d+$"}
           }
         }
       }

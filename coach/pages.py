@@ -17,6 +17,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from functools import cached_property
 from pathlib import Path
 
+from coach import block as block_module
 from coach import checkin, dates, history, overlay, page_parts, paths, program, render, state, stats, units
 from coach import config as config_module
 from coach.errors import ConfigError, NetworkError, RefusedError, ValidationError
@@ -550,9 +551,7 @@ def render_dashboard(root, as_of, view=None):
     view = view or _View(root, as_of)
     status = [view.header_line()]
     if view.state:
-        block = view.state["block"]
-        status.append(f"Block: {block['hard_weeks_completed']} hard weeks done · deload "
-                      f"{block['deload']['status'].replace('_', ' ')}")
+        status.append(block_module.status_line(view.root) or f"Block: {view.state['block']['id']}")
     records = [r for r in checkin.records(view.root) if r.date <= view.today]
     if records:
         last = records[-1]
