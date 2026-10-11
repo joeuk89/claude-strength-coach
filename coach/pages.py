@@ -443,10 +443,7 @@ class _View:
         replaced = self.slot("brief.if_you_miss")
         if replaced:
             return [item.text for item in replaced]
-        rules = (self.program or {}).get("missed_day_rules") or []
-        if not rules:
-            return ["No missed-day rules yet: tell the coach, and the rest of the week is reprogrammed."]
-        return [f"{rule.get('condition')} → {rule.get('action')}" for rule in rules]
+        return ["No missed-day rules yet: tell the coach, and the rest of the week is reprogrammed."]
 
     def wins(self):
         items = []

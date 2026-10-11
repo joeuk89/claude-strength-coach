@@ -1,7 +1,8 @@
 """Missed-day rules: match a missed session to the program's rule and apply it as a mid-week overlay (contract C37).
 
-Matching (`match`) and application (`apply_rule`) stay separate so another
-item can apply a rule it builds itself, ahead of the program's rules.
+Matching (`match`) and application (`apply_rule`) stay separate so a caller
+can apply a rule it builds itself (a priority lift's floor dose), ahead of
+the program's rules.
 `plan` is read-only; `apply` writes the miss, the overlay and the record
 lines once the athlete has said "go".
 """
@@ -37,6 +38,11 @@ def _day(value):
 
 def _weekday_word(weekday):
     return weekday.capitalize()
+
+
+def _today(config, now):
+    zone_name = config.athlete.timezone
+    return now.astimezone(dates.zone(zone_name) if zone_name else None).date()
 
 
 def rules(root):
@@ -142,14 +148,15 @@ def _later_sessions(doc, day):
     return [s for s in doc["sessions"] if s["date"] > _day(day).isoformat()]
 
 
-def _fold(doc, missed, day, rule, names):
+def _fold(doc, missed, day, rule, names, today):
     """(sessions after the miss with the fold applied, flags) for a `fold` rule."""
     action = rule["action"]
     later = copy.deepcopy(_later_sessions(doc, day))
-    targets = [s for s in later if action["into"] in (NEXT, s["session_id"])]
+    targets = [s for s in later
+               if action["into"] in (NEXT, s["session_id"]) and s["date"] >= today.isoformat()]
     if not targets:
         into = "session" if action["into"] == NEXT else names.session(action["into"])
-        raise Unmatched(f"no later {into} in the overlay's span")
+        raise Unmatched(f"no later {into} from today to the end of the overlay's span")
     target = min(targets, key=lambda s: s["date"])
     found_flags = []
     for item in action["exercises"]:
@@ -177,7 +184,7 @@ def _fold(doc, missed, day, rule, names):
     return later, found_flags
 
 
-def _shift(doc, missed, day, rule, config):
+def _shift(doc, missed, day, rule, config, today):
     """(sessions after the miss with the missed session moved, flags) for a `shift` rule."""
     day = _day(day)
     end = dates.parse_date(doc["span"]["end"])
@@ -185,7 +192,8 @@ def _shift(doc, missed, day, rule, config):
     available = config.athlete.available_days
     for weekday in rule["action"]["to_weekdays"]:
         candidate = day + timedelta(days=(WEEKDAYS.index(weekday) - day.weekday()) % 7 or 7)
-        if candidate > end or candidate.isoformat() in taken or (available and weekday not in available):
+        if (candidate < today or candidate > end or candidate.isoformat() in taken
+                or (available and weekday not in available)):
             continue
         moved = dict(copy.deepcopy(missed), date=candidate.isoformat(), moved_from=missed["date"])
         later = copy.deepcopy(_later_sessions(doc, day)) + [moved]
@@ -195,7 +203,7 @@ def _shift(doc, missed, day, rule, config):
             f"{render.day_label(candidate)}, this week only."))
         return later, [flag]
     days = ", ".join(_weekday_word(w) for w in rule["action"]["to_weekdays"])
-    raise Unmatched(f"none of {days} is free after the miss inside the overlay's span")
+    raise Unmatched(f"none of {days} is free after the miss, from today to the end of the overlay's span")
 
 
 def _draft_set(set_):
@@ -235,10 +243,12 @@ def apply_rule(root, doc, session_id, day, rule, now=None, config=None, library=
 
     Takes any rule object, including one no program holds. Raises Unmatched
     when the rule cannot apply: `manual`, a fold with no later target, a
-    shift with no free day.
+    shift with no free day. A day before today is never a target or free.
     """
     root = Path(root)
     config = config or config_module.load(root)
+    now = now or datetime.now(timezone.utc)
+    today = _today(config, now)
     names = _names_for(root, library=library)
     missed = _missed_session(doc, session_id, day)
     kind = rule["action"]["kind"]
@@ -247,12 +257,12 @@ def apply_rule(root, doc, session_id, day, rule, now=None, config=None, library=
     if kind == "skip":
         return None
     if kind == "fold":
-        sessions, extra = _fold(doc, missed, day, rule, names)
+        sessions, extra = _fold(doc, missed, day, rule, names, today)
     else:
-        sessions, extra = _shift(doc, missed, day, rule, config)
+        sessions, extra = _shift(doc, missed, day, rule, config, today)
     if not sessions:
         raise Unmatched("no session is left in the overlay's span")
-    built = overlay.build(_draft(doc, sessions, extra), config, root=root, now=now or datetime.now(timezone.utc))
+    built = overlay.build(_draft(doc, sessions, extra), config, root=root, now=now)
     built["flags"] = validity.merge_flags(built, validity.check_overlay(root, built))
     return built
 
@@ -440,6 +450,11 @@ def apply(root, session_id, day, tag=None, dry_run=False, now=None):
     now = now or datetime.now(timezone.utc)
     if tag is not None and tag not in history.MISS_TAGS:
         raise ValidationError(f"tag {tag!r} is not a miss tag; use one of {', '.join(history.MISS_TAGS)}")
+    recorded = next((a for a in history.annotations(root, "miss")
+                     if a["session_id"] == session_id and a["date"] == day.isoformat()), None)
+    if recorded is not None:
+        raise RefusedError(f"The miss of {session_id} on {day} is already recorded (annotation {recorded['id']}); "
+                           f"nothing was written")
     found = plan(root, session_id, day, now)
     if not found["matched"]:
         raise RefusedError(f"No missed-day rule applies to {found['title']} on {day} ({found['reason']}); "

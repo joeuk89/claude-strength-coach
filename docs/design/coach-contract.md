@@ -3978,6 +3978,9 @@ changed lines and moved sessions carry `missed_day_rule` (info). It runs
   working sets (warm-ups dropped), `superset_id`, `override` and
   `change` cleared, provenance kept. A shift's candidate for a weekday is
   the first date with that weekday after the miss.
+- A day before today (the athlete's time zone, C2 `COACH_NOW`) is never
+  a fold target or a free shift day, so a miss planned once those days
+  have passed is unmatched and falls back to the mid-week reprogram.
 - `missed list` returns `data.missed`: `{date, session_id, title,
   overlay_id, recorded, tag}` per missed core session (optional sessions
   are never a miss), reading unsynced workouts too (C17); `recorded` is
@@ -3990,8 +3993,9 @@ changed lines and moved sessions carry `missed_day_rule` (info). It runs
 - Write lines: as R-03 with the draft's session titles; without Hevy
   `Reply "go" to train this. Nothing goes to Hevy (no Hevy).`; for
   `skip` `Reply "go" to train this. Nothing goes to Hevy (no change).`
-- `missed apply` re-plans, refuses (exit 3) an unmatched miss before
-  writing anything, and writes the `miss` annotation with source
+- `missed apply` refuses (exit 3) before writing anything when a `miss`
+  annotation already names that session and date, then re-plans, refuses
+  (exit 3) an unmatched miss before writing anything, and writes the `miss` annotation with source
   `missed apply`. `skip` writes no overlay. Record lines for the other
   cases: `- Rule miss-a: Session A moved from Mon 12 Oct to Thu 15 Oct,
   this week only.`, `- Rule miss-c: nothing changes this week.`, `- No
@@ -4089,8 +4093,9 @@ these headings:
   (priority 20), then unresolved `warn` flags (30) on the overlays behind
   the week's sessions, then part items (default 50). R-40a routes them
   through `coach.flags.for_mode` (C44).
-- If you miss a day: one line per `program.missed_day_rules` entry (v1:
-  `condition → action`); R-22's part replaces the slot with `describe`.
+- If you miss a day: R-22's `missed` part fills the slot with one line
+  per `program.missed_day_rules` entry, in `describe`'s words; with no
+  rules, one line saying so.
 - Wins: at most three, by priority: a new best e1RM in the last seven
   days (20; `total`, `per_hand_x2` and `single_implement` lifts only, a
   point strictly above every earlier one); a core-complete streak of two

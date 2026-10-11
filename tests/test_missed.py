@@ -4,7 +4,7 @@ import copy
 import json
 import re
 
-from coach import flags, missed, overlay, propose, render
+from coach import dates, flags, missed, overlay, propose, render
 from coach.library import Library
 from tests.support import INSTANCES, REPO_ROOT
 from tests.support.activity import write_hevy_cache
@@ -255,6 +255,13 @@ class ApplyTest(MissedCase):
         self.assertIn("propose week --kind midweek", envelope["error"]["message"])
         self.assertEqual(self.snapshot(), before)
 
+    def test_a_second_apply_of_the_same_miss_is_refused_and_writes_nothing(self):
+        self.apply("--tag", "sleep")
+        before = self.snapshot()
+        envelope = self.apply("--tag", "sleep", expect=3)
+        self.assertIn("already recorded", envelope["error"]["message"])
+        self.assertEqual(self.snapshot(), before)
+
 
 class UnfoldTest(MissedCase):
     def setUp(self):
@@ -275,7 +282,6 @@ class UnfoldTest(MissedCase):
 
     def test_last_prescription_ignores_fold_lines(self):
         from coach import config as config_module
-        from coach import dates
 
         config = config_module.load(self.root)
         run = propose.Run(self.root, config, dates.parse_date("2026-10-18"), dates.parse_timestamp(NOW))
@@ -346,6 +352,17 @@ class UnmatchedTest(MissedCase):
         self.edit_overlay(lambda doc: doc.update(sessions=[s for s in doc["sessions"] if s["date"] != "2026-10-17"]))
         self.assert_unmatched(self.plan())
 
+    def test_a_fold_whose_target_day_has_passed(self):
+        self.assert_unmatched(self.plan(env={"COACH_NOW": "2026-10-18T08:00:00Z"}))
+
+    def test_a_shift_whose_free_days_have_passed(self):
+        self.drop_workout_on("2026-10-12")
+        self.edit_overlay(lambda doc: doc.update(sessions=[s for s in doc["sessions"] if s["date"] != "2026-10-17"]))
+        self.assertTrue(self.plan(session="session-a", day="2026-10-12",
+                                  env={"COACH_NOW": "2026-10-16T08:00:00Z"})["matched"])
+        self.assert_unmatched(self.plan(session="session-a", day="2026-10-12",
+                                        env={"COACH_NOW": "2026-10-18T08:00:00Z"}))
+
     def test_a_skip_rule_matches_and_changes_nothing(self):
         self.set_rules([{"id": "miss-b", "session_id": "session-b", "text": None, "when": {},
                          "action": {"kind": "skip"}}])
@@ -368,7 +385,8 @@ class ApplyRuleTest(MissedCase):
         rule = {"id": "floor-bb-back-squat", "session_id": "session-a", "text": None, "when": {},
                 "action": {"kind": "fold", "into": "session-b", "exercises": [{"exercise_id": "bb_back_squat"}]}}
         self.drop_workout_on("2026-10-12")
-        draft = missed.apply_rule(self.root, doc, "session-a", "2026-10-12", rule)
+        draft = missed.apply_rule(self.root, doc, "session-a", "2026-10-12", rule,
+                                  now=dates.parse_timestamp("2026-10-13T08:00:00Z"))
         session_b = next(s for s in draft["sessions"] if s["session_id"] == "session-b")
         last = session_b["exercises"][-1]
         self.assertEqual(last["exercise_id"], "bb_back_squat")
@@ -498,3 +516,5 @@ class ProgramWeekSkillTest(MissedCase):
         self.assertIn("`missed_rule_unmatched`", step)
         self.assertIn("step 2's mid-week reprogram", step)
         self.assertNotIn("missed apply", step[:step.index('"go"')])
+        self.assertIn("for Hevy users, `python3 -m coach routines push", step)
+        self.assertIn("`recorded: true`", step)
