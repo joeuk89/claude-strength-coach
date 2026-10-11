@@ -69,7 +69,9 @@ session keeps its lines from the overlay in force
 (`data/overlays/<id>.json`), re-dated.
 
 **Deload** — run `python3 -m coach propose week --kind deload --week
-<label>`. It applies the program's deload rule (`blocks.deload_rule` in
+<label>`, or for a light week the check-in agreed, the `command` that
+`block decide` printed (a `light` or `return` week adds `--transform
+light` or `--transform return`). It applies the program's deload rule (`blocks.deload_rule` in
 `program show`) to every program session in the span; the standard rule
 keeps two thirds of each line's working sets, takes 10 % off loads from
 the current working weights and puts every set at RPE 6, with bodyweight
@@ -229,12 +231,11 @@ and the athlete trains the temp sessions from it.
   {"start": "<start>", "end": "<end>"}}`. The next `/check-in` judges
   the week against this overlay, and the first programming pass after
   the span ends retires its routines and clears `one_off`.
-- If this was a **deload or other light week**, reset the hard-week
-  count in the same edit: `block.hard_weeks_completed` to 0 and
-  `block.deload` to `{"status": "in_progress", "since": "<span
-  start>"}`. Keep the block's `started` date: the check-in that closes
-  the light week starts the next block. The rules are in `CLAUDE.md`
-  "Coaching principles" → Fatigue management.
+- If this was a **deload or other light week**, leave `block` alone:
+  `python3 -m coach block decide --outcome adopted` records it, and the
+  check-in that closes the week (`block close`) ends the block and
+  starts the next at zero. The rules are in `CLAUDE.md` "Coaching
+  principles" → Fatigue management.
 - Then run `python3 -m coach state show`, which refuses an invalid
   state.
 
