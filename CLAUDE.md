@@ -294,6 +294,7 @@ and its sources.
   Adding aerobic work costs no muscle or maximal strength on average, but trained lifters gain less lower-body strength when both share a session (rn:concurrent-training.1, rn:concurrent-training.2).
   On a day with lifting and a quality run, lift first and keep at least 6 hours between them (rn:concurrent-training.4).
   No quality run in the 24 hours before a heavy squat or hinge session: one with a working set at RPE 7 or above, or of 6 reps or fewer when no RPE is set (rn:concurrent-training.5).
+  The 24 hours is a cautious coaching heuristic: not the day before (rn:concurrent-training.5).
   Easy runs may share a day with lifting; only quality runs trigger the spacing (rn:concurrent-training.6).
 - **Adherence before structure** — a program the athlete trains beats a
   better one they don't. Adherence is defined, and checked, in

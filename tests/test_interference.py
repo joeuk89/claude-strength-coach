@@ -7,7 +7,7 @@ import textwrap
 import unittest
 from pathlib import Path
 
-from coach import jsonio, migrate, plugins
+from coach import jsonio, migrate, plugins, research
 from tests.support import INSTANCES, REPO_ROOT, VALID, run_cli
 
 INTERFERENCE = INSTANCES / "interference"
@@ -97,6 +97,11 @@ class KindTest(unittest.TestCase):
         self.assertEqual(registry.get("interference", "same_day").module.CITES, ("rn:concurrent-training.4",))
         self.assertEqual(registry.get("interference", "quality_before_heavy_lower").module.CITES,
                          ("rn:concurrent-training.5",))
+
+    def test_the_24_hour_rule_is_a_heuristic_on_two_acute_trials(self):
+        claim = research.resolve("rn:concurrent-training.5", research.load_notes(REPO_ROOT))
+        self.assertEqual((claim.basis, claim.confidence), ("heuristic", "low"))
+        self.assertEqual(set(claim.sources), {"sporer-2003", "panissa-2016"})
 
     def test_both_commands_are_allowlisted(self):
         allowed = json.loads((REPO_ROOT / ".claude" / "settings.json").read_text(encoding="utf-8"))

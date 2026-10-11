@@ -217,15 +217,18 @@ weekly_run_distance = 0       # caps; 0 = no cap
 weekly_run_minutes = 0
 single_run_distance = 0
 single_run_minutes = 0
-weekly_quality = 2            # quality activities a week, runs and conditioning together; 0 = no cap (a heuristic)
-spike_ratio = 1.10            # a run longer than this × the longest run in the lookback is a spike: in one large
-spike_lookback_days = 30      # observational cohort, single runs over 10 % past the 30-day longest had more
-                              # overuse injuries (no research note holds this claim yet)
-spike_min_history_days = 14   # a run is judged only once the logs reach back this far before it (a heuristic)
+weekly_quality = 2            # quality activities a week, runs and conditioning together; 0 = no cap
+                              # (a heuristic, rn:running-load.5)
+spike_ratio = 1.10            # a run longer than this × the longest run in the lookback is a spike, linked to
+spike_lookback_days = 30      # more overuse injuries (rn:running-load.1)
+spike_min_history_days = 14   # a run is judged only once the logs reach back this far before it
+                              # (a heuristic, rn:running-load.4)
 sleep_short_hours = 7.0       # a night below this is short; adults need 7 h or more (rn:sleep-dieting.1)
 sleep_debt_nights = 4         # short nights of the last 7 that raise sleep_debt (a heuristic)
 sleep_min_nights = 4          # nights with data needed to judge (a heuristic)
 reconcile_move_days = 3       # a logged activity this many days from its plan still matches that planned activity, as moved
-quality_rpe_min = 7           # a session RPE at or above this makes an activity a quality one (a heuristic)
-external_session_minutes = 60 # a coach-led session counts as this long at this session RPE (heuristics)
-external_session_rpe = 6
+                              # (a heuristic)
+quality_rpe_min = 7           # a session RPE at or above this makes an activity a quality one
+                              # (a heuristic, rn:running-load.6)
+external_session_minutes = 60 # a coach-led session counts as this long at this session RPE
+external_session_rpe = 6      # (heuristics, rn:running-load.7)
