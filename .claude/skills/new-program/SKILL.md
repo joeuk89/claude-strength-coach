@@ -71,7 +71,11 @@ redesign), offer the three paths in one message and recommend one from
 - Adopt's output lists what still needs the athlete:
   - `unconfirmed` — exercises without a confirmed load mode: ask how
     each is performed, then `python3 -m coach library set-mode <id>
-    <mode>` or `python3 -m coach library confirm <ids>`.
+    <mode>` or `python3 -m coach library confirm <ids>`, before adopting.
+    A confirmed mode that differs from a line's fails validation at that
+    slot: ask whether its start load meant the old mode or the confirmed
+    one, then `python3 -m coach program reconcile-mode <id> --basis
+    old|confirmed` (`--input <draft>` before adopting).
   - `avoided` — exercises the athlete avoids, with the reason. Adopt
     keeps them; propose a swap from `python3 -m coach library show <id>`
     (its `substitutes`) and agree it with the athlete.

@@ -82,6 +82,11 @@ def from_hevy_kg(weight_kg, load_mode, unit):
     return json_number(total)
 
 
+def convert_mode(value, from_mode, to_mode, unit):
+    """The value the athlete sets in `to_mode` for the Hevy load `value` gives in `from_mode`: 20 total is 10/hand."""
+    return from_hevy_kg(to_hevy_kg(value, from_mode, unit), to_mode, unit)
+
+
 def _distance_factor(unit):
     if unit not in DISTANCE_UNITS:
         raise ValueError(f"unknown distance unit {unit!r}; expected one of {', '.join(DISTANCE_UNITS)}")

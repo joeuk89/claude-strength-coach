@@ -102,11 +102,19 @@ class ProblemsTest(unittest.TestCase):
     def test_timed_modes_need_their_measure(self):
         doc = valid_doc()
         exercise = doc["sessions"][1]["exercises"][1]
-        exercise.update(load_mode="duration", start_load=None)
+        exercise.update(exercise_id="plank", load_mode="duration", start_load=None)
         exercise["sets"] = [{"count": 3, "type": "normal"}]
         self.assert_problem(doc, "$.sessions[1].exercises[1].sets[0]", "duration_seconds")
         exercise["sets"] = [{"count": 3, "type": "normal", "duration_seconds": 30}]
         self.assertEqual(problem_paths(doc), [])
+
+    def test_a_line_in_another_mode_than_the_confirmed_one(self):
+        doc = valid_doc()
+        doc["sessions"][1]["exercises"][1].update(load_mode="total", start_load=20)
+        self.assert_problem(doc, "$.sessions[1].exercises[1].load_mode", "confirmed load mode is bodyweight",
+                            kind=program.LOAD_MODE_PROBLEM)
+        found = program.problems(doc, config_module.load(VALID))
+        self.assertEqual(found, [])
 
     def test_rep_range_backwards(self):
         doc = valid_doc()

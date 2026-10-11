@@ -29,7 +29,8 @@ _RESEARCH_CHECKS = ("research_notes", "research_render_fresh")
 PATH_MAP = (
     ("config.toml", ("config", "nutrition_template")),
     ("profile.md", ("bare_hevy_values", "research_citations")),
-    ("data/exercises.json", ("library_valid", "load_modes_confirmed", "overlay_library_consistency")),
+    ("data/exercises.json", ("library_valid", "load_modes_confirmed", "overlay_library_consistency",
+                             "program_exercise_ids")),
     ("data/program.json", _PROGRAM_CHECKS),
     ("data/state.json", _PROGRAM_CHECKS),
     ("routine/*.md", ("routine_render_fresh",)),

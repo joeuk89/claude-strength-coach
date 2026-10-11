@@ -53,8 +53,8 @@ def program_exercise_ids(ctx):
     library, failed = _library(ctx)
     if failed:
         return failed
-    return [Result("fail", f"{error.path}: {error.message}", _PROGRAM)
-            for error in program.exercise_id_errors(doc, library)]
+    errors = program.exercise_id_errors(doc, library) + program.load_mode_errors(doc, library)
+    return [Result("fail", f"{error.path}: {error.message}", _PROGRAM) for error in errors]
 
 
 @check(id="avoided_in_program", owner="R-17a")
