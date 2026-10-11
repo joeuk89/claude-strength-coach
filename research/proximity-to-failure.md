@@ -99,6 +99,14 @@ text = "Hypertrophy is similar across about 5–30 reps per set, as long as the 
 basis = "evidence"
 sources = ["schoenfeld-2017-load", "lopez-2021", "currier-2023"]
 status = "current"
+
+[[claims]]
+n = 5
+text = "A hard set is a working set not logged or prescribed at RPE 5 or below, so a set stopped 5 or more reps short of failure doesn't count toward dose, and one logged without an RPE does."
+basis = "heuristic"
+sources = ["robinson-2024", "refalo-2023"]
+status = "current"
+confidence = "low"
 -->
 <!-- coach:begin research proximity-to-failure -->
 
@@ -110,6 +118,7 @@ status = "current"
 | 2 | Heavy strength work can leave more reps in reserve than hypertrophy work, because strength gains are similar across a wide range of reps in reserve and sets to failure add fatigue. | evidence | robinson-2024, grgic-2022, acsm-2026 | current |
 | 3 | Strength is built best with heavy loads of about 80 % of 1RM or more, for about 1–6 reps per set. | evidence | currier-2023, acsm-2026, lopez-2021, schoenfeld-2017-load, acsm-2009 | current |
 | 4 | Hypertrophy is similar across about 5–30 reps per set, as long as the sets are taken close to failure. | evidence | schoenfeld-2017-load, lopez-2021, currier-2023 | current |
+| 5 | A hard set is a working set not logged or prescribed at RPE 5 or below, so a set stopped 5 or more reps short of failure doesn't count toward dose, and one logged without an RPE does. | heuristic (low confidence) | robinson-2024, refalo-2023 | current |
 
 | Source | Citation | Type | Year |
 | --- | --- | --- | --- |
@@ -176,6 +185,16 @@ difference between low (more than 15 RM), moderate (9–15 RM) and high
 comparably promoted muscle hypertrophy". The 5–30 band is the practical
 span of those studies; very light loads (above about 30 reps) are less
 well tested and much more tiring per set.
+
+**Claim 5.** No study sets a cut-off for a hard set. Robinson et al.
+(2024) found hypertrophy improves as sets end closer to failure, so a
+set far from failure gives less stimulus than one near it. Refalo et al.
+(2023) found non-failure sets grew muscle as well as failure sets, so a
+set need not reach failure to count. RPE 5 is the framework's line: it
+leaves out warm-up-like and technique sets while keeping every set
+prescribed under claim 1. The same line decides planned dose. A set
+logged without an RPE counts, so a lifter who doesn't rate sets still
+gets their dose.
 
 ## Applying it
 

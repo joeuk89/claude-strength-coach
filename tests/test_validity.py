@@ -7,7 +7,7 @@ import unittest
 from datetime import date
 from pathlib import Path
 
-from coach import flags, overlay, units, validity
+from coach import flags, overlay, research, units, validity
 from tests.support import INSTANCES, REPO_ROOT, VALID, run_cli
 from tests.support.history import (R_A, W, HistoryCase, hevy_exercise, hevy_set, hevy_workout, read_json,
                                    write_json)
@@ -111,6 +111,17 @@ class FlagCodesTest(unittest.TestCase):
                 self.assertEqual(registry[code].owner, "R-24")
                 self.assertEqual(registry[code].severities, severities)
         self.assertEqual(validity.owned_codes(), set(R24_CODES))
+
+
+class FeasibilityThresholdsTest(unittest.TestCase):
+    def test_the_thresholds_keep_their_values(self):
+        self.assertEqual((validity.UNEARNED_IMPLIED_RPE, validity.RPE_TOLERANCE), (10.5, 1))
+
+    def test_they_cite_a_heuristic_claim_that_names_the_hinge_caveat(self):
+        self.assertEqual(validity.CITES, ("rn:autoregulation.6",))
+        claim = research.resolve("rn:autoregulation.6", research.load_notes(REPO_ROOT))
+        self.assertEqual((claim.basis, claim.sources), ("heuristic", ("lesuer-1997", "halperin-2022")))
+        self.assertIn("hinge", claim.text)
 
 
 class ValidityCase(HistoryCase):

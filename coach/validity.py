@@ -37,6 +37,7 @@ SYMPTOM_FREE_HOURS = 48
 E1RM_WINDOW_DAYS = 42
 UNEARNED_IMPLIED_RPE = 10.5
 RPE_TOLERANCE = 1
+CITES = ("rn:autoregulation.6",)
 NO_E1RM_INCREMENTS = 2
 FEASIBILITY_MODES = ("total", "per_hand_x2", "single_implement")
 
