@@ -4373,9 +4373,9 @@ null`:
 - `kpi.kind`: `e1rm` (C18 best point), `top_load`, `top_reps` (heaviest or
   most reps in a working set at the newest exposure), `rung`
   (`assistance_ladder` state, R-23b). `target` and `by` nullable.
-- `floor.sets` default 2; `floor.rpe` null = the current prescription's RPE.
-  `program validate` rejects a priority `exercise_id` that no session
-  holds.
+- `floor.sets` default 2 (rn:minimum-effective-dose.4); `floor.rpe` null
+  = the current prescription's RPE. `program validate` rejects a
+  priority `exercise_id` that no session holds.
 - `coach.structure.priority_floor(root, missed_session_id, date) -> rule | None`
   builds a synthetic C37 fold rule for the priority lifts the missed
   session carried, or None when it carried none:
@@ -4414,7 +4414,7 @@ null`:
   minimum week that fails them and the check names why.
 - **Synthetic rule id.** One rule covers every priority lift the missed
   session carried (alongside a program fold, only those the fold leaves
-  out; see "Order in `missed plan`" below), in `priority` order: `priority:<id>`, or
+  out or carries short; see "Order in `missed plan`" below), in `priority` order: `priority:<id>`, or
   `priority:<id>+<id>` for two or more. The rule also carries
   `"text": null`, as program rules do. "Carried" means a line in the
   missed session of the overlay in force (the program session when no
@@ -4431,20 +4431,24 @@ null`:
   - the matched rule can't be applied (`apply_rule` raises `Unmatched`,
     for example a shift with no free day);
   - the matched rule is a fold that leaves out a priority lift the missed
-    session carried.
+    session carried, or carries it short.
 
   A shift that moves the whole session carries every lift with it, so
   the floor is not tried and no `priority_exposures_missed` is raised.
   In the first three cases the floor rule, when it applies, becomes the
   miss's rule (`data.rule`). In the fourth, the floor rule covers only
-  the lifts the fold leaves out (its id names just those), it folds
-  into the week the program's fold has already changed, `data.rule`
-  stays the program's rule, and `data.floor_rule` holds the floor rule
-  (null in every other case). The summary's first line then ends
-  `, with the priority floor <id>.` and the record line reads
-  `- Rules <rule id> and <floor id>: …`. A lift the program's fold lists
-  counts as kept in the week whatever set count the fold gives it. When
-  the floor rule is tried and is unmatched, `data.flags` gets one
+  the lifts the fold leaves out or carries short (its id names just
+  those), it folds into the week the program's fold has already changed,
+  a short lift's folded line is topped up to `floor.sets` working sets
+  (never more than prescribed) at its prescribed load and `floor.rpe`,
+  keeping the program rule's `fold.rule_id`, `data.rule` stays the
+  program's rule, and
+  `data.floor_rule` holds the floor rule (null in every other case).
+  The summary's first line then ends `, with the priority floor <id>.`
+  and the record line reads `- Rules <rule id> and <floor id>: …`. A
+  fold covers a lift it gives `floor.sets` working sets or more, or
+  every working set the missed line prescribes; with fewer, it carries
+  the lift short. When the floor rule is tried and is unmatched, `data.flags` gets one
   `priority_exposures_missed` per lift and the program's rule stands
   alone (or the miss stays unmatched).
 - `structure priority [--since D]` (default: 28 days before today)
