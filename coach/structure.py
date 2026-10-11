@@ -153,6 +153,7 @@ class _Instance:
     overlays: list = None
     decisions: dict = None
     _workouts: list = field(default=None, repr=False)
+    _moved_away: set = field(default=None, repr=False)
 
     @classmethod
     def load(cls, root, today=None, now=None, program_doc=None, require_program=True):
@@ -176,6 +177,34 @@ class _Instance:
         if self._workouts is None:
             self._workouts = history.workouts(self.root, now=self.now)
         return self._workouts
+
+    @property
+    def adopted(self):
+        """The first day the program plans sessions: its recorded adoption, else the first overlay's start, else None.
+
+        Workouts before it stay training evidence; the program never planned anything they could miss.
+        """
+        recorded = (self.state or {}).get("program_adopted")
+        if recorded:
+            return dates.parse_date(recorded)
+        starts = [dates.parse_date(doc["span"]["start"]) for doc in self.overlays]
+        return min(starts) if starts else None
+
+    def obliges(self, day):
+        return self.adopted is not None and day >= self.adopted
+
+    def moved_away(self):
+        """(original date, session id) of each session an overlay in force on the new date moved elsewhere."""
+        if self._moved_away is None:
+            self._moved_away = set()
+            for doc in self.overlays:
+                for session in doc["sessions"]:
+                    if not session.get("moved_from"):
+                        continue
+                    found = overlay.pick_in_force(self.overlays, session["date"])
+                    if found and found[0]["id"] == doc["id"]:
+                        self._moved_away.add((session["moved_from"], session["session_id"]))
+        return self._moved_away
 
     def made_on(self, decision):
         zone = self.config.athlete.timezone
@@ -232,9 +261,14 @@ def _program_session(session, day):
 
 
 def _planned_pairs(inst, span):
-    """(overlay, session) planned in a span: the overlay in force each day, else the schedule rule on the program."""
+    """(overlay, session) planned in a span: the overlay in force each day, else the schedule rule on the program.
+
+    Days before the program's adoption plan nothing, and a moved session is planned on its new date only.
+    """
     pairs, uncovered = [], set()
     for day in span.days():
+        if not inst.obliges(day):
+            continue
         found = overlay.pick_in_force(inst.overlays, day)
         if found:
             pairs += [(found[0], s) for s in overlay.sessions_on(found[0], day)]
@@ -245,6 +279,8 @@ def _planned_pairs(inst, span):
         for day, session_id in _schedule(inst, inst.program, span):
             if day in uncovered:
                 pairs.append((stand_in, _program_session(inst.program_session(session_id), day)))
+    moved = inst.moved_away()
+    pairs = [pair for pair in pairs if (pair[1]["date"], pair[1]["session_id"]) not in moved]
     return sorted(pairs, key=lambda pair: (pair[1]["date"], pair[1]["session_id"]))
 
 
@@ -258,6 +294,7 @@ def _external_rows(inst, span):
             days = [d for d in span.days() if base.WEEKDAYS[d.weekday()] == external["weekday"]]
         else:
             days = sorted({dates.parse_date(a["date"]) for a in own})
+        days = [d for d in days if inst.obliges(d)]
         used = set()
         for day in days:
             candidates = [(abs((dates.parse_date(a["date"]) - day).days), -index, index)
@@ -323,22 +360,20 @@ def _kind(inst, span, activity, until):
     return "ordinary"
 
 
-def _history_start(inst):
-    starts = [dates.parse_date(doc["span"]["start"]) for doc in inst.overlays]
-    starts += [dates.parse_date(w["date"]) for w in inst.workouts()]
-    return min(starts) if starts else None
+def _program_week(inst, span):
+    """True for a week wholly after the program's adoption, or for the adoption week when it still plans a session."""
+    if inst.adopted is None or span.end < inst.adopted:
+        return False
+    return span.start >= inst.adopted or bool(_planned_pairs(inst, span) or _external_rows(inst, span))
 
 
 def _closed_weeks(inst, until, reach):
-    """Up to `reach` weeks ending on or before `until`, newest first, none ending before the history starts."""
-    start = _history_start(inst)
-    if start is None:
-        return []
+    """Up to `reach` program weeks ending on or before `until`, newest first."""
     span = inst.week(until)
     if span.end > until:
         span = inst.week(span.start - timedelta(days=1))
     found = []
-    while len(found) < reach and span.end >= start:
+    while len(found) < reach and _program_week(inst, span):
         found.append(span)
         span = inst.week(span.start - timedelta(days=1))
     return found
@@ -368,9 +403,11 @@ def _week_reports(inst, spans):
     return reports
 
 
-def _session_row(row, tier):
+def _session_row(row, tier, planned):
     found = {"session_id": row["session_id"], "date": row["date"], "tier": tier, "status": row["status"],
              "moved": row["moved"], "workout_id": row["workout_id"], "overlay_id": row["overlay_id"]}
+    if planned.get("moved_from"):
+        found["moved_from"] = planned["moved_from"]
     if row["status"] == "missed":
         found["tag"] = row["tag"]
     if row["unlogged"]:
@@ -391,7 +428,7 @@ def _report(inst, span, rows, extra, sessions_by_key, workouts):
     logged = []
     for row in rows:
         tier = inst.tier(row["session_id"])
-        sessions.append(_session_row(row, tier))
+        sessions.append(_session_row(row, tier, sessions_by_key[(row["date"], row["session_id"])]))
         workout = workouts.get(row["workout_id"])
         if tier == "core":
             if row["status"] != "upcoming":
@@ -930,23 +967,26 @@ def _lifted(session, exercise_id):
 
 
 def _replacements(sessions_by_key, span, exercise_id, missed_key):
-    """Keys of sessions in the week that make up a missed exposure: a fold of the lift from it, or the moved session."""
+    """Keys of sessions in the week that fold the lift out of a missed exposure."""
     day, session_id = missed_key
     found = []
     for (other_day, other_id), session in sessions_by_key.items():
         if not span.contains(dates.parse_date(other_day)):
             continue
-        folded = any(line["exercise_id"] == exercise_id and (line.get("fold") or {}).get("from_date") == day
-                     and line["fold"]["from_session_id"] == session_id for line in session["exercises"])
-        moved = other_id == session_id and session.get("moved_from") == day and _lifted(session, exercise_id)
-        if folded or moved:
+        if any(line["exercise_id"] == exercise_id and (line.get("fold") or {}).get("from_date") == day
+               and line["fold"]["from_session_id"] == session_id for line in session["exercises"]):
             found.append((other_day, other_id))
     return found
 
 
 def _priority_weeks(inst, lifts, since, until):
-    """{exercise id: [week rows]} and the priority_exposures_missed flags over the weeks from `since` to `until`."""
-    spans = _weeks_between(inst, since, until)
+    """{exercise id: [week rows]} and the priority_exposures_missed flags over the program weeks `since` to `until`.
+
+    A moved session is one planned exposure, on its new date.
+    """
+    spans = [span for span in _weeks_between(inst, since, until) if _program_week(inst, span)]
+    if not spans:
+        return {lift["exercise_id"]: [] for lift in lifts}, []
     pairs = [pair for span in spans for pair in _planned_pairs(inst, span)]
     window = dates.Span(spans[0].start, spans[-1].end)
     matched = stats.adherence_of(inst.root, pairs, window, today=inst.today, now=inst.now)
@@ -966,7 +1006,7 @@ def _priority_weeks(inst, lifts, since, until):
         for span in spans:
             keys = sorted(key for key, session in sessions_by_key.items()
                           if span.contains(dates.parse_date(key[0])) and inst.tier(key[1]) == "core"
-                          and not session.get("moved_from") and _lifted(session, exercise_id))
+                          and _lifted(session, exercise_id))
             missed = [key for key in keys if status.get(key) == "missed" and key[0] < inst.today.isoformat()]
             replaced = pending = 0
             unreplaced = []
@@ -995,7 +1035,8 @@ def _priority_weeks(inst, lifts, since, until):
 def priority(root, since=None, *, today=None, now=None):
     """Each priority lift's KPI now and its trend since `since`, its exposures per week against plan, and the flags.
 
-    `since` defaults to four weeks before today.
+    `since` defaults to four weeks before today. The KPI reads every workout since then; the weekly rows start at
+    the program's adoption.
     """
     inst = _Instance.load(root, today, now)
     since = _as_date(since) or inst.today - timedelta(days=PRIORITY_DAYS)

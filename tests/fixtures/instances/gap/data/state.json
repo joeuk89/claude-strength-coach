@@ -1,5 +1,6 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
+  "program_adopted": "2026-08-31",
   "rotation": {
     "position": null,
     "confirmed": true,

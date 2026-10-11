@@ -1,10 +1,11 @@
 {
-  "title": "Program state, data/state.json: rotation, block counters, one-off span, scheme state, Hevy ids (contract C16)",
+  "title": "Program state, data/state.json: adoption date, rotation, block counters, one-off span, scheme state, Hevy ids (contract C16)",
   "type": "object",
-  "required": ["schema_version", "rotation", "block", "one_off", "scheme_state", "hevy"],
+  "required": ["schema_version", "program_adopted", "rotation", "block", "one_off", "scheme_state", "hevy"],
   "additionalProperties": false,
   "properties": {
-    "schema_version": {"const": 4},
+    "schema_version": {"const": 5},
+    "program_adopted": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
     "rotation": {
       "type": "object",
       "required": ["position", "confirmed", "confirmed_at", "week"],

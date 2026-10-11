@@ -130,6 +130,13 @@ one-off or minimum week, and not inside a layoff of 11+ days. Adherence
 looks at the last four, reaching back at most 12 weeks.
 _Avoid_: regular week, counted week
 
+**Planned session**:
+A session the program expected on a date, which adherence counts as
+trained or missed. Sessions are planned only from the day the program
+was adopted, so older workouts never count as misses, and a moved
+session is planned once, on its new date. A new block changes neither.
+_Avoid_: obligation, scheduled session
+
 **Block**:
 The stretch of hard training between one light week and the next,
 counted in completed hard weeks rather than calendar weeks.

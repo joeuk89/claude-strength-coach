@@ -65,6 +65,7 @@ class TemporaryRoutineMigrationTest(unittest.TestCase):
     def test_v1_routine_ids_become_entries_that_carry_nothing(self):
         doc = valid_state()
         doc["schema_version"] = 1
+        del doc["program_adopted"]
         doc["rotation"].pop("week")
         doc["scheme_state"] = {slot: entry["data"] for slot, entry in doc["scheme_state"].items()}
         doc["hevy"]["temporary_routines"] = ["t-1", "t-2"]
@@ -101,3 +102,23 @@ class StateShowTest(EnvelopeMixin, unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ProgramAdoptedMigrationTest(unittest.TestCase):
+    def test_v4_state_gains_an_unknown_adoption_and_a_note(self):
+        doc = valid_state()
+        doc["schema_version"] = 4
+        del doc["program_adopted"]
+        with Instance() as root:
+            (root / "data" / "state.json").write_text(json.dumps(doc), encoding="utf-8")
+            report = migrate.run(root, dry_run=False, now=datetime(2026, 10, 11, 18, tzinfo=timezone.utc))
+            upgraded = state.load(root)
+        self.assertIsNone(upgraded["program_adopted"])
+        self.assertEqual({k: v for k, v in upgraded.items() if k not in ("schema_version", "program_adopted")},
+                         {k: v for k, v in doc.items() if k != "schema_version"})
+        self.assertTrue(any("program_adopted is unknown" in note for note in report["notes"]))
+
+    def test_a_bad_adoption_date_is_a_problem(self):
+        doc = valid_state()
+        doc["program_adopted"] = "2026-02-30"
+        self.assertIn("$.program_adopted", problem_paths(doc))

@@ -484,6 +484,7 @@ def _new_state(draft, doc, old_state, old_program, rotation, today):
     folder = draft["hevy_folder"] if draft["hevy_folder"] is not None else old_folders.get("program")
     state = {
         "schema_version": jsonio.current_version(jsonio.load_schema(state_module.SCHEMA)),
+        "program_adopted": today.isoformat(),
         "rotation": rotation,
         "block": copy.deepcopy(old_state["block"]) if old_state else {
             "id": "b-0001", "started": today.isoformat(), "hard_weeks_completed": 0, "last_closed_week": None,

@@ -73,6 +73,7 @@ def _date(value, path, errors):
 
 def _dates(doc):
     errors = []
+    _date(doc["program_adopted"], "$.program_adopted", errors)
     _date(doc["rotation"]["confirmed_at"], "$.rotation.confirmed_at", errors)
     block = doc["block"]
     for key in ("started", "last_closed_week", "last_deep_review"):
