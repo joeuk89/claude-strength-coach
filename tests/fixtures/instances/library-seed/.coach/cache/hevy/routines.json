@@ -1,0 +1,271 @@
+{
+  "schema_version": 1,
+  "fetched_at": "2026-10-11T17:00:00Z",
+  "source": "hevy",
+  "data": [
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "title": "Session A",
+      "folder_id": null,
+      "updated_at": "2026-10-04T19:00:00Z",
+      "created_at": "2026-08-01T10:00:00Z",
+      "exercises": [
+        {
+          "index": 0,
+          "title": "Squat (Barbell)",
+          "rest_seconds": 180,
+          "notes": "",
+          "exercise_template_id": "F0000001",
+          "superset_id": null,
+          "sets": [
+            {
+              "index": 0,
+              "type": "warmup",
+              "weight_kg": 60,
+              "reps": 5,
+              "distance_meters": null,
+              "duration_seconds": null,
+              "custom_metric": null
+            },
+            {
+              "index": 1,
+              "type": "normal",
+              "weight_kg": 95,
+              "reps": 5,
+              "distance_meters": null,
+              "duration_seconds": null,
+              "custom_metric": null
+            },
+            {
+              "index": 2,
+              "type": "normal",
+              "weight_kg": 95,
+              "reps": 5,
+              "distance_meters": null,
+              "duration_seconds": null,
+              "custom_metric": null
+            },
+            {
+              "index": 3,
+              "type": "normal",
+              "weight_kg": 95,
+              "reps": 5,
+              "distance_meters": null,
+              "duration_seconds": null,
+              "custom_metric": null
+            }
+          ]
+        },
+        {
+          "index": 1,
+          "title": "Bench Press (Dumbbell)",
+          "rest_seconds": 120,
+          "notes": "",
+          "exercise_template_id": "F0000002",
+          "superset_id": null,
+          "sets": [
+            {
+              "index": 0,
+              "type": "normal",
+              "weight_kg": 45,
+              "reps": null,
+              "distance_meters": null,
+              "duration_seconds": null,
+              "custom_metric": null,
+              "rep_range": {
+                "start": 8,
+                "end": 10
+              }
+            },
+            {
+              "index": 1,
+              "type": "normal",
+              "weight_kg": 45,
+              "reps": null,
+              "distance_meters": null,
+              "duration_seconds": null,
+              "custom_metric": null,
+              "rep_range": {
+                "start": 8,
+                "end": 10
+              }
+            },
+            {
+              "index": 2,
+              "type": "normal",
+              "weight_kg": 45,
+              "reps": null,
+              "distance_meters": null,
+              "duration_seconds": null,
+              "custom_metric": null,
+              "rep_range": {
+                "start": 8,
+                "end": 10
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "title": "Session B",
+      "folder_id": null,
+      "updated_at": "2026-10-04T19:00:00Z",
+      "created_at": "2026-08-01T10:00:00Z",
+      "exercises": [
+        {
+          "index": 0,
+          "title": "Dumbbell Row",
+          "rest_seconds": 120,
+          "notes": "",
+          "exercise_template_id": "F0000003",
+          "superset_id": null,
+          "sets": [
+            {
+              "index": 0,
+              "type": "normal",
+              "weight_kg": 30,
+              "reps": null,
+              "distance_meters": null,
+              "duration_seconds": null,
+              "custom_metric": null,
+              "rep_range": {
+                "start": 8,
+                "end": 10
+              }
+            },
+            {
+              "index": 1,
+              "type": "normal",
+              "weight_kg": 30,
+              "reps": null,
+              "distance_meters": null,
+              "duration_seconds": null,
+              "custom_metric": null,
+              "rep_range": {
+                "start": 8,
+                "end": 10
+              }
+            },
+            {
+              "index": 2,
+              "type": "normal",
+              "weight_kg": 30,
+              "reps": null,
+              "distance_meters": null,
+              "duration_seconds": null,
+              "custom_metric": null,
+              "rep_range": {
+                "start": 8,
+                "end": 10
+              }
+            }
+          ]
+        },
+        {
+          "index": 1,
+          "title": "Pull Up",
+          "rest_seconds": 120,
+          "notes": "",
+          "exercise_template_id": "F0000004",
+          "superset_id": null,
+          "sets": [
+            {
+              "index": 0,
+              "type": "normal",
+              "weight_kg": 0,
+              "reps": 8,
+              "distance_meters": null,
+              "duration_seconds": null,
+              "custom_metric": null
+            },
+            {
+              "index": 1,
+              "type": "normal",
+              "weight_kg": 0,
+              "reps": 8,
+              "distance_meters": null,
+              "duration_seconds": null,
+              "custom_metric": null
+            },
+            {
+              "index": 2,
+              "type": "normal",
+              "weight_kg": 0,
+              "reps": 8,
+              "distance_meters": null,
+              "duration_seconds": null,
+              "custom_metric": null
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "title": "Bench Press (Dumbbell)",
+          "rest_seconds": 90,
+          "notes": "",
+          "exercise_template_id": "F0000002",
+          "superset_id": null,
+          "sets": [
+            {
+              "index": 0,
+              "type": "normal",
+              "weight_kg": 40,
+              "reps": 12,
+              "distance_meters": null,
+              "duration_seconds": null,
+              "custom_metric": null
+            },
+            {
+              "index": 1,
+              "type": "normal",
+              "weight_kg": 40,
+              "reps": 12,
+              "distance_meters": null,
+              "duration_seconds": null,
+              "custom_metric": null
+            }
+          ]
+        },
+        {
+          "index": 3,
+          "title": "Tyre Flip",
+          "rest_seconds": 150,
+          "notes": "",
+          "exercise_template_id": "C0000001",
+          "superset_id": null,
+          "sets": [
+            {
+              "index": 0,
+              "type": "normal",
+              "weight_kg": 100,
+              "reps": 5,
+              "distance_meters": null,
+              "duration_seconds": null,
+              "custom_metric": null
+            },
+            {
+              "index": 1,
+              "type": "normal",
+              "weight_kg": 100,
+              "reps": 5,
+              "distance_meters": null,
+              "duration_seconds": null,
+              "custom_metric": null
+            },
+            {
+              "index": 2,
+              "type": "normal",
+              "weight_kg": 100,
+              "reps": 5,
+              "distance_meters": null,
+              "duration_seconds": null,
+              "custom_metric": null
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

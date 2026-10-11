@@ -1,0 +1,217 @@
+{
+  "title": "The builtin exercise catalogue, coach/catalogue/exercises.json (R-11)",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "exercises"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "exercises": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/entry"
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]+$"
+    },
+    "text": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "pattern": {
+      "enum": [
+        "squat",
+        "hinge",
+        "lunge",
+        "horizontal_push",
+        "vertical_push",
+        "horizontal_pull",
+        "vertical_pull",
+        "elbow_flexion",
+        "elbow_extension",
+        "shoulder_raise",
+        "knee_flexion",
+        "knee_extension",
+        "hip_abduction",
+        "hip_adduction",
+        "calf_raise",
+        "core",
+        "carry",
+        "conditioning"
+      ]
+    },
+    "muscle": {
+      "enum": [
+        "abdominals",
+        "front_delts",
+        "side_delts",
+        "rear_delts",
+        "biceps",
+        "triceps",
+        "forearms",
+        "quadriceps",
+        "hamstrings",
+        "calves",
+        "glutes",
+        "abductors",
+        "adductors",
+        "lats",
+        "upper_back",
+        "traps",
+        "lower_back",
+        "chest",
+        "cardio",
+        "neck",
+        "full_body",
+        "other"
+      ]
+    },
+    "equipment": {
+      "enum": [
+        "barbell",
+        "ez_bar",
+        "trap_bar",
+        "dumbbell",
+        "kettlebell",
+        "machine",
+        "smith_machine",
+        "cable",
+        "plate",
+        "band",
+        "suspension",
+        "bodyweight",
+        "cardio_machine",
+        "other"
+      ]
+    },
+    "load_mode": {
+      "enum": [
+        "total",
+        "per_hand_x2",
+        "single_implement",
+        "bodyweight",
+        "assisted",
+        "band",
+        "duration",
+        "distance"
+      ]
+    },
+    "muscles": {
+      "type": "object",
+      "required": [
+        "primary",
+        "secondary"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "primary": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/muscle"
+          }
+        },
+        "secondary": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/muscle"
+          }
+        }
+      }
+    },
+    "increment": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "kg",
+        "lb"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kg": {
+          "type": "number",
+          "minimum": 0.001
+        },
+        "lb": {
+          "type": "number",
+          "minimum": 0.001
+        }
+      }
+    },
+    "texts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/text"
+      }
+    },
+    "ids": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/id"
+      }
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "aliases",
+        "hevy_titles",
+        "hevy_template_ids",
+        "muscles",
+        "pattern",
+        "equipment",
+        "load_mode_default",
+        "increment",
+        "substitutes"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "$ref": "#/$defs/text"
+        },
+        "aliases": {
+          "$ref": "#/$defs/texts"
+        },
+        "hevy_titles": {
+          "$ref": "#/$defs/texts"
+        },
+        "hevy_template_ids": {
+          "$ref": "#/$defs/texts"
+        },
+        "muscles": {
+          "$ref": "#/$defs/muscles"
+        },
+        "pattern": {
+          "$ref": "#/$defs/pattern"
+        },
+        "equipment": {
+          "$ref": "#/$defs/equipment"
+        },
+        "load_mode_default": {
+          "$ref": "#/$defs/load_mode"
+        },
+        "increment": {
+          "$ref": "#/$defs/increment"
+        },
+        "substitutes": {
+          "$ref": "#/$defs/ids"
+        }
+      }
+    }
+  }
+}

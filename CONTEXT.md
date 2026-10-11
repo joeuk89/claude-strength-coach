@@ -75,6 +75,14 @@ other modes are `total` (bar or stack), `bodyweight` (added load),
 carry no load. A property of the slot, not of the exercise's name.
 _Avoid_: load type, dumbbell weight (ambiguous between per-hand and Hevy value)
 
+**Exercise library**:
+Every exercise the coach can prescribe, each with a stable id: the
+builtin catalogue that ships with the framework, merged with the
+athlete's own entries (overrides, custom exercises, the load mode the
+athlete confirmed for each exercise, and exercises they avoid). Exercises
+in a program, an overlay or a Hevy routine are named by library id.
+_Avoid_: exercise database, exercise list, catalogue (only the builtin part)
+
 **Coach's brief**:
 The narrative presentation of a proposed training week, given to the
 athlete for approval before anything is written: week focus, what's
