@@ -11,7 +11,8 @@ for the framework, this workspace is the source of truth for the
 athlete's data — and this skill never touches the data.
 
 **The framework set:** every file tracked in `template/main` **except**
-`docs/**` (the template's own development history) and `.gitkeep`
+`docs/**` (the template's own development history), `tests/**` (the
+template's own test suite and fixtures) and `.gitkeep`
 placeholders. There is no separate manifest — the template repo is the
 manifest. Personal files (`profile.md`, `routine/`, `check-ins/`,
 `nutrition/`, athlete-specific docs in `reference/`, `.env`) are not
