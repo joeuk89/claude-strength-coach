@@ -39,7 +39,8 @@ the draft and build again. Your draft is
    rows from `profile.md` → Food & eating (written by `/recipes`'
    interview: staples, office days, who covers which meals, plan style)
    and the bank's card slugs, using the example in
-   `config.example.toml` for the shape.
+   `config.example.toml` for the shape. Review anchor recipe links with
+   the athlete using [draft.md](draft.md) → Anchor shopping coverage.
 2. Show the athlete the exact TOML and what each standing row means in
    plain words. Write it to `config.toml` only on their approval.
 3. Run `python3 -m coach config validate`, then `python3 -m coach check
@@ -93,7 +94,7 @@ Show, in one message:
    marked *(covered)*, anchors *(anchor)*, locked entries 🔒 with the
    reason), and the pool table above it in loose style, where the pool
    is the contract.
-2. The flags that remain, one line each.
+2. The flags that remain, including each named anchor's missing shopping coverage.
 3. The shopping summary: the Buy count by aisle, and the "check you
    have" staples with the amounts needed.
 4. Every assumption you made (cover estimates, picks you chose).

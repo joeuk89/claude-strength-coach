@@ -34,6 +34,28 @@ variety and what the athlete likes to eat. A card with `servings` above
 1 fills that many slots from one batch; schedule the cook day in
 `notes`. Variations stack only when they change different ingredients.
 
+## Anchor shopping coverage
+
+During setup, offer each anchor's optional `recipe = "<slug>"` link in
+`[[nutrition.anchors]]`, replacing its inline `kcal` and `protein_g`.
+Use only an active card the athlete confirms describes the food and
+serving; a similar name is not a match. When no correct card exists,
+keep the valid bare anchor and its known macros; `/recipes` can add a
+card once the athlete supplies ingredients and amounts.
+
+Anchors already fill their scheduled slots; assign additional food only
+when needed, keeping the anchor out of open-slot picks. Linked anchors
+shop their scheduled servings using the card's batch size. For a supplied
+meal, a slot exception with `recipe` and `covered_by` replaces the anchor;
+a `cover` exception records supplied food without a card. Pantry items
+belong in `staples` or `use_up` and retain their normal shopping treatment.
+
+Present every remaining `anchor_shopping_unknown` warning before approval:
+name the anchor and explain that its macros count but its ingredients are
+missing from shopping. Keep the bare anchor if that is the agreed choice;
+state that the athlete must arrange it separately. Quantities come from
+confirmed ingredients, never from macros.
+
 ## The dry run's flags
 
 Fix the draft and re-run the dry run until no `block` flag remains:
@@ -42,6 +64,7 @@ Fix the draft and re-run the dry run until no `block` flag remains:
 | --- | --- | --- |
 | `recipe_unknown`, `variation_unknown` | block | Correct the slug or variation name, or pick another card. |
 | `variation_conflict` | block | Keep one of the two variations. |
+| `anchor_shopping_unknown` | warn | Follow Anchor shopping coverage above; show any gap before approval. |
 | `slot_open` | warn | Add an assignment; leave it open only on purpose (say so). |
 | `protein_below_floor` | warn | Add a top-up or swap a meal; present any that remain. |
 | `kcal_off_target` | warn | Adjust portions or picks; present any that remain, with the reason. |

@@ -66,6 +66,12 @@ meal plan. An anchor is a fixed daily item in a set slot that:
 Propose candidates from what the athlete already eats and likes, check
 the sum (anchors + a typical day's meals ≥ floor), and agree each
 anchor's name, slot (breakfast, lunch, dinner, snack) and days (daily,
-office days, named weekdays). Record them in `config.toml` (SKILL.md
-step 9). `/meal-plan` treats them as fixed blocks; `/check-in` asks
-whether they happened most days.
+office days, named weekdays). Offer `recipe = "<slug>"` when an active
+card describes that exact food and serving; confirm the card with the
+athlete rather than matching its name alone. Use the link instead of
+`kcal` and `protein_g`: the card supplies macros and shopping ingredients.
+A bare anchor with known macros remains valid when no correct card is
+available; its ingredients are unknown, so `/meal-plan` flags its missing
+shopping coverage without guessing quantities. Record the agreed anchors
+in `config.toml` (SKILL.md step 9). `/meal-plan` treats them as fixed
+blocks; `/check-in` asks whether they happened most days.

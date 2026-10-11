@@ -3507,7 +3507,8 @@ picks for open slots:
   (recipe, variation set) = ceil(count ÷ servings).
 - Flag codes: `protein_below_floor`, `kcal_off_target`, `slot_open`,
   `recipe_unknown`, `variation_unknown`, `variation_conflict`,
-  `recipe_benched`, `use_up_unmatched`, `units_mixed`, `no_target`.
+  `recipe_benched`, `use_up_unmatched`, `units_mixed`, `no_target`,
+  `anchor_shopping_unknown`.
   Severities as in C10. `meals approve` refuses unresolved `block` flags.
 - `approval` is as in C10. `meals shopping --format issue` refuses an
   unapproved plan (exit 3).
@@ -3544,7 +3545,13 @@ Settled while building R-33c (`coach/schemas/meal_plan.schema.json`,
   `recipe`, `title`, `variations`, `count`, `covered_by`, `servings`,
   `batches` (null when covered or the card is unknown), and the
   per-serving `kcal` and `protein_g`. Anchors that name a card are in the
-  pool and the shopping list; inline anchors are in neither.
+  pool and the shopping list for scheduled occurrences only, using the
+  same batch, coverage and pantry rules. Inline anchors keep their macros
+  but contribute no inferred ingredients; each planned occurrence emits
+  `anchor_shopping_unknown`, naming the anchor, date and slot and asking
+  for a confirmed recipe link or separate shopping arrangements. Exceptions
+  replace anchors before pooling and flagging. Setup offers a recipe link
+  only for an explicitly confirmed matching card, never a guessed name.
 - **Shopping.** Variations apply to a batch's ingredients in order; one
   that conflicts with an earlier one is skipped. `use_up` comes off the
   matching (item, unit) line; `used_up` records the amount taken off.
@@ -3564,7 +3571,11 @@ Settled while building R-33c (`coach/schemas/meal_plan.schema.json`,
   resolution}`. Severities are fixed per code: `recipe_unknown`,
   `variation_unknown` and `variation_conflict` are `block`, the rest
   `warn`. `slot_open` fires for a slot with no item and for a pool slot
-  with no assignment.
+  with no assignment. `anchor_shopping_unknown` is a warning that leaves
+  a bare anchor valid; dry runs and plan renders show it, and standalone
+  shopping markdown and issue bodies include unresolved coverage warnings.
+  The v1 schema supports this flag; historical plans remain snapshots
+  with their original flags and approval hashes.
 - **Style.** `plan_style` when set; otherwise `loose` when a standing
   row covers dinner, else `strict`.
 - **Commands.** `meals template` defaults to the first whole week after

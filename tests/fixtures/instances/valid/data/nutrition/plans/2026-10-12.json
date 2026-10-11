@@ -815,11 +815,47 @@
   },
   "flags": [
     {
+      "code": "anchor_shopping_unknown",
+      "severity": "warn",
+      "date": "2026-10-12",
+      "slot": "snack",
+      "message": "Mon 12 Oct snack: Whey shake has no recipe link, so its ingredients are missing from shopping. Link the confirmed recipe card or arrange this anchor separately; its macros still count.",
+      "resolved": false,
+      "resolution": null
+    },
+    {
+      "code": "anchor_shopping_unknown",
+      "severity": "warn",
+      "date": "2026-10-13",
+      "slot": "snack",
+      "message": "Tue 13 Oct snack: Whey shake has no recipe link, so its ingredients are missing from shopping. Link the confirmed recipe card or arrange this anchor separately; its macros still count.",
+      "resolved": false,
+      "resolution": null
+    },
+    {
       "code": "kcal_off_target",
       "severity": "warn",
       "date": "2026-10-13",
       "slot": null,
       "message": "Tue 13 Oct: 1995 kcal is 17% under the 2400 kcal target (tolerance 15%).",
+      "resolved": false,
+      "resolution": null
+    },
+    {
+      "code": "anchor_shopping_unknown",
+      "severity": "warn",
+      "date": "2026-10-14",
+      "slot": "snack",
+      "message": "Wed 14 Oct snack: Whey shake has no recipe link, so its ingredients are missing from shopping. Link the confirmed recipe card or arrange this anchor separately; its macros still count.",
+      "resolved": false,
+      "resolution": null
+    },
+    {
+      "code": "anchor_shopping_unknown",
+      "severity": "warn",
+      "date": "2026-10-15",
+      "slot": "snack",
+      "message": "Thu 15 Oct snack: Whey shake has no recipe link, so its ingredients are missing from shopping. Link the confirmed recipe card or arrange this anchor separately; its macros still count.",
       "resolved": false,
       "resolution": null
     },
@@ -833,6 +869,15 @@
       "resolution": null
     },
     {
+      "code": "anchor_shopping_unknown",
+      "severity": "warn",
+      "date": "2026-10-16",
+      "slot": "snack",
+      "message": "Fri 16 Oct snack: Whey shake has no recipe link, so its ingredients are missing from shopping. Link the confirmed recipe card or arrange this anchor separately; its macros still count.",
+      "resolved": false,
+      "resolution": null
+    },
+    {
       "code": "kcal_off_target",
       "severity": "warn",
       "date": "2026-10-16",
@@ -842,11 +887,29 @@
       "resolution": null
     },
     {
+      "code": "anchor_shopping_unknown",
+      "severity": "warn",
+      "date": "2026-10-17",
+      "slot": "snack",
+      "message": "Sat 17 Oct snack: Whey shake has no recipe link, so its ingredients are missing from shopping. Link the confirmed recipe card or arrange this anchor separately; its macros still count.",
+      "resolved": false,
+      "resolution": null
+    },
+    {
       "code": "kcal_off_target",
       "severity": "warn",
       "date": "2026-10-17",
       "slot": null,
       "message": "Sat 17 Oct: 1540 kcal is 36% under the 2400 kcal target (tolerance 15%).",
+      "resolved": false,
+      "resolution": null
+    },
+    {
+      "code": "anchor_shopping_unknown",
+      "severity": "warn",
+      "date": "2026-10-18",
+      "slot": "snack",
+      "message": "Sun 18 Oct snack: Whey shake has no recipe link, so its ingredients are missing from shopping. Link the confirmed recipe card or arrange this anchor separately; its macros still count.",
       "resolved": false,
       "resolution": null
     },

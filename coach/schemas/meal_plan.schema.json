@@ -151,7 +151,7 @@
       "properties": {
         "code": {"enum": ["protein_below_floor", "kcal_off_target", "slot_open", "recipe_unknown",
                           "variation_unknown", "variation_conflict", "recipe_benched", "use_up_unmatched",
-                          "units_mixed", "no_target"]},
+                          "units_mixed", "no_target", "anchor_shopping_unknown"]},
         "severity": {"enum": ["info", "warn", "block"]},
         "date": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
         "slot": {"type": ["string", "null"]},
