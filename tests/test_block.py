@@ -12,7 +12,7 @@ from unittest import mock
 from coach import block, flags, jsonio, program, structure
 from coach.validate import validate
 from tests.support import INSTANCES, REPO_ROOT, VALID, run_cli
-from tests.support.history import read_json, write_json
+from tests.support.history import prescribe_fixture_history, read_json, write_json
 from tests.support.skills import skill_text
 
 BLOCK = INSTANCES / "block"
@@ -300,6 +300,7 @@ class TriggerTest(BlockCase):
         self.assertIn("triggers 2 of 4 (readiness, sleep)", data["status_line"])
 
     def test_rpe_drift_on_squat_in_the_last_two_session_a_workouts_makes_it_a_deload(self):
+        prescribe_fixture_history(self.root)
         self.init(3)
         for day in ("2026-09-28", "2026-10-05"):
             self.set_rpe(day, "bb_back_squat", 8.5)
@@ -309,6 +310,7 @@ class TriggerTest(BlockCase):
         self.assertEqual(data["block"]["light_week"]["type"], "deload")
 
     def test_drift_in_only_the_last_workout_is_not_two_running(self):
+        prescribe_fixture_history(self.root)
         self.set_rpe("2026-10-05", "bb_back_squat", 8.5)
         week = self.close("2026-W41")["weeks"][-1]
         self.assertFalse(week["signals"]["rpe_drift"])
@@ -483,6 +485,10 @@ class TransformTest(BlockCase):
 
 class LayoffTest(BlockCase):
     base = INSTANCES / "layoff"
+
+    def setUp(self):
+        super().setUp()
+        prescribe_fixture_history(self.root)
 
     def test_return_leaves_lines_the_core_already_decayed(self):
         weekly = self.data("propose", "week", "--week", "2026-W42", "--dry-run")["overlay"]

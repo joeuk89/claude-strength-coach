@@ -84,6 +84,8 @@ class LoggedSet:
     reps: Optional[int]
     rpe: Optional[float]
     load: Optional[float]
+    duration_seconds: Optional[int] = None
+    distance_meters: Optional[float] = None
 
     @property
     def working(self):
@@ -95,8 +97,8 @@ class Exposure:
     """One exercise in one logged workout (C17), its loads as coaching numbers.
 
     `prescribed` holds the working sets the overlay in force that day asked
-    for (the program's set groups when none did); `week_kind` is that
-    overlay's kind, or None.
+    for, or is empty when the historical prescription is unknown.
+    `week_kind` is that overlay's kind, or None.
     """
 
     date: date
@@ -422,8 +424,10 @@ def usable_oldest_first(exposures, after=None):
 
 
 def missed(exposure):
-    """True when an exposure fell short of what it prescribed: a set missing or below its target reps."""
+    """Whether prescribed sets or reps were missed, or None when the historical prescription is unknown."""
     prescribed = working(exposure.prescribed)
+    if not prescribed:
+        return None
     logged = [s for s in exposure.sets if s.working]
     if len(logged) < len(prescribed):
         return True

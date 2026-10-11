@@ -47,22 +47,33 @@ def propose(ctx):
     through = ctx.state.get("through")
     misses = ctx.state.get("misses", 0)
     for exposure in base.usable_oldest_first(ctx.exposures, date.fromisoformat(through) if through else None):
-        misses = misses + 1 if base.missed(exposure) else 0
+        missed = base.missed(exposure)
+        misses = misses + 1 if missed is True else 0
     state = {"misses": misses, "through": source.date.isoformat()}
     load = source.top_load
     limit = ctx.params["misses_before_reset"]
     if load is None:
         return base.Proposal(sets=base.with_load(sets, load), rationale="Linear: the last exposure logged no load",
                              derived_from=source, state=state)
+    if not source.prescribed:
+        return base.Proposal(sets=base.with_load(sets, load),
+                             rationale="Linear: historical prescription unknown, so the last logged load holds",
+                             derived_from=source, state=state)
     if misses >= limit:
         factor = ctx.params["reset_factor"]
         new_load = load * factor
         state["misses"] = 0
+        review = ()
+        if (ctx.slot.start_load is not None
+                and (new_load - ctx.slot.start_load) * ctx.exercise.load_direction < 0):
+            review = (base.flag(ctx, "linear_below_start",
+                                f"Linear reset to {base.load_words(ctx, new_load)} is below the program's "
+                                f"starting load {base.load_words(ctx, ctx.slot.start_load)}; review progression"),)
         return base.Proposal(
             sets=base.with_load(sets, new_load),
             rationale=(f"Linear: prescribed reps missed {misses} exposures running, so the load resets to "
                        f"{base.number(factor * 100)} % of {base.load_words(ctx, load)}"),
-            derived_from=source, state=state, round_down=True,
+            derived_from=source, state=state, round_down=True, flags=review,
         )
     if misses:
         return base.Proposal(

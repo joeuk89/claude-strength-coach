@@ -2003,7 +2003,9 @@ Reserved codes:
 | `rpe_infeasible` | warn | R-24 | | RPE target more than 1 away from the RPE implied by load, reps and current e1RM. |
 | `session_over_cap` | warn | R-24 | | Estimated session duration above its cap. |
 | `no_data` | warn | R-23a | | No usable exposure and no start load; load left empty for the coach. |
-| `stalled` | warn | R-23a | | No load or rep gain over three exposures running. |
+| `stalled` | warn | R-23a | | No metric or matched-work effort gain over three comparable slot exposures; a coaching heuristic, not a diagnosis. Suppressed when the final proposal advances load. |
+| `prescription_unknown` | warn | R-23a | | Historical prescription unknown; no prescribed hit or miss inferred. Prescription validation still runs. |
+| `linear_below_start` | info | R-23a | | Linear reset fell below the starting load; review progression without automatic adjustment. |
 | `rpe_drift` | warn | R-23a | | Compound or recovery-capped exercise: logged RPE at least 1 over target on two or more working sets of the last exposure. |
 | `return_week` | info | R-23a | | Decay applied; names the band and days off. A lifting line's flag adds the load change (`loads × 0.9`, or `assistance held` on an `assisted` line), the set change and any RPE cap. |
 | `return_after_illness` | warn | R-23a | | An `ill` miss or status day in the gap: confirm `SYMPTOM_FREE_HOURS` (48) hours symptom-free; first session capped at RPE `ILLNESS_RPE_CAP` (7). |
@@ -2239,7 +2241,7 @@ class SchemeContext:
     slot: SlotInfo                # session_id, set groups, rest_seconds, cues, constraints, start_load
     params: dict                  # validated, defaults filled
     state: dict                   # validated; INITIAL when absent or after a scheme change
-    exposures: tuple[Exposure, ...]          # all slots, newest first; suspect/excluded marked
+    exposures: tuple[Exposure, ...]          # same session/exercise/load mode, newest first; suspect/excluded marked
     e1rm: float | None            # best point in 42 days (C18)
     last_prescription: dict | None # this slot's line in the newest approved overlay, ignoring lines
                                    # that carry `fold` (C37; R-22 adds the filter)
@@ -2351,8 +2353,19 @@ and `plugins test` runs them. Loaded with
   down; decay and the deload transforms set it too.
 - The `Exposure` a plugin sees is `coach.plugins.base.Exposure`: C17's
   fields with every load as the coaching number, plus `prescribed` (the
-  working sets the overlay in force that day asked for; the slot's
-  program sets when none did) and `week_kind` (that overlay's kind).
+  working sets the overlay in force that day asked for; empty when unknown)
+  and `week_kind` (that overlay's kind). Logged sets retain reps, duration
+  and distance as well as load and RPE. Unknown historical prescriptions
+  are never filled from today's program: linear and ladder hold, double
+  progression holds load, and `prescription_unknown` makes the uncertainty
+  explicit.
+  `base.missed` returns None for unknown prescriptions. Progression history
+  matches the session, exercise and load mode; e1RM and layoff evidence
+  remain exercise-wide. The three-exposure stall heuristic compares equal
+  working-set counts with known metrics: more load (less assistance), more
+  reps at that load, more duration/distance, or lower RPE at otherwise
+  matched work. Missing metrics or a changed load mode/set count cannot
+  establish a stall. A final advancing load suppresses the warning.
   `base.baseline(exposures)` is the exposure loads derive from: the
   newest neither excluded, `suspect` nor trained in a `deload` week. The
   core refuses a proposal derived from an excluded or suspect exposure.

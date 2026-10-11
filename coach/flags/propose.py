@@ -8,7 +8,11 @@ OWNER = "R-23a"
 register("no_data", owner=OWNER, severities=("warn",),
          summary="No usable exposure and no start load; load left empty for the coach.")
 register("stalled", owner=OWNER, severities=("warn",),
-         summary="No load or rep gain over three exposures running.")
+         summary="No metric or matched-work effort gain over three comparable exposures; a coaching heuristic.")
+register("prescription_unknown", owner=OWNER, severities=("warn",),
+         summary="Historical prescription unknown; no prescribed hit or miss inferred.")
+register("linear_below_start", owner=OWNER, severities=("info",),
+         summary="Linear reset fell below the starting load; review progression without automatic adjustment.")
 register("rpe_drift", owner=OWNER, severities=("warn",),
          summary="Compound or recovery-capped exercise: logged RPE at least 1 over target on two or more working "
                  "sets of the last exposure.")
