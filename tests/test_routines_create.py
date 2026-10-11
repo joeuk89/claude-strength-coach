@@ -230,6 +230,20 @@ class OneOffCreateTest(CreateCase):
         self.assertEqual(self.put_paths, [f"/v1/routines/{T1}"])
         self.assertEqual([r["status"] for r in data["routines"]], ["reused", "created", "created"])
 
+    def test_a_spare_hevy_no_longer_has_is_skipped_and_dropped_from_state(self):
+        self.fake.collection("routines")[:] = [r for r in self.fake.collection("routines") if r["id"] != T1]
+        dry = self.create("--dry-run", overlay_id=ONE_OFF)["data"]
+        self.assertEqual(dry["stale"], [T1])
+        self.assertIn(f"Hevy no longer has temporary routine(s) {T1}", dry["summary"])
+        self.assertEqual(len(read_state(self.root)["hevy"]["temporary_routines"]), 2)
+
+        data = self.create(overlay_id=ONE_OFF)["data"]
+        self.assertEqual(self.put_paths, [f"/v1/routines/{T2}"])
+        self.assertEqual([r["status"] for r in data["routines"]], ["reused", "created", "created"])
+        carriers = read_state(self.root)["hevy"]["temporary_routines"]
+        self.assertNotIn(T1, [entry["routine_id"] for entry in carriers])
+        self.assertEqual([entry["session_id"] for entry in carriers], ["travel-a", "travel-b", "travel-c"])
+
     def test_dry_run_names_the_folder_and_the_reuse(self):
         data = self.create("--dry-run", overlay_id=ONE_OFF)["data"]
         self.assertEqual(self.fake.writes, [])

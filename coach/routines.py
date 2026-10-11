@@ -20,7 +20,7 @@ from coach import program as program_module
 from coach import state as state_module
 from coach.errors import ConfigError, RefusedError, ValidationError
 from coach.hevy.cache import HevyCache
-from coach.hevy.client import HevyClient, created_routine, timestamp
+from coach.hevy.client import HevyClient, HevyRequestError, created_routine, timestamp
 from coach.validate import validate as validate_schema
 
 PRESCRIPTION = "prescription"
@@ -651,8 +651,10 @@ def create(ctx, overlay_id, dry_run):
     A temporary session reuses a temporary routine no other overlay still
     carries before a new one is created in the one-off folder (created first
     when state.json has none); any other session gets a new routine in the
-    program folder. Refuses (exit 3) as push does; a read-back that differs
-    exits 1 with the report, keeping the ids already recorded.
+    program folder. A spare Hevy no longer has (404) is skipped and, unless
+    dry_run, dropped from state.json. Refuses (exit 3) as push does; a
+    read-back that differs exits 1 with the report, keeping the ids already
+    recorded.
     """
     _require_hevy(ctx)
     doc = _load(ctx, overlay_id)
@@ -666,17 +668,22 @@ def create(ctx, overlay_id, dry_run):
     needed = [(key, session, carries) for key, session, carries in plan(doc, today, planned) if key.startswith(_NEW)]
     folder = {"title": ONE_OFF_FOLDER_TITLE, "id": None, "status": "not_needed"}
     if not needed:
-        return _create_report(doc, ctx, [], folder, dry_run, 0)
+        return _create_report(doc, ctx, [], folder, dry_run, 0, [])
 
     state_doc = state_module.load(ctx.root)
     _require_program_sessions(ctx.root, doc, [session for _, session, _ in needed])
     hevy = state_doc["hevy"]
     client = HevyClient.from_context(ctx)
     spare = _spare_temporary(ctx.root, doc, today, hevy, ids)
-    work = []
+    work, stale = [], []
     for _, session, carries in needed:
-        reuse = spare.pop(0) if session.get("temporary") and spare else None
-        live = _get_routine(client, reuse) if reuse else None
+        reuse, live = None, None
+        while session.get("temporary") and spare and live is None:
+            reuse = spare.pop(0)
+            live = _live_spare(client, reuse)
+            if live is None:
+                stale.append(reuse)
+                reuse = None
         work.append((session, carries, reuse, live))
     one_off = hevy["folders"]["one_off"]
     if one_off is None and any(s.get("temporary") and not reuse for s, _, reuse, _ in work):
@@ -697,8 +704,11 @@ def create(ctx, overlay_id, dry_run):
                             for line, exercise in zip(session["exercises"], body["routine"]["exercises"])]
         entries.append(entry)
     if dry_run:
-        return _create_report(doc, ctx, entries, folder, dry_run, 0)
+        return _create_report(doc, ctx, entries, folder, dry_run, 0, stale)
 
+    if stale:
+        hevy["temporary_routines"] = [e for e in hevy["temporary_routines"] if e["routine_id"] not in stale]
+        _save_state(ctx.root, state_doc)
     writes = 0
     if folder["status"] == "pending":
         answer = client.post("/v1/routine_folders", {"routine_folder": {"title": ONE_OFF_FOLDER_TITLE}},
@@ -738,9 +748,19 @@ def create(ctx, overlay_id, dry_run):
                 "its id is recorded in state.json, and later routines were not written.",
                 details=[{"path": c["path"], "message": f"sent {c['after']!r}, Hevy has {c['before']!r}"}
                          for c in remaining],
-                data=_create_report(doc, ctx, entries, folder, dry_run, writes),
+                data=_create_report(doc, ctx, entries, folder, dry_run, writes, stale),
             )
-    return _create_report(doc, ctx, entries, folder, dry_run, writes)
+    return _create_report(doc, ctx, entries, folder, dry_run, writes, stale)
+
+
+def _live_spare(client, routine_id):
+    """The spare temporary routine as Hevy has it, or None when Hevy no longer has it."""
+    try:
+        return _get_routine(client, routine_id)
+    except HevyRequestError as error:
+        if error.status == 404:
+            return None
+        raise
 
 
 def _require_program_sessions(root, doc, sessions):
@@ -816,8 +836,9 @@ def _folder_id(answer):
     return folder_id
 
 
-def _create_report(doc, ctx, entries, folder, dry_run, writes):
-    return _report("create", doc, ctx, entries, dry_run=dry_run, writes=writes, folder=dict(folder))
+def _create_report(doc, ctx, entries, folder, dry_run, writes, stale):
+    return _report("create", doc, ctx, entries, dry_run=dry_run, writes=writes, folder=dict(folder),
+                   stale=list(stale))
 
 
 def _load_text(value, mode, unit, load=None):
@@ -1010,6 +1031,10 @@ def _create_summary(report):
     reused = sum(1 for entry in entries if entry["reuse"])
     lines = [f"Overlay {overlay_id} → Hevy: {len(entries) - reused} new routine(s), "
              f"{reused} temporary routine(s) reused."]
+    if report["stale"]:
+        verb = "would be dropped from" if report["dry_run"] else "dropped from"
+        lines.append(f"Hevy no longer has temporary routine(s) {', '.join(map(str, report['stale']))}; "
+                     f"{verb} {paths.STATE}.")
     folder = report["folder"]
     if folder["status"] == "would_create":
         lines.append(f'Folder "{folder["title"]}" is created first; {paths.STATE} has none.')

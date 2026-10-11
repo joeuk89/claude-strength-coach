@@ -1120,7 +1120,9 @@ Cues: <cues>
   entry, in state order, that carries no session of this overlay and no
   session dated today or later of another overlay in force that day; it
   GETs that routine and PUTs the session over it (`intended_body` with
-  the live routine, so the folder is kept). With none left it POSTs a new
+  the live routine, so the folder is kept). A spare that GET answers 404
+  is skipped, listed in the report's `stale`, and dropped from
+  `temporary_routines` (not under `--dry-run`). With none left it POSTs a new
   routine to `hevy.folders.one_off`, POSTing the folder `One-off weeks`
   first when that is null. Any other session gets a new routine in
   `hevy.folders.program` (no `folder_id` when null). The folder follows

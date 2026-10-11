@@ -340,8 +340,8 @@ class SettingsTest(unittest.TestCase):
 
     def test_commands_that_stay_behind_a_prompt(self):
         names = {text[len("python3 -m coach "):] for text, _ in bash_rules() if text.startswith("python3 -m coach")}
-        for name in ("routines push", "routines retire", "routines create", "migrate run", "hevy record-fixtures", "plugins test",
-                     "gate pretooluse"):
+        for name in ("routines push", "routines retire", "routines create", "migrate run",
+                     "hevy record-fixtures", "plugins test", "gate pretooluse"):
             self.assertNotIn(name, names)
         for text, _ in bash_rules():
             self.assertNotIn(text.strip(), ("python3 -m coach", "python3", "python3 -m"))
