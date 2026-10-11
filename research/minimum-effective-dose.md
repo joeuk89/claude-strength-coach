@@ -58,6 +58,13 @@ text = "A priority lift keeps a floor of 2 hard sets at its prescribed load in a
 basis = "heuristic"
 sources = ["androulakis-korakakis-2020", "spiering-2021"]
 status = "current"
+
+[[claims]]
+n = 5
+text = "An exercise folded into another session after a missed day carries 2 working sets by default, one above the single-set floor."
+basis = "heuristic"
+sources = ["spiering-2021", "androulakis-korakakis-2020"]
+status = "current"
 -->
 <!-- coach:begin research minimum-effective-dose -->
 
@@ -69,6 +76,7 @@ status = "current"
 | 2 | Lifters aged about 60 and over need more than one third of their usual weekly sets to keep muscle size, so their maintenance dose stays nearer their normal training. | evidence | bickel-2011, spiering-2021 | current |
 | 3 | One hard set per exercise of 6–12 reps at about 70–85 % of 1RM, done 2–3 times a week, still builds 1RM strength in trained lifters. | evidence (low confidence) | androulakis-korakakis-2020 | current |
 | 4 | A priority lift keeps a floor of 2 hard sets at its prescribed load in a disrupted week, a margin above the single set that still builds strength. | heuristic | androulakis-korakakis-2020, spiering-2021 | current |
+| 5 | An exercise folded into another session after a missed day carries 2 working sets by default, one above the single-set floor. | heuristic | spiering-2021, androulakis-korakakis-2020 | current |
 
 | Source | Citation | Type | Year |
 | --- | --- | --- | --- |
@@ -116,6 +124,12 @@ confidence on the claim.
 builds strength (claim 3), and a second gives a margin for a bad day
 without adding much time. It is not a tested figure.
 
+**Claim 5.** The 2 working sets a folded exercise carries by default
+rest on the same reasoning as claim 4. Spiering et al. and
+Androulakis-Korakakis et al. support 1 set per exercise as the floor;
+the second set is a margin, chosen so the session it lands in stays
+short. It is not a tested figure.
+
 ## Applying it
 
 - In a disrupted stretch, cut sets before load: keep each lift at its
@@ -124,6 +138,8 @@ without adding much time. It is not a tested figure.
   training: about 2 sessions a week and 2–3 sets per exercise.
 - When time is very short, one hard set per main lift, 2–3 times a week,
   still moves strength forward.
+- When a missed session's exercise moves into a later session, give it 2
+  working sets unless the program's rule says otherwise.
 
 ## Open questions
 

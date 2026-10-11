@@ -5,6 +5,8 @@ can apply a rule it builds itself (a priority lift's floor dose), after the
 program's rules as a fallback, alone or on top of a program fold.
 `plan` is read-only; `apply` writes the miss, the overlay and the record
 lines once the athlete has said "go".
+A fold carries `DEFAULT_FOLD_SETS` working sets unless the rule says
+otherwise (rn:minimum-effective-dose.5).
 """
 
 import copy

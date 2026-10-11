@@ -4,7 +4,7 @@ import unittest
 from datetime import date
 from pathlib import Path
 
-from coach import jsonio, research
+from coach import jsonio, missed, research, stats, structure
 from coach.validate import check_schema
 from tests.support import INSTANCES, MINIMAL_CONFIG, REPO_ROOT, VALID, TempInstance, run_cli, run_module
 
@@ -293,6 +293,26 @@ class TemplateRepoTest(unittest.TestCase):
 
     def test_schema_uses_only_the_supported_subset(self):
         check_schema(jsonio.load_schema("research_note"))
+
+    def test_dose_defaults_cite_their_claims(self):
+        notes = research.load_notes(REPO_ROOT)
+        fold = research.resolve("rn:minimum-effective-dose.5", notes)
+        self.assertIsNotNone(fold)
+        self.assertEqual(fold.basis, "heuristic")
+        self.assertEqual(fold.sources, ("spiering-2021", "androulakis-korakakis-2020"))
+        for module, refs in ((structure, ("rn:volume-frequency.1", "rn:volume-frequency.3")),
+                             (missed, ("rn:minimum-effective-dose.5",))):
+            for ref in refs:
+                with self.subTest(module=module.__name__, ref=ref):
+                    self.assertIn(ref, module.__doc__)
+        contract = (REPO_ROOT / "docs/design/coach-contract.md").read_text(encoding="utf-8")
+        c37 = contract.split("## C37.", 1)[1].split("\n## C38.", 1)[0]
+        self.assertIn("rn:minimum-effective-dose.5", c37)
+
+    def test_dose_default_values_are_unchanged(self):
+        self.assertEqual((structure.DEFAULT_TARGET, structure.SESSION_CEILING), (10, 11.0))
+        self.assertEqual(stats.SECONDARY_WEIGHT, 0.5)
+        self.assertEqual(missed.DEFAULT_FOLD_SETS, 2)
 
 
 class NoteValidationTest(InstanceCase):

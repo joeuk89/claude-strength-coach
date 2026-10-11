@@ -231,7 +231,7 @@ and its sources.
 - **Weekly balance** — each muscle group should get appropriate weekly
   volume across **all** sessions combined, including any coach-led ones.
 - **Volume — within a recoverable range** —
-  ~10–20 hard sets per muscle group per week is a reasonable working range; more is not automatically better (rn:volume-frequency.1).
+  ~10–20 hard sets per muscle group per week is a coaching range; more is not automatically better (rn:volume-frequency.1).
   Count cardio as part of total training stress, especially for legs.
 - **Intensity & rep ranges** — strength via heavier loads / lower reps (~1–6 reps, ~80 %+ of 1RM; rn:proximity-to-failure.3); hypertrophy across ~5–30 reps taken close to failure (rn:proximity-to-failure.4).
 - **Frequency** — a scheduling choice bounded by per-session volume.

@@ -430,7 +430,8 @@ Adherence thresholds are coaching heuristics, not research cut-offs:
     per week over the four weeks, rounded up, minimum two;
   - a before/after table of weekly hard sets per muscle, kept equal;
   - each session within the time limits in `profile.md` and about 11
-    fractional hard sets per muscle (an indirect set counts as half);
+    fractional hard sets per muscle (an indirect set counts as half;
+    rn:volume-frequency.2, rn:volume-frequency.3);
   - anything trimmed, named.
 
   The athlete adopts, declines with a reason, or defers to a date.

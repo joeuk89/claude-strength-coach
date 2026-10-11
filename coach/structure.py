@@ -3,7 +3,9 @@
 Planned and delivered dose count sets the same way (`coach.stats.set_weights`
 and the same hard-set rule), so the two compare like for like. The 70 % and
 80 % adherence thresholds and the three-of-four undershoot rule are coaching
-heuristics (R-02), not research cut-offs.
+heuristics (R-02), not research cut-offs. `DEFAULT_TARGET` is the low end
+of the weekly range (rn:volume-frequency.1); `SESSION_CEILING` is the
+per-session ceiling (rn:volume-frequency.3).
 """
 
 from dataclasses import dataclass, field
