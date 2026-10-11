@@ -1347,7 +1347,10 @@ column, or, in a load column, when the same row has a number in a
 Hevy-headed column. Ranges, dates, sets × reps, RPE, durations,
 distances, equipment increments and bodyweight measurements are not
 prescription loads. An excluded measurement covers only its own figures;
-a later instruction in the same sentence is still checked. Equipment
+a later instruction in the same sentence is still checked. Measurement
+subjects include changes (`bodyweight fell 2 kg`) and numeric
+continuations (`bodyweight went from 75 kg to 73 kg`); their verbs do
+not change which figures they describe. Equipment
 capacity descriptions follow the same rules in profiles, overlay text
 and override reasons.
 
@@ -1355,15 +1358,18 @@ The check reads a `per_hand_x2` overlay line's `target_note`, `change`,
 `cues`, `focus` and `override.reason`, and the prose of `profile.md` and
 `check-ins/*.md` outside rendered regions. Overlay text and override
 authoring use the same load-figure parser. In free prose a figure
-belongs to an exercise named before it in its comma/semicolon-delimited
-clause or sentence; ownership does not cross into another clause. A
-comma before a load or a load instruction (`DB bench, move to 20 kg`)
+belongs to an exercise named before it in its clause or sentence.
+Punctuation and conjunctions delimit new subjects, including unmatched
+exercises (`DB bench 20/hand and leg curl 25 kg`). A comma or
+conjunction before a load instruction (`DB bench, move to 20 kg`)
 continues the same prescription. A numbered exercise clause such as
 `3 sets of leg curl at 25 kg` does not.
 Equipment names alone do not identify an exercise prescription.
 Library names, aliases, Hevy titles and ids identify exercises; movement
 names shared by equipment variants require an unambiguous load mode,
-and explicit equipment context selects the matching variant. An
+and equipment modifiers attached to that exercise select the matching
+variant. Equipment words belonging to another exercise or a bodyweight
+measurement do not change its mode. An
 unresolved or unmatched exercise never inherits an earlier exercise's
 mode. No library load modes are changed to interpret prose.
 

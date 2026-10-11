@@ -408,6 +408,36 @@ class BareHevyValuesTest(unittest.TestCase):
             self.assertIn("30 kg", failed[1]["message"])
             self.assertTrue(all("'25 kg'" not in r["message"] for r in failed))
 
+    def test_bodyweight_context_does_not_change_an_exercises_equipment(self):
+        examples = (
+            "Arnold press 20 kg at bodyweight 73 kg",
+            "Arnold press 20 kg with bodyweight down 2 kg",
+            "Arnold press 20 kg with bodyweight stable",
+            "Arnold press 20 kg: the cable step is 5 kg",
+            "Arnold press 20 kg; bodyweight 73 kg",
+            "At bodyweight 73 kg, Arnold press 20 kg",
+            "Arnold press 20 kg and bodyweight fell 2 kg",
+        )
+        for text in examples:
+            with self.subTest(text=text), TempCopy() as tmp:
+                tmp.write("profile.md", text)
+                code, results, _ = check(tmp.root, "bare_hevy_values")
+                self.assertEqual(code, 1, results)
+                [failed] = failures(results, "bare_hevy_values")
+                self.assertIn(": '20 kg' for db_arnold_press", failed["message"])
+
+    def test_conjunctions_separate_exercises_and_preserve_load_instructions(self):
+        for conjunction in ("and", "and then", "but", "but then", "then", "plus", "while"):
+            for following, expected in (("leg curl 25 kg", 0),
+                                        ("3 sets of leg curl at 25 kg", 0),
+                                        ("move to 25 kg", 1),
+                                        ("dumbbell RDL 25 kg", 1)):
+                text = f"DB bench 20/hand {conjunction} {following}."
+                with self.subTest(text=text), TempCopy() as tmp:
+                    tmp.write("profile.md", text)
+                    code, results, _ = check(tmp.root, "bare_hevy_values")
+                    self.assertEqual(code, expected, results)
+
     def test_comma_preserves_load_instructions_but_not_a_new_numbered_exercise(self):
         for text, expected in (("DB bench, move to 20 kg.", 1),
                                ("DB bench 20/hand, 3 sets of leg curl at 25 kg.", 0),
@@ -450,6 +480,11 @@ class BareHevyValuesTest(unittest.TestCase):
         for text, expected in (("dumbbell lateral raise 10 kg", 1),
                                ("cable lateral raise 10 kg", 0),
                                ("lateral raise (cable) 10 kg", 0),
+                               ("cable-based lateral raise 10 kg", 0),
+                               ("lateral raise 10 kg on the cable machine", 0),
+                               ("lateral raise with 10 kg dumbbells", 1),
+                               ("lateral raise 10 kg using dumbbells", 1),
+                               ("dumbbells for lateral raise 10 kg", 1),
                                ("lateral raise 10 kg", 0)):
             with self.subTest(text=text), TempCopy() as tmp:
                 tmp.write("profile.md", text)
@@ -573,8 +608,15 @@ class LoadFigureTest(unittest.TestCase):
             "move dumbbells to 8 kg": ["8 kg"],
             "dumbbells up to 30 kg; move to 8 kg": ["8 kg"],
             "equipment has 2.5 kg steps; add 2.5 kg": ["2.5 kg"],
+            "the cable step is 5 kg and move to 8 kg": ["8 kg"],
             "bodyweight 73 kg; move to 8 kg": ["8 kg"],
             "bodyweight 73 kg and move to 8 kg": ["8 kg"],
+            "bodyweight fell 2 kg; move to 8 kg per hand": [],
+            "bodyweight dropped by 2 kg and move to 8 kg": ["8 kg"],
+            "bodyweight went from 75 kg to 73 kg and move to 8 kg": ["8 kg"],
+            "bodyweight was 75 kg and now 73 kg; move to 8 kg per hand": [],
+            "bodyweight 75 → 73 and move to 8 kg": ["8 kg"],
+            "bodyweight stable and move to 8 kg": ["8 kg"],
             "Goal plan current: 1.9 kg to 73 kg and move to 8 kg": ["8 kg"],
             "cables and dumbbells to 30 kg.": [],
             "move cables and dumbbells to 8 kg": ["8 kg"],

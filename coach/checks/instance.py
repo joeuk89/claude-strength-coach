@@ -25,7 +25,7 @@ from coach.config import equipment_for
 from coach.errors import ConfigError, ValidationError
 from coach.hevy.cache import HevyCache
 from coach.library import Library
-from coach.load_statements import bare_figures, bare_message, statements
+from coach.load_statements import bare_figures, bare_message, measurement_spans, statements
 
 OWNER = "R-16"
 PATHS_KEY = "x-coach-paths"
@@ -350,7 +350,15 @@ class _Mentions:
     """Exercise mentions resolved only when their load mode is unambiguous."""
 
     _EQUIPMENT = {"db": "dumbbell", "dbs": "dumbbell", "dumbbells": "dumbbell",
-                  "bb": "barbell", "kb": "kettlebell", "cables": "cable"}
+                  "bb": "barbell", "kb": "kettlebell", "cables": "cable",
+                  "kettlebells": "kettlebell", "barbells": "barbell"}
+    _EQUIPMENT_WORD = r"(?:dumbbells?|dbs?|barbells?|bb|kettlebells?|kb|cables?|machine|band|bodyweight)"
+    _BEFORE_EQUIPMENT = re.compile(rf"\b({_EQUIPMENT_WORD})(?:-based)?\s+(?:for\s+)?$", re.IGNORECASE)
+    _AFTER_EQUIPMENT = re.compile(
+        rf"(?:\b(?:on|using|with)\s+(?:the\s+)?(?:\d+(?:\.\d+)?\s*(?:kg|lb)s?\s*)?|\(\s*)"
+        rf"({_EQUIPMENT_WORD})\b", re.IGNORECASE,
+    )
+    _EQUIPMENT_STEP = re.compile(rf"\b({_EQUIPMENT_WORD})\s+(?:step|increment)\b", re.IGNORECASE)
 
     def __init__(self, lib):
         candidates = {}
@@ -367,14 +375,30 @@ class _Mentions:
     def _key(phrase):
         return " ".join(phrase.lower().replace("-", " ").split())
 
+    def _equipment(self, text, match, end, ambiguous):
+        words = re.findall(r"[a-z]+", match.group(0).lower())
+        named = {self._EQUIPMENT.get(word, word) for word in words}
+        named &= {"dumbbell", "barbell", "kettlebell", "cable", "machine", "band", "bodyweight"}
+        if named:
+            return named
+        before = self._BEFORE_EQUIPMENT.search(text[:match.start()])
+        modifiers = [(before, 0)] if before else []
+        after = text[match.end():end]
+        modifiers += [(m, match.end()) for m in self._AFTER_EQUIPMENT.finditer(after)
+                      if m.group(1).lower() != "bodyweight"]
+        if ambiguous:
+            modifiers += [(m, match.end()) for m in self._EQUIPMENT_STEP.finditer(after)]
+        measurements = measurement_spans(text)
+        return {self._EQUIPMENT.get(m.group(1).lower(), m.group(1).lower()) for m, offset in modifiers
+                if not any(start <= offset + m.start(1) < stop for start, stop in measurements)}
+
     def find(self, text):
-        equipment = {self._EQUIPMENT.get(word, word) for word in re.findall(r"[a-z]+", text.lower())}
-        equipment &= {"dumbbell", "barbell", "kettlebell", "cable", "machine", "band", "bodyweight"}
-        if "cable" in equipment:
-            equipment.discard("machine")
         found = []
-        for match in self._pattern.finditer(text):
+        matches = list(self._pattern.finditer(text))
+        for index, match in enumerate(matches):
+            end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
             entries = list(self._candidates[self._key(match.group(0))].values())
+            equipment = self._equipment(text, match, end, ambiguous=len(entries) > 1)
             if equipment:
                 entries = [e for e in entries if e["equipment"] in equipment]
             modes = {e["effective_load_mode"] or e["load_mode_default"] for e in entries}

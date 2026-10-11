@@ -633,6 +633,26 @@ class OverrideTest(ProposeCase):
         self.assertIn("'8 kg'", result["error"]["message"])
         self.assertEqual(self.snapshot(), before)
 
+    def test_bodyweight_change_reasons_validate_only_the_prescription(self):
+        measurements = ("bodyweight fell 2 kg", "bodyweight dropped by 2 kg",
+                        "bodyweight has increased by 2 kg", "bodyweight went from 75 kg to 73 kg",
+                        "bodyweight was 75 kg and now 73 kg", "bodyweight 75 → 73", "lost 2 kg of bodyweight")
+        for measurement in measurements:
+            with self.subTest(measurement=measurement):
+                before = self.snapshot()
+                self.coach("propose", "override", "--proposal", FIRST_ID, "--session", "session-a",
+                           "--exercise", "db_bench_press", "--load", "8", "--reason",
+                           measurement + " and move to 8 kg", "--standing", expect=1)
+                self.assertEqual(self.snapshot(), before)
+                self.coach("propose", "override", "--proposal", FIRST_ID, "--session", "session-a",
+                           "--exercise", "db_bench_press", "--load", "8", "--reason",
+                           measurement + "; move to 8 kg per hand")
+                draft = read_json(self.draft_path())
+                built = overlay.build(draft, config.load(self.root), root=self.root, now=dates.parse_timestamp(NOW))
+                approved = overlay.approve(built, dates.parse_timestamp(NOW))
+                write_json(self.root / "data" / "overlays" / f"{FIRST_ID}.json", approved)
+                self.coach("check", "--only", "bare_hevy_values")
+
     def test_equipment_only_reasons_pass_authoring_and_approved_overlay_checks(self):
         examples = (
             "Home only: adjustable dumbbells, 2–20 kg per hand in 2 kg steps.",

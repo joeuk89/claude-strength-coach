@@ -219,6 +219,23 @@ class SessionStartTest(unittest.TestCase):
 
 
 class PostToolUseTest(unittest.TestCase):
+    def test_measurement_and_conjunction_context_preserves_actual_load_guards(self):
+        for text, blocked in (("Arnold press 20 kg at bodyweight 73 kg", True),
+                              ("DB bench 20/hand and leg curl 25 kg.", False),
+                              ("DB bench 20/hand and move to 25 kg.", True)):
+            with self.subTest(text=text):
+                root = copy_of(self, VALID)
+                profile = root / "profile.md"
+                profile.write_text(text, encoding="utf-8")
+                code, response, _ = run_hook("posttooluse", root, edit_input(profile))
+                self.assertEqual(code, 0)
+                if blocked:
+                    self.assertIsNotNone(response)
+                    self.assertEqual(response["decision"], "block")
+                    self.assertIn("bare_hevy_values", response["reason"])
+                else:
+                    self.assertIsNone(response)
+
     def test_comma_load_context_blocks_only_the_actual_dumbbell_prescription(self):
         for text, blocked in (("DB bench, move to 20 kg.", True),
                               ("DB bench 20/hand, 3 sets of leg curl at 25 kg.", False)):

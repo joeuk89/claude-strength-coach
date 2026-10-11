@@ -73,25 +73,45 @@ _EQUIPMENT_CAPACITY_BEFORE = re.compile(
     r"\s+(?:(?:go\s+)?up\s+(?:to|in)|to|down\s+to)\s*$", re.IGNORECASE,
 )
 _WEIGHT = r"\d+(?:\.\d+)?\s*(?:kgs?|lbs?|kilos?|pounds?)(?![A-Za-z])"
-_BODYWEIGHT_MEASUREMENT = re.compile(
-    r"\b(?:body\s*weight|body mass|goal weight|goal plan current)\b"
-    rf"\s*(?:(?:is|was|at|now|currently|current|target)\s+)*[:=]?\s*{_WEIGHT}"
-    rf"(?:\s*(?:to|→|->)\s*{_WEIGHT})?", re.IGNORECASE,
+_MEASUREMENT_SUBJECT = re.compile(r"\b(?:body\s*weight|body mass|goal weight|goal plan current)\b", re.IGNORECASE)
+_CLAUSE_SEPARATOR = re.compile(
+    r"(,|[;!?\n]|\.(?!\d)|\b(?:(?:and|but)\s+then|and|but|then|plus|while|whereas)\b)", re.IGNORECASE,
 )
+_MEASUREMENT_CONTINUATION = re.compile(r"\s*(?:to|at|→|->|and\s+now|,?\s*now)\s*", re.IGNORECASE)
+_MEASUREMENT_SUFFIX = re.compile(rf"{_WEIGHT}\s+(?:of\s+)?(?:body\s*weight|body mass)\b", re.IGNORECASE)
 _EQUIPMENT_LIMIT = re.compile(
     rf"{_WEIGHT}\s+{_EQUIPMENT_NOUN}\s+(?:is|are)\s+(?:the\s+)?(?:heaviest|maximum|largest)\b",
     re.IGNORECASE,
 )
+_INCREMENT_BEFORE = re.compile(r"\b(?:step|increment)\s+(?:is|of|:)\s*$", re.IGNORECASE)
 _INCREMENT_AFTER = re.compile(r"\s*(?:cable\s+)?(?:steps?|increments?)\b", re.IGNORECASE)
 
 
-def _unrelated_measurement(text, figure):
-    before = statements(text[:figure.start])[-1]
-    measured = any(match.start() <= figure.start < match.end()
-                   for pattern in (_BODYWEIGHT_MEASUREMENT, _EQUIPMENT_LIMIT)
-                   for match in pattern.finditer(text))
+def measurement_spans(text):
+    """Associate a measurement subject with its first figure and numeric continuations."""
+    spans = [(match.start(), match.end()) for pattern in (_EQUIPMENT_LIMIT, _MEASUREMENT_SUFFIX)
+             for match in pattern.finditer(text)]
+    figures = _figures(text)
+    for subject in _MEASUREMENT_SUBJECT.finditer(text):
+        boundary = _CLAUSE_SEPARATOR.search(text, subject.end())
+        end = boundary.start() if boundary else len(text)
+        following = [figure for figure in figures if figure.start >= subject.end()]
+        if not following or following[0].start >= end:
+            continue
+        measured_end = following[0].end
+        for figure in following[1:]:
+            if not _MEASUREMENT_CONTINUATION.fullmatch(text[measured_end:figure.start]):
+                break
+            measured_end = figure.end
+        spans.append((subject.start(), measured_end))
+    return spans
+
+
+def _unrelated_measurement(text, figure, measurements):
+    before = re.split(r"[;!?\n]|\.(?!\d)", text[:figure.start])[-1]
+    measured = any(start <= figure.start < end for start, end in measurements)
     return bool(measured or _EQUIPMENT_CAPACITY_BEFORE.search(before)
-                or _INCREMENT_AFTER.match(text[figure.end:]))
+                or _INCREMENT_BEFORE.search(before) or _INCREMENT_AFTER.match(text[figure.end:]))
 
 
 def bare_figures(text, load_column=False):
@@ -102,11 +122,12 @@ def bare_figures(text, load_column=False):
     another figure in its chain, says per hand or gives the Hevy value.
     """
     bare = []
+    measurements = measurement_spans(text)
     for chain in _chains(text, _figures(text)):
         if any(f.two_number or f.rpe for f in chain):
             continue
         bare += [f for f in chain if (f.unit or load_column or len(chain) > 1)
-                 and (load_column or not _unrelated_measurement(text, f))]
+                 and (load_column or not _unrelated_measurement(text, f, measurements))]
     return bare
 
 
@@ -129,11 +150,12 @@ _LOAD_CONTINUATION = re.compile(
 
 
 def statements(text):
-    """Keep comma-separated load instructions with their exercise, not numbered exercises."""
-    parts = re.split(r"(,|[;!?\n]|\.(?!\d))", text)
+    """Separate subjects at punctuation or conjunctions, retaining explicit load continuations."""
+    parts = _CLAUSE_SEPARATOR.split(text)
     found = [parts[0]]
     for separator, following in zip(parts[1::2], parts[2::2]):
-        if separator == "," and _LOAD_CONTINUATION.match(following):
+        if (separator == "," or separator[0].isalpha()) \
+                and _LOAD_CONTINUATION.match(following):
             found[-1] += separator + following
         else:
             found.append(following)
