@@ -314,6 +314,14 @@ class ImportRulesTest(ImportCase):
                                                            {"count": 1, "type": "normal", "reps": 12}])
         self.assertEqual(session["exercises"][0]["start_load"], 25)
 
+    def test_an_assisted_line_starts_from_its_least_assistance(self):
+        root = self.instance()
+        self.set_library(root, "pull_up", load_mode="assisted")
+        sets = [hevy_set(30, 6), hevy_set(20, 6), hevy_set(20, 6)]
+        draft = self.draft_of([routine("Session B", [hevy_exercise("F0000004", "Pull Up", sets)])], root=root)
+        self.assertEqual(exercise(draft, "session-b", "pull_up")["start_load"], 20)
+        self.assertIn("BW-20 assist", rows(draft, "converted_load", "pull_up")[0]["message"])
+
     def test_an_all_conditioning_routine_is_a_conditioning_session(self):
         root = self.instance()
         lib = read(root, "data/exercises.json")
@@ -615,6 +623,16 @@ class AdoptReplaceTest(AdoptCase):
         self.assertEqual(envelope["data"]["removed"], ["routine/session-b.md"])
         self.assertFalse((self.root / "routine/session-b.md").exists())
         self.assertIn("routine/session-b.md", git(self.root, "diff", "--cached", "--name-only").stdout.split())
+
+    def test_an_invalid_old_state_is_archived_as_it_is_and_carries_nothing(self):
+        state = read(self.root, "data/state.json")
+        del state["block"]
+        write(self.root, "data/state.json", state)
+        code, envelope, _ = self.adopt(self.root, self.replacement(), "--replace")
+        self.assertEqual(code, 0, envelope)
+        self.assertEqual(read(self.root, "data/archive/programs/2026-10-11/state.json"), state)
+        self.assertEqual(read(self.root, "data/state.json")["scheme_state"], {})
+        self.assertTrue(any("archived as it is" in warning for warning in envelope["warnings"]))
 
     def test_one_off_and_temporary_routines_carry_over(self):
         state = read(self.root, "data/state.json")

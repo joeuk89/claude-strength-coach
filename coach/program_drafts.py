@@ -247,7 +247,7 @@ def _start_load(sets, exercise_id, mode, session_id, library, config, rows):
     if not weights:
         return (0 if mode == "bodyweight" else None), None
     unit = config.athlete.units
-    top = max(weights)
+    top = min(weights) if mode == "assisted" else max(weights)
     value, message = _converted(top, exercise_id, mode, library, config)
     rows.append(_row("converted_load", message, session_id, exercise_id))
     if len(set(weights)) > 1:
@@ -288,7 +288,7 @@ def _program_name(folders, folder_id):
 
 def _detect(routines, top_loads, library, unit):
     """Percentage-based signals: keywords, week-marked titles, one exercise at three or more top loads."""
-    evidence = []
+    evidence, keywords = [], set()
     for routine in routines:
         texts = [(routine.get("title"), f"the title {routine.get('title')!r}"),
                  (routine.get("notes"), f"the note on {routine.get('title')!r}")]
@@ -297,6 +297,7 @@ def _detect(routines, top_loads, library, unit):
         for text, where in texts:
             for keyword, pattern in _KEYWORDS:
                 if text and pattern.search(text):
+                    keywords.add(keyword)
                     evidence.append({"kind": "keyword", "exercise_id": None, "message": f'"{keyword}" in {where}'})
 
     by_stem = {}
@@ -322,7 +323,6 @@ def _detect(routines, top_loads, library, unit):
                                         f"{len(found)} routines: {loads}"})
 
     kinds = {item["kind"] for item in evidence}
-    keywords = {item["message"].split('"')[1] for item in evidence if item["kind"] == "keyword"}
     suggested = []
     if "week_titles" in kinds or keywords & set(_WAVE_KEYWORDS):
         suggested.append("wave_531")
@@ -472,6 +472,17 @@ def _new_state(draft, doc, old_state, old_program, rotation, today):
     return state, {"kept": kept, "dropped": dropped}
 
 
+def _readable(load, root, present, warnings):
+    """The current document, or None when absent or invalid; an invalid one is archived as it is but carries nothing over."""
+    if not present:
+        return None
+    try:
+        return load(root)
+    except ValidationError as exc:
+        warnings.append(f"{exc.message}; it is archived as it is, and nothing in it carries over")
+        return None
+
+
 def _archive_dir(root, today):
     base = Path(root) / paths.PROGRAM_ARCHIVE_DIR
     candidate, suffix = base / today.isoformat(), 2
@@ -530,8 +541,9 @@ def adopt(root, draft, replace=False, position=None, dry_run=False, today=None):
     if existing and not replace:
         raise RefusedError(f"{paths.PROGRAM} already holds a program; adopt with --replace to archive it "
                            f"under {paths.PROGRAM_ARCHIVE_DIR}/{today.isoformat()}/ and replace it")
-    old_program = program.read_json(program.path_for(root)) if existing else None
-    old_state = state_module.read_json(state_module.path_for(root)) if state_module.exists(root) else None
+    warnings = []
+    old_program = _readable(program.load, root, existing, warnings)
+    old_state = _readable(state_module.load, root, state_module.exists(root), warnings)
     new_state, scheme_report = _new_state(draft, doc, old_state, old_program, rotation, today)
     state_errors = state_module.problems(new_state, doc)
     if state_errors:
@@ -545,7 +557,7 @@ def adopt(root, draft, replace=False, position=None, dry_run=False, today=None):
     result = {
         "program": paths.PROGRAM.as_posix(), "sessions": [s["id"] for s in doc["sessions"]],
         "rotation": rotation, "scheme_state": scheme_report,
-        "archived": [], "written": [], "removed": [], "staged": [], "warnings": [],
+        "archived": [], "written": [], "removed": [], "staged": [], "warnings": warnings,
         "unconfirmed": _unconfirmed(doc, library),
         "avoided": _avoided(doc, library),
         "without_routine": [s["id"] for s in doc["sessions"] if s["id"] not in draft["hevy_routines"].values()]

@@ -4546,8 +4546,9 @@ reads the C8 cache and writes a draft (default
   `kind: "conditioning"`.
 - Set groups come from consecutive routine sets with the same type and
   reps or rep range. Warm-up sets are kept.
-- Start load is the top working set's `weight_kg` through
-  `units.from_hevy_kg` with the confirmed load mode; every conversion is
+- Start load is the top working set's `weight_kg` (for an `assisted`
+  line, the least assistance) through `units.from_hevy_kg` with the
+  confirmed load mode; every conversion is
   a `converted_load` row (`Hevy 50 → 25/hand`). The value is rounded
   with `units.round_to_increment` to the exercise's increment
   (`stats.load_increment`) only when it does not convert back to the
