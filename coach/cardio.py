@@ -15,6 +15,7 @@ from coach import dates, flags, history, niggles, render, stats, statusdays, uni
 from coach import program as program_module
 from coach.activity.store import ActivityStore
 
+CITES = ("rn:running-load.1", "rn:running-load.2", "rn:running-load.3", "rn:running-load.4")
 PLAN_TIERS = ("review", "program")
 QUALITY_WORDS = ("interval", "tempo", "threshold", "hill", "fartlek", "track", "race")
 LIFTING = "lifting"

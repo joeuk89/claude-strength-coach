@@ -58,6 +58,13 @@ url = "https://pubmed.ncbi.nlm.nih.gov/14636098/"
 type = "rct"
 year = 2003
 
+[[sources]]
+id = "panissa-2016"
+citation = "Panissa VLG, Cal Abad CC, Julio UF, Andreato LV, Franchini E. High-Intensity Intermittent Exercise and its Effects on Heart Rate Variability and Subsequent Strength Performance. Front Physiol. 2016;7:81."
+url = "https://doi.org/10.3389/fphys.2016.00081"
+type = "rct"
+year = 2016
+
 [[claims]]
 n = 1
 text = "Adding aerobic training to lifting does not reduce muscle growth on average, though running (not cycling) has reduced it in older pooled data."
@@ -89,8 +96,8 @@ status = "current"
 [[claims]]
 n = 5
 text = "No quality run in the 24 hours before a heavy squat or hinge session, meaning one with a working set at RPE 7 or above, or of 6 reps or fewer when no RPE is set."
-basis = "evidence"
-sources = ["sporer-2003"]
+basis = "heuristic"
+sources = ["sporer-2003", "panissa-2016"]
 status = "current"
 confidence = "low"
 
@@ -112,7 +119,7 @@ confidence = "low"
 | 2 | Adding aerobic training does not reduce maximal strength gains on average, but trained lifters gain less lower-body strength when both are done in the same session. | evidence | schumann-2022, petre-2021, wilson-2012 | current |
 | 3 | Adding aerobic training reduces gains in power and explosive strength, most when both are done in the same session. | evidence | schumann-2022, wilson-2012 | current |
 | 4 | On a day with lifting and a quality run, lift first and keep at least 6 hours between them. | evidence | robineau-2016, eddens-2018, murlasits-2018, schumann-2022 | current |
-| 5 | No quality run in the 24 hours before a heavy squat or hinge session, meaning one with a working set at RPE 7 or above, or of 6 reps or fewer when no RPE is set. | evidence (low confidence) | sporer-2003 | current |
+| 5 | No quality run in the 24 hours before a heavy squat or hinge session, meaning one with a working set at RPE 7 or above, or of 6 reps or fewer when no RPE is set. | heuristic (low confidence) | sporer-2003, panissa-2016 | current |
 | 6 | Easy runs may go on the same day as lifting; only quality runs trigger the spacing rules. | heuristic (low confidence) | wilson-2012, schumann-2022 | current |
 
 | Source | Citation | Type | Year |
@@ -124,6 +131,7 @@ confidence = "low"
 | murlasits-2018 | [Murlasits Z, Kneffel Z, Thalib L. The physiological effects of concurrent strength and endurance training sequence: A systematic review and meta-analysis. J Sports Sci. 2018;36(11):1212-1219.](<https://doi.org/10.1080/02640414.2017.1364405>) | meta-analysis | 2018 |
 | robineau-2016 | [Robineau J, Babault N, Piscione J, Lacome M, Bigard AX. Specific Training Effects of Concurrent Aerobic and Strength Exercises Depend on Recovery Duration. J Strength Cond Res. 2016;30(3):672-683.](<https://doi.org/10.1519/JSC.0000000000000798>) | rct | 2016 |
 | sporer-2003 | [Sporer BC, Wenger HA. Effects of aerobic exercise on strength performance following various periods of recovery. J Strength Cond Res. 2003;17(4):638-644.](<https://pubmed.ncbi.nlm.nih.gov/14636098/>) | rct | 2003 |
+| panissa-2016 | [Panissa VLG, Cal Abad CC, Julio UF, Andreato LV, Franchini E. High-Intensity Intermittent Exercise and its Effects on Heart Rate Variability and Subsequent Strength Performance. Front Physiol. 2016;7:81.](<https://doi.org/10.3389/fphys.2016.00081>) | rct | 2016 |
 
 <!-- coach:end research concurrent-training -->
 
@@ -132,9 +140,9 @@ confidence = "low"
 For muscle size and maximal strength, cardio added to lifting costs little
 on average; power and explosive strength suffer more, especially when
 both are trained in one session. Keep hard runs away from heavy leg work:
-lift first with at least 6 hours between on a shared day, and no quality
-run in the 24 hours before a heavy squat or hinge session. Easy runs are
-free to go anywhere.
+lift first with at least 6 hours between on a shared day, and, as a
+cautious rule of thumb, no quality run in the 24 hours before a heavy squat
+or hinge session. Easy runs are free to go anywhere.
 
 ## Evidence
 
@@ -165,16 +173,27 @@ authors advise against less than 6 hours between them. On order,
 eddens-2018 (10 studies) found lifting before cardio gave more lower-body
 dynamic strength (6.91 % weighted mean difference) and no difference in
 hypertrophy, and murlasits-2018 found 3.96 kg more lower-body 1RM with
-strength first and no cost to aerobic capacity.
+strength first and no cost to aerobic capacity. schumann-2022 found the
+loss in explosive strength only when both were in one session, not with 3
+hours or more between them, so 6 hours is the cautious end of the range.
 
-**Claim 5.** In sporer-2003, a randomised crossover trial with 16 active
+**Claim 5.** Two small acute trials measured how long a hard bout of
+cardio cuts lower-body lifting performance; neither tested 24 hours as a
+threshold. In sporer-2003, a randomised crossover trial with 16 active
 men, intervals or steady cycling 4 or 8 hours before lifting cut the reps
 completed on leg press, but not on bench press; at 24 hours performance
-was back to control. The trial used cycling; running, with its eccentric
-load, is likely to tire the legs at least as much (wilson-2012). One small
-acute trial supports the 24 hours, so the claim carries low confidence. The heavy thresholds (RPE 7, 6 reps) are
-this framework's definition of heavy lower-body work, not figures from the
-trial.
+was back to control. In panissa-2016, nine trained men ran 5 km of
+1-minute intervals before 4 sets of half squats at 80 % of 1RM: reps and
+total load dropped at 30 minutes and 1 hour, and at 4, 8 and 24 hours did
+not differ from control (8 hours still showed a moderate effect size). So
+the measured drop lasts up to about 1 hour after running intervals and up
+to 8 hours after cycling. Running, with its eccentric load, may still tire
+the legs more than cycling over a training block (wilson-2012). The 24
+hours is a conservative "not the day before" rule, a coaching heuristic
+with low confidence; a program can lower it through the
+`quality_before_heavy_lower` rule's `hours` param. The heavy thresholds
+(RPE 7, 6 reps) are this framework's definition of heavy lower-body work,
+not figures from either trial.
 
 **Claim 6.** wilson-2012 found interference grows with how often and how
 long the cardio is (correlations −0.26 to −0.35 for frequency and −0.29 to
@@ -199,7 +218,10 @@ still counts toward weekly training stress.
 ## Open questions
 
 - Does a quality run the day before heavy squats cost long-term strength,
-  or only that session's reps? sporer-2003 measured one session.
+  or only that session's reps? sporer-2003 and panissa-2016 measured one
+  session each.
+- Would a shorter window than 24 hours, such as 8, lose anything? No
+  trial has compared them.
 - How much do easy runs interfere in trained lifters who also run high
   weekly mileage?
 - Is 3 hours between sessions, schumann-2022's threshold, as good as 6?

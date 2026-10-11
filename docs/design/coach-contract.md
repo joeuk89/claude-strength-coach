@@ -5306,9 +5306,9 @@ weekly_run_minutes = 0
 single_run_distance = 0
 single_run_minutes = 0
 weekly_quality = 2             # quality activities per week, runs and conditioning together; 0 = no cap
-spike_ratio = 1.10             # run_volume_spike above this × the longest run in the lookback
+spike_ratio = 1.10             # run_volume_spike above this × the longest run in the lookback (rn:running-load.1)
 spike_lookback_days = 30
-spike_min_history_days = 14    # a run is judged only once the store's first activity is this far before it
+spike_min_history_days = 14    # a run is judged only once the store's first activity is this far before it (rn:running-load.4)
 sleep_short_hours = 7.0        # a night below this is short
 sleep_debt_nights = 4          # short nights of the last 7 that raise sleep_debt
 sleep_min_nights = 4           # nights with data needed to judge
@@ -5348,8 +5348,9 @@ external_session_rpe = 6
 | `external_default` | a coach-led session annotated done (C17 `external`) | `external_session_rpe`, for `external_session_minutes` |
 | `kind_default` | otherwise | `lifting` 6, `run` 4, `ride` 4, `swim` 4, `row` 5, `walk` 2, `hike` 3, `conditioning` 7, `sport` 6, `mobility` 1, `other` 4 |
 
-- The combined figure is information only. No flag reads it, and no ratio
-  of it is ever computed.
+- The combined figure is information only (rn:running-load.3). No flag
+  reads it, and no ratio of it is ever computed (rn:running-load.2).
+- `coach.cardio.CITES` holds `rn:running-load.1` to `.4`.
 - Check `cardio_config` (fail, naming the key): caps 0 or more,
   `spike_ratio` above 1, `spike_lookback_days` at least 1,
   `spike_min_history_days` 0 to `spike_lookback_days`,
@@ -5450,7 +5451,7 @@ week-flag provider in `propose week`; registered in
 | Code | Rule |
 |---|---|
 | `cap_breach` | Logged week, and planned week at `review`/`program`: run distance or minutes above the weekly cap; any single run above the single-run cap; quality activities above `weekly_quality`. One flag per cap broken, naming value, cap and unit. A planned record with only a duration target is checked on minutes only. |
-| `run_volume_spike` | A run whose distance (else minutes) exceeds `spike_ratio` × the longest logged run in the `spike_lookback_days` before its date. Warn logged, info planned. No reference run, or store history shorter than the lookback (the store's first logged Activity, any kind, is fewer than `spike_min_history_days` before the run): listed in `data.skipped` with the reason, not flagged. |
+| `run_volume_spike` | A run whose distance (else minutes) exceeds `spike_ratio` × the longest logged run in the `spike_lookback_days` before its date. Warn logged, info planned. No reference run, or store history shorter than the lookback (the store's first logged Activity, any kind, is fewer than `spike_min_history_days` before the run): listed in `data.skipped` with the reason, not flagged (rn:running-load.1, rn:running-load.4). |
 | `quality_stack` | Two quality bouts on the same or consecutive local dates, logged or planned. Lifting is not part of it; lifting against runs is `collision` (C51). |
 | `sleep_debt` | Over the 7 nights ending on the evaluation date (C30 wellness, resolved): at least `sleep_min_nights` with a value and at least `sleep_debt_nights` below `sleep_short_hours`. Evaluation date: the span's last day for `--week` and `--span`, or today when the span ends later; today for proposals. |
 | `status_active` | A status day overlaps the span or today. Warn `ill`/`injured` (`injured` adds "check with a qualified professional"), info `travel`. |

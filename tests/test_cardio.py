@@ -11,8 +11,9 @@ from pathlib import Path
 from unittest import mock
 
 import coach.weekflags
-from coach import cardio, dates, flags
-from tests.support import INSTANCES, run_cli
+from coach import cardio, dates, flags, research
+from coach.config_tables.cardio import CARDIO as CARDIO_TABLE
+from tests.support import INSTANCES, REPO_ROOT, run_cli
 
 CARDIO = INSTANCES / "cardio"
 LAYOFF = INSTANCES / "layoff"
@@ -418,6 +419,53 @@ class CardPartTest(CardioCase):
         self.assertIn("Easy 5 km", fields["runs"]["prefill"])
         self.assertIn("4 under 7 h", fields["sleep"]["prefill"])
         self.assertIn("sleep_debt", self.codes(card["flags"]))
+
+
+class EvidenceTest(unittest.TestCase):
+    def setUp(self):
+        self.notes = research.load_notes(REPO_ROOT)
+
+    def claim(self, ref):
+        found = research.resolve(ref, self.notes)
+        self.assertIsNotNone(found, ref)
+        return found
+
+    def test_the_module_cites_the_running_load_claims(self):
+        self.assertEqual(cardio.CITES, tuple(f"rn:running-load.{n}" for n in range(1, 5)))
+        for ref in cardio.CITES:
+            self.claim(ref)
+
+    def test_the_claims_state_the_defaults_the_code_uses(self):
+        defaults = {name: key.default for name, key in CARDIO_TABLE.keys.items()}
+        self.assertEqual((defaults["spike_ratio"], defaults["spike_lookback_days"], defaults["spike_min_history_days"]),
+                         (1.10, 30, 14))
+        spike = self.claim("rn:running-load.1")
+        self.assertIn("1.10", spike.text)
+        self.assertIn("30 days", spike.text)
+        note = next(n for n in self.notes if n.id == "running-load")
+        self.assertEqual((spike.basis, spike.confidence or note.confidence), ("evidence", "low"))
+        guard = self.claim("rn:running-load.4")
+        self.assertEqual((guard.basis, "14 days" in guard.text), ("heuristic", True))
+
+    def test_the_sources_behind_each_claim(self):
+        expected = {1: ("evidence", {"frandsen-2025"}),
+                    2: ("evidence", {"frandsen-2025", "impellizzeri-2020", "lolli-2019"}),
+                    3: ("evidence", {"foster-2001", "haddad-2017"}),
+                    4: ("heuristic", set())}
+        for n, (basis, sources) in expected.items():
+            with self.subTest(claim=n):
+                found = self.claim(f"rn:running-load.{n}")
+                self.assertEqual((found.basis, set(found.sources)), (basis, sources))
+
+    def test_the_config_example_cites_the_running_load_claims(self):
+        lines = (REPO_ROOT / "config.example.toml").read_text(encoding="utf-8").splitlines()
+        start = lines.index("[cardio]")
+        end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("[")), len(lines))
+        section = "\n".join(lines[start:end])
+        self.assertNotIn("no research note", section)
+        for ref in ("rn:running-load.1", "rn:running-load.4", "rn:running-load.5", "rn:running-load.6",
+                    "rn:running-load.7"):
+            self.assertIn(ref, section)
 
 
 if __name__ == "__main__":
