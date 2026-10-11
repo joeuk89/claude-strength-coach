@@ -707,7 +707,7 @@ def render_fresh_sweep(ctx):
     framework = _framework_files(ctx)
     for path in _markdown_files(ctx.root):
         rel = _rel(ctx, path)
-        if rel in framework:
+        if rel.startswith("tests/") or rel in framework:
             continue
         found, count = _region_results(ctx, rel, path.read_bytes().decode("utf-8"))
         results += found

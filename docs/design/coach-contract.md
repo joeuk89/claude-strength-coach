@@ -989,9 +989,12 @@ for every non-GET request, success or failure, once its retries are over.
   regions are snapshots with no freshness check (late syncs must not fail
   old records).
 - **The sweep** (R-16 `render_fresh_sweep`) reads every `*.md` under the
-  root outside dot-directories, except framework files: those tracked at
-  the template commit `.claude/framework-sync.json` records, which the
-  athlete cannot fix because the next sync overwrites them. A marker is
+  root outside dot-directories, except the bundled root `tests/` tree
+  (regardless of framework-sync metadata) and framework files tracked at
+  the template commit `.claude/framework-sync.json` records. The athlete
+  cannot fix framework content because the next sync overwrites it.
+  Athlete-owned Markdown in other locations, including custom notes,
+  remains eligible. A marker is
   a region marker only when it starts its own line (up to three spaces
   of indent) outside a fenced code block and an inline code span, so
   docs that show markers as examples hold no regions. It finds a kind's

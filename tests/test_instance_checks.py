@@ -574,6 +574,46 @@ class RenderFreshSweepTest(unittest.TestCase):
                          ["notes/mine.md", "reference/guide.md"])
         self.assertEqual([row["path"] for row in failures(after, "render_fresh_sweep")], ["notes/mine.md"])
 
+    @unittest.skipUnless(shutil.which("git"), "needs git")
+    def test_bundled_tests_are_excluded_independently_of_framework_sync(self):
+        stale = "<!-- coach:begin overlay 2026-10-12-weekly -->\nstale\n" \
+                "<!-- coach:end overlay 2026-10-12-weekly -->\n"
+        bundled = stale + "<!-- coach:begin week-review 2026-10-11 -->\nstale\n" \
+                  "<!-- coach:end week-review 2026-10-11 -->\n" \
+                  "<!-- coach:begin overlay 2026-01-05-weekly -->\nunavailable\n" \
+                  "<!-- coach:end overlay 2026-01-05-weekly -->\n"
+        athlete_paths = ["profile.md", "notes/tests/custom.md", "tests-notes/custom.md"]
+        for metadata in ("absent", "malformed", "unreadable", "unknown-commit", "valid"):
+            with self.subTest(metadata=metadata), GitRepo() as repo:
+                guide = repo.root / "reference/guide.md"
+                guide.write_text(stale, encoding="utf-8")
+                repo.git("add", "reference/guide.md")
+                repo.git("commit", "-q", "-m", "template")
+                commit = subprocess.run(["git", "-C", str(repo.root), "rev-parse", "HEAD"], check=True,
+                                        capture_output=True, text=True).stdout.strip()
+                marker = repo.root / ".claude/framework-sync.json"
+                if metadata != "absent":
+                    marker.parent.mkdir()
+                    if metadata == "unreadable":
+                        marker.mkdir()
+                    elif metadata == "malformed":
+                        marker.write_text("{", encoding="utf-8")
+                    else:
+                        marker.write_text(json.dumps({"template_commit": commit if metadata == "valid"
+                                                      else "unknown-commit"}), encoding="utf-8")
+                fixture = repo.root / "tests/fixtures/instance/profile.md"
+                fixture.parent.mkdir(parents=True)
+                fixture.write_text(bundled, encoding="utf-8")
+                for rel in athlete_paths:
+                    path = repo.root / rel
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text(stale, encoding="utf-8")
+                code, results, _ = check(repo.root, "render_fresh_sweep")
+                expected = athlete_paths + ([] if metadata == "valid" else ["reference/guide.md"])
+                self.assertEqual(code, 1)
+                self.assertEqual(sorted(row["path"] for row in results), sorted(expected), results)
+                self.assertEqual(statuses(results, "render_fresh_sweep"), ["fail"] * len(expected))
+
     def test_valid_regions_are_fresh(self):
         _, results, _ = check(VALID, "render_fresh_sweep")
         [row] = [r for r in results if r["id"] == "render_fresh_sweep"]
