@@ -581,13 +581,6 @@ def rendered_path(plan_id):
     return paths.MEAL_PLANS_DIR / f"{plan_id}.md"
 
 
-def ids(root):
-    directory = Path(root) / paths.MEAL_PLANS_DATA_DIR
-    if not directory.is_dir():
-        return []
-    return sorted(p.stem for p in directory.glob("*.json"))
-
-
 def read_json(path):
     path = Path(path)
     if not path.is_file():
