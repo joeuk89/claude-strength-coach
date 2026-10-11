@@ -593,7 +593,8 @@ def _exposures_of(found_workouts):
             if exercise["exercise_id"] is None or not working:
                 continue
             exposures.append({
-                "date": workout["date"], "workout_id": workout["workout_id"], "session_id": workout["session_id"],
+                "date": workout["date"], "start_time": workout.get("start_time"),
+                "workout_id": workout["workout_id"], "session_id": workout["session_id"],
                 "exercise_id": exercise["exercise_id"], "load_mode": exercise["load_mode"], "sets": working,
                 "overlay_id": workout.get("overlay_id"),
                 "suspect": False, "excluded": exercise["discounted"] or exercise["convention_unknown"],

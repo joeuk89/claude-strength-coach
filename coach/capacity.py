@@ -2,12 +2,15 @@
 
 from datetime import timedelta
 
+from coach import config as config_module
 from coach import dates, decisions, overlay
 
 
 class Context:
     def __init__(self, root, as_of=None):
         self.as_of = as_of
+        zone_name = config_module.load(root).athlete.timezone
+        self.tz = dates.zone(zone_name) if zone_name else None
         self.decisions = [d for d in decisions.load(root)["decisions"] if d["outcome"] == "adopted"
                           and (as_of is None or dates.parse_timestamp(d["made_at"]) <= as_of)]
         self.overlays = [doc for doc in overlay.list(root) if overlay.is_approved(doc)
@@ -44,8 +47,12 @@ class Context:
         decay = (line.get("provenance") or {}).get("decay")
         if decay and (decay["load_factor"] < 1 or decay["set_delta"] < 0 or decay["rpe_cap"] is not None):
             context["kind"] = "return"
-        overrides = [d for d in self.decisions if d["kind"] == "override" and d["overlay_id"] == doc["id"]
+        approved_at = dates.parse_timestamp(doc["approval"]["approved_at"])
+        overrides = [d for d in self.decisions if d["kind"] == "override"
                      and d["scope"] == {"session_id": exposure["session_id"], "exercise_id": exposure["exercise_id"]}
+                     and (d["overlay_id"] == doc["id"]
+                          or (d["standing"] and line.get("override")
+                              and dates.parse_timestamp(d["made_at"]) <= approved_at))
                      and self.applies(d, exposure)]
         chosen = max(overrides, key=lambda d: (d["made_at"], d["id"]), default=None)
         if chosen and _reduced(chosen, exposure["load_mode"]):
@@ -53,11 +60,17 @@ class Context:
         return context
 
     def applies(self, decision, exposure):
-        closed = decision["closed_at"]
-        if decision["status"] == "withdrawn" and closed:
-            if (self.as_of is None or dates.parse_timestamp(closed) <= self.as_of) and closed[:10] <= exposure["date"]:
+        if decision["status"] == "withdrawn" and decision["closed_at"]:
+            closed = dates.parse_timestamp(decision["closed_at"])
+            if (self.as_of is None or closed <= self.as_of) and self._before_workout(closed, exposure):
                 return False
         return decision["until"] is None or exposure["date"] <= decision["until"]
+
+    def _before_workout(self, moment, exposure):
+        """Without a start time, only an earlier local day proves a withdrawal came before the workout."""
+        if exposure.get("start_time"):
+            return moment <= dates.parse_timestamp(exposure["start_time"])
+        return moment.astimezone(self.tz).date().isoformat() < exposure["date"]
 
 
 def _reduced(decision, load_mode):

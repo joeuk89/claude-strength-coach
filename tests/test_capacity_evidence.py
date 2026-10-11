@@ -16,9 +16,9 @@ class CapacityEvidenceTest(NoHevyCase):
         for path in (self.root / "data/history").glob("????-??.json"):
             path.unlink()
 
-    def log_session(self, day, squat=100, bench=22.5, bench_reps=10, rpe=8, squat_rpe=7):
+    def log_session(self, day, squat=100, bench=22.5, bench_reps=10, rpe=8, squat_rpe=7, overlay_id=None):
         draft = self.filled(day="2026-10-12")
-        draft.update(date=day, overlay_id=draft["overlay_id"] if day == "2026-10-12" else None)
+        draft.update(date=day, overlay_id=overlay_id or (draft["overlay_id"] if day == "2026-10-12" else None))
         for exercise in draft["exercises"]:
             for logged in exercise["sets"]:
                 if logged["type"] != "warmup":
@@ -264,3 +264,86 @@ class CapacityEvidenceTest(NoHevyCase):
         evidence = stats.capacity_evidence(data, "db_bench_press", "2026-10-19")
         self.assertEqual(evidence["estimate"]["e1rm"], 36)
         self.assertIsNone(evidence["reason"])
+
+    def time_workout(self, day, start, end):
+        path = self.root / "data/history/2026-10.json"
+        doc = read_json(path)
+        for workout in doc["workouts"]:
+            if workout["date"] == day:
+                workout.update(start_time=start, end_time=end)
+        write_json(path, doc)
+
+    def test_same_day_withdrawal_after_a_timed_workout_keeps_light_context(self):
+        self.log_session("2026-10-05")
+        self.log_session("2026-10-12", bench=18.5, bench_reps=8, rpe=6)
+        self.time_workout("2026-10-12", "2026-10-12T17:00:00Z", "2026-10-12T18:00:00Z")
+        self.decision(status="withdrawn", closed_at="2026-10-12T21:00:00Z", closed_reason="Resume normal work")
+        for as_of in (None, datetime(2026, 10, 12, 20, tzinfo=timezone.utc),
+                      datetime(2026, 10, 13, 1, tzinfo=timezone.utc)):
+            with self.subTest(as_of=as_of):
+                data = stats.e1rm_series(self.root, as_of=as_of)
+                self.assertEqual(data["series"]["db_bench_press"][-1]["date"], "2026-10-05")
+                self.assertIsNone(data["delta"]["db_bench_press"])
+                self.assertEqual(data["observations"]["db_bench_press"][-1]["context"]["kind"], "light")
+        self.decision(status="withdrawn", closed_at="2026-10-12T16:00:00Z", closed_reason="Cancel recovery")
+        data = stats.e1rm_series(self.root)
+        self.assertEqual(data["series"]["db_bench_press"][-1]["e1rm"], 25.9)
+        self.assertEqual(data["observations"]["db_bench_press"][-1]["context"]["kind"], "normal")
+
+    def test_same_day_withdrawal_without_workout_timing_keeps_light_context(self):
+        self.log_session("2026-10-05")
+        self.log_session("2026-10-12", bench=18.5, bench_reps=8, rpe=6)
+        self.decision(status="withdrawn", closed_at="2026-10-12T06:00:00Z", closed_reason="Resume normal work")
+        data = stats.e1rm_series(self.root)
+        self.assertEqual(data["series"]["db_bench_press"][-1]["date"], "2026-10-05")
+        self.assertEqual(data["observations"]["db_bench_press"][-1]["context"]["kind"], "light")
+
+    def standing_week(self, carried=True, approved_at="2026-10-18T19:00:00Z"):
+        from coach import units
+
+        doc = read_json(self.root / "data/overlays/2026-10-12-weekly.json")
+        doc.update(id="2026-10-19-weekly", span={"start": "2026-10-19", "end": "2026-10-25"},
+                   created_at="2026-10-18T18:00:00Z")
+        for session in doc["sessions"]:
+            session["date"] = "2026-10-19"
+            for line in session["exercises"]:
+                if line["exercise_id"] == "db_bench_press":
+                    line["sets"] = [{"type": "normal", "load": units.make_load(18.5, "per_hand_x2", "kg"),
+                                     "reps": 8, "rpe": 6} for _ in range(2)]
+                    line["override"] = {"reason": "Shoulder settles at lighter work", "proposed_sets": [
+                        {"type": "normal", "load": units.make_load(23.5, "per_hand_x2", "kg"), "reps": 10, "rpe": 8}
+                        for _ in range(3)]} if carried else None
+        doc = overlay.approve(doc, datetime.fromisoformat(approved_at.replace("Z", "+00:00")))
+        write_json(self.root / "data/overlays/2026-10-19-weekly.json", doc)
+        return doc
+
+    def standing_decision(self, made_at="2026-10-11T19:00:00Z"):
+        return self.decision(kind="override", overlay_id="2026-10-12-weekly", made_at=made_at,
+                             scope={"session_id": "session-a", "exercise_id": "db_bench_press"}, details=None,
+                             reason="Shoulder settles at lighter work", standing=True, until="2026-11-08",
+                             proposed_sets=[{"type": "normal", "load": 22.5, "reps": 10, "rpe": 8}] * 3,
+                             chosen_sets=[{"type": "normal", "load": 18.5, "reps": 8, "rpe": 6}] * 2)
+
+    def test_standing_reduction_keeps_its_provenance_in_a_later_approved_overlay(self):
+        self.log_session("2026-10-05")
+        doc = self.standing_week()
+        self.log_session("2026-10-19", bench=18.5, bench_reps=8, rpe=6, overlay_id=doc["id"])
+        decision = self.standing_decision()
+        data = stats.e1rm_series(self.root)
+        self.assertEqual(data["observations"]["db_bench_press"][-1]["context"],
+                         {"kind": "reduced", "overlay_id": doc["id"], "decision_id": decision["id"]})
+        self.assertEqual(data["series"]["db_bench_press"][-1]["date"], "2026-10-05")
+        self.assertIsNone(data["delta"]["db_bench_press"])
+
+    def test_standing_reduction_applies_only_to_overlays_that_carried_it(self):
+        self.log_session("2026-10-05")
+        for case, carried, made_at in (("not carried", False, "2026-10-11T19:00:00Z"),
+                                       ("made after approval", True, "2026-10-19T08:00:00Z")):
+            with self.subTest(case=case):
+                doc = self.standing_week(carried=carried)
+                if case == "not carried":
+                    self.log_session("2026-10-19", bench=18.5, bench_reps=8, rpe=6, overlay_id=doc["id"])
+                self.standing_decision(made_at=made_at)
+                data = stats.e1rm_series(self.root)
+                self.assertEqual(data["observations"]["db_bench_press"][-1]["context"]["kind"], "normal")
+                self.assertEqual(data["series"]["db_bench_press"][-1]["date"], "2026-10-19")

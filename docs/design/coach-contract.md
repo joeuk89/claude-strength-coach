@@ -1893,9 +1893,10 @@ workout with at least one non-warm-up set left after annotations.
 ```python
 coach.history.workouts(root, since=None, until=None, include_unsynced=False) -> list[ResolvedWorkout]   # annotations applied
 coach.history.exposures(root, exercise_id, before=None) -> list[Exposure]       # newest first
-# Exposure: date, workout_id, session_id, exercise_id, load_mode, sets (working sets only),
+# Exposure: date, start_time, workout_id, session_id, exercise_id, load_mode, sets (working sets only),
 #           suspect (open convention_slip candidate), excluded (discount / unknown_convention),
-#           discounted, convention_unknown (which of the two)
+#           discounted, convention_unknown (which of the two), overlay_id;
+#           all_exposures adds capacity_context (C18)
 # Read workouts and their sets carry discounted, convention_unknown and repaired (the fields a
 # repair replaced); each workout carries unsynced and conditioning (C17 conditioning rule).
 coach.history.last_lifting_date(root, before) -> date | None                    # any workout with a lifting exercise
@@ -1964,17 +1965,22 @@ capacity loss. Check-in `e1rm_notes` and progress text explain omitted
 observations; the raw values remain inspectable through `stats e1rm` and
 history. No lower-bound estimate is invented above the cap.
 
-C17 exposures also carry their stored `overlay_id` and additive
+C17 exposures also carry their workout's `start_time` (null when the
+source has none), their stored `overlay_id` and additive
 `capacity_context = {kind, overlay_id, decision_id}`. Context uses the
 stored overlay when known, otherwise the approved overlay in force:
 `deload` kind, adopted `light_week` decisions (`deload`, `light`, `return`),
 actual return reductions in line `provenance.decay`, or an explicit
 matching adopted override that reduces working-set count, load, reps or
 RPE without increasing another of those measures (`reduced`; increased
-assistance is a load reduction). It never
-infers recovery from a `one_off` name or free text. Unknown context is
-`normal`. Decisions withdrawn before the exposure do not apply; a later
-withdrawal does not erase the exposure's historical recovery context.
+assistance is a load reduction). A matching override is one recorded for
+that overlay, or a C25 standing override the approved overlay carried
+(its line has an `override`) and that was made by the overlay's approval.
+It never infers recovery from a `one_off` name or free text. Unknown
+context is `normal`. Decisions withdrawn before the workout started do
+not apply; a later withdrawal, even on the same day, does not erase the
+exposure's historical recovery context. Without a workout start time,
+only a withdrawal on an earlier local day counts as before the workout.
 Neither this context nor capacity eligibility excludes an exposure from
 progression: return-week logs remain the next week's baseline.
 
