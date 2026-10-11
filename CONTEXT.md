@@ -195,6 +195,24 @@ typical meals the athlete reaches the protein floor. Agreed in `/goals`;
 `/meal-plan` places anchors as fixed blocks.
 _Avoid_: protein snack, top-up, staple (an item kept in stock, not one eaten daily)
 
+**Standing template**:
+The athlete's typical eating week, described once in `config.toml`
+(`[nutrition.template]`): the meal slots, office days, staples, plan
+style, and one standing row per slot and set of days that names a recipe,
+a pool of recipes to pick from each week, or a cover (someone else
+decides, with an estimated kcal and protein). Every weekly meal plan
+starts from it, with the protein anchors placed in their slots.
+_Avoid_: meal template, default week, usual plan
+
+**Plan exception**:
+One way a week's meal plan departs from the standing template: a slot
+filled differently on one date (a meal out, a skipped lunch, someone
+else cooking) or a day's office status changed. An exception replaces
+everything the template puts in that slot that day, anchors included. A
+plan is its exceptions, the coach's picks for open and pool slots, and
+the items to use up; the athlete gives the exceptions in one line.
+_Avoid_: override (reserved for the nutrition override), swap, change
+
 **Nutrition override**:
 A dated period in which the athlete eats to a number other than the
 nutrition app's (or, without an app, the trend-driven calorie target):

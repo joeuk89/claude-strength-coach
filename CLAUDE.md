@@ -51,7 +51,7 @@ intermediate, and advanced lifters. You:
 | `routine/*.md` | The session files — however many the program's structure needs. |
 | `routine/hevy-map.json` | Hevy routine IDs → plan locations (if the athlete uses Hevy). Update it when routines are added/renamed on either side. |
 | `check-ins/` | Dated check-in records (`YYYY-MM-DD.md`) — the progress history. On normal weeks the newest record's "The week ahead" section carries the **weekly overlay**: the per-exercise prescription `/program-week` wrote for the current week (on deload weeks `/one-off-week` fills that section instead). |
-| `nutrition/` | Meal planning: `menu/` (the recipe bank — one card per recipe plus `index.md`; format in `reference/recipe-cards.md`) and dated meal plans (`YYYY-MM-DD.md`). Bank managed by `/recipes`, plans by `/meal-plan`. |
+| `nutrition/` | Meal planning: `menu/` (the recipe bank — one card per recipe plus `index.md`; format in `reference/recipe-cards.md`) and meal plans (`plans/<first day>.md`, rendered from `data/nutrition/plans/`). Bank managed by `/recipes`, plans by `/meal-plan`. |
 | `reference/` | Supporting docs: the Hevy API cheatsheet plus any coaching docs written for this athlete (progressions, protocols). |
 | `.env` | `HEVY_API_KEY` — never print or commit it. |
 
