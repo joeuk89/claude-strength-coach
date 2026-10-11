@@ -94,6 +94,23 @@ def from_meters(meters, unit):
     return json_number(round(meters / _distance_factor(unit), 6))
 
 
+def mass_kg(value, unit):
+    """Kilograms for a body mass in kg or lb, to the gram."""
+    _number(value, "mass")
+    return json_number(round(value * _factor(unit), 3))
+
+
+_KCAL_PER = {"kcal": 1, "kJ": 1 / 4.184}
+
+
+def energy_kcal(value, unit):
+    """Kilocalories for an energy in kcal or kJ, to 0.1 kcal."""
+    _number(value, "energy")
+    if unit not in _KCAL_PER:
+        raise ValueError(f"unknown energy unit {unit!r}; expected one of {', '.join(_KCAL_PER)}")
+    return json_number(round(value * _KCAL_PER[unit], 1))
+
+
 def make_load(value, load_mode, unit):
     """Build the C5 load object, or None for modes that carry no load."""
     if load_mode not in LOAD_MODES:
