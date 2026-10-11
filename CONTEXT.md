@@ -167,7 +167,8 @@ high, or fat-free mass when a credible body-fat reading exists). The
 **target** is what the coach steers toward, the **stretch** is the most
 that still adds anything, and the **floor** is the reachable number the
 athlete is held to now: recent intake plus a little, never under
-1.2 g/kg or over the target. The floor rises after two consecutive
+1.2 g/kg of bodyweight or goal weight (~1.5 g/kg of fat-free mass) or
+over the target. The floor rises after two consecutive
 check-ins at or over it and only `/goals` lowers it. For a nutrition app
 user the floor is the protein number set in the app.
 _Avoid_: protein goal, protein minimum, macro target, g/kg bodyweight (without the reference mass)

@@ -104,10 +104,8 @@ of sleep opportunity instead of 8.5 h cut the fat lost by 55 % and raised
 fat-free mass lost by 60 % (Nedeltcheva et al. 2010, *Ann Intern Med*
 153:435–441, https://doi.org/10.7326/0003-4819-153-7-201010050-00006).
 The ~7 h line is the AASM/SRS adult minimum (Watson et al. 2015, *J Clin
-Sleep Med* 11:591–592, https://doi.org/10.5664/jcsm.4758). The athlete
-can still choose the deficit; record that choice and its reason beside
-the gate status. `/check-in` re-checks the gate during a deficit once a
-sleep source exists.
+Sleep Med* 11:591–592, https://doi.org/10.5664/jcsm.4758). `/check-in`
+re-checks the gate during a deficit once a sleep source exists.
 
 Agree with the athlete: **goal weight** (or body-comp outcome), **phase
 sequence** with rough dates, **target trend rate per phase**, and **what
@@ -154,8 +152,8 @@ fat.
   most that still adds anything (useful on a hard cut); the **floor** is
   the reachable number the athlete is held to this week.
 - **MacroFactor users:** the floor is the protein number set in the app
-  (step 6). The app's protein figure and the floor on file are always
-  the same number.
+  (step 6). The app's protein figure and the floor on file are the same
+  number unless an active nutrition override covers protein (step 7).
 - Round to the nearest 5 g.
 
 Sources: Morton et al. 2018 (*Br J Sports Med* 52:376–384,
@@ -277,7 +275,7 @@ check-ins)" beside it. The section holds:
   — or, no app: starting estimate <kcal> (<method>, <date>) · current target <kcal> (last changed <date>: <trend reason>)
 - **Protein reference mass:** <mass> · basis: bodyweight | goal weight | fat-free mass (<why: the reading, its method and date>)
 - **Protein:** floor <g> (since <date>; app users: = the app's protein setting) · target <g> · stretch <g>
-- **Sleep gate:** passed (<14-day avg>, <date>) | recomp (<14-day avg>, <date>) | pending measurement (<what was reported>) | not evaluated · <athlete's choice and reason, if they overrode it>
+- **Sleep gate:** passed (<14-day avg>, <date>) | recomp (<14-day avg>, <date>) | pending measurement (<what was reported>) | not evaluated
 
 ### Protein anchors
 | Anchor | Slot | Days | Protein | kcal |

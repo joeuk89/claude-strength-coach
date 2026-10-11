@@ -121,7 +121,8 @@ fields, always in this order:
 6. **Nutrition** — MacroFactor users: trend weight · expenditure ·
    targets (kcal / protein) · last 7 days' average (kcal / protein). A
    dashboard screenshot is accepted. Without MacroFactor: this week's
-   morning weigh-ins, and roughly how eating went. Then, for both: days
+   morning weigh-ins, and roughly how eating went (with your average
+   daily protein if you track it). Then, for both: days
    logged (of 7) · anchors most days (y/n). Leave out days logged for an
    athlete who doesn't track food, and anchors when none are on file.
    Nutrition setup still TBD in `profile.md`: one morning scale weight.
@@ -149,7 +150,7 @@ Check-in for <window> (<weekly|deep> — <reason>).
 4. Sleep. One line: average hours a night (from your watch or phone if it tracks sleep), and how it felt.
 5. Niggles. Anything new? Left knee (watching): quiet or still there?
 6. Nutrition. MacroFactor: trend weight · expenditure · targets (kcal/protein) · 7-day average (kcal/protein). A screenshot works.
-   No MacroFactor: this week's morning weigh-ins, and roughly how eating went.
+   No MacroFactor: this week's morning weigh-ins, and roughly how eating went (with your average daily protein if you track it).
    Both: days logged (of 7) · anchors most days (y/n).
 7. Meal plan: what stuck, what got swapped?
 8. Next week. Anything different: travel, schedule, kit, illness?
@@ -309,14 +310,17 @@ compare:
 **Without MacroFactor:** take the morning weigh-ins and the eating read
 from the Nutrition field; compare the weight trend across recent
 check-ins against the target trend rate in `profile.md`. When a
-**2–3-week trend** misses the target rate, move the calorie target on
-file by ~100–150 kcal/day in the direction the trend needs, and record
-the change and its reason in Nutrition & goals. Never re-derive it from
-an equation; a fresh estimate comes only from `/goals` with a new phase.
+**2–3-week trend** misses the target rate, propose moving the calorie
+target on file by ~100–150 kcal/day in the direction the trend needs.
+With the athlete's yes, update it and its reason in Nutrition & goals.
+Never re-derive it from an equation; a fresh estimate comes only from
+`/goals` with a new phase.
 
 **Both — protein habit progression.** Read the weekly average protein
-(the app's 7-day average, or the athlete's own tracking) against the
-**floor** in `profile.md`:
+against the **floor** in `profile.md`: the app's 7-day average, or,
+without MacroFactor, the average daily protein from the Nutrition field.
+No figure (the athlete doesn't track protein) → skip the progression
+this week.
 
 - Average at or over the floor at **two consecutive check-ins** since
   the floor last changed → propose raising the floor by ~10–15 g,
