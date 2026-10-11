@@ -54,9 +54,10 @@ dumbbells = []                # per-hand dumbbell weights available; [] = not ch
 # morning weigh-in and /goals sets things up. Weights are in [athlete]
 # bodyweight_units. No key holds a calorie figure the nutrition app owns:
 # kcal_target is only for app = "none", and is an error otherwise.
-#   protein: floor, target and stretch in grams a day; floor_since is the
-#     date the floor last changed, and floor_step_g how far it rises once
-#     average protein meets it at two check-ins running (never above target).
+#   protein: floor, target and stretch in grams a day; readings dated on
+#     or after floor_since count toward a raise, and floor_step_g is how far
+#     the floor rises once average protein meets it at two check-ins running
+#     (never above target).
 #   anchors: the 2-3 standing protein anchors. days: "daily", "office",
 #     "home" or weekday ids "mon" .. "sun".
 #   override: at most one, expiring no more than 21 days after it starts;

@@ -125,7 +125,7 @@ fields, always in this order:
       without an app, this week's morning weigh-ins and average daily
       protein if they track it. A dashboard screenshot is accepted.
    2. Habits: anchors most days (y/n)? Anything in the plan that didn't
-      work?
+      work? The anchors ask is left out when no anchors are on file.
    3. Next week: food exceptions — who cooks which nights, office-day
       changes, meals out. Asked **only when a standing weekly template
       exists** (`[nutrition.template]` in `config.toml`); `data.questions`
@@ -143,7 +143,7 @@ already covers the fields, don't send the template; leave out any single
 field it already answers.
 
 Reference template (wording may be tightened; the fields and their order
-are fixed):
+are fixed; the Food field's a/b/c wording comes from `data.questions`):
 
 ```
 Check-in for <window> (<weekly|deep> — <reason>).
@@ -156,8 +156,9 @@ Check-in for <window> (<weekly|deep> — <reason>).
 5. Niggles. Anything new? Left knee (watching): quiet or still there?
 6. Food.
    a. MacroFactor: trend weight · expenditure · targets (kcal/protein) · 7-day average (kcal/protein) · days logged. A screenshot works.
+      (No app: this week's morning weigh-ins · average daily protein, if you track it.)
    b. Anchors most days (y/n)? Anything in the plan that didn't work?
-   c. Food exceptions next week: who cooks which nights, office-day changes, meals out?
+   c. (only with a standing weekly template) Food exceptions next week: who cooks which nights, office-day changes, meals out?
 7. Next week. Anything different: travel, schedule, kit, illness?
 ```
 
@@ -334,9 +335,12 @@ tweaking numbers here.
 - `protein_floor_raise` — average protein met the floor at the two most
   recent readings since `floor_since`. Propose raising the floor to
   `proposed_floor_g` (the step, capped at the target). With the
-  athlete's yes, set `floor_g` and `floor_since` (today) in
-  `[nutrition.protein]` in `config.toml`; MacroFactor users set the
-  app's protein to the new floor the same day. No flag → the floor
+  athlete's yes, set `floor_g` to `proposed_floor_g` and `floor_since`
+  to `proposed_floor_since` (the day after the latest counted reading,
+  so this week's reading, taken under the old floor, doesn't count
+  toward the next raise) in `[nutrition.protein]` in `config.toml`;
+  MacroFactor users set the app's protein to the new floor the same
+  day. No flag → the floor
   stays: missing it never lowers it; only `/goals` lowers it.
 - `app_protein_mismatch` — the app's protein target is not the floor.
   Have the athlete set the app to the floor, unless the active override

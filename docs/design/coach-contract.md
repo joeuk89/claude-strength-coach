@@ -2920,10 +2920,12 @@ dates unique:
   rounded to 0.01; null (with `span` and `days`) when the readings cover
   under 14 days. A number only: no flag judges it.
 - A flag is `{code, message, ...}` with the numbers it names.
-  `protein_floor_raise` (`floor_g`, `proposed_floor_g`, `dates`): the
-  two most recent readings dated on or after `floor_since` both have
-  `avg_protein_g >= floor_g`, and the floor is under the target; it
-  proposes `min(floor_g + floor_step_g, target_g)`. `override_expired`
+  `protein_floor_raise` (`floor_g`, `proposed_floor_g`,
+  `proposed_floor_since`, `dates`): the two most recent readings dated
+  on or after `floor_since` both have `avg_protein_g >= floor_g`, and
+  the floor is under the target; it proposes `min(floor_g +
+  floor_step_g, target_g)`, with `floor_since` set to the day after the
+  later of `dates` so neither counted reading counts again. `override_expired`
   (`expires`): today is on or after `expires`. `override_renewed_twice`
   (`renewal`): `renewal` is 2. `app_protein_mismatch` (`app_protein_g`,
   `floor_g`, `override_active`): an app is in use and the latest
@@ -2934,7 +2936,9 @@ dates unique:
 - `questions` are plain strings in order: the readings question (the
   app's numbers in R-01's order, or, without an app, "this week's
   morning weigh-ins · average daily protein, if you track it"), the
-  habits question, and the food-exceptions question only when
+  habits question ("anchors most days (y/n)? Anything in the plan that
+  didn't work?", or only "Anything in the plan that didn't work?" when
+  `anchors` is empty), and the food-exceptions question only when
   `template` is true. `brief_line` reads `Food: protein floor <g> g,
   last week <g> g · anchors: <names or none> · override: <none | what,
   until D | what, from D | expired D>`; with no reading it says "no

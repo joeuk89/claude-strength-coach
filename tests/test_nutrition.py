@@ -96,6 +96,24 @@ class StatusTest(CliMixin, unittest.TestCase):
         self.assertEqual(raise_flag["floor_g"], 110)
         self.assertEqual(raise_flag["proposed_floor_g"], 120)
         self.assertEqual(raise_flag["dates"], ["2026-10-04", "2026-10-11"])
+        self.assertEqual(raise_flag["proposed_floor_since"], "2026-10-12")
+        self.assertIn("floor_since = 2026-10-12", raise_flag["message"])
+
+    def test_accepted_raise_needs_two_new_readings(self):
+        with InstanceCopy() as root:
+            raise_flag = flag(self.run_ok(root, "nutrition", "status"), "protein_floor_raise")
+            edit_config(root, "floor_g = 110", f"floor_g = {raise_flag['proposed_floor_g']}")
+            edit_config(root, "floor_since = 2026-09-28", f"floor_since = {raise_flag['proposed_floor_since']}")
+            later = {"COACH_NOW": "2026-10-18T18:00:00Z"}
+            self.run_ok(root, "nutrition", "record", "--date", "2026-10-18", "--trend-weight", "82.1",
+                        "--target-protein", "120", "--avg-protein", "121", "--days-logged", "7", env=later)
+            self.assertEqual(codes(self.run_ok(root, "nutrition", "status", env=later)), [])
+            latest = {"COACH_NOW": "2026-10-25T18:00:00Z"}
+            self.run_ok(root, "nutrition", "record", "--date", "2026-10-25", "--trend-weight", "82.0",
+                        "--target-protein", "120", "--avg-protein", "122", "--days-logged", "7", env=latest)
+            raise_flag = flag(self.run_ok(root, "nutrition", "status", env=latest), "protein_floor_raise")
+            self.assertEqual(raise_flag["dates"], ["2026-10-18", "2026-10-25"])
+            self.assertEqual(raise_flag["proposed_floor_g"], 128)
 
     def test_no_raise_when_only_one_reading_counts(self):
         with InstanceCopy() as root:
@@ -198,6 +216,10 @@ class QuestionsTest(unittest.TestCase):
         no_app = nutrition.questions(dict(status, app="none"))
         self.assertIn("morning weigh-ins", no_app[0])
         self.assertNotIn("expenditure", no_app[0])
+
+    def test_no_anchors_drops_the_anchors_ask(self):
+        status = dict(nutrition.status(VALID, date(2026, 10, 11)), anchors=[])
+        self.assertEqual(nutrition.questions(status)[1], "Anything in the plan that didn't work?")
 
     def test_disabled_status_has_nothing(self):
         self.assertEqual(nutrition.questions({"enabled": False}), [])

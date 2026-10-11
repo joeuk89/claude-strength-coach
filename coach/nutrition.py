@@ -8,7 +8,7 @@ athlete approves, and config changes go through /goals (ADR-0002).
 """
 
 import copy
-from datetime import date
+from datetime import date, timedelta
 
 from coach import config as config_module
 from coach import dates, jsonio, paths, units
@@ -27,7 +27,8 @@ STALE_AFTER_DAYS = 14
 QUESTION_READINGS_APP = ("trend weight · expenditure · targets (kcal/protein) · 7-day average (kcal/protein) · "
                          "days logged")
 QUESTION_READINGS_NO_APP = "this week's morning weigh-ins · average daily protein, if you track it"
-QUESTION_HABITS = "anchors most days (y/n)? Anything in the plan that didn't work?"
+QUESTION_ANCHORS = "anchors most days (y/n)?"
+QUESTION_PLAN = "Anything in the plan that didn't work?"
 QUESTION_NEXT_WEEK = "food exceptions next week: who cooks which nights, office-day changes, meals out?"
 
 
@@ -206,14 +207,17 @@ def _flags(nutrition, series, override, today):
     if (floor < target and len(counted) == 2
             and all(r["avg_protein_g"] is not None and r["avg_protein_g"] >= floor for r in counted)):
         proposed = min(floor + step, target)
+        # The counted readings measured weeks under the old floor, so the new floor's count starts after them.
+        since = (dates.parse_date(counted[-1]["date"]) + timedelta(days=1)).isoformat()
         shown = ", ".join(f"{r['date']}: {_num(r['avg_protein_g'])} g" for r in counted)
         flags.append({
             "code": "protein_floor_raise",
             "message": f"Average protein met the {_num(floor)} g floor at the last two check-ins ({shown}). "
                        f"Propose raising the floor to {_num(proposed)} g in [nutrition.protein] floor_g, with "
-                       "floor_since set to today" + ("; the athlete sets the app's protein to match." if has_app
-                                                     else "."),
-            "floor_g": floor, "proposed_floor_g": proposed, "dates": [r["date"] for r in counted],
+                       f"floor_since = {since}" + ("; the athlete sets the app's protein to match." if has_app
+                                                   else "."),
+            "floor_g": floor, "proposed_floor_g": proposed, "proposed_floor_since": since,
+            "dates": [r["date"] for r in counted],
         })
 
     flags += override_flags(override, has_app)
@@ -310,7 +314,8 @@ def questions(status):
     """The Sunday message's food questions; the third only with a standing weekly template."""
     if not status.get("enabled"):
         return []
-    found = [QUESTION_READINGS_APP if status["app"] != "none" else QUESTION_READINGS_NO_APP, QUESTION_HABITS]
+    habits = f"{QUESTION_ANCHORS} {QUESTION_PLAN}" if status["anchors"] else QUESTION_PLAN
+    found = [QUESTION_READINGS_APP if status["app"] != "none" else QUESTION_READINGS_NO_APP, habits]
     if status.get("template"):
         found.append(QUESTION_NEXT_WEEK)
     return found

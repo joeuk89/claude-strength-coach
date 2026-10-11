@@ -185,7 +185,11 @@ consecutive check-ins** since the floor last changed, the floor rises by
 ~10–15 g, **never above the target**. Missing the floor never lowers it;
 only `/goals` lowers it, with a reason. `/check-in` applies the raise.
 For MacroFactor users the athlete sets the app's protein to the new
-floor the same day.
+floor the same day. Whenever `/goals` changes `floor_g`, set
+`floor_since` to the day after the newest reading on file (`python3 -m
+coach nutrition readings --last 1`), or today if that is later: a
+reading already on file measured the old floor and must not count
+toward the next raise.
 
 ## 5. Agree the protein anchors
 
@@ -290,7 +294,7 @@ reference_mass = 80.0
 floor_g = 110                   # app users: the protein number set in the app
 target_g = 128
 stretch_g = 176
-floor_since = 2026-09-28        # the date the floor last changed
+floor_since = 2026-09-28        # readings dated on or after this count toward a raise
 floor_step_g = 10               # how far the floor rises (step 4: 10–15 g)
 
 [[nutrition.anchors]]           # one table per anchor
