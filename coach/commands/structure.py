@@ -49,7 +49,7 @@ def adherence(args, ctx):
               help="a candidate program to check instead, compared with data/program.json for new sessions"),
           arg("--variant", choices=structure.VARIANTS,
               help="minimum: check the minimum week (at most two sessions within their caps, every priority floor, "
-                   "a third of each dose target); exit 1 names each reason it fails")),
+                   "a third of the corresponding ordinary week's planned dose); exit 1 names each reason it fails")),
 )
 def balance(args, ctx):
     candidate = None

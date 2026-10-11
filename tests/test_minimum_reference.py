@@ -2,7 +2,7 @@
 
 import copy
 
-from coach import jsonio, program, structure
+from coach import cli, commands, jsonio, program, structure
 from coach.library import Library
 from tests.support import INSTANCES
 from tests.support.history import read_json, write_json
@@ -42,16 +42,16 @@ class MinimumReferenceTest(MinimumCase):
     def test_six_ordinary_sets_need_two_even_when_hypertrophy_target_is_ten(self):
         self.ordinary_bench(6)
         self.edit_json("data/program.json", lambda doc: doc.update(dose_targets={"chest": 10}))
-        for delivered, passed in ((1, False), (2, True)):
-            with self.subTest(delivered=delivered):
-                self.set_minimum(sessions=minimum_sessions(bench_sets=delivered))
+        for planned, passed in ((1, False), (2, True)):
+            with self.subTest(planned=planned):
+                self.set_minimum(sessions=minimum_sessions(bench_sets=planned))
                 report = self.report()
                 chest = report["positions"][0]["muscles"]["chest"]
-                self.assertEqual(chest, {"ordinary": 6, "third": 2, "planned": delivered, "met": passed})
+                self.assertEqual(chest, {"ordinary": 6, "third": 2, "planned": planned, "met": passed})
                 self.assertEqual(report["passed"], passed, report["reasons"])
                 self.assertEqual(report["targets"]["chest"], 10)
 
-    def test_scheduled_coach_dose_is_only_delivered_when_retained(self):
+    def test_scheduled_coach_dose_is_only_planned_when_retained(self):
         for retained in (False, True):
             with self.subTest(retained=retained):
                 self.external(retained=retained)
@@ -63,11 +63,19 @@ class MinimumReferenceTest(MinimumCase):
                 self.assertEqual([s["external_id"] for s in position["reference_external"]], ["pt"])
                 self.assertEqual([s["external_id"] for s in position["external"]], ["pt"] if retained else [])
 
-    def test_unscheduled_external_estimate_does_not_inflate_the_reference(self):
-        self.external(weekday=None)
-        report = self.report()
-        self.assertNotIn("calves", report["positions"][0]["muscles"])
-        self.assertTrue(report["passed"], report["reasons"])
+    def test_coach_work_without_a_weekday_counts_in_the_reference_as_in_ordinary_balance(self):
+        for retained in (False, True):
+            with self.subTest(retained=retained):
+                self.external(retained=retained, weekday=None)
+                ordinary = structure.balance(self.root, today="2026-10-11")["muscles"]["calves"]["average"]
+                report = self.report()
+                position = report["positions"][0]
+                self.assertEqual(position["muscles"]["calves"], {
+                    "ordinary": ordinary, "third": 2, "planned": 6 if retained else 0, "met": retained})
+                self.assertEqual(report["passed"], retained, report["reasons"])
+                self.assertEqual([(s["external_id"], s["date"]) for s in position["reference_external"]],
+                                 [("pt", None)])
+                self.assertEqual([s["external_id"] for s in position["external"]], ["pt"] if retained else [])
 
     def rotation(self, minimum_names=None):
         def change(doc):
@@ -139,23 +147,50 @@ class MinimumReferenceTest(MinimumCase):
                             "ordinary": None, "third": None, "planned": 12, "met": None})
 
     def test_retained_coach_session_is_in_the_written_plan(self):
-        self.external(retained=True)
-        report = structure.minimum(self.root, "2026-10-12", write=True, today="2026-10-11")
-        plan = read_json(self.root / report["path"])
-        self.assertEqual(plan["external_sessions"][0]["external_id"], "pt")
-        self.assertEqual(plan["external_sessions"][0]["date"], "2026-10-14")
+        for weekday, date in (("wed", "2026-10-14"), (None, None)):
+            with self.subTest(weekday=weekday):
+                self.external(retained=True, weekday=weekday)
+                report = structure.minimum(self.root, "2026-10-12", write=True, today="2026-10-11")
+                plan = read_json(self.root / report["path"])
+                self.assertEqual([(s["external_id"], s["date"]) for s in plan["external_sessions"]], [("pt", date)])
 
-    def test_retained_external_ids_must_be_unique_known_and_scheduled(self):
+    def test_retained_external_ids_must_be_unique_and_known(self):
         self.external(retained=True)
-        for ids, weekday, fragment in ((["pt", "pt"], "wed", "listed twice"),
-                                       (["missing"], "wed", "no external session"),
-                                       (["pt"], None, "weekday")):
-            with self.subTest(ids=ids, weekday=weekday):
+        for ids, fragment in ((["pt", "pt"], "listed twice"), (["missing"], "no external session")):
+            with self.subTest(ids=ids):
                 doc = read_json(self.root / "data/program.json")
                 doc["minimum_week"]["external_sessions"] = ids
-                doc["external_sessions"][0]["weekday"] = weekday
                 problems = program.validate(doc, None, Library.load(self.root), self.root)
                 self.assertTrue(any(fragment in e.message for e in problems), problems)
+
+    def test_a_retained_coach_session_without_a_weekday_is_valid(self):
+        self.external(retained=True, weekday=None)
+        doc = read_json(self.root / "data/program.json")
+        self.assertEqual(program.validate(doc, None, Library.load(self.root), self.root), [])
+
+    def test_fixed_minimum_reports_position_independent_failures_once(self):
+        self.rotation()
+        self.edit_json("data/program.json", lambda doc: doc["priority"][0]["floor"].update(sets=5))
+        with (self.root / "config.toml").open("a") as handle:
+            handle.write("\n[sessions.cap_minutes]\nmin-a = 5\n")
+        reasons = self.report()["reasons"]
+        for failure in ("over its 5 min cap", "priority floor"):
+            found = [reason for reason in reasons if failure in reason]
+            self.assertEqual(len(found), 1, reasons)
+            self.assertFalse(found[0].startswith(("a:", "b:")), found)
+
+    def test_fixed_minimum_names_the_ordinary_position_a_dose_failure_compares_with(self):
+        self.rotation()
+        self.edit_json("data/program.json", lambda doc: doc["sessions"][1]["exercises"][0]["sets"][0].update(count=30))
+        reasons = self.report()["reasons"]
+        self.assertTrue(any(reason.startswith("against ordinary b: lats:") for reason in reasons), reasons)
+        self.assertFalse(any(reason.startswith("against ordinary a: lats:") for reason in reasons), reasons)
+
+    def test_minimum_help_describes_the_ordinary_week_reference(self):
+        _, subparsers = cli.build_parser(commands.discover())
+        variant = subparsers["structure balance"]._option_string_actions["--variant"]
+        self.assertIn("a third of the corresponding ordinary week's planned dose", variant.help)
+        self.assertNotIn("dose target", variant.help)
 
     def test_v7_migration_preserves_minimum_and_does_not_invent_coach_work(self):
         doc = read_json(self.root / "data/program.json")

@@ -566,16 +566,12 @@ def _new_sessions(current, candidate):
 
 def _balance(inst, program_doc, candidate):
     reference = inst.week(inst.today + timedelta(days=1))
+    external = _week_external(program_doc, reference)
     positions, totals = [], {}
     for position, planned in _cycle(inst, program_doc, reference):
-        dose, rows = {}, []
-        for day, session_id in planned:
-            session = inst.program_session(session_id, program_doc)
-            rows.append({"date": day.isoformat(), "session_id": session_id, "tier": session["tier"]})
-            if session["tier"] == "core" and session["kind"] == "lifting":
-                _add(dose, session_dose(inst.library, session))
-        for external in program_doc["external_sessions"]:
-            _add(dose, external["estimated_sets"])
+        rows = [{"date": day.isoformat(), "session_id": session_id,
+                 "tier": inst.program_session(session_id, program_doc)["tier"]} for day, session_id in planned]
+        dose = _ordinary_dose(inst, program_doc, planned, external)
         _add(totals, dose)
         positions.append({"position": position, "sessions": rows,
                           "external": [e["id"] for e in program_doc["external_sessions"]], "muscles": _rounded(dose)})
@@ -921,28 +917,44 @@ def _hard_sets(line):
     return sum(s.get("count", 1) for s in line["sets"] if _is_hard(s))
 
 
-def _minimum_external(program_doc, span, retained=None):
-    return [{"external_id": external["id"], "title": external["title"], "date": day.isoformat(),
-             "estimated_sets": dict(external["estimated_sets"])}
-            for external in program_doc["external_sessions"]
-            if retained is None or external["id"] in retained
-            for day in span.days() if base.WEEKDAYS[day.weekday()] == external["weekday"]]
+def _week_external(program_doc, span, retained=None):
+    """Each coach-led session once in the week: on its weekday's date, or with no date when it has no weekday."""
+    rows = []
+    for external in program_doc["external_sessions"]:
+        if retained is not None and external["id"] not in retained:
+            continue
+        days = [day for day in span.days() if base.WEEKDAYS[day.weekday()] == external["weekday"]]
+        rows.append({"external_id": external["id"], "title": external["title"],
+                     "date": days[0].isoformat() if days else None,
+                     "estimated_sets": dict(external["estimated_sets"])})
+    return rows
+
+
+def _is_core_lifting(session):
+    return session["tier"] == "core" and session["kind"] == "lifting"
+
+
+def _ordinary_dose(inst, program_doc, planned, external):
+    """One ordinary week's planned dose: its core lifting sessions plus the coach-led estimates."""
+    dose = {}
+    for _, session_id in planned:
+        session = inst.program_session(session_id, program_doc)
+        if _is_core_lifting(session):
+            _add(dose, session_dose(inst.library, session))
+    for row in external:
+        _add(dose, row["estimated_sets"])
+    return dose
 
 
 def _minimum_reference(inst, program_doc, planned, external):
-    dose, rows = {}, []
-    for day, session_id in planned:
-        session = inst.program_session(session_id, program_doc)
-        if session["tier"] == "core" and session["kind"] == "lifting":
-            _add(dose, session_dose(inst.library, session))
-            rows.append({"date": day.isoformat(), "session_id": session_id})
-    for session in external:
-        _add(dose, session["estimated_sets"])
-    return dose, rows
+    rows = [{"date": day.isoformat(), "session_id": session_id} for day, session_id in planned
+            if _is_core_lifting(inst.program_session(session_id, program_doc))]
+    return _ordinary_dose(inst, program_doc, planned, external), rows
 
 
-def _minimum_position(inst, program_doc, position, planned, ordinary, external, reference_position):
-    prefix = f"{position or reference_position}: " if position or reference_position else ""
+def _minimum_position(inst, program_doc, position, planned, external, *, ordinary, reference_position):
+    prefix = f"{position}: " if position else ""
+    dose_prefix = prefix or (f"against ordinary {reference_position}: " if reference_position else "")
     reasons = []
     if len(planned) > MINIMUM_MAX_SESSIONS:
         reasons.append(f"{prefix}the schedule plans {len(planned)} sessions in the week; a minimum week has at most "
@@ -985,8 +997,8 @@ def _minimum_position(inst, program_doc, position, planned, ordinary, external, 
                            "third": _round(third) if third is not None else None,
                            "planned": _round(planned_sets), "met": met}
         if met is False:
-            reasons.append(f"{prefix}{muscle}: {_round(planned_sets)} fractional sets planned, below a third of its "
-                           f"ordinary dose of {_round(ordinary[muscle])} ({_round(third)})")
+            reasons.append(f"{dose_prefix}{muscle}: {_round(planned_sets)} fractional sets planned, below a third "
+                           f"of its ordinary dose of {_round(ordinary[muscle])} ({_round(third)})")
     return {"position": position, "reference_position": reference_position, "sessions": rows,
             "external": external, "muscles": muscles, "priority": floors}, reasons
 
@@ -1002,8 +1014,8 @@ def _minimum_balance(inst, program_doc, reference=None):
     positions = []
     ordinary_cycle = dict(_cycle(inst, program_doc, reference))
     minimum_cycle = dict(_cycle(inst, program_doc, reference, minimum["schedule"], set(minimum["sessions"])))
-    reference_external = _minimum_external(program_doc, reference)
-    external = _minimum_external(program_doc, reference, set(minimum.get("external_sessions", [])))
+    reference_external = _week_external(program_doc, reference)
+    external = _week_external(program_doc, reference, set(minimum.get("external_sessions", [])))
     if None not in ordinary_cycle and None not in minimum_cycle and ordinary_cycle.keys() != minimum_cycle.keys():
         reasons.append("ordinary and minimum rotating schedules must use the same position names; "
                        "use matching names or a fixed minimum schedule")
@@ -1015,7 +1027,8 @@ def _minimum_balance(inst, program_doc, reference=None):
                 paired_external = reference_external
                 ordinary, reference_sessions = _minimum_reference(
                     inst, program_doc, ordinary_cycle[reference_position], paired_external)
-            row, found = _minimum_position(inst, program_doc, position, planned, ordinary, external, reference_position)
+            row, found = _minimum_position(inst, program_doc, position, planned, external, ordinary=ordinary,
+                                           reference_position=reference_position)
             row.update(reference_sessions=reference_sessions, reference_external=paired_external)
             positions.append(row)
             reasons += [reason for reason in found if reason not in reasons]
@@ -1044,7 +1057,7 @@ def minimum(root, week_start, *, write=False, dry_run=False, today=None, now=Non
                 "span": span.to_json(),
                 "sessions": [{"date": day.isoformat(), "session_id": session_id,
                               "title": inst.program_session(session_id)["title"]} for day, session_id in planned],
-                "external_sessions": _minimum_external(inst.program, span, set(minimum_week.get("external_sessions", []))),
+                "external_sessions": _week_external(inst.program, span, set(minimum_week.get("external_sessions", []))),
                 "rotation": None, "flags": []}
     path = minimum_plan_path(span.start)
     if write:

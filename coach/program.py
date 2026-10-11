@@ -258,7 +258,7 @@ def _minimum_week_errors(doc):
         elif status[session_id] != MINIMUM_WEEK_STATUS:
             errors.append(Error(path, f"{session_id} is {status[session_id]}; a minimum-week session is "
                                       f"{MINIMUM_WEEK_STATUS}"))
-    externals = {external["id"]: external for external in doc["external_sessions"]}
+    externals = {external["id"] for external in doc["external_sessions"]}
     seen = set()
     for index, external_id in enumerate(minimum.get("external_sessions", [])):
         path = f"$.minimum_week.external_sessions[{index}]"
@@ -267,8 +267,6 @@ def _minimum_week_errors(doc):
         seen.add(external_id)
         if external_id not in externals:
             errors.append(Error(path, f"no external session {external_id}"))
-        elif externals[external_id]["weekday"] is None:
-            errors.append(Error(path, f"{external_id} needs a weekday to be scheduled in the minimum week"))
     return errors
 
 

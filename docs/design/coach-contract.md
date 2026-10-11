@@ -1673,12 +1673,13 @@ program to v4 and overlay (and its draft) to v3 (C37). R-44a took
 program to v5 (`interference`, C51). R-30b took program to v6
 (`priority`, `minimum_week`, C40) and overlay (and its draft) to v4 (a
 fold's `rule_id` may be a priority floor rule's id, C40). R-44b took
-program to v7 (session `scheme`, C51). Program v8 adds retained minimum-week
-coach-led sessions (C40). Every later
-bump takes the next free version when it merges and adds one step to the
-R-17a migration chain, so the chain stays linear.
+program to v7 (session `scheme`, C51), and program v8 adds the minimum
+week's retained coach-led sessions (`minimum_week.external_sessions`, C40).
+Every later bump takes the next free version when it merges and adds one
+step to the R-17a migration chain, so the chain stays linear.
 Program bumps: R-22 (executable `missed_day_rules`, C37), R-30b (`priority`, `minimum_week`, C40), R-44a
-(`interference`, C51), R-44b (session `scheme`, C51). State bump: R-31
+(`interference`, C51), R-44b (session `scheme`, C51), v8
+(`minimum_week.external_sessions`, C40). State bump: R-31
 took state to v4 (`block`, C42). Overlay: R-24 takes it to v2 (C21), R-22 to v3 (C37) and R-30b to v4 (C40). A
 brief or section that names a version number means the next free one.
 
@@ -4637,7 +4638,8 @@ null`:
   within its C19 cap, every priority floor present, and at least one third
   of the corresponding ordinary programmed dose (rn:minimum-effective-dose.6).
   This fractional-muscle check is application policy, not a maintenance
-  guarantee; retain the older-lifter caveat (rn:minimum-effective-dose.2). `structure minimum --week W --write` writes the plan file
+  guarantee; retain the older-lifter caveat (rn:minimum-effective-dose.2).
+  `structure minimum --week W --write` writes the plan file
   `.coach/plans/<week start>-minimum.json` (C6), a C23 `SchedulePlan` for
   `propose week --plan`. The overlay stays kind `weekly`; the plan file
   makes the week kind `minimum` (C41), which adherence skips and the
@@ -4716,9 +4718,9 @@ null`:
 - **Program v8.** Optional `minimum_week.external_sessions` lists retained
   coach-led ids, default `[]`; migration `0007_minimum_external_sessions`
   adds the empty list to configured minimums and preserves null minimums.
-  Validation rejects unknown or duplicate external ids, and ids without a
-  scheduled `weekday`. Retained sessions use their ordinary weekday; the
-  minimum plan records them separately from the self-programmed sessions.
+  Validation rejects unknown or duplicate external ids. A retained session
+  keeps its ordinary `weekday`, or stays undated when it has none; the
+  minimum plan records it separately from the self-programmed sessions.
 - `structure balance --variant minimum` returns `variant`,
   `reference_week` (the week holding tomorrow), `sessions`, `schedule`,
   `targets` (general dose targets, informational only), `positions`,
@@ -4728,18 +4730,23 @@ null`:
   `sessions` with `minutes`, `cap_minutes`, `within_cap`, and retained
   `external` rows with `date`, `external_id`, `title`, `estimated_sets`.
   `muscles` gives `ordinary`, `third`, `planned`, `met`; `priority` gives
-  `floor_sets`, `sets`, `session_id`, `met`. Ordinary dose counts scheduled
-  active core lifting sessions plus coach-led sessions with a weekday;
-  minimum dose counts scheduled standby lifting sessions plus explicitly
-  retained coach-led work. An unscheduled coach-led estimate receives no
-  automatic credit. Every muscle in either dose is visible, independently
-  of hypertrophy targets; zero ordinary dose means zero required dose.
+  `floor_sets`, `sets`, `session_id`, `met`. The ordinary planned dose is
+  the one the ordinary balance counts for that position: its scheduled
+  active core lifting sessions plus every coach-led session once a week,
+  with or without a `weekday` (`date` null when it has none). The
+  minimum's planned dose counts its scheduled standby lifting sessions plus
+  each explicitly retained coach-led session once; an omitted one adds
+  nothing. Every muscle in either dose is visible, independently of
+  hypertrophy targets; zero ordinary dose means zero required dose.
 - A fixed minimum is checked against each ordinary rotation position; a
   fixed ordinary schedule supplies the reference for each minimum position.
   Two rotating schedules compare matching position names. Different name
   sets fail with guidance to configure matching names or a fixed minimum.
   Every minimum position still reports session-count, duration and priority
-  checks. Matching positions retain dose comparisons; an unmatched position
+  checks. A reason carries its minimum position's name when the minimum
+  rotates; a fixed minimum names the ordinary position only on dose reasons
+  (`against ordinary <position>: `), so its other reasons appear once.
+  Matching positions retain dose comparisons; an unmatched position
   reports its planned dose but sets `reference_position`, `reference_sessions`,
   `reference_external`, and each muscle's `ordinary`, `third`, `met` to null.
   The check never silently pairs unrelated positions or averages them away.
@@ -4756,7 +4763,8 @@ null`:
   standby sessions, refuses when no minimum exists or no session is planned,
   and writes only with `--write` (not `--dry-run`). The plan is
   `{variant: "minimum", rule, week, span, sessions: [{date, session_id,
-  title}], external_sessions: [{date, external_id, title, estimated_sets}],
+  title}], external_sessions: [{date (null without a weekday), external_id,
+  title, estimated_sets}],
   rotation: null, flags: []}`. `propose week --plan` consumes its lifting
   sessions; the external rows document the coach-led work retained.
 - `/program-week`'s short-week workflow explains how to create standby

@@ -1,4 +1,4 @@
-"""Program v7 to v8: minimum weeks retain no coach-led sessions until explicitly configured."""
+"""Program v7 to v8: a minimum week retains no coach-led sessions until it lists them (contract C40)."""
 
 DOC = "program"
 FROM = 7

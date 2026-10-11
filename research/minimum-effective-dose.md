@@ -68,7 +68,7 @@ status = "current"
 
 [[claims]]
 n = 6
-text = "The minimum-week check uses one third of the corresponding ordinary programmed weekly fractional-muscle dose, including scheduled coach-led estimates, as application policy rather than a research-validated threshold."
+text = "The minimum-week check uses one third of the corresponding ordinary programmed weekly fractional-muscle dose, including every coach-led estimate the ordinary week counts, as application policy rather than a research-validated threshold."
 basis = "heuristic"
 sources = ["bickel-2011"]
 status = "current"
@@ -84,7 +84,7 @@ status = "current"
 | 3 | One hard set per exercise of 6–12 reps at about 70–85 % of 1RM, done 2–3 times a week, still builds 1RM strength in trained lifters. | evidence (low confidence) | androulakis-korakakis-2020 | current |
 | 4 | A priority lift keeps a floor of 2 hard sets at its prescribed load in a disrupted week, a margin above the single set that still builds strength. | heuristic | androulakis-korakakis-2020, spiering-2021 | current |
 | 5 | An exercise folded into another session after a missed day carries 2 working sets by default, one above the single-set floor. | heuristic | spiering-2021, androulakis-korakakis-2020 | current |
-| 6 | The minimum-week check uses one third of the corresponding ordinary programmed weekly fractional-muscle dose, including scheduled coach-led estimates, as application policy rather than a research-validated threshold. | heuristic | bickel-2011 | current |
+| 6 | The minimum-week check uses one third of the corresponding ordinary programmed weekly fractional-muscle dose, including every coach-led estimate the ordinary week counts, as application policy rather than a research-validated threshold. | heuristic | bickel-2011 | current |
 
 | Source | Citation | Type | Year |
 | --- | --- | --- | --- |
@@ -141,8 +141,8 @@ short. It is not a tested figure.
 
 **Claim 6.** The app applies an approximate one-third comparison to each
 muscle's fractional hard sets in the corresponding ordinary program week.
-Scheduled coach-led estimates enter the reference; only sessions explicitly
-retained in the minimum week enter its planned dose. Bickel studied reductions
+Every coach-led estimate the ordinary week counts enters the reference; only
+sessions explicitly retained in the minimum week enter its planned dose. Bickel studied reductions
 from prior exercise dose, not this fractional-muscle calculation. The check
 is application policy and passing it does not prove maintenance, especially
 for older lifters.

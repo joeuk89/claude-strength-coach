@@ -23,9 +23,11 @@ through the normal brief and approval before editing `data/program.json`:
    has the corresponding ordinary reference.
 3. List only coach-led sessions that will still happen in
    `minimum_week.external_sessions`, using their ids from the program's
-   `external_sessions`. Each retained session needs a `weekday`; it keeps
-   that day. An omitted or empty list credits no coach-led dose to the
-   minimum. Confirm that the retained sessions also fit the short week.
+   `external_sessions`. A retained session keeps its `weekday`, or stays
+   undated if it has none, and counts once. An omitted or empty list
+   credits no coach-led dose to the minimum, though the ordinary reference
+   still counts every coach-led session. Confirm that the retained
+   sessions also fit the short week.
 4. Run `python3 -m coach program validate`, then `python3 -m coach program
    render`, then `python3 -m coach structure balance --variant minimum`.
    Resolve every failure before offering this minimum for use; otherwise
@@ -39,8 +41,8 @@ session duration separately. The check permits at most two self-programmed
 minimum sessions and applies the existing time caps; retained coach-led
 work is listed separately and still matters to the athlete's available time.
 
-The approximate one-third comparison uses ordinary programmed weekly dose,
-including scheduled coach-led estimates, rather than a hypertrophy target.
+The approximate one-third comparison uses the ordinary week's planned dose,
+including every coach-led estimate, rather than a hypertrophy target.
 This fractional-muscle calculation is application policy
 (rn:minimum-effective-dose.6), not a universal maintenance guarantee.
 Older lifters can need more work to retain muscle size
