@@ -89,6 +89,13 @@ conditioning and optional ones included — and you push back if the
 athlete asks for one; exercise swaps are fine. A redesign the adherence
 trigger started builds the smaller schedule the check-in agreed.
 
+**Run mode.** With `mode = "run"` in `config.toml`'s `[coaching]`
+table, the athlete wants their own program run as written. Import it and
+finish the draft as Path A says, mapping their own progression rule to a
+scheme, but in step 8 propose no improvements: mention balance gaps or
+recovery clashes as information only. Never offer a redesign; build one
+only when the athlete asks for it.
+
 ## Path A — Import (they already have a program)
 
 For athletes arriving with routines in Hevy (or on paper).

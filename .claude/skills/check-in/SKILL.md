@@ -55,6 +55,21 @@ in step 4 says so: switch to deep and tell the athlete.
 The Sunday message's first line names the tier and why; the athlete can
 override. Mark the tier in the record's title line.
 
+**Run mode.** With `mode = "run"` in `config.toml`'s `[coaching]`
+table, the athlete wants their own program run as written. Progression,
+return weeks, validity checks, light weeks and every `block` flag work
+as in coach mode. Structural flags (`restructure_required`,
+`add_session_type_blocked`, `volume_undershoot`, `session_volume_high`)
+come out of `checkin prepare` and the `structure` commands at `info`,
+their message starting "run mode: ": mention them as information only.
+Still report adherence from `structure adherence`, but do not present a
+restructure or a smaller schedule and do not call `structure decide`,
+unless the athlete asks for a restructure themselves. The adherence
+trigger never makes a run-mode check-in deep. Skip the deep tier's
+structure review (weekly balance, junk volume, what the next block
+should change), propose no swap, new session or redesign, and never
+offer `/new-program`.
+
 ## 2. Pull the data
 
 The window runs from the last check-in to today (excluding workouts the
