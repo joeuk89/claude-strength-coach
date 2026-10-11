@@ -501,7 +501,7 @@ covers the rest of the profile):
 | anchors: name, slot, days, macros or card | how the anchors were chosen; what the athlete likes |
 | the active override: dates, what, reason, exit condition, renewal count | — |
 | staples, office days, standing coverage, plan style (R-33c) | food likes, dislikes, allergies/intolerances, cooking appetite, shopping pattern |
-| — | sleep-gate status and reasoning (until an activity source, C29) |
+| — | sleep-gate status, reasoning and source/period coverage (C29; reference/nutrition-sleep.md) |
 | — | the MacroFactor setup summary and revision notes |
 
 Before the first `/meal-plan` setup, the athlete's answers for the R-33c
@@ -3102,8 +3102,20 @@ R-32 and is registered in `coach/flags/research.py`.
   - `wellness_days(span) -> list[dict]`: one resolved day per date in the
     span that has any value.
   - `sleep_summary(span) -> {"avg_asleep_hours": float|null, "nights": int,
-    "nights_in_span": int, "sources": [str]}`, averaged over nights with a
-    value (a span record counts once per covered day without a daily value).
+    "nights_in_span": int, "sources": [str], ...}`: `nights` counts actual
+    nightly observations. `nightly_avg_asleep_hours` uses those only.
+    The overall average weights whole, non-overlapping source periods
+    by their days; a clipped or partially superseded period is excluded,
+    never used to infer its missing nights. `evidence` retains id, source,
+    original span, kind (`nightly`/`period_mean`), hours, `self_report`,
+    resolved dates and `included_in_average`. `covered_dates`,
+    `missing_dates` and `complete` describe eligible average coverage.
+    `wellness summary` returns actual `nights` separately and a read-only
+    `nutrition_gate` for the trailing 14 dates ending today: complete
+    coverage under 7 h is `recomp`, otherwise `passed`; incomplete or
+    non-trailing coverage is `pending measurement`. Profile status and
+    approved phase edits remain the coach's job. The gate is a
+    low-confidence coaching heuristic (rn:sleep-dieting.3).
   - `records(kind, include_void=False)`: the last raw line per id, voided
     ids left out unless `include_void`; `lines(kind)` gives every line
     in file order and `history(kind, id)` one id's lines, for audits and
@@ -3175,7 +3187,10 @@ Wellness record (`wellness_record.schema.json`):
   bump.
 
 Resolved wellness day: `{"date", "sleep", "resting_hr_bpm", "hrv_ms",
-"steps", "body_mass_kg", "body_fat_pct", "field_sources": {field: source}}`.
+"steps", "body_mass_kg", "body_fat_pct", "field_sources": {field: source},
+"field_provenance": {field: {id, source, span, kind}}}`. Each field retains
+its original record span; a period mean never establishes individual
+short nights for the separate seven-day fatigue decision.
 
 - Readers get records without `schema_version`, `op`, `recorded_at` and
   `content_hash`; resolved Activities and wellness days are built from

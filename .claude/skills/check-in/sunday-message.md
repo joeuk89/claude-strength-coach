@@ -37,10 +37,11 @@ fields, always in this order:
    and any planned activity `cardio reconcile` found missed, and asks
    only for runs no source logged. Without one, ask count and total
    distance.
-4. **Sleep** — with a sleep source and enough tracked nights, the card
+4. **Sleep** — with enough dated nightly observations, the card
    states the last seven nights (average and short nights) and asks how
-   it felt. Otherwise ask, in one line: "average hours a night (from your
-   watch or phone if it tracks sleep), and how it felt".
+   it felt. Otherwise ask, in one line: "average hours a night, dates
+   covered and source (manual diary, self-reported period mean or
+   tracker), and how it felt".
 5. **Niggles** — anything new? Name each open niggle-log row (`watching`
    or `easing`) and ask whether it is quiet or still there.
 6. **Food** — the food questions, worded as `python3 -m coach nutrition

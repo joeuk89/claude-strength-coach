@@ -147,10 +147,11 @@ class WellnessTest(ActivityCase):
         fixture = {"2026-10-05": 6.9, "2026-10-06": 7.2, "2026-10-07": 6.4, "2026-10-08": 7.5, "2026-10-09": 6.8}
         for day, hours in fixture.items():
             self.assertEqual(nights[day], (hours, "apple_health"), day)
-        self.assertEqual(nights["2026-10-11"], (7.0, "manual"))
-        self.assertEqual(data["sleep"]["nights"], 7)
+        self.assertNotIn("2026-10-11", nights)
+        self.assertEqual(data["sleep"]["missing_dates"], ["2026-10-11"])
+        self.assertEqual(data["sleep"]["nights"], 6)
         self.assertEqual(data["sleep"]["nights_in_span"], 7)
-        self.assertEqual(data["sleep"]["avg_asleep_hours"], round((sum(fixture.values()) + 6.5 + 7.0) / 7, 2))
+        self.assertEqual(data["sleep"]["avg_asleep_hours"], round((sum(fixture.values()) + 6.5) / 6, 2))
 
     def test_adding_again_updates_the_same_record_and_keeps_other_fields(self):
         self.ok("wellness", "add", "--date", "2026-10-12", "--sleep-hours", "6.5")

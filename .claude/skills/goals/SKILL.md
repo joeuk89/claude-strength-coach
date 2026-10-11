@@ -47,8 +47,8 @@ the conversation hasn't covered:
 - **Recent protein intake** without the app: a typical day's protein,
   estimated together from two or three recent days.
 - A **body-fat reading**, if they have one: number, method and date.
-- **Sleep**: the trailing 14-day average from a watch or phone that
-  tracks sleep; otherwise how they sleep, in their words.
+- **Sleep**: dated nightly hours or an explicitly identified period
+  average, from manual self-report or a tracker; otherwise their words.
 - How training and recovery feel; anything coming up (travel, events).
 
 **Scope check:** a yes/no entry point ("should the bulk still start?")

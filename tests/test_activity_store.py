@@ -98,14 +98,19 @@ class ValidFixtureTest(StoreCase):
 
     def test_sleep_summary(self):
         summary = self.store().sleep_summary(WEEK)
-        self.assertEqual(summary["nights"], 7)
+        self.assertEqual(summary["nights"], 6)
         self.assertEqual(summary["nights_in_span"], 7)
         self.assertEqual(summary["sources"], ["apple_health", "manual"])
         self.assertIsInstance(summary["avg_asleep_hours"], float)
 
     def test_sleep_summary_with_no_values(self):
         summary = self.store().sleep_summary(Span(date(2026, 9, 1), date(2026, 9, 3)))
-        self.assertEqual(summary, {"avg_asleep_hours": None, "nights": 0, "nights_in_span": 3, "sources": []})
+        self.assertIsNone(summary["avg_asleep_hours"])
+        self.assertEqual(summary["nights"], 0)
+        self.assertEqual(summary["nights_in_span"], 3)
+        self.assertEqual(summary["sources"], [])
+        self.assertEqual(len(summary["missing_dates"]), 3)
+        self.assertFalse(summary["complete"])
 
 
 class DedupTest(StoreCase):

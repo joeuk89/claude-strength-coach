@@ -23,6 +23,8 @@ The answers that scripts read go into config and data, not prose:
   selecting solo sessions. Pick that many days from availability with the
   athlete; availability alone creates no obligations. Coach-led sessions go
   into the program draft. A yes to runs or classes sets `[activity] enabled = true`.
+  Wanting to record manual sleep hours proposes it, with athlete approval and
+  config validation; manual sleep needs no watch or device adapter.
 - **Question 5** → `[equipment]` for the main place: `available` (from
   `barbell`, `ez_bar`, `trap_bar`, `dumbbell`, `kettlebell`, `machine`,
   `smith_machine`, `cable`, `plate`, `band`, `suspension`, `bodyweight`,

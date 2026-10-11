@@ -126,26 +126,53 @@ class ActivityStore:
         for day in span.days():
             candidates = (self._by_precedence(daily.get(day, []))
                           + self._by_precedence([r for s, r in spans if s.contains(day)]))
-            resolved, sources = {"date": day.isoformat()}, {}
+            resolved, sources, provenance = {"date": day.isoformat()}, {}, {}
             for field in WELLNESS_FIELDS:
                 resolved[field] = None
                 for record in candidates:
                     if _has(field, record.get(field)):
                         resolved[field] = record[field]
                         sources[field] = record["source"]
+                        provenance[field] = {"id": record["id"], "source": record["source"],
+                                             "span": record["span"],
+                                             "kind": ("nightly" if record["span"]["start"] == record["span"]["end"]
+                                                      else "period_mean")}
                         break
             if sources:
                 resolved["field_sources"] = sources
+                resolved["field_provenance"] = provenance
                 days.append(resolved)
         return days
 
     def sleep_summary(self, span):
-        nights = [(day["sleep"]["asleep_hours"], day["field_sources"]["sleep"])
-                  for day in self.wellness_days(span)
-                  if day["sleep"] is not None and day["sleep"].get("asleep_hours") is not None]
-        average = round(sum(hours for hours, _ in nights) / len(nights), 2) if nights else None
-        return {"avg_asleep_hours": average, "nights": len(nights), "nights_in_span": len(span.days()),
-                "sources": sorted({source for _, source in nights})}
+        evidence = {}
+        for day in self.wellness_days(span):
+            if day["sleep"] is None or day["sleep"].get("asleep_hours") is None:
+                continue
+            provenance = day["field_provenance"]["sleep"]
+            item = evidence.setdefault(provenance["id"], dict(
+                provenance, asleep_hours=day["sleep"]["asleep_hours"],
+                self_report=provenance["source"] == "manual", resolved_dates=[]))
+            item["resolved_dates"].append(day["date"])
+        covered, weighted_hours, nightly_hours = [], 0, []
+        for item in evidence.values():
+            original = dates.Span(*(dates.parse_date(item["span"][key]) for key in ("start", "end")))
+            original_dates = [day.isoformat() for day in original.days()]
+            # A period mean cannot recover the average of only its unobserved or clipped nights.
+            item["included_in_average"] = item["resolved_dates"] == original_dates
+            if item["included_in_average"]:
+                covered.extend(original_dates)
+                weighted_hours += item["asleep_hours"] * len(original_dates)
+            if item["kind"] == "nightly":
+                nightly_hours.append(item["asleep_hours"])
+        missing = sorted({day.isoformat() for day in span.days()} - set(covered))
+        return {"avg_asleep_hours": round(weighted_hours / len(covered), 2) if covered else None,
+                "nightly_avg_asleep_hours": (round(sum(nightly_hours) / len(nightly_hours), 2)
+                                             if nightly_hours else None),
+                "nights": len(nightly_hours), "nights_in_span": len(span.days()),
+                "covered_dates": sorted(covered), "missing_dates": missing, "complete": not missing,
+                "sources": sorted({item["source"] for item in evidence.values()}),
+                "evidence": list(evidence.values())}
 
     def change(self, kind, line):
         """Whether appending `line` changes anything: a new or changed record, or a void of a live one."""
