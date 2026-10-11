@@ -1009,8 +1009,11 @@ Cues: <cues>
   span ended before today; a routine's chosen session dated today or
   later is in force (C10) under a different overlay. Then push GETs
   every routine in the span. It refuses (exit 3) before any PUT if any
-  live `updated_at` differs from the cached one; `--refresh` re-reads
-  the cache first. A PUT, GET back and diff follow per changed routine,
+  live `updated_at` differs from the cached one, with or without
+  `--refresh`: an app edit is reviewed with `routines diff --refresh`
+  before any push. `--refresh` only fills a routine missing from the
+  cache and, once the guard passes, writes the live routines into the
+  cache (unless `--dry-run`). A PUT, GET back and diff follow per changed routine,
   in overlay order. The read-back replaces the cached routine. A
   read-back that differs logs `verified: false`, stops the push and
   exits 1 with the report in `data`. Re-running after success sends no

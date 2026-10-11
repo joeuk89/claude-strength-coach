@@ -192,6 +192,20 @@ class PushRefusalTest(RoutinesCase):
         self.assertNotIn("PUT", [r["method"] for r in self.fake.requests])
         self.assertIn("--refresh", envelope["error"]["message"])
 
+    def test_refresh_does_not_bypass_an_app_edit(self):
+        session_b = self.fake.collection("routines")[1]
+        session_b["exercises"].append(copy.deepcopy(session_b["exercises"][0]))
+        session_b["updated_at"] = "2026-10-11T07:30:00Z"
+        cached_at = HevyCache(self.root).routine(R2)["updated_at"]
+        self.assert_refused("--refresh", words=("Session B",))
+        self.assert_refused("--refresh", "--dry-run", words=("Session B",))
+        self.assertEqual(HevyCache(self.root).routine(R2)["updated_at"], cached_at)
+        self.assert_refused(words=("Session B",))
+
+        self.routines_cmd("diff", "--refresh")
+        self.routines_cmd("push")
+        self.assertIn(f"/v1/routines/{R2}", self.put_paths)
+
 
 class PushTest(RoutinesCase):
     def test_after_approve_writes_each_routine_once_then_nothing(self):
@@ -220,6 +234,13 @@ class PushTest(RoutinesCase):
         self.assertEqual(again["writes"], 0)
         self.assertEqual(len(audit_lines(self.root)), 4)
         self.assertEqual(self.routines_cmd("diff")["data"]["changes"], [])
+
+    def test_refresh_fills_routines_missing_from_the_cache(self):
+        shutil.rmtree(self.root / ".coach")
+        self.assertIn("hevy pull", self.routines_cmd("push", expect=1)["error"]["message"])
+        data = self.routines_cmd("push", "--refresh")["data"]
+        self.assertEqual(self.put_paths, [f"/v1/routines/{R1}", f"/v1/routines/{R2}"])
+        self.assertEqual([r["status"] for r in data["routines"]], ["written", "written"])
 
     def test_put_bodies_have_no_nulls_and_no_routine_notes(self):
         self.routines_cmd("push")

@@ -309,19 +309,23 @@ def _get_routine(client, routine_id):
     return routine
 
 
-def _routines(ctx, cache, routine_ids, refresh, dry_run, client=None):
+def _routines(ctx, cache, routine_ids, refresh, dry_run):
     """{routine id: routine}: re-read from Hevy with refresh (and cached unless dry_run), else from the cache."""
     if refresh:
-        client = client or HevyClient.from_context(ctx)
+        client = HevyClient.from_context(ctx)
         found = {}
         for routine_id in routine_ids:
             found[routine_id] = _get_routine(client, routine_id)
             if not dry_run:
                 cache.upsert_routine(found[routine_id])
         return found
+    return _from_cache(cache, routine_ids)
+
+
+def _from_cache(cache, routine_ids, allow_missing=False):
     found = {routine_id: cache.routine(routine_id) for routine_id in routine_ids}
     missing = [routine_id for routine_id, routine in found.items() if routine is None]
-    if missing:
+    if missing and not allow_missing:
         raise ValidationError(
             f"Routine(s) {', '.join(missing)} are not in the Hevy cache; run {_PULL}, or pass --refresh"
         )
@@ -457,9 +461,11 @@ def push(ctx, overlay_id, dry_run, refresh=False):
     client = HevyClient.from_context(ctx)
     cache = HevyCache(ctx.root, clock=ctx.now)
     routine_ids = [routine_id for routine_id, _, _ in routine_plan]
-    cached = _routines(ctx, cache, routine_ids, refresh, dry_run, client=client)
-    live = cached if refresh else {routine_id: _get_routine(client, routine_id) for routine_id in routine_ids}
-    moved = [cached[r] for r in routine_ids if live[r].get("updated_at") != cached[r].get("updated_at")]
+    cached = _from_cache(cache, routine_ids, allow_missing=refresh)
+    missing = [routine_id for routine_id, routine in cached.items() if routine is None]
+    live = {routine_id: _get_routine(client, routine_id) for routine_id in routine_ids}
+    moved = [cached[r] for r in routine_ids
+             if cached[r] is not None and live[r].get("updated_at") != cached[r].get("updated_at")]
     if moved:
         names = ", ".join(f"{r.get('title')} ({r.get('id')})" for r in moved)
         raise RefusedError(
@@ -468,6 +474,11 @@ def push(ctx, overlay_id, dry_run, refresh=False):
             details=[{"path": None, "message": f"{r.get('title')}: cached updated_at {r.get('updated_at')}, "
                                                f"Hevy now has {live[r['id']].get('updated_at')}"} for r in moved],
         )
+    for routine_id in missing:
+        cached[routine_id] = live[routine_id]
+    if refresh and not dry_run:
+        for routine_id in routine_ids:
+            cache.upsert_routine(live[routine_id])
 
     entries, bodies = [], {}
     for routine_id, session, carries in routine_plan:
