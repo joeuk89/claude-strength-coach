@@ -262,3 +262,14 @@ class IdentityTest(CardioCase):
         result = self.data("cardio", "flags", "--week", "2026-W41")
         messages = [f["message"] for f in result["flags"] if f["code"] == "custom_quality_seen"]
         self.assertEqual(messages, ["quality activity on 2026-10-07"])
+
+    def test_conditioning_kind_precedes_easy_name_rpe_and_planned_quality(self):
+        for intended_quality in (False, True):
+            with self.subTest(planned_quality=intended_quality):
+                planned = dict(plan("manual:p", "2026-10-06", None, intended_quality), kind="conditioning")
+                completed = dict(activity("manual:a", "2026-10-07", None, name="Easy circuit", rpe=6),
+                                 kind="conditioning")
+                self.set_records([planned], [completed])
+                [row] = self.reconcile()
+                self.assertEqual((row["status"], row["activity_id"], row["quality"], row["quality_basis"]),
+                                 ("moved", "manual:a", True, "kind"))

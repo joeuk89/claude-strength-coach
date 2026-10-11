@@ -17,11 +17,14 @@ def _name_quality(activity):
 def _evidence(plan, activity, rpe_min):
     target = plan.get("target") or {}
     name = (activity.get("name") or "").strip().casefold()
+    planned_quality = plan["quality"]
     quality = _name_quality(activity)
+    effort = activity["rpe"] >= rpe_min if activity.get("rpe") is not None else None
+    if activity["kind"] == "conditioning":
+        planned_quality = quality = effort = True
     values = {"name": int(name != plan["title"].strip().casefold()) if name else None,
-              "quality": int(quality != plan["quality"]) if quality is not None else None,
-              "effort": int((activity["rpe"] >= rpe_min) != plan["quality"])
-              if activity.get("rpe") is not None else None}
+              "quality": int(quality != planned_quality) if quality is not None else None,
+              "effort": int(effort != planned_quality) if effort is not None else None}
     for key in ("distance_meters", "duration_seconds"):
         actual, wanted = activity.get(key), target.get(key)
         values[key] = abs(actual - wanted) if actual is not None and wanted is not None else None

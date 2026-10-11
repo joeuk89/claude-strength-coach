@@ -6389,7 +6389,9 @@ for both.
   observed effort (logged RPE judged using C48's threshold, or explicit
   name quality) needs corroborating exact name, distance or duration;
   otherwise it stays ambiguous. RPE never defeats corroborated identity
-  and still determines delivered quality. Matches are one-to-one and
+  and still determines delivered quality. Conditioning retains C48's kind
+  precedence in matching: it is quality regardless of a plan's quality
+  flag, low logged RPE or easy wording. Matches are one-to-one and
   input-order independent.
 - A matched local date is `done`; a different date is `moved`, with
   `moved_days`. Unmatched plans before today are `missed`, otherwise
