@@ -13,7 +13,8 @@ from datetime import timedelta
 
 from coach import config as config_module
 from coach import dates, flags, history, overlay, state, stats, units
-from coach.checks.instance import _cap as cap_for, _capped_value as capped_value
+from coach.checks.instance import _capped_value as capped_value
+from coach.checks.instance import cap_for
 from coach.config_tables.sessions import cap_minutes
 from coach.errors import ConfigError, ValidationError
 from coach.library import Library
@@ -377,7 +378,7 @@ class _Checker:
     def increment(self, line, session):
         if self.library is None:
             return 0
-        return stats._increment(self.library, self.config, line["exercise_id"], session["location"]) or 0
+        return stats.load_increment(self.library, self.config, line["exercise_id"], session["location"]) or 0
 
     def caps_and_kit(self, session, line):
         loads = [s["load"] for s in line["sets"] if self.sound(line, s.get("load"))]

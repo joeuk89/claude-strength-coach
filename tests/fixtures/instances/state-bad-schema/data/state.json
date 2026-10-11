@@ -1,9 +1,10 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "rotation": {
     "position": null,
     "confirmed": true,
-    "confirmed_at": null
+    "confirmed_at": null,
+    "week": null
   },
   "block": {
     "started": "2026-09-28",
@@ -15,8 +16,16 @@
   },
   "one_off": null,
   "scheme_state": {
-    "session-a/bb_back_squat": {},
-    "session-a/db_bench_press": {}
+    "session-a/bb_back_squat": {
+      "scheme": null,
+      "data": {},
+      "pending": null
+    },
+    "session-a/db_bench_press": {
+      "scheme": null,
+      "data": {},
+      "pending": null
+    }
   },
   "hevy": {
     "routines": {

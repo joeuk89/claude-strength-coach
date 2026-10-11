@@ -4,15 +4,16 @@
   "required": ["schema_version", "rotation", "block", "one_off", "scheme_state", "hevy"],
   "additionalProperties": false,
   "properties": {
-    "schema_version": {"const": 2},
+    "schema_version": {"const": 3},
     "rotation": {
       "type": "object",
-      "required": ["position", "confirmed", "confirmed_at"],
+      "required": ["position", "confirmed", "confirmed_at", "week"],
       "additionalProperties": false,
       "properties": {
         "position": {"type": ["string", "null"], "pattern": "^[a-z0-9-]+$"},
         "confirmed": {"type": "boolean"},
-        "confirmed_at": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"}
+        "confirmed_at": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+        "week": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"}
       }
     },
     "block": {
@@ -50,7 +51,27 @@
         }
       }
     },
-    "scheme_state": {"type": "object", "additionalProperties": {"type": "object"}},
+    "scheme_state": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["scheme", "data", "pending"],
+        "additionalProperties": false,
+        "properties": {
+          "scheme": {"type": ["string", "null"], "pattern": "^[a-z][a-z0-9_]*$"},
+          "data": {"type": "object"},
+          "pending": {
+            "type": ["object", "null"],
+            "required": ["overlay_id", "data"],
+            "additionalProperties": false,
+            "properties": {
+              "overlay_id": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}-[a-z0-9-]+$"},
+              "data": {"type": "object"}
+            }
+          }
+        }
+      }
+    },
     "hevy": {
       "type": "object",
       "required": ["routines", "folders", "temporary_routines"],

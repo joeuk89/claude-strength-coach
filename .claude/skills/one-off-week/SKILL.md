@@ -68,17 +68,23 @@ weekly balance including coach-led sessions and cardio. Each moved
 session keeps its lines from the overlay in force
 (`data/overlays/<id>.json`), re-dated.
 
-**Deload** — apply the program's deload rule (`blocks.deload_rule` in
-`program show`). If it says nothing more specific, propose a standard
-one (~2/3 the sets, ~10% off loads, everything at ~RPE 6; bodyweight
-work cut by sets and stopped further from failure, ladders resumed, not
-restarted). Base loads on **current working weights** — the overlay in
-force and the cached log, each logged Hevy value turned into the
-athlete's number with `python3 -m coach units convert --mode <load
-mode> --from-hevy-kg <value>`; otherwise ask. Keep the program's
-priority protocols alive at reduced dose. Remind the athlete to tell
-any coach/PT it's a deload week, and deload whatever the profile says
-moves with the lifting (conditioning etc.).
+**Deload** — run `python3 -m coach propose week --kind deload --week
+<label>`. It applies the program's deload rule (`blocks.deload_rule` in
+`program show`) to every program session in the span; the standard rule
+keeps two thirds of each line's working sets, takes 10 % off loads from
+the current working weights and puts every set at RPE 6, with bodyweight
+work cut by sets and taken further from failure. Its sessions are temp
+sessions (`"temporary": true`, titled "Deload — <session title>") that
+keep their program session ids. Review each line, change one with
+`python3 -m coach propose override` and a reason, settle a flag with
+`python3 -m coach propose resolve`, then run `python3 -m coach propose
+finalize --proposal <id>`, which writes the overlay. Then go to step 3
+with that id: its draft and `overlay build` items are already done, so
+start at "Where it renders", then carry on from its validate item. Keep
+the program's priority protocols alive at reduced dose (ladders resumed,
+not restarted). Remind the athlete to tell any coach/PT it's a deload
+week, and deload whatever the profile says moves with the lifting
+(conditioning etc.).
 
 **Illness** — a week back after illness follows the return rule in
 `CLAUDE.md` "Coaching principles": its illness conditions (when

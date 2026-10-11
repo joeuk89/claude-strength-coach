@@ -4,7 +4,7 @@
   "required": ["schema_version", "name", "sessions", "external_sessions", "schedule", "blocks", "missed_day_rules"],
   "additionalProperties": false,
   "properties": {
-    "schema_version": {"const": 1},
+    "schema_version": {"const": 2},
     "name": {"$ref": "#/$defs/text"},
     "sessions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/session"}},
     "external_sessions": {"type": "array", "items": {"$ref": "#/$defs/external_session"}},
@@ -13,7 +13,7 @@
       "required": ["rule", "params"],
       "additionalProperties": false,
       "properties": {
-        "rule": {"enum": ["fixed_weekdays", "alternating_external_anchor", "next_in_sequence", "explicit_calendar"]},
+        "rule": {"$ref": "#/$defs/plugin_name"},
         "params": {"type": "object"}
       }
     },
@@ -28,7 +28,7 @@
           "required": ["name", "params"],
           "additionalProperties": false,
           "properties": {
-            "name": {"enum": ["standard", "scheme", "light"]},
+            "name": {"$ref": "#/$defs/plugin_name"},
             "params": {"type": "object"}
           }
         }
@@ -40,6 +40,17 @@
     "text": {"type": "string", "pattern": "\\S"},
     "optional_text": {"type": ["string", "null"], "pattern": "\\S"},
     "session_id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+    "plugin_name": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+    "constraint": {
+      "type": "object",
+      "required": ["kind", "value", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {"enum": ["rpe_cap", "no_added_load", "load_cap"]},
+        "value": {"type": ["number", "null"], "minimum": 0},
+        "reason": {"$ref": "#/$defs/text"}
+      }
+    },
     "session": {
       "type": "object",
       "required": ["id", "title", "kind", "tier", "status", "focus", "exercises"],
@@ -67,14 +78,13 @@
         "rest_seconds": {"type": ["integer", "null"], "minimum": 0},
         "superset_id": {"type": ["integer", "null"], "minimum": 0},
         "cues": {"$ref": "#/$defs/optional_text"},
-        "constraints": {"type": "array", "items": {"$ref": "#/$defs/text"}},
+        "constraints": {"type": "array", "items": {"$ref": "#/$defs/constraint"}},
         "scheme": {
           "type": "object",
           "required": ["name", "params"],
           "additionalProperties": false,
           "properties": {
-            "name": {"enum": ["hold", "linear", "double_progression", "fixed_reps_rpe", "rpe_anchored", "wave_531",
-                              "assistance_ladder", "maintenance"]},
+            "name": {"$ref": "#/$defs/plugin_name"},
             "params": {"type": "object"}
           }
         },

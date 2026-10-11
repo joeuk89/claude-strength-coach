@@ -59,7 +59,19 @@
       "Bash(python3 -m coach checkin skeleton:*)",
       "Bash(python3 -m coach pages show:*)",
       "Bash(python3 -m coach pages render:*)",
-      "Bash(python3 -m coach pages publish:*)"
+      "Bash(python3 -m coach pages publish:*)",
+      "Bash(python3 -m coach plugins list:*)",
+      "Bash(python3 -m coach plugins show:*)",
+      "Bash(python3 -m coach plugins validate:*)",
+      "Bash(python3 -m coach schedule plan:*)",
+      "Bash(python3 -m coach schedule confirm:*)",
+      "Bash(python3 -m coach decisions list:*)",
+      "Bash(python3 -m coach decisions withdraw:*)",
+      "Bash(python3 -m coach propose show:*)",
+      "Bash(python3 -m coach propose week:*)",
+      "Bash(python3 -m coach propose override:*)",
+      "Bash(python3 -m coach propose resolve:*)",
+      "Bash(python3 -m coach propose finalize:*)"
     ]
   },
   "hooks": {

@@ -167,7 +167,8 @@ def _half(increment):
     return increment / 2
 
 
-def _increment(library, config, exercise_id, location):
+def load_increment(library, config, exercise_id, location):
+    """The load step for an exercise at a location: its library increment, else its equipment's, else 0."""
     unit = config.athlete.units
     step = library.increment(exercise_id, unit)
     if step is not None:
@@ -300,7 +301,7 @@ def adherence(root, overlay_id=None, span=None, include_unsynced=False, today=No
                 for line in session["exercises"]:
                     logged = [s for e in workout["exercises"] if e["exercise_id"] == line["exercise_id"]
                               for s in e["sets"]]
-                    increment = _increment(library, config, line["exercise_id"], location)
+                    increment = load_increment(library, config, line["exercise_id"], location)
                     row["exercises"].append(_exercise_status(line, logged, increment))
         elif note is not None:
             used_notes.add(note["id"])

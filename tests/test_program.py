@@ -276,6 +276,7 @@ class RenderCommandTest(EnvelopeMixin, unittest.TestCase):
         with Instance() as root:
             doc = read_program(root)
             doc["sessions"] = doc["sessions"][:1]
+            doc["schedule"]["params"]["days"].pop("thu")
             write_program(root, doc)
             (root / "routine" / "notes.md").write_text("hand-written\n", encoding="utf-8")
             data = self.run_ok("--root", str(root), "program", "render")

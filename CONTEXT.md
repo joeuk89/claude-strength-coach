@@ -71,6 +71,14 @@ prescription: double progression, linear, wave, RPE-anchored, assistance
 ladder, hold. Every exercise in a program has one.
 _Avoid_: progression model, autoregulation (one kind of scheme)
 
+**Standing override**:
+A coach's change to one exercise's proposed prescription that holds in
+later weeks until a set end date (four weeks by default, eight at most),
+so the progression scheme stops proposing it away; the scheme's own
+proposal is still shown beside it. A one-week override changes only the
+week it was made in.
+_Avoid_: pinned line, manual hold, permanent override
+
 **Recovery cap**:
 An RPE ceiling written into an exercise's prescription to protect
 recovery or a niggle: every working set stays at or under it. RPE drift

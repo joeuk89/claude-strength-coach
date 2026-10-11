@@ -190,7 +190,7 @@ class StatusCommandTest(unittest.TestCase):
         self.assertIn("deload not due", text(found))
         copy = TempCopy(self)
         state = json.loads((copy.root / "data/state.json").read_text(encoding="utf-8"))
-        state["rotation"] = {"position": "week-b", "confirmed": False, "confirmed_at": None}
+        state["rotation"] = {"position": "week-b", "confirmed": False, "confirmed_at": None, "week": None}
         state["block"]["deload"] = {"status": "due", "since": "2026-10-11"}
         copy.write("data/state.json", json.dumps(state, indent=2) + "\n")
         found = copy.status()["program"]
@@ -274,8 +274,9 @@ class ProviderRegistryTest(unittest.TestCase):
 
     def test_discovery_finds_the_shipped_providers(self):
         found = {item.id: item for item in status.discover()}
-        self.assertEqual(set(found), {"instance", "checks", "hevy", "overlay", "program", "checkin"})
-        self.assertTrue(all(item.owner == "R-26b" for item in found.values()))
+        self.assertEqual(set(found), {"instance", "checks", "hevy", "overlay", "program", "checkin", "proposal"})
+        self.assertEqual({item.id for item in found.values() if item.owner != "R-26b"}, {"proposal"})
+        self.assertEqual(found["proposal"].owner, "R-23a")
 
     def test_section_rules(self):
         with self.assertRaises(ValueError):

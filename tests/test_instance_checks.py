@@ -182,7 +182,7 @@ class SchemaVersionsTest(unittest.TestCase):
 
     def test_migrated_documents_come_from_the_migration_registry(self):
         with TempCopy() as tmp:
-            tmp.edit_json("data/program.json", lambda doc: doc.update(schema_version=2))
+            tmp.edit_json("data/program.json", lambda doc: doc.update(schema_version=3))
             _, results, _ = check(tmp.root, "schema_versions")
         [row] = failures(results, "schema_versions")
         self.assertEqual(row["path"], "data/program.json")

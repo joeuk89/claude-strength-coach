@@ -1,0 +1,67 @@
+{
+  "title": "Coaching decisions, data/decisions.json: overrides, adherence triggers and light weeks (contract C25)",
+  "description": "Records are appended and never deleted. `status` is stored as written; an active decision whose `until` has passed reads as expired. `details` is null for an override and validated per kind for the others by coach.decisions.",
+  "type": "object",
+  "required": ["schema_version", "decisions"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": 1},
+    "decisions": {"type": "array", "items": {"$ref": "#/$defs/decision"}}
+  },
+  "$defs": {
+    "date": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+    "optional_date": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+    "timestamp": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"},
+    "text": {"type": "string", "pattern": "\\S"},
+    "decision": {
+      "type": "object",
+      "required": ["id", "kind", "made_at", "overlay_id", "scope", "outcome", "reason", "standing", "until",
+                   "revisit_on", "proposed_sets", "chosen_sets", "details", "status", "closed_at", "closed_reason"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^d-\\d{4,}$"},
+        "kind": {"enum": ["override", "adherence_trigger", "light_week"]},
+        "made_at": {"$ref": "#/$defs/timestamp"},
+        "overlay_id": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}-[a-z0-9-]+$"},
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "session_id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+            "exercise_id": {"type": "string", "pattern": "^[a-z0-9_]+$"}
+          }
+        },
+        "outcome": {"enum": ["adopted", "declined", "deferred"]},
+        "reason": {"$ref": "#/$defs/text"},
+        "standing": {"type": "boolean"},
+        "until": {"$ref": "#/$defs/optional_date"},
+        "revisit_on": {"$ref": "#/$defs/optional_date"},
+        "proposed_sets": {"type": ["array", "null"], "items": {"$ref": "#/$defs/set"}},
+        "chosen_sets": {"type": ["array", "null"], "items": {"$ref": "#/$defs/set"}},
+        "details": {"type": ["object", "null"]},
+        "status": {"enum": ["active", "expired", "withdrawn"]},
+        "closed_at": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"},
+        "closed_reason": {"type": ["string", "null"], "pattern": "\\S"}
+      }
+    },
+    "set": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {"enum": ["normal", "warmup", "dropset", "failure"]},
+        "reps": {"type": ["integer", "null"], "minimum": 1},
+        "rep_range": {
+          "type": ["object", "null"],
+          "required": ["start", "end"],
+          "additionalProperties": false,
+          "properties": {"start": {"type": "integer", "minimum": 1}, "end": {"type": "integer", "minimum": 1}}
+        },
+        "rpe": {"type": ["number", "null"], "minimum": 1, "maximum": 10},
+        "load": {"type": ["number", "null"], "minimum": 0},
+        "duration_seconds": {"type": ["integer", "null"], "minimum": 1},
+        "distance_meters": {"type": ["number", "null"], "minimum": 0}
+      }
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "decisions": [
+    {
+      "id": "d-0001",
+      "kind": "override",
+      "made_at": "2026-10-11T19:02:00Z",
+      "overlay_id": "2026-10-12-weekly",
+      "scope": {"session_id": "session-a", "exercise_id": "bb_back_squat"},
+      "outcome": "adopted",
+      "reason": "synthetic: a standing override with no end date",
+      "standing": true,
+      "until": null,
+      "revisit_on": null,
+      "proposed_sets": [{"type": "normal", "reps": 5, "rpe": 7, "load": 100}],
+      "chosen_sets": [{"type": "normal", "reps": 5, "rpe": 7, "load": 95}],
+      "details": null,
+      "status": "active",
+      "closed_at": null,
+      "closed_reason": null
+    }
+  ]
+}

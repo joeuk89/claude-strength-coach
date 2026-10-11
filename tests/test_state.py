@@ -65,12 +65,14 @@ class TemporaryRoutineMigrationTest(unittest.TestCase):
     def test_v1_routine_ids_become_entries_that_carry_nothing(self):
         doc = valid_state()
         doc["schema_version"] = 1
+        doc["rotation"].pop("week")
+        doc["scheme_state"] = {slot: entry["data"] for slot, entry in doc["scheme_state"].items()}
         doc["hevy"]["temporary_routines"] = ["t-1", "t-2"]
         with Instance() as root:
             (root / "data" / "state.json").write_text(json.dumps(doc), encoding="utf-8")
             migrate.run(root, dry_run=False, now=datetime(2026, 10, 11, 18, tzinfo=timezone.utc))
             upgraded = state.load(root)
-        self.assertEqual(upgraded["schema_version"], 2)
+        self.assertEqual(upgraded["schema_version"], 3)
         self.assertEqual(upgraded["hevy"]["temporary_routines"],
                          [{"routine_id": "t-1", "overlay_id": None, "session_id": None},
                           {"routine_id": "t-2", "overlay_id": None, "session_id": None}])
