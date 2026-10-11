@@ -2368,15 +2368,24 @@ and `plugins test` runs them. Loaded with
   in kg, 5 and 10 in lb), `region` (null: lower for the squat, hinge,
   lunge, knee, calf and hip patterns, else upper), `amrap` (true: the
   last set of each wave week is type `failure`, its `reps` the minimum).
-  State `{wave_week 0..3, training_max, proposed_for}`. Each weekly
-  proposal advances one wave week, except a second proposal for a
-  session under 7 days after `proposed_for`, which repeats the week.
+  State `{wave_week 0..3, training_max, proposed_for, proposed_on}`:
+  `proposed_for` is the latest session date proposed at this wave week,
+  `proposed_on` the `today` of that run. A `weekly` run advances one
+  wave week. It repeats the week for a later session of the same run
+  (`proposed_on` is today) and for a session on or before
+  `proposed_for` (a weekly run again over a week already proposed). A
+  `midweek` or `deload` run always repeats it. Session-date distance
+  alone can't decide, because `next_in_sequence`,
+  `alternating_external_anchor` and `explicit_calendar` move a
+  session's weekday from week to week. Two weekly runs on the same day
+  for consecutive weeks therefore repeat the week in the second.
   After week 3 the next proposal starts week 1 with the training max
   raised. A deload run (`scheme` transform) calls its `deload`: 40/50/60 %
   × 5 of the lower of the stored and the proposed training max, so the
-  raise waits for the next wave. Its `decay` lowers the training max by
-  the band's `load_factor` (kept in state), rebuilds the week without a
-  `failure` set, keeps `return_set_count` sets, caps each load at the
+  raise waits for the next wave. Its `decay` takes the lower of the
+  stored and the proposed training max, so a return week never carries
+  a wave's raise, and lowers it by the band's `load_factor` (kept in
+  state). It rebuilds the week without a `failure` set, keeps `return_set_count` sets, caps each load at the
   derived-from load × `load_factor` and applies the band's RPE cap, so
   the line passes R-24's decay check. With no training max and no
   e1RM it holds the program's sets at the last or start load.
@@ -2384,13 +2393,16 @@ and `plugins test` runs them. Loaded with
 - `assistance_ladder` params: `rungs` (ordered easiest first, each
   `{name, load}`; `load` is the assistance for `assisted`, the added load
   for `bodyweight`, where null means 0, and null for `band`), `reps`,
-  `sets`, `rpe` (null: the program's). State `{rung, through}`. Every
-  valid exposure after `through` (only the newest when `through` is
-  null) that logged every target set at its target reps (the top of a
-  range) at or under the target RPE moves up one rung, to the top rung
-  at most. `target_note` names the rung. `decay` steps back
-  `bands_back(days_off)` rungs (never below the first), with the band's set cut
-  and RPE cap and no load cut. `LOAD_MODES` is `bodyweight`, `assisted`
+  `sets`, `rpe` (null: the program's). State `{rung, through}`. A
+  proposal moves up at most one rung, to the top rung at most: when the
+  newest valid exposure after `through` (the newest overall when
+  `through` is null) logged every target set at its target reps (the
+  top of a range) at or under the target RPE. A slot trained twice a
+  week therefore climbs one rung a week, never two. `target_note` names
+  the rung. `decay` steps back `bands_back(days_off)` rungs from the
+  lower of the stored and the proposed rung (never below the first),
+  so a climb never reaches a return week, with the band's set cut and
+  RPE cap and no load cut. `LOAD_MODES` is `bodyweight`, `assisted`
   and `band`.
 - `maintenance` repeats the newest valid exposure's top load with the
   fewest reps logged at that load, at the program's working set count

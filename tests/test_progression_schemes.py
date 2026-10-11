@@ -151,6 +151,18 @@ class AssistanceLadderTest(unittest.TestCase):
                 self.assertEqual(loads_and_reps(proposal), [(30, 8)] * 3)
                 self.assertEqual(proposal.state["rung"], 1)
 
+    def test_two_hits_in_one_week_climb_one_rung(self):
+        hits = tuple(exposure(date(2026, 10, d), [(40, 8, 8)] * 3, exercise=PULL_UP) for d in (8, 5))
+        proposal = run(self.ladder({"rung": 0, "through": "2026-10-01"}, hits))
+        self.assertEqual(proposal.state, {"rung": 1, "through": "2026-10-08"})
+        self.assertEqual(loads_and_reps(proposal), [(30, 8)] * 3)
+
+    def test_the_newest_exposure_decides(self):
+        hit = exposure(date(2026, 10, 5), [(40, 8, 8)] * 3, exercise=PULL_UP)
+        short = exposure(date(2026, 10, 8), [(40, 8, 8), (40, 8, 8), (40, 6, 8)], exercise=PULL_UP)
+        proposal = run(self.ladder({"rung": 0, "through": "2026-10-01"}, (short, hit)))
+        self.assertEqual(proposal.state["rung"], 0)
+
     def test_an_exposure_is_counted_once(self):
         hit = exposure(date(2026, 10, 5), [(30, 8, 8)] * 3, exercise=PULL_UP)
         proposal = run(self.ladder({"rung": 1, "through": "2026-10-05"}, (hit,)))
@@ -175,6 +187,13 @@ class AssistanceLadderTest(unittest.TestCase):
                 self.assertEqual(loads_and_reps(decayed), [(load, 8)] * 2)
                 self.assertEqual(decayed.state["rung"], rung)
                 self.assertIn(self.PARAMS["rungs"][rung]["name"], decayed.target_note)
+
+    def test_a_hit_before_the_layoff_still_steps_back_from_the_rung_trained(self):
+        hit = exposure(date(2026, 9, 27), [(30, 8, 8)] * 3, exercise=PULL_UP)
+        ctx = self.ladder({"rung": 1, "through": "2026-09-20"}, (hit,), days_off=15)
+        decayed = scheme("assistance_ladder").module.decay(ctx, run(ctx), 15)
+        self.assertEqual(decayed.state["rung"], 0)
+        self.assertEqual(loads_and_reps(decayed), [(40, 8)] * 2)
 
     def test_bodyweight_variations_carry_no_added_load(self):
         params = {"rungs": [{"name": "incline push-up"}, {"name": "push-up"}]}
@@ -204,15 +223,16 @@ class Wave531Test(unittest.TestCase):
         }
         for week, expected in weeks.items():
             with self.subTest(week=week):
-                state = {"wave_week": week - 1, "training_max": 100, "proposed_for": "2026-10-05"}
+                state = {"wave_week": week - 1, "training_max": 100, "proposed_for": "2026-10-05",
+                         "proposed_on": "2026-10-04"}
                 proposal = run(self.wave(state))
                 self.assertEqual(self.shape(proposal), expected)
                 self.assertEqual(proposal.state, {"wave_week": week, "training_max": 100,
-                                                  "proposed_for": "2026-10-12"})
+                                                  "proposed_for": "2026-10-12", "proposed_on": "2026-10-11"})
                 self.assertIn(f"week {week} of 3", proposal.rationale)
 
     def test_the_next_wave_raises_the_training_max_by_the_lower_or_upper_increment(self):
-        done = {"wave_week": 3, "training_max": 100, "proposed_for": "2026-10-05"}
+        done = {"wave_week": 3, "training_max": 100, "proposed_for": "2026-10-05", "proposed_on": "2026-10-04"}
         bench = replace(SQUAT, id="bb_bench_press", pattern="horizontal_push")
         for exercise, params, unit, raised in ((SQUAT, None, "kg", 105), (bench, None, "kg", 102.5),
                                                (SQUAT, None, "lb", 110), (bench, None, "lb", 105),
@@ -224,32 +244,55 @@ class Wave531Test(unittest.TestCase):
                 self.assertAlmostEqual(proposal.sets[0].load, raised * 0.65)
 
     def test_a_second_run_in_the_same_week_reproposes_that_week(self):
-        state = {"wave_week": 2, "training_max": 100, "proposed_for": "2026-10-12"}
-        proposal = run(self.wave(state, session_date=date(2026, 10, 15)))
-        self.assertEqual(proposal.state, state)
-        self.assertEqual(proposal.sets[0].load, 70)
+        state = {"wave_week": 2, "training_max": 100, "proposed_for": "2026-10-15", "proposed_on": "2026-10-11"}
+        midweek = replace(self.wave(state, session_date=date(2026, 10, 15)), week_kind="midweek",
+                          today=date(2026, 10, 13))
+        weekly_again = self.wave(state, session_date=date(2026, 10, 15))
+        for ctx in (midweek, weekly_again):
+            with self.subTest(kind=ctx.week_kind):
+                proposal = run(ctx)
+                self.assertEqual(proposal.state["wave_week"], 2)
+                self.assertEqual(proposal.state["proposed_for"], "2026-10-15")
+                self.assertEqual(proposal.sets[0].load, 70)
+
+    def test_one_wave_week_per_weekly_run_whatever_weekday_the_session_falls_on(self):
+        runs = ((date(2026, 10, 11), (date(2026, 10, 12), date(2026, 10, 16))),
+                (date(2026, 10, 18), (date(2026, 10, 21),)),
+                (date(2026, 10, 25), (date(2026, 10, 26), date(2026, 10, 30))),
+                (date(2026, 11, 1), (date(2026, 11, 4),)))
+        state, found = None, []
+        for today, days in runs:
+            weeks = []
+            for day in days:
+                proposal = run(replace(self.wave(state, {"training_max": 100}, session_date=day), today=today))
+                state = proposal.state
+                weeks.append(state["wave_week"])
+            found.append(weeks)
+        self.assertEqual(found, [[1, 1], [2], [3, 3], [1]])
+        self.assertEqual(state["training_max"], 105)
 
     def test_the_first_training_max_is_ninety_percent_of_the_e1rm_or_the_params(self):
-        fresh = {"wave_week": 0, "training_max": None, "proposed_for": None}
+        fresh = {"wave_week": 0, "training_max": None, "proposed_for": None, "proposed_on": None}
         self.assertEqual(run(self.wave(fresh, e1rm=120)).state["training_max"], 108)
         self.assertEqual(run(self.wave(fresh, {"training_max": 90}, e1rm=120)).state["training_max"], 90)
 
     def test_with_no_training_max_and_no_e1rm_the_line_holds(self):
-        fresh = {"wave_week": 0, "training_max": None, "proposed_for": None}
+        fresh = {"wave_week": 0, "training_max": None, "proposed_for": None, "proposed_on": None}
         proposal = run(self.wave(fresh))
         self.assertEqual(proposal.state, fresh)
         self.assertEqual({s.load for s in proposal.sets if s.working}, {100})
         self.assertIn("no training max", proposal.rationale)
 
     def test_the_deload_is_40_50_60_of_the_finished_wave_s_training_max(self):
-        ctx = self.wave({"wave_week": 3, "training_max": 100, "proposed_for": "2026-10-05"})
+        state = {"wave_week": 3, "training_max": 100, "proposed_for": "2026-10-05", "proposed_on": "2026-10-04"}
+        ctx = self.wave(state)
         deloaded = scheme("wave_531").module.deload(ctx, run(ctx))
         self.assertEqual(self.shape(deloaded), [(40, 5, "normal"), (50, 5, "normal"), (60, 5, "normal")])
         self.assertTrue(deloaded.round_down)
 
     def test_a_return_band_lowers_the_training_max(self):
         source = exposure(date(2026, 9, 14), [(65, 5, None), (75, 5, None), (85, 8, None)])
-        state = {"wave_week": 1, "training_max": 100, "proposed_for": "2026-09-14"}
+        state = {"wave_week": 1, "training_max": 100, "proposed_for": "2026-09-14", "proposed_on": "2026-09-13"}
         ctx = self.wave(state, days_off=28, exposures=(source,))
         decayed = scheme("wave_531").module.decay(ctx, run(ctx), 28)
         self.assertEqual(decayed.state["training_max"], 90)
@@ -258,11 +301,18 @@ class Wave531Test(unittest.TestCase):
 
     def test_a_retest_band_caps_rpe_and_the_derived_from_load(self):
         source = exposure(date(2026, 8, 1), [(60, 5, None)] * 2)
-        state = {"wave_week": 2, "training_max": 100, "proposed_for": "2026-08-01"}
+        state = {"wave_week": 2, "training_max": 100, "proposed_for": "2026-08-01", "proposed_on": "2026-07-31"}
         ctx = self.wave(state, days_off=60, exposures=(source,))
         decayed = scheme("wave_531").module.decay(ctx, run(ctx), 60)
         self.assertEqual(decayed.state["training_max"], 85)
         self.assertEqual([(s.load, s.rpe) for s in decayed.sets if s.working], [(51, 7)])
+
+    def test_a_return_week_after_a_finished_wave_lowers_the_unraised_training_max(self):
+        source = exposure(date(2026, 9, 10), [(75, 5, None), (85, 3, None), (95, 1, None)])
+        state = {"wave_week": 3, "training_max": 100, "proposed_for": "2026-09-10", "proposed_on": "2026-09-09"}
+        ctx = self.wave(state, days_off=30, exposures=(source,))
+        decayed = scheme("wave_531").module.decay(ctx, run(ctx), 30)
+        self.assertEqual((decayed.state["wave_week"], decayed.state["training_max"]), (1, 90))
 
     def test_programs_only_lines_with_an_e1rm(self):
         self.assertEqual(scheme("wave_531").module.LOAD_MODES, base.E1RM_MODES)
@@ -286,19 +336,22 @@ class Wave531ProposeTest(ProposeCase):
         self.assertEqual(squat_loads(doc), [(65, 5, "normal"), (75, 5, "normal"), (85, 5, "failure")])
         for set_ in working(find_line(doc, "bb_back_squat")):
             self.assertIsNotNone(units.plate_breakdown(coaching(set_["load"]), 20.0, [25, 20, 15, 10, 5, 2.5, 1.25]))
-        self.assertEqual(self.meta_state(), {"wave_week": 1, "training_max": 100, "proposed_for": "2026-10-12"})
+        self.assertEqual(self.meta_state(), {"wave_week": 1, "training_max": 100, "proposed_for": "2026-10-12",
+                                             "proposed_on": "2026-10-11"})
         self.assertEqual([f for f in doc["flags"] if f["severity"] == "block"], [])
 
     def test_week_four_is_the_40_50_60_deload_then_the_next_wave_raises_the_training_max(self):
         self.edit_json("data/state.json", lambda doc: doc["scheme_state"].update({"session-a/bb_back_squat": {
-            "scheme": "wave_531", "data": {"wave_week": 3, "training_max": 100, "proposed_for": "2026-10-05"},
+            "scheme": "wave_531", "data": {"wave_week": 3, "training_max": 100, "proposed_for": "2026-10-05",
+                                           "proposed_on": "2026-10-04"},
             "pending": None}}))
         self.edit_program(lambda doc: doc["blocks"].update(deload_rule={"name": "scheme", "params": {}}))
         deload = self.propose("--kind", "deload", "--dry-run")["overlay"]
         self.assertEqual(squat_loads(deload), [(40, 5, "normal"), (50, 5, "normal"), (60, 5, "normal")])
 
         doc = self.propose()["overlay"]
-        self.assertEqual(self.meta_state(), {"wave_week": 1, "training_max": 105, "proposed_for": "2026-10-12"})
+        self.assertEqual(self.meta_state(), {"wave_week": 1, "training_max": 105, "proposed_for": "2026-10-12",
+                                             "proposed_on": "2026-10-11"})
         self.assertEqual(squat_loads(doc), [(67.5, 5, "normal"), (77.5, 5, "normal"), (87.5, 5, "failure")])
 
 

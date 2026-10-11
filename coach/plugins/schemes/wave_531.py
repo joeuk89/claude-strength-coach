@@ -42,14 +42,16 @@ PARAMS = {
 }
 STATE = {
     "schema": {
-        "type": "object", "required": ["wave_week", "training_max", "proposed_for"], "additionalProperties": False,
+        "type": "object", "required": ["wave_week", "training_max", "proposed_for", "proposed_on"],
+        "additionalProperties": False,
         "properties": {
             "wave_week": {"type": "integer", "minimum": 0, "maximum": 3},
             "training_max": {"type": ["number", "null"], "minimum": 0},
             "proposed_for": {"type": ["string", "null"], "pattern": base.DATE_PATTERN},
+            "proposed_on": {"type": ["string", "null"], "pattern": base.DATE_PATTERN},
         },
     },
-    "initial": {"wave_week": 0, "training_max": None, "proposed_for": None},
+    "initial": {"wave_week": 0, "training_max": None, "proposed_for": None, "proposed_on": None},
 }
 FLAGS = {}
 LOAD_MODES = base.E1RM_MODES
@@ -72,10 +74,14 @@ def _sets(ctx, training_max, scheme, amrap):
     return warmups + tuple(found)
 
 
-def _same_week(ctx):
-    """True when this slot's wave week was already proposed for a session under 7 days before this one."""
+def _repeats(ctx):
+    """True when this proposal repeats the stored wave week: any run but a weekly one, a later session of the same
+    run, or a weekly run again over a week already proposed. Session dates alone can't tell, because a sequence
+    or calendar schedule moves a session's weekday from week to week."""
+    if ctx.week_kind != "weekly" or ctx.state.get("proposed_on") == ctx.today.isoformat():
+        return True
     last = ctx.state.get("proposed_for")
-    return last is not None and (ctx.session_date - date.fromisoformat(last)).days < 7
+    return last is not None and ctx.session_date <= date.fromisoformat(last)
 
 
 def _hold(ctx, source):
@@ -104,9 +110,10 @@ def propose(ctx):
         else:
             return _hold(ctx, source)
         week = 0
-    if _same_week(ctx) and week:
+    if _repeats(ctx) and week:
         words.append("proposed again in the same week")
-        proposed_for = ctx.state["proposed_for"]
+        last = ctx.state.get("proposed_for")
+        proposed_for = max(last, proposed_for) if last else proposed_for
     elif week >= len(WEEKS):
         region, step = _increment(ctx)
         training_max = round(training_max + step, 2)
@@ -125,7 +132,8 @@ def propose(ctx):
         sets=_sets(ctx, training_max, WEEKS[week], amrap),
         rationale=", ".join([lead] + words),
         derived_from=source,
-        state={"wave_week": week, "training_max": training_max, "proposed_for": proposed_for},
+        state={"wave_week": week, "training_max": training_max, "proposed_for": proposed_for,
+               "proposed_on": ctx.today.isoformat()},
         target_note=f"Wave week {week} of 3" + (": last set as many reps as possible" if amrap else ""),
     )
 
@@ -141,11 +149,13 @@ def deload(ctx, proposal):
 
 
 def decay(ctx, proposal, days_off):
-    """The training max falls by the band's load factor; the band's set cut and RPE cap apply, and no load
-    passes the derived-from load times that factor."""
-    training_max = proposal.state.get("training_max")
-    if training_max is None:
+    """The lower of the stored and the proposed training max falls by the band's load factor, so a wave's raise
+    never reaches a return week; the band's set cut and RPE cap apply, and no load passes the derived-from load
+    times that factor."""
+    maxes = [m for m in (ctx.state.get("training_max"), proposal.state.get("training_max")) if m is not None]
+    if not maxes:
         return base.default_decay(ctx, proposal, days_off)
+    training_max = min(maxes)
     band = base.return_band(days_off)
     lowered = round(training_max * band.load_factor, 2)
     week = proposal.state["wave_week"] or 1

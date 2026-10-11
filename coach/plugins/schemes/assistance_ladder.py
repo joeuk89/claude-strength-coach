@@ -97,20 +97,19 @@ def propose(ctx):
         judged = [source] if source is not None else []
     else:
         judged = base.usable_oldest_first(ctx.exposures, date.fromisoformat(through))
-    start, moved = rung, []
-    for exposure in judged:
-        if _hit(exposure, targets) and rung < len(rungs) - 1:
-            rung += 1
-            moved.append(exposure.date.isoformat())
+    newest = judged[-1] if judged else None
+    start = rung
+    if newest is not None and _hit(newest, targets) and rung < len(rungs) - 1:
+        rung += 1
     state = {"rung": rung, "through": source.date.isoformat() if source else through}
     name = rungs[rung]["name"]
-    if moved:
-        reason = (f"every set reached its target reps at or under the target RPE on {', '.join(moved)}, so up "
-                  f"from {rungs[start]['name']} to {name}")
+    if rung > start:
+        reason = (f"every set reached its target reps at or under the target RPE on {newest.date.isoformat()}, so "
+                  f"up from {rungs[start]['name']} to {name}")
     elif judged and rung == len(rungs) - 1:
         reason = f"{name} is the top rung, so it holds"
     elif judged:
-        reason = f"not every set reached its target on {judged[-1].date.isoformat()}, so {name} holds"
+        reason = f"not every set reached its target on {newest.date.isoformat()}, so {name} holds"
     else:
         reason = f"no new exposure, so {name} holds"
     return base.Proposal(sets=_at(ctx, targets, rung), rationale=f"Assistance ladder: {reason}",
@@ -118,9 +117,11 @@ def propose(ctx):
 
 
 def decay(ctx, proposal, days_off):
-    """Back one rung per return band past `0-10`; the band's set cut and RPE cap still apply."""
+    """Back one rung per return band past `0-10` from the lower of the stored and the proposed rung, so a climb
+    never reaches a return week; the band's set cut and RPE cap still apply."""
     band = base.return_band(days_off)
-    rung = max(0, proposal.state["rung"] - base.bands_back(days_off))
+    stored = min(ctx.state.get("rung", 0), len(ctx.params["rungs"]) - 1)
+    rung = max(0, min(stored, proposal.state["rung"]) - base.bands_back(days_off))
     sets = _at(ctx, proposal.sets, rung)
     if band.set_delta:
         sets = base.keep_working(sets, base.return_set_count(proposal, band.set_delta))
