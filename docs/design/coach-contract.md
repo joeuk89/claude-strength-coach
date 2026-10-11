@@ -1272,7 +1272,7 @@ Unless stated, each is a copy of `valid/` plus what is listed.
 | `history-bad-schema/`, `history-unresolved/`, `annotations-invalid/` | R-20 | not copies of `valid/`: `valid/`'s config and `slip/`'s `2026-10.json`, with one fault each: a set with an unknown key `weight`; workout 3's squat as an unmatched "Mystery Lift"; an annotation discounting a workout the history lacks |
 | `flag-unknown/` | R-20 | not a copy of `valid/`: its config and its overlay, unapproved, carrying a flag with the unregistered code `no_such_code` |
 | `checkin/` | R-21a | external session `pt-tue` (Tue) in the program; approved overlay `2026-10-05-weekly` (span 2026-10-05..2026-10-11: Session A 2026-10-05 squat 3×5 @ 97.5 RPE 7.5, DB bench 3×10 @ 22.5/hand (Hevy: 45) RPE 8; Session B 2026-10-08 row 3×10 @ 30 RPE 8, pull-up 3×8 BW; Session A 2026-10-10 as on 10-05); `valid/`'s two records replaced by `check-ins/2026-09-06.md` (deep) and `check-ins/2026-10-04.md` (weekly, holding its week-review region); `[sessions.cap_minutes] session-a = 45`; `writes.jsonl` verify lines for both routines, `2026-10-05-weekly` and its approval hash, at 2026-10-04T19:00:00Z; a Hevy cache holding the four C14 workouts and the two routines as that overlay writes them, `...0002` with `updated_at` 2026-10-07T07:00:00Z and one extra exercise (DB bench); `data/history/2026-09.json` and `2026-10.json` from `history sync`; `miss` annotations 2026-09-14 Session A `sleep`, 2026-09-17 Session B `sleep`, 2026-09-21 Session A `time` |
-| `gap/` | R-21b | same program as `checkin/`; record `check-ins/2026-09-13.md` (weekly); last workout 2026-09-14 (squat 3×5 @ 100), none after; no overlay after 2026-09-20 |
+| `gap/` | R-21b | `layoff/`'s history (last workout 2026-09-14, squat 3×5 @ 100, none after) with `checkin/`'s program (`pt-tue`, mon/thu); no overlays; records `check-ins/2026-08-30.md` (weekly, the research record), `2026-09-06.md` (deep) and `2026-09-13.md` (weekly), so at `COACH_NOW` no deep review is due |
 | `missed/` | R-22 | program with rules `miss-b` (fold row, 2 sets, into Session A, `min_days_left` 1), `miss-a` (shift to sat, then thu); the library names `db_single_arm_row` "Single-arm row"; approved overlay `2026-10-12-weekly` re-dated: Session A 2026-10-12, Session B 2026-10-14, Session A 2026-10-17; `data/history/` as in `pages/`, so the workout for Session A on 2026-10-12 is the only one in that week; the record's overlay region and `routine/` re-rendered |
 | `missed-bad-rule/`, `missed-weekly-fold/` | R-22 | not copies of `valid/`: `missed/`'s config and library, with one fault each: `miss-b` folding into `session-z`; the weekly overlay holding a folded row on Session A 2026-10-17 |
 | `dose/` | R-30a | program with `pt-tue` estimated at `{"chest": 3, "lats": 3}`; approved weekly overlays for 2026-W36 to 2026-W41 built from `tests/fixtures/overlay/draft-kg.json` re-dated (Session A Monday, Session B Thursday, each created the Sunday before at 19:00Z); `data/history/2026-08.json` to `2026-10.json` from `history sync` of synthetic workouts `...0301` to `...0309` (Session A squat 3×5 @ 95 RPE 7, DB bench 3×10 @ Hevy 45 RPE 8; Session B row 3×10 @ 30 RPE 8, pull-up 3×8 BW), no Hevy cache; `miss` and `external` annotations made at each week's Sunday check-in, giving the weeks below (planned = Session A, Session B, PT = 3) |
@@ -2060,6 +2060,8 @@ RETURN_BANDS = (   # days_off upper bound inclusive, id, load_factor, set_delta,
     (None, "43+",   0.85, -1, 7,    True),
 )
 GRACE_DAYS = 10
+ILLNESS_RPE_CAP = 7
+SYMPTOM_FREE_HOURS = 48    # R-21b; R-02's illness rule
 
 coach.validity.band_for(days_off) -> Band
 coach.validity.interval_days(exposures) -> int     # median of the last ≤4 gaps, clamped 7..14; 7 with <2 gaps
@@ -2460,7 +2462,8 @@ Output: `data.overlay` is the complete C10 overlay (approval null,
 flags filled, every line's `provenance` filled), and `data.lines` is a
 compact list `{session_id, exercise_id, text, change, rationale, flags}`
 with `text` from `units.format_load` for the coach's brief. The overlay
-id follows C10.
+id follows C10. `data.lines_digest` (R-21b) is the C7 canonical hash of
+`data.lines`; `propose show` returns it too.
 
 - `propose override --proposal ID --session S --exercise E (--sets SPEC | --load N) --reason TEXT [--standing [--until D]]`
   changes one line, keeps the original in the line's C10 `override.proposed_sets`,
@@ -3610,6 +3613,9 @@ coach.checkin.card_text(card) -> str                                         # t
 coach.checkin.misses(root, since, until, now=None) -> dict
 coach.checkin.render_week_review(root, record_date) -> str                   # C11
 coach.checkin.skeleton(root, date, tier=None, overlay_id=None, refresh=False, dry_run=False, now=None) -> dict
+coach.checkin.mode_for(found, day) -> (mode, deep_reasons)                   # R-21b; due() and prepare() share it
+coach.checkin.tag_gap(root, today, tag, now=None, dry_run=False) -> dict      # R-21b
+coach.checkin_catchup.return_brief(root, config, now, proposal_id=None, overlay_id=None, reason="layoff") -> dict   # R-21b
 CATCH_UP_AFTER_DAYS = 10    # R-02's first return band ends at 10 days
 ```
 
@@ -3619,13 +3625,19 @@ and `render_card` would capture R-33b's `card` regions.
 
 - **Window**: day after the last record's date to today (`--until` sets
   the end). No record: from the program's first overlay span start.
-- **Mode**: `catch_up` when `days_since > CATCH_UP_AFTER_DAYS` (R-21b; until
-  it merges, R-21a reports `weekly` with a `catch_up_pending` warning).
+- **Mode**: `catch_up` when `days_since > CATCH_UP_AFTER_DAYS`.
   Otherwise `deep` when there is no record, the last deep record is 42 or
   more days old, a card part adds a reason, or `--tier deep`; else
-  `weekly`. A catch-up never runs deep; it sets `deep_deferred: true`, and
-  the next non-catch-up check-in is deep with reason "deferred from
-  catch-up <date>" when a deep was due.
+  `weekly`. `--tier weekly` or `--tier deep` overrides a catch-up. A
+  catch-up never runs deep; it sets `deep_deferred: true` (a record-based
+  deep reason, or a part's tier reason), and its `tier_reasons` are the
+  gap (`"28 days since the last check-in, over 10"`) plus `"deep review
+  deferred (<reasons>)"`. When the newest records are catch-ups and a
+  deep review was due at one of them (judged from the records before
+  it), the next check-in's deep reasons start with "deferred from
+  catch-up <date>", so a check-in that is not itself a catch-up runs
+  deep. A part's tier reason is not recorded, so only record-based
+  reasons carry over. `checkin due` uses the same rule.
 - `due_date` = last record date + `[checkin] cadence_days`.
 
 **Card document** (`checkin prepare` → `data.card`; `data.text` is the
@@ -3824,28 +3836,63 @@ as it was):
   "summary": [{"week": "2026-W38", "planned_core": 3, "trained_core": 0, "missed_by_tag": {"untagged": 3},
                "optional_trained": 0, "external_done": null, "workouts": 0, "planned_from": "schedule"}],
   "questions": [{"id": "gap", "n": 1, "ask": "…"}, {"id": "now", "n": 2, "ask": "…"}, {"id": "next_week", "n": 3, "ask": "…"}],
-  "return_week": {"proposal_id": "…", "overlay_id": "2026-10-12-weekly", "band": "22-42", "days_off": 28,
+  "missed": [{"date": "2026-09-17", "session_id": "session-b", "title": "Session B", "tag": "untagged"}],
+  "return_week": {"proposal_id": "2026-10-12-weekly", "overlay_id": "2026-10-12-weekly", "week": "2026-W42",
+                  "span": {"start": "2026-10-12", "end": "2026-10-18"}, "band": "22-42", "days_off": 28,
                   "load_factor": 0.9, "set_delta": -1, "rpe_cap": null,
-                  "sessions": [{"date": "2026-10-12", "title": "Session A", "lines": ["Squat 2×5 @ 90"]}],
-                  "flags": [], "lines_digest": "sha256:…"},
+                  "sessions": [{"date": "2026-10-12", "session_id": "session-a", "title": "Session A", "rpe_cap": null,
+                                "lines": ["Back Squat (Barbell) 2×5 @ 90 RPE 7"]}],
+                  "flags": [], "lines_digest": "sha256:…", "names": {"bb_back_squat": "Back Squat (Barbell)"}},
+  "return_week_problem": null,
   "write_line": "Reply \"go\" to train this and write: Session A, Session B (Hevy)."
 }
 ```
 
 - `summary`: one row per week in the window (C7 weeks; `week` is the
-  label). Planned sessions come from the overlay in force, else from
-  `schedule plan` for that week (`planned_from: "schedule"`).
-- `return_week`: `propose week --dry-run` for the week after today
-  (R-23a), which applies C22 decay. `lines_digest` = C7 canonical hash of
-  `data.lines`. After "ok", the real `propose week` must give the same
-  digest; if not, the coach presents again.
+  label, `start` the week's first day; the first and last rows may cover
+  part of a week). Planned sessions come from the overlay in force (the
+  card's C18 rows), else from `schedule plan` for those days, each
+  matched to a workout of its session (its `session_id`, or the routine
+  `state.hevy.routines` maps to it) in the same week, a
+  `trained_unlogged` annotation, or a `miss` annotation for its tag.
+  `planned_from` is `overlay` when an overlay is in force on every day of
+  the row, `schedule` on none, else `mixed`. `external_done` counts
+  coach-led sessions recorded done, null when none was recorded;
+  `workouts` counts every logged workout in the row.
+- `missed`: every missed planned core session in the window, with its
+  tag or `untagged`; `checkin tag-gap` and the record's `Missed:` line
+  read it.
+- `return_week`: `propose week --dry-run` for the week holding tomorrow
+  (R-23a's default span; `week` names it), which applies C22 decay.
+  `days_off` = first session date − last lifting workout; `band` and its
+  numbers from `band_for(days_off)`. Each session's `rpe_cap` is the
+  band's cap, or `ILLNESS_RPE_CAP` on the first session when the
+  proposal raised `return_after_illness`. `names` maps the week's
+  exercise and session ids to names, for the flags line. `lines_digest` =
+  C7 canonical hash of `data.lines`; `propose week` and `propose show`
+  return the same `lines_digest`. After "ok", the real `propose week
+  --week <week>` must give the same digest; if not, the coach presents
+  again. When the proposal fails (an invalid program, no session
+  planned), `return_week` and `write_line` are null,
+  `return_week_problem` holds the message, `checkin prepare` warns, and
+  the text ends "Answer 1–3." instead.
+- The record of a catch-up check-in is titled `(catch-up)`; `checkin
+  skeleton` picks that tier from the mode. Its week-review region holds
+  the `Missed:` line and the summary table, never the return week (the
+  region reads committed history only and runs no proposal).
+- The rotation line (the `coach_led` field, else `next_week`; in
+  catch-up mode question 3) states the position `schedule plan` infers
+  for next week and whether it is confirmed; with no plannable program
+  it falls back to `state.rotation`.
 - The card ends with the write line (R-03's shape) and "Reply ok to accept
   all of this, or answer 1–3." "ok" alone means: misses stay untagged,
   nothing new to report, the return week as shown, written to Hevy.
 - Parts contribute `facts` and `nudge_lines` in catch-up mode; their
   fields are ignored.
-- `checkin tag-gap --tag T` writes one `miss` annotation per untagged
-  missed planned core session in the window.
+- `checkin tag-gap --tag T [--dry-run]` writes one `miss` annotation per
+  untagged missed planned core session in the window (`source` "checkin
+  tag-gap <date>"), through `coach.history.add_annotations`, the same
+  path as `history annotate`. A second run finds nothing left to tag.
 - `checkin return-brief (--proposal ID | --overlay ID) --reason ill|travel|no_kit|layoff`
   returns `data.text`, the return template of the coach's brief: (1) one
   sentence on the gap (days off, reason); (2) what the return week does
@@ -3855,7 +3902,13 @@ as it was):
   first session at RPE 7 or below; fever, chest symptoms or a slow recovery
   mean checking with a qualified professional first). `travel` and
   `no_kit` take a coach-built one-off overlay. Read-only; the coach may
-  edit the words before presenting.
+  edit the words before presenting. Exactly one of `--proposal` and
+  `--overlay` (exit 2 otherwise). Output: `text`, `days_off`, `band`,
+  `sessions` (as `return_week.sessions`), `reason`, `source` and
+  `warnings`; `ill` on a week whose first session is not capped at
+  `ILLNESS_RPE_CAP` warns (record the ill misses and propose again). The
+  48 hours is `coach.validity.SYMPTOM_FREE_HOURS`, beside
+  `ILLNESS_RPE_CAP` (C22), and a test keeps it equal to `CLAUDE.md`.
 
 ## C37. Missed-day rules (R-22; R-23a, R-25, R-30b read)
 
