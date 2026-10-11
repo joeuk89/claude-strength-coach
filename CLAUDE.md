@@ -245,7 +245,7 @@ and its sources.
     A session is trained as prescribed when at least two thirds of its prescribed working sets were logged and its mean logged RPE was no more than 1.5 below target; a coach-led session counts when it happened (rn:deloads.11).
   - **Reset:** a deload or other light week, a return week (see return after a layoff below), or any week with under 50 % of planned sessions trained sets the count back to zero (rn:deloads.2).
     The check-in that closes such a week ends the block, and the next block starts at zero.
-    `/one-off-week` zeroes the count when it plans a light week, but the block number moves on only when that week closes.
+    `/one-off-week` leaves the count alone when it plans a light week: the count resets, and the block number moves on, only when the check-in closes that week.
     A week at 50–75 %, or a one-off week for travel or limited kit, neither counts nor resets (rn:deloads.2).
   - **Ceiling:** propose a light week when the count reaches the program's ceiling: default 6 completed hard weeks, settable from 4 to 8 in the program's `blocks.hard_weeks_ceiling` (rn:deloads.3).
     At the ceiling it is proposed whatever else is true; if the athlete declines, record the reason and propose it again at the next check-in.

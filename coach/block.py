@@ -8,13 +8,12 @@ trigger rule (rn:deloads.5), the trained-as-prescribed rule
 coaching heuristics, not research cut-offs.
 """
 
-import importlib
-import importlib.util
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from coach import cardio
 from coach import config as config_module
 from coach import constraints, dates, decisions, flags, history, jsonio, niggles, overlay, paths, patterns
 from coach import program as program_module
@@ -42,7 +41,6 @@ LOGGED_SHARE = (2, 3)
 RPE_SHORTFALL = 1.5
 SKIP_BELOW = 3
 TRIGGERS_FOR_LIGHT = 2
-DEEP_AFTER_DAYS = 42
 LAYOFF_DAYS = validity.RETURN_BANDS[0].upper
 NO_DECAY_BAND = validity.RETURN_BANDS[0].id
 _ID = re.compile(r"^b-(\d+)$")
@@ -308,14 +306,6 @@ def _aggravated(inst, on_date):
     return [row["area"] for row in doc["niggles"] if niggles.status_on(row, on_date) == "aggravated"]
 
 
-def sleep_debt(root, span):
-    """R-43's sleep-debt reading over a span when that item is present: True, False, or None for no source."""
-    if importlib.util.find_spec("coach.cardio") is None:
-        return None
-    reader = getattr(importlib.import_module("coach.cardio"), "sleep_debt", None)
-    return reader(root, span) if reader else None
-
-
 def _signals(inst, span, readiness, sleep, target):
     """(signals, fired triggers, detail words) for one closed week."""
     drift = _drifting(inst, span)
@@ -324,7 +314,7 @@ def _signals(inst, span, readiness, sleep, target):
     if target and sleep:
         sleep_value, source = sleep, "athlete"
     else:
-        debt = sleep_debt(inst.root, span)
+        debt = cardio.sleep_debt(inst.root, span)
         sleep_value = "unknown" if debt is None else ("poor" if debt else "ok")
         source = "none" if debt is None else "sleep_debt"
     signals = {"readiness": readiness, "sleep": sleep_value, "sleep_source": source, "rpe_drift": bool(drift),
@@ -406,11 +396,20 @@ def status_line(root):
         return None
 
 
-def _last_deep(inst, block_state):
+def _deep_tier(inst, block_state):
+    """(reasons, last deep date) by the check-in's own deep rules, counting a `--deep` close as a deep record."""
     from coach import checkin
-    found = [dates.parse_date(block_state["last_deep_review"])] if block_state["last_deep_review"] else []
-    found += [r.date for r in checkin.records(inst.root) if r.tier == "deep" and r.date <= inst.today]
-    return max(found) if found else None
+    found = [r for r in checkin.records(inst.root) if r.date <= inst.today]
+    if block_state["last_deep_review"]:
+        found = sorted(found + [checkin.Record(dates.parse_date(block_state["last_deep_review"]), "deep",
+                                               paths.STATE)], key=lambda r: r.date)
+    deep = [r.date for r in found if r.tier == "deep"]
+    reasons = []
+    if checkin.deep_reasons(found, inst.today):
+        reasons.append("six_weeks" if deep else "first_close")
+    if checkin.deferred_reason(found):
+        reasons.append("catch_up_deferred")
+    return reasons, (deep[-1] if deep else None)
 
 
 def _restructure_required(inst):
@@ -423,12 +422,7 @@ def _restructure_required(inst):
 
 def deep_review(inst, block_state):
     """Whether the check-in that closes the newest week is deep, and why (C43)."""
-    reasons = []
-    last = _last_deep(inst, block_state)
-    if last is None:
-        reasons.append("first_close")
-    elif (inst.today - last).days >= DEEP_AFTER_DAYS:
-        reasons.append("six_weeks")
+    reasons, last = _deep_tier(inst, block_state)
     if block_state["light_week"]["status"] == "proposed":
         reasons.append("light_week_proposed")
     if _restructure_required(inst):
@@ -437,6 +431,7 @@ def deep_review(inst, block_state):
 
 
 _DEEP_WORDS = {"first_close": "no deep check-in on record", "six_weeks": "six weeks since the last deep check-in",
+               "catch_up_deferred": "a catch-up check-in deferred the deep review",
                "light_week_proposed": "a light week is being proposed",
                "restructure_required": "the adherence trigger fired"}
 
@@ -505,12 +500,14 @@ def _first_open_week(inst, ledger, target, replaced):
     return inst.week(dates.parse_date(block["started"]))
 
 
-def _light_week_after(previous, outcome, week_type, reason, target):
+def _light_week_after(previous, outcome, week_type, reason, target, replaced):
     if previous["status"] == "agreed" and previous["week"] and previous["week"] > target.end.isoformat():
         return dict(previous)
     if outcome == "due":
-        return {"status": "proposed", "type": week_type, "reason": reason,
-                "week": (target.end + timedelta(days=1)).isoformat(), "decision_id": None}
+        week = (target.end + timedelta(days=1)).isoformat()
+        if replaced and previous["status"] == "declined" and (previous["type"], previous["week"]) == (week_type, week):
+            return dict(previous)
+        return {"status": "proposed", "type": week_type, "reason": reason, "week": week, "decision_id": None}
     return dict(_NOT_DUE, status={"watch": "watch", "skipped": "skipped"}.get(outcome, "not_due"))
 
 
@@ -595,7 +592,7 @@ def close(root, week_start, readiness=None, sleep=None, deep=False, dry_run=Fals
 
     previous = inst.state["block"]
     last_deep = inst.today.isoformat() if deep else previous["last_deep_review"]
-    light_week = _light_week_after(previous["light_week"], outcome, week_type, reason, target)
+    light_week = _light_week_after(previous["light_week"], outcome, week_type, reason, target, replaced)
     block_state = _block_state(ledger, light_week, target.start.isoformat(), last_deep)
     inst.state = dict(inst.state, block=block_state)
     deep_report = deep_review(inst, block_state)

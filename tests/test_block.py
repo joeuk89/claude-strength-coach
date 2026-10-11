@@ -9,7 +9,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from unittest import mock
 
-from coach import block, flags, jsonio, program
+from coach import block, flags, jsonio, program, structure
 from coach.validate import validate
 from tests.support import INSTANCES, REPO_ROOT, VALID, run_cli
 from tests.support.history import read_json, write_json
@@ -215,6 +215,28 @@ class WeekClassTest(BlockCase):
         logged["exercises"][0]["sets"].insert(0, warmup)
         self.assertTrue(block.trained_as_prescribed([line], logged))
 
+    def test_a_week_with_an_overlay_is_judged_against_the_overlay(self):
+        proposal = self.data("propose", "week", "--week", "2026-W42")
+        for index, flag in enumerate(proposal["overlay"]["flags"]):
+            if flag["severity"] == "block":
+                self.data("propose", "resolve", "--proposal", proposal["overlay"]["id"], "--flag", str(index),
+                          "--resolution", "test week")
+        self.data("propose", "finalize", "--proposal", proposal["overlay"]["id"])
+        self.train_week("2026-10-12")
+        inst = block._Instance.load(self.root, "2026-10-18", None)
+        rows = [r for r in structure.week(self.root, inst.week(date(2026, 10, 12)), today=inst.today)["sessions"]
+                if "external_id" not in r]
+        overlay_doc = next(d for d in inst.overlays if d["id"] == proposal["overlay"]["id"])
+        self.assertTrue(rows)
+        for row in rows:
+            with self.subTest(session=row["session_id"], day=row["date"]):
+                self.assertEqual(row["overlay_id"], overlay_doc["id"])
+                wanted = next(s for s in overlay_doc["sessions"]
+                              if (s["session_id"], s["date"]) == (row["session_id"], row["date"]))
+                self.assertEqual(block._planned_lines(inst, row), wanted["exercises"])
+        self.close()
+        self.assertEqual(self.close("2026-W42", now=NEXT_SUNDAY)["weeks"][-1]["class"], "hard")
+
     def test_an_unconfirmed_coach_led_session_is_left_out(self):
         self.edit("data/history/annotations.json",
                   lambda doc: doc.update(annotations=[a for a in doc["annotations"] if a["date"] != "2026-10-06"]))
@@ -294,7 +316,7 @@ class TriggerTest(BlockCase):
         self.assertEqual(data["weeks"][-1]["outcome"], "watch")
 
     def test_sleep_debt_reads_the_cardio_module_when_the_athlete_says_nothing(self):
-        with mock.patch("coach.block.sleep_debt", return_value=True) as reader:
+        with mock.patch("coach.cardio.sleep_debt", return_value=True) as reader:
             week = self.close("2026-W41")["weeks"][-1]
         self.assertEqual((week["signals"]["sleep"], week["signals"]["sleep_source"]), ("poor", "sleep_debt"))
         self.assertIn("sleep", week["triggers"])
@@ -313,6 +335,15 @@ class TriggerTest(BlockCase):
         self.assertEqual(data["block"]["light_week"]["type"], "return")
         self.assertEqual(data["block"]["light_week"]["reason"], "illness")
         self.assertTrue(data["status_line"].endswith("proposed for wk of 12 Oct (return, illness)"))
+
+
+class SleepSourceTest(BlockCase):
+    base = INSTANCES / "cardio"
+
+    def test_a_close_reads_the_sleep_debt_from_the_activity_source(self):
+        week = self.close("2026-W41")["weeks"][-1]
+        self.assertEqual((week["signals"]["sleep"], week["signals"]["sleep_source"]), ("poor", "sleep_debt"))
+        self.assertIn("sleep", week["triggers"])
 
 
 class DecideTest(BlockCase):
@@ -489,6 +520,17 @@ class DeepReviewTest(BlockCase):
         self.init(1)
         self.assertEqual(self.close()["deep_review"]["reasons"], ["first_close"])
 
+    def test_a_deep_review_a_catch_up_deferred_is_still_due(self):
+        self.edit("data/state.json", lambda doc: doc["block"].update(last_deep_review=None))
+        (self.root / "check-ins").mkdir(exist_ok=True)
+        (self.root / "check-ins" / "2026-08-02.md").write_text("# Check-in — 2026-08-02 (deep)\n", encoding="utf-8")
+        (self.root / "check-ins" / "2026-09-27.md").write_text("# Check-in — 2026-09-27 (catch-up)\n",
+                                                               encoding="utf-8")
+        self.init(1)
+        deep = self.close()["deep_review"]
+        self.assertEqual(deep["reasons"], ["six_weeks", "catch_up_deferred"])
+        self.assertEqual(deep["last_deep_review"], "2026-08-02")
+
     def test_a_deep_close_records_the_review(self):
         self.edit("data/state.json", lambda doc: doc["block"].update(last_deep_review=None))
         self.init(1)
@@ -508,6 +550,27 @@ class RecloseTest(BlockCase):
         self.assertEqual(len(weeks), 6)
         self.assertEqual(weeks[-1]["signals"]["readiness"], "poor")
         self.assertEqual(weeks[-1]["count_after"], 6)
+
+    def test_reclosing_after_a_decline_keeps_the_decline(self):
+        self.close()
+        decision = self.data("block", "decide", "--outcome", "declined", "--reason", "competition week")["decision"]
+        data = self.close("2026-W41", "--readiness", "poor")
+        self.assertEqual(data["block"]["light_week"], {"status": "declined", "type": "deload", "reason": "ceiling",
+                                                       "week": "2026-10-12", "decision_id": decision["id"]})
+        self.assertTrue(data["status_line"].endswith(
+            "light week: declined (competition week), proposed again next check-in"))
+        self.assertNotIn("light_week_proposed", data["deep_review"]["reasons"])
+        self.assertNotIn("light_week_due", codes(data))
+
+    def test_reclosing_after_a_decline_proposes_again_when_the_proposal_changes(self):
+        self.close()
+        self.data("block", "decide", "--outcome", "declined", "--reason", "competition week")
+        self.drop_workout("2026-10-05")
+        self.drop_workout("2026-10-08")
+        self.data("history", "annotate", "--kind", "miss", "--date", "2026-10-05", "--session", "session-a",
+                  "--tag", "ill")
+        light = self.close()["block"]["light_week"]
+        self.assertEqual((light["status"], light["type"], light["decision_id"]), ("proposed", "return", None))
 
     def test_reclosing_an_older_week_exits_1(self):
         self.close()

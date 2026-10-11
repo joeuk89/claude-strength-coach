@@ -1276,7 +1276,7 @@ Unless stated, each is a copy of `valid/` plus what is listed.
 | `missed/` | R-22 | program with rules `miss-b` (fold row, 2 sets, into Session A, `min_days_left` 1), `miss-a` (shift to sat, then thu); the library names `db_single_arm_row` "Single-arm row"; approved overlay `2026-10-12-weekly` re-dated: Session A 2026-10-12, Session B 2026-10-14, Session A 2026-10-17; `data/history/` as in `pages/`, so the workout for Session A on 2026-10-12 is the only one in that week; the record's overlay region and `routine/` re-rendered |
 | `missed-bad-rule/`, `missed-weekly-fold/` | R-22 | not copies of `valid/`: `missed/`'s config and library, with one fault each: `miss-b` folding into `session-z`; the weekly overlay holding a folded row on Session A 2026-10-17 |
 | `dose/` | R-30a | program with `pt-tue` estimated at `{"chest": 3, "lats": 3}`; approved weekly overlays for 2026-W36 to 2026-W41 built from `tests/fixtures/overlay/draft-kg.json` re-dated (Session A Monday, Session B Thursday, each created the Sunday before at 19:00Z); `data/history/2026-08.json` to `2026-10.json` from `history sync` of synthetic workouts `...0301` to `...0309` (Session A squat 3×5 @ 95 RPE 7, DB bench 3×10 @ Hevy 45 RPE 8; Session B row 3×10 @ 30 RPE 8, pull-up 3×8 BW), no Hevy cache; `miss` and `external` annotations made at each week's Sunday check-in, giving the weeks below (planned = Session A, Session B, PT = 3) |
-| `block/` | R-31 | program with `hard_weeks_ceiling` 6 and `pt-tue`; a ledger with block `b-0001` started 2026-08-31 and no closed weeks; weekly overlays for 2026-W36 to W41; workouts matching each overlay (every core session at the prescribed sets and RPE) plus `external` done annotations. Closing W36 to W41 gives six hard weeks |
+| `block/` | R-31 | program with `hard_weeks_ceiling` 6 and `pt-tue`; a ledger with block `b-0001` started 2026-08-31 and no closed weeks; no weekly overlays, so W36 to W41 are judged against the program sessions; workouts matching them (every core session at the prescribed sets and RPE) plus `external` done annotations. Closing W36 to W41 gives six hard weeks. A test that needs an overlay week builds W42 with `propose week` |
 | `nohevy/` | R-40c | the valid program and overlay; `[hevy] enabled = false`; no Hevy cache; `data/log/workouts.jsonl` holding the two Session A workouts of the logged-workouts table, logged by hand (squat 3×5 @ 95 RPE 7, DB bench 3×10 @ 22.5/hand RPE 8; the same on 2026-10-05 at 97.5), with `overlay_id` null; `this-week-sheets.md` rendered at 2026-10-11T18:00:00Z |
 | `manual-log-invalid/` | R-40c | not a copy of `valid/`: `nohevy/`'s config, library, program and overlay, and a log whose line 2 repeats line 1's id, line 3 logs `no_such_lift` in session `session-z`, and line 4 voids `manual:2026-09-21-session-a-1`, which no line logs |
 | `sheets-stale/` | R-40c | not a copy of `valid/`: `nohevy/`'s config, library, overlay and sheets, with Session A's squat working sets hand-edited from 100 to 105 |
@@ -4187,8 +4187,8 @@ these headings:
   name.
 
 **Dashboard** (`README.md`): first, a status block of at most six lines
-(the brief's header line; block `hard_weeks_completed` and
-`deload.status` from state; last check-in date, tier and link; open flag
+(the brief's header line; the block status line from
+`coach.block.status_line` (C43); last check-in date, tier and link; open flag
 count (unresolved `warn` and `block` flags on the week's overlays); the
 page's as-of time as "Updated <day> <HH:MM> (<zone>)", then part lines up
 to six), then the Sessions table, then a progress summary of at most
@@ -4682,7 +4682,7 @@ Rules (R-02's prose, scripted; the prose stays the human copy):
 - **Triggers** (four): athlete-reported readiness, compound RPE drift two
   sessions running (`coach.patterns.rpe_drift`), an `aggravated` niggle
   (C27), poor sleep (the athlete's report, or `coach.cardio.sleep_debt`
-  over the closed week when R-43 is present; None means no source).
+  over the closed week; None means no source).
 - A light week is due at the ceiling, or on two fired triggers with at
   least three hard weeks; skipped with a recorded reason below three; one
   trigger is a watch. A declined light week at the ceiling is proposed
@@ -4698,8 +4698,8 @@ Rules (R-02's prose, scripted; the prose stays the human copy):
   `return`.
 - The next check-in is deep (`deep_review.due`) when six weeks have passed
   since the last deep close, a light week is being proposed, R-30a's
-  structural flags are raised, or on the first close; never because of the
-  light week itself.
+  structural flags are raised, a catch-up check-in deferred a due deep
+  review, or on the first close; never because of the light week itself.
 
 Status line format:
 
@@ -4753,26 +4753,33 @@ Flags (registered in `coach/flags/block.py`; rows in C20):
   `trained_unlogged` session has no logged sets, so it is not.
 - **Triggers**: readiness and sleep only for the week `--week` names
   (earlier weeks of a catch-up close read sleep from
-  `coach.block.sleep_debt` only, else `unknown`). RPE drift: a compound
+  `coach.cardio.sleep_debt` only, else `unknown`). RPE drift: a compound
   or recovery-capped lift whose two newest non-excluded exposures up to
   the week's end, the newer inside the week, both drift (prescriptions
   from `coach.propose.Run.exposures`). Niggle: a row whose status on the
   week's last day (today for the week closed today or later) is
-  `aggravated`. `coach.block.sleep_debt(root, span)` calls
-  `coach.cardio.sleep_debt` when that module exists.
+  `aggravated`. Sleep reads `coach.cardio.sleep_debt(root, span)`
+  (C49): None, so `unknown`, without an activity source.
 - **Illness**: a `low` week with an `ill` miss proposes a `return` week
   with reason `illness` (C42's reason enum gains `illness`), whatever
   the count.
 - **Light-week state after a close**: an `agreed` week later than the
-  closed week is kept; otherwise the closed week's outcome sets it
+  closed week is kept; so is a `declined` state, with its
+  `decision_id`, when the close re-closes the same week and still
+  proposes the same type for the same week. Otherwise the closed week's
+  outcome sets it
   (`due` → `proposed` for the next week, `watch`, `skipped`, `none` →
   `not_due`). The status line adds ", proposed again next check-in" to
   a decline only when the reason is `ceiling`; a declined trigger week
   is proposed again only if the triggers fire again.
-- **Deep review** reasons: `first_close` (no deep review on record: the
-  later of `state.block.last_deep_review` and the newest deep
-  `check-ins/` record), `six_weeks` (42 days or more since it),
-  `light_week_proposed`, and `restructure_required` (the adherence
+- **Deep review** reasons: `first_close` and `six_weeks` come from
+  `coach.checkin.deep_reasons` over the `check-ins/` records, with
+  `state.block.last_deep_review` counted as one more deep record:
+  `first_close` when no deep review is on record, `six_weeks` when
+  `checkin.DEEP_AFTER_DAYS` (42) or more have passed since the newest;
+  `catch_up_deferred` when `coach.checkin.deferred_reason` finds a
+  catch-up that put a due deep review off; `light_week_proposed`; and
+  `restructure_required` (the adherence
   trigger from `coach.structure.adherence`). R-02's prose names the
   adherence trigger, not every structural flag, so `volume_undershoot`
   and `add_session_type_blocked` do not make a check-in deep. `--deep`
@@ -5547,7 +5554,7 @@ Providers R-26b ships:
 | `checks` | the `coach check` summary and the ids of any `fail` or `warn` |
 | `hevy` | cache age against `[hevy] cache_max_age_hours`; skipped when Hevy is disabled |
 | `overlay` | the overlay in force today (id, kind, span), else the next to start with its first session; whether it is approved, pushed and verified (a routine counts as verified when its latest `verify` line for the overlay's id and approval hash says so; Hevy off: approved only); the next one or two planned sessions; and the days of the coming week no overlay covers. The coming week is the week holding tomorrow (`[athlete] week_starts`), from today on: the rest of this week, or all of next week on its last day. Invalid overlays are skipped (`checks` names them) |
-| `program` | rotation position and whether it is confirmed (R-25's `header_facts`), the confirmation date (`state.json`); hard weeks completed and deload status (`state.json`); `attention` when the position is unconfirmed or the deload is `due` or `in_progress` |
+| `program` | rotation position and whether it is confirmed (R-25's `header_facts`), the confirmation date (`state.json`); the block status line (`coach.block.status_line`, C43) and `light_week` (`state.json`); `attention` when the position is unconfirmed or the light week is `proposed` or `agreed` |
 | `checkin` | last check-in, days since, due date, tier and mode (`first`, `weekly`, `deep`, `catch_up`) from R-25's `header_facts` (its `data` is `header_facts`' `checkin`); `attention` when there is no record or the due date is today or past |
 
 Later items add a provider when they own a fact the coach should see at
