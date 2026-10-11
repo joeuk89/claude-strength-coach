@@ -1,13 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "x-coach-paths": ["data/nutrition/plans/*.json"],
   "title": "Meal plan, data/nutrition/plans/<id>.json (contract C34)",
   "type": "object",
   "required": ["schema_version", "id", "span", "created_at", "style", "targets", "input", "days", "pool",
                "shopping", "flags", "approval"],
   "additionalProperties": false,
   "properties": {
-    "schema_version": {"type": "integer", "const": 1},
+    "schema_version": {"type": "integer", "const": 2},
     "id": {"$ref": "#/$defs/date"},
     "span": {"$ref": "#/$defs/span"},
     "created_at": {"$ref": "#/$defs/timestamp"},
@@ -151,7 +150,7 @@
       "properties": {
         "code": {"enum": ["protein_below_floor", "kcal_off_target", "slot_open", "recipe_unknown",
                           "variation_unknown", "variation_conflict", "recipe_benched", "use_up_unmatched",
-                          "units_mixed", "no_target"]},
+                          "units_mixed", "no_target", "anchor_shopping_unknown"]},
         "severity": {"enum": ["info", "warn", "block"]},
         "date": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
         "slot": {"type": ["string", "null"]},

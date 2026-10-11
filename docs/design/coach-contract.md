@@ -748,7 +748,7 @@ none and `bodyweight`, `assisted`, `duration` or `distance`; band and
   runner owns are found through its registry (C16 `FILES`). A schema for
   any other instance document (append-only JSONL logs, `.coach/` caches,
   and committed documents no runner subpackage declares yet: the
-  readings series, the activity sync map and meal plans) carries a top-level
+  readings series and the activity sync map) carries a top-level
   `"x-coach-paths"`: globs relative to the instance root
   (`["data/hevy/writes.jsonl"]`). The validator treats it as an
   annotation, so adding it bumps no version. `schema_versions` reads both;
@@ -1578,7 +1578,8 @@ skip when there is no `data/program.json` (`state_schema`: no
   whose `__init__.py` sets `FILES`, a tuple of glob patterns from the
   instance root. R-17a declares `program` (`data/program.json`), `state`,
   `overlay` (`data/overlays/*.json`) and `exercise_library`
-  (`data/exercises.json`). An item that adds a committed JSON document
+  (`data/exercises.json`). Meal plans declare `data/nutrition/plans/*.json`
+  under `meal_plan` (C34). An item that adds a committed JSON document
   adds its own subpackage (C1: add files). Append-only JSONL logs keep
   each line at the version it was written (readers handle old lines),
   and the gitignored `.coach/` caches are rebuilt rather than migrated,
@@ -3472,7 +3473,7 @@ picks for open slots:
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "id": "2026-10-12",
   "span": {"start": "2026-10-12", "end": "2026-10-18"},
   "created_at": "2026-10-11T19:00:00Z",
@@ -3507,7 +3508,8 @@ picks for open slots:
   (recipe, variation set) = ceil(count ÷ servings).
 - Flag codes: `protein_below_floor`, `kcal_off_target`, `slot_open`,
   `recipe_unknown`, `variation_unknown`, `variation_conflict`,
-  `recipe_benched`, `use_up_unmatched`, `units_mixed`, `no_target`.
+  `recipe_benched`, `use_up_unmatched`, `units_mixed`, `no_target`,
+  `anchor_shopping_unknown`.
   Severities as in C10. `meals approve` refuses unresolved `block` flags.
 - `approval` is as in C10. `meals shopping --format issue` refuses an
   unapproved plan (exit 3).
@@ -3544,7 +3546,13 @@ Settled while building R-33c (`coach/schemas/meal_plan.schema.json`,
   `recipe`, `title`, `variations`, `count`, `covered_by`, `servings`,
   `batches` (null when covered or the card is unknown), and the
   per-serving `kcal` and `protein_g`. Anchors that name a card are in the
-  pool and the shopping list; inline anchors are in neither.
+  pool and the shopping list for scheduled occurrences only, using the
+  same batch, coverage and pantry rules. Inline anchors keep their macros
+  but contribute no inferred ingredients; each planned occurrence emits
+  `anchor_shopping_unknown`, naming the anchor, date and slot and asking
+  for a confirmed recipe link or separate shopping arrangements. Exceptions
+  replace anchors before pooling and flagging. Setup offers a recipe link
+  only for an explicitly confirmed matching card, never a guessed name.
 - **Shopping.** Variations apply to a batch's ingredients in order; one
   that conflicts with an earlier one is skipped. `use_up` comes off the
   matching (item, unit) line; `used_up` records the amount taken off.
@@ -3564,7 +3572,16 @@ Settled while building R-33c (`coach/schemas/meal_plan.schema.json`,
   resolution}`. Severities are fixed per code: `recipe_unknown`,
   `variation_unknown` and `variation_conflict` are `block`, the rest
   `warn`. `slot_open` fires for a slot with no item and for a pool slot
-  with no assignment.
+  with no assignment. `anchor_shopping_unknown` is a warning that leaves
+  a bare anchor valid; dry runs and plan renders show it, and standalone
+  shopping markdown and issue bodies include unresolved coverage warnings.
+  Meal plan v2 adds this flag. The migration from v1 changes only the
+  version, preserving saved meals, shopping, flags and approval stamps.
+  The version changes the approval hash: a previously approved plan needs
+  the athlete's agreement and `meals approve` again before its shopping
+  issue can be published. Migration notes name that loss of approval and
+  the `meals render` command. Historical flags stay as saved; build a new
+  plan to receive coverage warnings from current inputs.
 - **Style.** `plan_style` when set; otherwise `loose` when a standing
   row covers dinner, else `strict`.
 - **Commands.** `meals template` defaults to the first whole week after

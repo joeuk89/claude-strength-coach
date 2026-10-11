@@ -24,7 +24,7 @@ from coach.validate import validate as validate_schema
 
 SCHEMA = "meal_plan"
 DRAFT_SCHEMA = "meal_plan_draft"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 ID = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 BLOCK = "block"
@@ -33,6 +33,7 @@ FLAG_SEVERITY = {
     "protein_below_floor": WARN,
     "kcal_off_target": WARN,
     "slot_open": WARN,
+    "anchor_shopping_unknown": WARN,
     "recipe_unknown": BLOCK,
     "variation_unknown": BLOCK,
     "variation_conflict": BLOCK,
@@ -306,6 +307,10 @@ def _item(slot, source, entry, cards, flags, date, note=None, name=None):
         _recipe_item(item, entry, cards, flags, date)
     else:
         item.update(kcal=_num(entry["kcal"]), protein_g=_num(entry["protein_g"]))
+        if source == "anchor":
+            flags.add("anchor_shopping_unknown", f"{_where(date, slot)}: {name} has no recipe link, so its "
+                      "ingredients are missing from shopping. Link the confirmed recipe card or arrange "
+                      "this anchor separately; its macros still count.", date, slot)
     return item
 
 
@@ -692,6 +697,13 @@ def _buy_text(line, titles):
     return f"{_amount_text(line)} · {', '.join(titles.get(slug, slug) for slug in line['for'])}"
 
 
+def _shopping_coverage(doc):
+    flags = [flag for flag in doc["flags"] if flag["code"] == "anchor_shopping_unknown" and not flag["resolved"]]
+    if not flags:
+        return []
+    return ["", "### Shopping coverage", ""] + [f"- `{flag['code']}`: {flag['message']}" for flag in flags]
+
+
 def shopping_markdown(doc):
     """The plan's shopping list as markdown, starting at its `## Shopping list` heading."""
     titles = _titles(doc)
@@ -704,11 +716,12 @@ def shopping_markdown(doc):
     lines += ["### Check you have", ""]
     check = doc["shopping"]["check"]
     lines += [f"- {_amount_text(line)}" for line in check] if check else ["No staples needed."]
+    lines += _shopping_coverage(doc)
     return "\n".join(lines) + "\n"
 
 
 def shopping_issue(doc):
-    """(title, body) for a GitHub issue: tickable Buy lines under aisle headings, then the staples."""
+    """(title, body) for a GitHub issue: tickable purchases and staples, plus missing coverage."""
     span = doc["span"]
     title = f"Shopping: {render.short_date(span['start'])} – {render.short_date(span['end'])}"
     titles = _titles(doc)
@@ -717,6 +730,7 @@ def shopping_issue(doc):
         lines += [f"### {_aisle_label(aisle)}", ""] + [f"- [ ] {_buy_text(line, titles)}" for line in group] + [""]
     lines += ["### Check you have", ""]
     lines += [f"- [ ] {_amount_text(line)}" for line in doc["shopping"]["check"]] or ["Nothing to check."]
+    lines += _shopping_coverage(doc)
     return title, "\n".join(lines) + "\n"
 
 
