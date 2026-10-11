@@ -4558,7 +4558,9 @@ reads the C8 cache and writes a draft (default
   `bodyweight` line starts at 0 and other loaded lines at null.
   Working sets with different loads keep the top load and get a
   `mixed_loads` row. An exercise repeated in a routine becomes one entry
-  whose set groups follow each other.
+  whose set groups follow each other, with the first entry's rest and
+  superset; its start load and `mixed_loads` check cover the working
+  sets of every entry.
 - Cues come from the note's `Cues:` line when present; otherwise the note
   text with `Target:`, `Focus:` and `Wk of` lines removed
   (`cues_from_notes`).

@@ -157,10 +157,19 @@ and `config.toml` (units, equipment and its increments).
    sessions and cardio).
 4. **Walk the athlete through it** — the reasoning, not just the tables.
    Iterate until they'd actually train it. Confirm before writing files,
-   then write the draft to `.coach/drafts/program.json` (`source`
-   `design`, `hevy_routines` `{}`, `hevy_folder` null, an empty `report`
-   and an empty `detected`; the schema lists every key) and adopt it as
-   the output contract sets out.
+   then write the draft to `.coach/drafts/program.json` and adopt it as
+   the output contract sets out. The schema lists every key; set these
+   as follows:
+   - `source` `design`, `hevy_folder` null (adopt then keeps the
+     current program folder), `report` `[]`, and `detected`
+     `{"percentage_based": false, "evidence": [], "suggested_schemes": []}`.
+   - `hevy_routines` `{}` for a first program. For a redesign, adopt
+     builds `hevy.routines` only from the draft, so carry the mapping
+     over: take each `hevy.routines` entry from `python3 -m coach state
+     show` whose `session_id` the new program keeps, and write it as
+     `"<routine id>": "<session id>"`. Leave sessions that are new out;
+     step 5 gives them routines. A kept session left out gets a second
+     routine and its old one goes stale.
 5. **Hevy:** adopt lists the sessions without a routine in
    `without_routine`; the opening week's programming pass creates them.
    `/program-week` names each new routine in its write line, and after

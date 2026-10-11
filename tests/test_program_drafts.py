@@ -313,6 +313,23 @@ class ImportRulesTest(ImportCase):
         self.assertEqual(session["exercises"][0]["sets"], [{"count": 1, "type": "normal", "reps": 8},
                                                            {"count": 1, "type": "normal", "reps": 12}])
         self.assertEqual(session["exercises"][0]["start_load"], 25)
+        self.assertEqual(len(rows(draft, "mixed_loads", "db_bench_press")), 1)
+
+    def test_a_repeated_exercise_takes_its_top_set_from_every_entry(self):
+        top_set = hevy_exercise("F0000001", "Squat (Barbell)", [hevy_set(90, 5)])
+        back_off = hevy_exercise("F0000001", "Squat (Barbell)", [hevy_set(100, 3), hevy_set(100, 3)],
+                                 notes="Cues: brace hard")
+        draft = self.draft_of([routine("Session A", [top_set, back_off])])
+        squat = exercise(draft, "session-a", "bb_back_squat")
+        self.assertEqual(squat["start_load"], 100)
+        self.assertEqual(squat["cues"], "brace hard")
+        self.assertEqual(squat["sets"], [{"count": 1, "type": "normal", "reps": 5},
+                                         {"count": 2, "type": "normal", "reps": 3}])
+        mixed = rows(draft, "mixed_loads", "bb_back_squat")
+        self.assertEqual(len(mixed), 1)
+        self.assertIn("90, 100, 100", mixed[0]["message"])
+        self.assertEqual([row["message"] for row in rows(draft, "converted_load", "bb_back_squat")],
+                         ["Hevy 100 → 100"])
 
     def test_an_assisted_line_starts_from_its_least_assistance(self):
         root = self.instance()
@@ -682,6 +699,11 @@ class NewProgramSkillTest(unittest.TestCase):
         order = [path.index(name) for name in ("library seed", "library confirm", "program import-hevy",
                                                "one table", "program adopt")]
         self.assertEqual(order, sorted(order))
+
+    def test_a_designed_draft_spells_out_detected_and_keeps_routines_on_a_redesign(self):
+        path = self.text[self.text.index("## Path B"):self.text.index("## Close out")]
+        self.assertIn('`{"percentage_based": false, "evidence": [], "suggested_schemes": []}`', path)
+        self.assertIn("python3 -m coach state show", path)
 
     def test_it_does_no_load_arithmetic_and_no_hand_work_on_hevy_or_the_archive(self):
         for needle in ("units convert", "from-hevy-kg", "×2", "/2", "halve", "halving", "double the", "doubling",

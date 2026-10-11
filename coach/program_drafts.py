@@ -80,24 +80,23 @@ def import_hevy(root, routine_ids=None, folder_id=None, now=None):
     taken = set()
     for routine in routines:
         session_id = _session_id(routine.get("title") or "", taken)
-        exercises = {}
+        entries = {}
         for item in routine.get("exercises") or []:
             exercise_id = library.by_hevy_template_id(item["exercise_template_id"])["id"]
-            mode = modes[exercise_id]
-            if exercise_id in exercises:
-                exercises[exercise_id]["sets"] += _set_groups(item.get("sets") or [])
-                continue
-            line, rows, top = _exercise(item, exercise_id, mode, session_id, library, config)
-            exercises[exercise_id] = line
+            entries.setdefault(exercise_id, []).append(item)
+        exercises = []
+        for exercise_id, items in entries.items():
+            line, rows, top = _exercise(items, exercise_id, modes[exercise_id], session_id, library, config)
+            exercises.append(line)
             report += rows
             if top is not None:
                 top_loads.setdefault(exercise_id, []).append(top)
-        patterns = {(library.get(e) or {}).get("pattern") for e in exercises}
+        patterns = {(library.get(e) or {}).get("pattern") for e in entries}
         sessions.append({
             "id": session_id, "title": routine.get("title") or session_id,
             "kind": "conditioning" if patterns == {"conditioning"} else "lifting",
             "tier": "core", "status": "active", "location": None, "focus": None,
-            "exercises": list(exercises.values()),
+            "exercises": exercises,
         })
         hevy_routines[routine["id"]] = session_id
 
@@ -219,19 +218,24 @@ def _working_weights(sets):
             and item.get("weight_kg") is not None]
 
 
-def _exercise(item, exercise_id, mode, session_id, library, config):
-    """(program line, report rows, top load in athlete units or None) for one routine exercise."""
+def _exercise(items, exercise_id, mode, session_id, library, config):
+    """(program line, report rows, top load in athlete units or None) for every entry of one exercise in a routine.
+
+    The first entry gives the rest and superset; the sets of every entry count
+    toward the start load.
+    """
     rows = []
-    cues = _cues(item.get("notes"))
+    cues = next((found for found in (_cues(item.get("notes")) for item in items) if found), None)
     if cues:
         rows.append(_row("cues_from_notes", f"Cues from the Hevy note: {cues}", session_id, exercise_id))
-    start_load, top = _start_load(item.get("sets") or [], exercise_id, mode, session_id, library, config, rows)
+    sets = [entry for item in items for entry in item.get("sets") or []]
+    start_load, top = _start_load(sets, exercise_id, mode, session_id, library, config, rows)
     line = {
         "exercise_id": exercise_id,
         "load_mode": mode,
-        "sets": _set_groups(item.get("sets") or []),
-        "rest_seconds": item.get("rest_seconds"),
-        "superset_id": item.get("superset_id"),
+        "sets": [group for item in items for group in _set_groups(item.get("sets") or [])],
+        "rest_seconds": items[0].get("rest_seconds"),
+        "superset_id": items[0].get("superset_id"),
         "cues": cues,
         "constraints": [],
         "scheme": copy.deepcopy(IMPORT_SCHEME),
