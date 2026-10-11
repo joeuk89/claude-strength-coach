@@ -142,7 +142,9 @@ class SessionStartTest(unittest.TestCase):
     def test_template_repo_prints_nothing(self):
         root = copy_of(self, VALID)
         (root / "profile.md").unlink()
-        (root / "tests").mkdir()
+        (root / "config.toml").unlink()
+        subprocess.run(["git", "init", "-q", str(root)], check=True)
+        subprocess.run(["git", "-C", str(root), "config", "--local", "coach.workspace", "template"], check=True)
         code, response, _ = run_hook("sessionstart", root, session_input())
         self.assertEqual((code, response), (0, None))
 

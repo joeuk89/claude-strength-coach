@@ -14,7 +14,7 @@ import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from coach import paths
+from coach import paths, workspace
 from coach.context import Context
 from coach.errors import ConfigError
 
@@ -74,14 +74,15 @@ def discover():
 
 
 def instance_kind(root):
-    """`template` (a tests/ directory and no profile.md), `uninitialised` or `instance`."""
+    """Setup files take precedence over local template-development identity."""
     root = Path(root)
     has_profile = (root / paths.PROFILE).is_file()
-    if (root / "tests").is_dir() and not has_profile:
+    has_config = (root / paths.CONFIG).is_file()
+    if has_profile and has_config:
+        return INSTANCE
+    if not has_profile and not has_config and workspace.is_template(root):
         return TEMPLATE
-    if not has_profile or not (root / paths.CONFIG).is_file():
-        return UNINITIALISED
-    return INSTANCE
+    return UNINITIALISED
 
 
 class StatusContext(Context):

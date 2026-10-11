@@ -2,6 +2,7 @@
 
 import json
 import shutil
+import subprocess
 import tempfile
 import unittest
 from datetime import date
@@ -224,7 +225,8 @@ class StatusCommandTest(unittest.TestCase):
 
     def test_template_repo_is_recognised(self):
         with tempfile.TemporaryDirectory() as tmp:
-            (Path(tmp) / "tests").mkdir()
+            subprocess.run(["git", "init", "-q", tmp], check=True)
+            subprocess.run(["git", "-C", tmp, "config", "--local", "coach.workspace", "template"], check=True)
             envelope = self.run_status(Path(tmp))
         self.assertEqual(envelope["data"]["instance"], "template")
 

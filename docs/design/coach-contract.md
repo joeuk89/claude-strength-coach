@@ -5995,8 +5995,16 @@ def overlay(ctx) -> Section | None: ...
   `instance` and `checks` already report that.
 - Output: `data.sections` (in `order`, each `{id, level, lines,
   data}`), `data.instance` (`template`, `uninitialised` or `instance`)
-  and `data.today`. The template repo is recognised by a `tests/`
-  directory with no `profile.md`.
+  and `data.today`. Both `profile.md` and `config.toml` mean `instance`;
+  exactly one means `uninitialised`. With neither, template identity comes
+  from local Git config `coach.workspace = template`, or (when the setting
+  is absent) the canonical `joeuk89/claude-strength-coach` GitHub `origin`
+  URL (HTTPS or SSH). `coach.workspace = athlete` overrides that origin.
+  Only the requested root's own `.git` is consulted, never a parent repo.
+  Missing/unreadable Git identity and unknown settings default to
+  `uninitialised`; bundled tests never establish identity. The README's
+  clone/bootstrap step sets the local athlete identity before Claude starts;
+  file copies can `git init` and set it explicitly. No network lookup runs.
 
 Providers R-26b ships:
 
@@ -6037,7 +6045,8 @@ rule (hooks run outside the permission layer); `status` gets one. R-15's
   characters, ending "Detail: python3 -m coach status". The first line
   is "Coach status for <today> (items needing attention first):"; when
   the lines do not fit, the last kept line says how many were dropped.
-  In the template repo it prints nothing. On any failure, including
+  It uses the same C52 identity as status; in the template repo it prints
+  nothing. On any failure, including
   Python older than 3.11, it prints one line saying the coach scripts
   are unavailable and why. `coach/__main__.py` answers both hook
   commands under an old Python, or when the CLI fails before the hook
