@@ -1,4 +1,5 @@
 {
+  "x-coach-paths": [".coach/cache/hevy/meta.json"],
   "title": ".coach/cache/hevy/meta.json: when the cache was pulled and what it holds (contract C8)",
   "type": "object",
   "required": ["schema_version", "last_pull_started_at", "last_pull_finished_at", "last_full_pull_at",

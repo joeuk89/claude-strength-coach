@@ -1,4 +1,5 @@
 {
+  "x-coach-paths": ["data/activity/wellness.jsonl", ".coach/activity/wellness.jsonl"],
   "title": "One upsert line in the wellness file (contract C29, C30); a device record covers the day the athlete woke",
   "type": "object",
   "required": ["schema_version", "op", "id", "source", "recorded_at", "span", "content_hash"],

@@ -1,4 +1,5 @@
 {
+  "x-coach-paths": ["data/hevy/writes.jsonl"],
   "title": "One write line in data/hevy/writes.jsonl (contract C9); status is null when no response arrived",
   "type": "object",
   "required": ["schema_version", "at", "kind", "method", "path", "status", "routine_id", "overlay_id",

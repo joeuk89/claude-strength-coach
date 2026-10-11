@@ -736,6 +736,19 @@ none and `bodyweight`, `assisted`, `duration` or `distance`; band and
   `properties`, `additionalProperties`, `items`, `minItems`, `minimum`,
   `maximum`, `pattern`, `$ref` to `#/$defs/...`. Errors carry a JSONPath
   (`$.a[0].b`).
+- **Where versioned documents live** (R-16). The documents the migration
+  runner owns are found through its registry (C16 `FILES`). A schema for
+  any other instance document (append-only JSONL logs, `.coach/` caches,
+  and committed documents no runner subpackage declares yet: the
+  readings series and the activity sync map) carries a top-level
+  `"x-coach-paths"`: globs relative to the instance root
+  (`["data/hevy/writes.jsonl"]`). The validator treats it as an
+  annotation, so adding it bumps no version. `schema_versions` reads both;
+  when several schemas claim one JSONL file, each line goes to the schema
+  whose constant fields (`kind`, `op`) it matches. An item that adds an
+  instance document either declares it to the runner or adds the key to
+  its schema; a document neither names is not version-checked. Framework
+  files (the catalogue), drafts and the envelope carry neither.
 - On-disk format: `indent=2`, `ensure_ascii=False`, trailing newline,
   written atomically (temp file plus `os.replace`).
 - Canonical form for hashing: `json.dumps(obj, sort_keys=True,
@@ -968,6 +981,24 @@ for every non-GET request, success or failure, once its retries are over.
   never fails an old record because history was later corrected. `cardio`
   regions are snapshots with no freshness check (late syncs must not fail
   old records).
+- **The sweep** (R-16 `render_fresh_sweep`) reads every `*.md` under the
+  root outside dot-directories, except framework files: those tracked at
+  the template commit `.claude/framework-sync.json` records, which the
+  athlete cannot fix because the next sync overwrites them. A marker is
+  a region marker only when it starts its own line (up to three spaces
+  of indent) outside a fenced code block and an inline code span, so
+  docs that show markers as examples hold no regions. It finds a kind's
+  renderer as the first
+  top-level `coach` module (alphabetical) defining `render_<kind>`, with
+  hyphens as underscores; R-33b has no `render_card(root, id)`, so the
+  sweep builds one from `coach.recipes`. It leaves a region to its owner's
+  check where one looks (an `overlay` region in `check-ins/*.md`, a
+  `research` region in its own note, a `card` region in its own card), so
+  one stale region fails one check; every other region it renders and
+  compares (fail when stale). Unbalanced markers fail; a region of a kind
+  no renderer knows, or whose data cannot render, warns. Whole rendered
+  files stay with their owners' checks (`recipe_index_fresh`, R-17a's
+  `routine_render_fresh`, R-25's pages).
 - **Hidden data block.** A markdown file whose structured part a human
   edits (a research note, C28; a recipe card, C33) starts with a TOML block
   inside an HTML comment, which GitHub hides. The file's first line is
@@ -1095,6 +1126,47 @@ the overlay in force today (else the next to start), `warn` when the cached
 routine differs from it; `skip` when Hevy is off, there is no routine
 cache or no such overlay.
 
+R-16 registers the cross-cutting checks in `coach/checks/instance.py`.
+Checks about a prescription read only overlays whose span ends today or
+later: an ended overlay is history, and an approved one cannot be edited
+without breaking its approval. Each failing result names the file, the
+JSONPath or line, and the offending value.
+
+| Check | Overlays | Fails when | Skips when |
+|---|---|---|---|
+| `schema_versions` | all | a document the runner owns or an `x-coach-paths` glob claims (C7) has a newer version ("run /framework-sync"), an older one ("run python3 -m coach migrate run"; a Hevy cache file: "rebuild the cache with python3 -m coach hevy pull --full"), none, or is not JSON. A JSONL line fails only when newer: lines keep the version they were written at (C29) | no versioned documents |
+| `dangling_exercise_ids` | all | an overlay line's `exercise_id` is not in the library | no overlays; invalid library |
+| `dangling_routine_ids` | span not ended | a session's `hevy_routine_id` is not in the cached routines | Hevy off; no `.coach/cache/`; no cached routines; no such overlay |
+| `overlay_library_consistency` | span not ended | a line's `load_mode` differs from the confirmed one (unconfirmed is `load_modes_confirmed`'s), or its `hevy_template_id` is not one of the entry's | no such overlay; invalid library |
+| `load_caps` | span not ended | a set's load is above the C22 cap: `[caps]` id first (per hand for per-hand modes, total otherwise), else `dumbbell_max` of the session's location for per-hand modes | no such overlay |
+| `env_untracked` | — | `.env` is tracked, or exists and is not ignored (warn when absent and not ignored) | not a git working tree; no git |
+| `bare_hevy_values` | span not ended | a `per_hand_x2` load figure is not in the two-number form (below) | — |
+| `render_fresh_sweep` | — | see C11 "The sweep" | — |
+
+**Bare Hevy values.** A load figure is a number with a weight unit
+(`50 kg`), a number in a table column whose header says load, weight, kg
+or lb (and not Hevy), or a number in an arrow chain (`45 → 50`). It is
+in the two-number form when it, or another figure in its chain, says per
+hand (`/hand`, `per hand`, `each`) or gives the Hevy value (`(Hevy: 50)`).
+In a table, a figure is also in the two-number form when its column
+header says per hand (`Per hand (kg)`, `Load/hand (kg)`), when it sits
+in a Hevy-headed column, or, in a load column, when the same row has a
+number in a Hevy-headed column (`| DB bench press | 25 | 50 |` under
+`| Exercise | Per hand (kg) | Hevy (kg) |`). Ranges, dates, sets × reps,
+RPE, durations and distances are not load figures. The check reads a
+`per_hand_x2` overlay line's `target_note`, `change`, `cues`, `focus`
+and `override.reason`, and the prose of `profile.md` and
+`check-ins/*.md` outside rendered regions. In prose a figure belongs to
+the nearest exercise named before it on its line, and to no exercise
+when none is. A table row's figures belong to the exercise named before
+them on the row, else to the exercise in the row's exercise cell (the
+column headed exercise, lift or movement, else the first). A row whose
+exercise cell is empty continues the row above and takes its exercise;
+a row whose exercise cell names nothing the library knows has none.
+Library names, aliases, Hevy titles and ids name exercises, and
+"dumbbell" or "DB" alone means `per_hand_x2`. Only `per_hand_x2`
+figures can be bare: a single implement's two numbers match.
+
 ## C14. Shared test fixture ids
 
 So fixtures from parallel items line up, the shared valid instance
@@ -1159,6 +1231,7 @@ Unless stated, each is a copy of `valid/` plus what is listed.
 | `overlay-bad-schema/`, `overlay-bad-arithmetic/`, `overlay-stale-render/` | R-13 | `config.toml` plus the valid overlay with one fault each: Session B dated outside the span; DB bench working sets at `hevy_total` 25 for 25/hand; a hand-edited check-in region |
 | `routines-drift/`, `routines-pushed/` | R-14 | not copies of `valid/`: its `config.toml`, the valid overlay and a Hevy cache (`meta.json`, `routines.json`). `routines-drift/` caches the synthetic routines as pulled; `routines-pushed/` caches them after `routines push` of the valid overlay to the fake |
 | `program-bad-schema/`, `program-misspelt-key/`, `program-unknown-exercise/`, `program-avoided/`, `program-stale-render/`, `program-top-set/`, `state-bad-schema/` | R-17a | not copies of `valid/`: `config.toml` plus the valid program with one change each: DB bench without `load_mode`; squat `rest_secs`; squat as `no_such_exercise`; an instance library marking DB bench `avoid`; the valid routine pages with one character of `session-a.md` edited; squat as a 1×3 top set and 3×5 back-offs; a state with deload status `pending` |
+| `schema-version-log/`, `schema-newer/`, `schema-older/`, `dangling-exercise/`, `dangling-routine/`, `overlay-library-mismatch/`, `load-over-cap/`, `bare-hevy-value/`, `render-stale-sweep/` | R-16 | not copies of `valid/`: its `config.toml`, library and overlay, with one fault each: an audit-log line at schema version 2; the overlay at version 2; at 0; DB bench as `db_bench_pres`; Session B naming an uncached routine (with `routines-drift/`'s cache); DB bench naming template `F0000003`; DB bench working sets at 45/hand (Hevy: 90); DB bench `target_note` "go to 50 kg"; a hand-edited overlay region in `profile.md`. Overlays are re-approved. `env_untracked` builds its git repositories in temp directories, since fixtures hold no `.env` (C6) |
 
 `dose/` weeks:
 

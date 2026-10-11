@@ -1,4 +1,5 @@
 {
+  "x-coach-paths": ["data/activity/sync.json"],
   "title": "data/activity/sync.json: each activity source's last sync and its own cursor state (contract C31)",
   "type": "object",
   "required": ["schema_version", "sources"],

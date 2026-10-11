@@ -1,4 +1,5 @@
 {
+  "x-coach-paths": ["data/hevy/writes.jsonl"],
   "title": "One retire line in data/hevy/writes.jsonl (contract C9): a temporary routine retitled (unused) and read back",
   "type": "object",
   "required": ["schema_version", "at", "kind", "routine_id", "overlay_id", "overlay_hash", "verified", "diff"],
