@@ -56,7 +56,10 @@
       "Bash(python3 -m coach checkin prepare:*)",
       "Bash(python3 -m coach checkin misses:*)",
       "Bash(python3 -m coach checkin due:*)",
-      "Bash(python3 -m coach checkin skeleton:*)"
+      "Bash(python3 -m coach checkin skeleton:*)",
+      "Bash(python3 -m coach pages show:*)",
+      "Bash(python3 -m coach pages render:*)",
+      "Bash(python3 -m coach pages publish:*)"
     ]
   },
   "hooks": {

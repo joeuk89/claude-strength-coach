@@ -1,5 +1,6 @@
-"""Rotation position and block state from data/state.json (contract C16, C52)."""
+"""Rotation position from `coach.pages.header_facts`, block state from data/state.json (contract C16, C38, C52)."""
 
+from coach import pages
 from coach import state as state_module
 from coach.errors import ValidationError
 from coach.status import Section, provider
@@ -15,11 +16,12 @@ def program_status(ctx):
         doc = state_module.load(ctx.root)
     except ValidationError:
         return Section("program", ["data/state.json cannot be read; see the checks above."], {}, "attention")
-    rotation, block = doc["rotation"], doc["block"]
+    rotation, block = pages.header_facts(ctx.root, ctx.now())["rotation"], doc["block"]
     lines, attention = [], False
     if rotation["position"] is not None:
         if rotation["confirmed"]:
-            when = f" on {rotation['confirmed_at']}" if rotation["confirmed_at"] else ""
+            confirmed_at = doc["rotation"]["confirmed_at"]
+            when = f" on {confirmed_at}" if confirmed_at else ""
             lines.append(f"Rotation: {rotation['position']}, confirmed{when}.")
         else:
             lines.append(f"Rotation: {rotation['position']}, not confirmed; state it for the athlete to confirm "

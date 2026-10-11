@@ -1,0 +1,36 @@
+{
+  "schema_version": 2,
+  "rotation": {
+    "position": null,
+    "confirmed": true,
+    "confirmed_at": null
+  },
+  "block": {
+    "started": "2026-09-28",
+    "hard_weeks_completed": 2,
+    "deload": {
+      "status": "not_due",
+      "since": null
+    }
+  },
+  "one_off": null,
+  "scheme_state": {
+    "session-a/bb_back_squat": {},
+    "session-a/db_bench_press": {}
+  },
+  "hevy": {
+    "routines": {
+      "00000000-0000-4000-8000-000000000001": {
+        "session_id": "session-a"
+      },
+      "00000000-0000-4000-8000-000000000002": {
+        "session_id": "session-b"
+      }
+    },
+    "folders": {
+      "program": 1,
+      "one_off": null
+    },
+    "temporary_routines": []
+  }
+}
