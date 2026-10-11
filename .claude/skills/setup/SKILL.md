@@ -6,11 +6,10 @@ description: Use for first-run onboarding of this training workspace — when pr
 # First-run setup
 
 Take a fresh copy of the template to an approved first week in about ten
-replies. Each step skips itself when done, so `/setup` resumes after a
-partial run; on a set-up workspace it is how the athlete
-**reconfigures**: report each step's state and ask what to change. Ask
-each step's questions together, never one at a time. Every answer a
-script reads goes into `config.toml` or a `coach` command, not prose.
+replies. Skip completed steps so `/setup` resumes a partial run.
+On an existing workspace, report each step's state and ask what to change.
+Ask each step's questions together. Every answer a script reads goes
+into `config.toml` or a `coach` command, not prose.
 
 ## 0. State check
 
@@ -96,8 +95,9 @@ Skip the program when `data/program.json` exists. Otherwise follow
 **new-program** skill's three-path offer, the chosen path, `python3 -m
 coach program adopt`, and the one load-mode confirmation.
 
-Then run week one through the **program-week** skill: `python3 -m coach
-propose week`, the overlay, the coach's brief, and the approval gate,
+Before week one, follow [commit.md](commit.md) for the reviewed setup
+commit and upstream. Then run the **program-week** skill: `python3 -m
+coach propose week`, the overlay, the coach's brief, and the approval gate,
 where the athlete's "go" approves the week and its writes.
 
 ## 6. Nutrition (only when the athlete wants it now)
@@ -119,6 +119,6 @@ lines. Name what was deferred: anything step 1 noted, any step the
 athlete postponed, and that the first `/check-in` asks bodyweight and
 recovery. State the weekly rhythm: train and log everything (coach-led
 sessions too), `/check-in` weekly. With a Hevy key, `.env` stays
-uncommitted (gitignored). Offer to commit: `git add -A`, show
-what's staged, and commit with message `Initial setup: settings,
-profile and program` once they approve.
+uncommitted (gitignored). If setup changed any files after step 5's
+commit, offer a separate commit using [commit.md](commit.md)'s reviewed
+path list and athlete approval.

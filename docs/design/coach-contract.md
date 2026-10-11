@@ -4408,12 +4408,24 @@ before its local date. Withdrawals created later do not apply.
    (or a detached HEAD), when the git index already holds staged changes
    to any other path (naming them), and when `README.md` is not coach's
    (README ownership). Every refusal comes before anything is written.
-   No record to publish (or no `check-ins/<D>.md`) exits 1; no git exits 5.
+   The selected overlay must also be the brief's coming-week overlay;
+   a mismatch refuses before writes, so an older approval cannot publish
+   a different week's prescriptions. No record to publish (or no
+   `check-ins/<D>.md`) exits 1; no git exits 5.
+   Setup commits its explicit reviewed setup/adoption path list with
+   athlete approval before week-one publishing; C45 adoption still never
+   commits. A normal README clone has an upstream; a zip download or new
+   git repository needs an agreed remote and `git push -u <remote>
+   <branch>`. Setup and weekly close-out explain this prerequisite.
 3. Renders all three pages and refreshes the record's regions
-   (`checkin skeleton --refresh`).
+   (`checkin skeleton --refresh`). When Hevy is off, also renders
+   `this-week-sheets.md` from the same approved overlay as the brief,
+   refreshing missing or stale sheets. Hevy-enabled publication leaves
+   existing sheets alone and does not require them.
 4. Stages exactly `this-week.md`, `README.md`, `progress.md`,
    `data/overlays/<ID>.json` and `check-ins/<D>.md` (D defaults to the
-   newest record), commits with the message
+   newest record), plus `this-week-sheets.md` when Hevy is off, commits
+   with the message
    `coach: publish week of <span.start> (<ID>)`, and pushes `HEAD` to the
    current branch's upstream (never `--force`). A failed commit exits 1. A
    failed push exits 4 and keeps the commit; the message says to push by
@@ -5399,8 +5411,11 @@ item when Hevy is off and the brief has an overlay: "Session sheets:
 [this-week-sheets.md](this-week-sheets.md)" followed by one link per
 session to its anchor (`this-week-sheets.md#session-a`).
 
-`pages publish` (C38) stages its five paths only, so it does not commit
-`this-week-sheets.md`.
+`pages publish` (C38) includes `this-week-sheets.md` when Hevy is off:
+it regenerates the sheets from the approved overlay the brief names and
+commits them with their links. Its dry run reports that additional path
+without changing files, index or commits. With Hevy enabled there are no
+sheet links, and publication neither requires nor stages old sheets.
 
 ## C47. Unused.
 

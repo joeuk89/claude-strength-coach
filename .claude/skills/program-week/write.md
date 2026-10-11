@@ -55,21 +55,29 @@ write line named, nothing more.
 
 **No Hevy:** skip `routines retire` in step 3 (an ended one-off week
 still gets `one_off` set to null) and steps 4 and 5, and run `python3 -m
-coach sheets render`.
+coach sheets render --overlay <id>`.
 
 ## Close out
 
 **Publish the week.** Hevy users: only once `routines verify` reports
 every routine verified; a routine left unverified means no publish, and
 the recap says why. No Hevy: once `sheets render` has written the
-sheets. Run `python3 -m coach pages render`, then `python3 -m coach
+sheets. Before publishing, verify the branch's upstream with `git
+rev-parse --abbrev-ref --symbolic-full-name '@{upstream}'`. A normal
+README clone already has one; a zip download or freshly initialised
+repository needs an agreed remote and `git push -u <remote> <branch>`
+(add the remote first if absent). Without it, publishing exits 3 before
+writing or committing. During setup, finish its approved setup commit
+first. Run `python3 -m coach pages render`, then `python3 -m coach
 pages publish --overlay <id>`: it commits exactly the brief
 (`this-week.md`), the dashboard (`README.md`), `progress.md`, the overlay
-and the newest check-in record, and pushes them so the athlete's phone
-shows the week. If `pages render` exits 3 because `README.md` is still
+and the newest check-in record, plus `this-week-sheets.md` when Hevy is
+off. It refreshes those sheets from the approved overlay and pushes
+them so the athlete's phone shows the week. If `pages render` exits 3 because `README.md` is still
 the template's copy, ask once whether the dashboard may replace it, then
 run `python3 -m coach pages render --replace-readme`. A publish that
-exits 3 (overlay not approved, another file already staged) is reported,
+exits 3 (overlay not approved or not the brief's overlay, missing
+upstream, another file already staged) is reported,
 never worked around; exit 4 means the push failed and the commit is
 kept: tell the athlete to push by hand.
 

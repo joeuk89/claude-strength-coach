@@ -18,7 +18,7 @@ from functools import cached_property
 from pathlib import Path
 
 from coach import block as block_module
-from coach import checkin, dates, history, overlay, page_parts, paths, program, render, state, stats, units
+from coach import checkin, dates, history, overlay, page_parts, paths, program, render, sheets, state, stats, units
 from coach import config as config_module
 from coach import flags as flags_module
 from coach.config_tables import coaching
@@ -744,7 +744,7 @@ def _upstream(root, env):
 
 
 def publish(root, overlay_id, now, record_date=None, dry_run=False, env=None):
-    """Render the pages, then commit exactly them, the overlay and the record, and push (C38 publishing).
+    """Render and publish the pages, applicable session sheets, overlay and record (C38 publishing).
 
     Every refusal (exit 3) comes before anything is written. A rejected push exits 4 and keeps the commit.
     """
@@ -772,6 +772,10 @@ def publish(root, overlay_id, now, record_date=None, dry_run=False, env=None):
     branch, remote, merge = _upstream(root, env)
     publish_paths = [PAGE_PATHS[BRIEF], PAGE_PATHS[DASHBOARD], PAGE_PATHS[PROGRESS],
                      (paths.OVERLAYS_DIR / f"{overlay_id}.json").as_posix(), record.path.as_posix()]
+    view = _View(root, now)
+    include_sheets = not view.config.hevy.enabled
+    if include_sheets:
+        publish_paths.append(paths.SESSION_SHEETS.as_posix())
     staged = _git(root, "diff", "--cached", "--name-only", "-z", env=env).stdout.split("\0")
     others = sorted(p for p in staged if p and p not in publish_paths)
     if others:
@@ -780,6 +784,11 @@ def publish(root, overlay_id, now, record_date=None, dry_run=False, env=None):
     problem = readme_owner_problem(root)
     if problem:
         raise RefusedError(problem)
+    current_id = view.week_overlay["id"] if view.week_overlay else None
+    if current_id != overlay_id:
+        raise RefusedError(f"the brief shows overlay {current_id or 'none'}, not {overlay_id}; publish the approved "
+                           "overlay in force for the brief's coming week")
+    sheet_text = sheets.render_sheets(root, overlay_id) if include_sheets else None
     message = publish_message(doc)
     report = {"overlay_id": overlay_id, "record": record.path.as_posix(), "paths": publish_paths, "message": message,
               "branch": branch, "remote": remote, "upstream": merge, "commit": None, "pushed": False,
@@ -787,6 +796,8 @@ def publish(root, overlay_id, now, record_date=None, dry_run=False, env=None):
     if dry_run:
         return report
     report["rendered"] = write(root, now, KINDS)["pages"]
+    if sheet_text is not None:
+        (root / paths.SESSION_SHEETS).write_text(sheet_text, encoding="utf-8")
     checkin.skeleton(root, record.date, refresh=True, now=now)
     added = _git(root, "add", "--", *publish_paths, env=env)
     if added.returncode != 0:
