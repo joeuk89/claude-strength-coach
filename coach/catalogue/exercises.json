@@ -33,7 +33,8 @@
       "substitutes": [
         "bb_front_squat",
         "hack_squat",
-        "leg_press"
+        "leg_press",
+        "goblet_squat"
       ]
     },
     {
@@ -390,7 +391,8 @@
       "substitutes": [
         "trap_bar_deadlift",
         "bb_romanian_deadlift",
-        "bb_sumo_deadlift"
+        "bb_sumo_deadlift",
+        "db_romanian_deadlift"
       ]
     },
     {
