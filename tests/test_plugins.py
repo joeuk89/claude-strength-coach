@@ -134,12 +134,17 @@ class ScannerTest(unittest.TestCase):
         "from pathlib import Path": "imports pathlib",
         "from coach import history": "imports coach",
         "import coach.units": "imports coach.units",
+        "from coach import stats": "imports coach.stats",
+        "import coach.stats": "imports coach.stats",
+        "from coach.stats import e1rm_series": "imports coach.stats.e1rm_series",
+        "import coach.plugins.base": "binds the whole coach package",
         "from coach.plugins.base import _flags": "private name",
         "base._validity.band_for(3)": "private attribute",
         "__builtins__": "uses __builtins__",
     }
     ALLOWED = [
-        "from coach.plugins import base", "from coach import stats", "import math", "from dataclasses import replace",
+        "from coach.plugins import base", "from coach.stats import e1rm, load_for, implied_rpe",
+        "import coach.plugins.base as base", "import math", "from dataclasses import replace",
         "from typing import Optional", "from datetime import date, timedelta", "y = x * 3", "y = x * 0.9",
         "y = round(x / 4, 2)",
     ]
@@ -207,6 +212,16 @@ class ProgramParamsTest(InstanceCase):
             constraints=[{"kind": "rpe_cap", "value": 12, "reason": "left knee"}]))
         paths = [d["path"] for d in self.coach("program", "validate", expect=1)["error"]["details"]]
         self.assertEqual(paths, ["$.sessions[0].exercises[0].constraints[0].value"])
+
+    def test_fixed_reps_rpe_is_refused_on_a_line_without_an_e1rm_of_its_own(self):
+        self.edit_program(lambda doc: doc["sessions"][1]["exercises"][1].update(
+            scheme={"name": "fixed_reps_rpe", "params": {}}))
+        [detail] = self.coach("program", "validate", expect=1)["error"]["details"]
+        self.assertEqual(detail["path"], "$.sessions[1].exercises[1].scheme.name")
+        self.assertIn("fixed_reps_rpe programs only total, per_hand_x2, single_implement lines; this slot is bodyweight",
+                      detail["message"])
+        shown = self.coach("plugins", "show", "fixed_reps_rpe")["data"]["plugins"][0]
+        self.assertEqual(shown["load_modes"], ["total", "per_hand_x2", "single_implement"])
 
     def test_a_constraint_renders_in_words(self):
         self.edit_program(lambda doc: doc["sessions"][0]["exercises"][0].update(
@@ -280,13 +295,14 @@ class InstancePluginTest(InstanceCase):
     def test_shape_problems(self):
         source = fixed_load_plugin("custom_shape").replace('NAME = "custom_shape"', 'NAME = "other"').replace(
             "FLAGS = {}", 'FLAGS = {"bad_code": {"severities": ["warn"], "summary": "x"}}').replace(
-            "CITES = ()", 'CITES = ("rn:local-knee.1",)')
+            "CITES = ()", 'CITES = ("rn:local-knee.1",)\nLOAD_MODES = ("total", "kettlebell")')
         self.write_plugin("custom_shape", source)
         [plugin] = plugins.load(self.root).find("custom_shape")
         text = " | ".join(plugin.problems)
         self.assertIn("NAME is 'other'", text)
         self.assertIn("must start custom_", text)
         self.assertIn("local claim", text)
+        self.assertIn("LOAD_MODES must be a tuple of load modes", text)
 
     def test_instance_flags_are_registered(self):
         saved = dict(flags.registry())

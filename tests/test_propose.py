@@ -8,7 +8,7 @@ import textwrap
 import unittest
 from unittest import mock
 
-from coach import jsonio, overlay, units
+from coach import dates, jsonio, overlay, units
 from coach.plugins.schemes import double_progression
 from coach.validate import validate as validate_schema
 from tests.support import INSTANCES, REPO_ROOT
@@ -190,6 +190,32 @@ class DoubleProgressionShortTest(ProposeCase):
     def test_one_set_short_holds_the_load_and_adds_a_rep(self):
         line = find_line(self.propose("--dry-run")["overlay"], "db_bench_press")
         self.assertEqual({(s["reps"], coaching(s["load"])) for s in working(line)}, {(10, 24)})
+
+
+class DoubleProgressionAfterOwnOverlayTest(ProposeCase):
+    """Last week's approved overlay asked for 3×8 @ 24/hand, the bottom of the program's 8–10; 3×8 was logged."""
+
+    synced = False
+
+    def setUp(self):
+        super().setUp()
+        weekly = read_json(self.root / "data" / "overlays" / "2026-10-12-weekly.json")
+        weekly.pop("approval")
+        weekly.update(id="2026-10-05-weekly", created_at="2026-10-04T18:00:00Z",
+                      span={"start": "2026-10-05", "end": "2026-10-11"})
+        for session, day in zip(weekly["sessions"], ("2026-10-05", "2026-10-08")):
+            session["date"] = day
+        for set_ in working(find_line(weekly, "db_bench_press")):
+            set_.update(reps=8, rep_range=None, load=units.make_load(24, "per_hand_x2", "kg"))
+        approved = overlay.approve(weekly, dates.parse_timestamp("2026-10-04T19:00:00Z"))
+        write_json(self.root / "data" / "overlays" / "2026-10-05-weekly.json", approved)
+        self.cache(edit=edit_sets(BENCH, lambda wid, i, s: s.update(weight_kg=48.0, reps=8), workout_ids=(W[3],)))
+        self.sync()
+
+    def test_the_bottom_of_the_range_holds_the_load_and_adds_a_rep(self):
+        line = find_line(self.propose("--dry-run")["overlay"], "db_bench_press")
+        self.assertEqual({(s["reps"], coaching(s["load"])) for s in working(line)}, {(9, 24)})
+        self.assertIn("short of the top of the range", line["provenance"]["rationale"])
 
 
 class LinearTest(ProposeCase):

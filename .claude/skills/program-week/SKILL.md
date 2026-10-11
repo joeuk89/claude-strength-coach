@@ -146,9 +146,13 @@ formula applied blindly is not coaching.
      report pain or form breakdown.
    - `convention_slip`: an exact 2× jump at unchanged reps and RPE is a
      convention slip, not progress — raise it with the athlete.
-   - `return_week`, `return_after_illness`: name the band in the week
-     focus; with illness, confirm 48 hours symptom-free. The next pass
-     progresses from what the return week logged.
+   - `return_week`, `return_after_illness`: in a return week the
+     matching return band sets this week's loads, set counts and any RPE
+     cap instead of the progression scheme, measured from the pre-layoff
+     working loads; with illness, the first session back carries the
+     illness cap. Name the band in the week focus; with illness, confirm
+     48 hours symptom-free. The next pass progresses from what the return
+     week logged.
    - `no_data` (set the first load with the athlete), `stalled`,
      `constraint_applied`, `override_standing`, `scheme_reset`,
      `rotation_unconfirmed` (state the position for confirmation, as

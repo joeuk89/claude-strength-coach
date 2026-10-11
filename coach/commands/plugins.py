@@ -2,7 +2,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from coach import paths, plugins
+from coach import paths, plugins, units
 from coach.commands import arg, command
 from coach.errors import ValidationError
 
@@ -29,6 +29,8 @@ def show(args, ctx):
         if module is not None:
             item.update(params=getattr(module, "PARAMS", None), state=getattr(module, "STATE", None),
                         cites=list(getattr(module, "CITES", ())), flags=getattr(module, "FLAGS", None))
+            if plugin.kind == "scheme":
+                item["load_modes"] = list(getattr(module, "LOAD_MODES", None) or units.LOAD_MODES)
         item["problems"] = plugin.problems
         shown.append(item)
     return {"plugins": shown}

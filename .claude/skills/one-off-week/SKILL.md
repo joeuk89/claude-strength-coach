@@ -78,11 +78,13 @@ sessions (`"temporary": true`, titled "Deload — <session title>") that
 keep their program session ids. Review each line, change one with
 `python3 -m coach propose override` and a reason, settle a flag with
 `python3 -m coach propose resolve`, then run `python3 -m coach propose
-finalize --proposal <id>`, which writes the overlay: step 3 then starts
-at its validate item. Keep the program's priority protocols alive at
-reduced dose (ladders resumed, not restarted). Remind the athlete to tell
-any coach/PT it's a deload week, and deload whatever the profile says
-moves with the lifting (conditioning etc.).
+finalize --proposal <id>`, which writes the overlay. Then go to step 3
+with that id: its draft and `overlay build` items are already done, so
+start at "Where it renders", then carry on from its validate item. Keep
+the program's priority protocols alive at reduced dose (ladders resumed,
+not restarted). Remind the athlete to tell any coach/PT it's a deload
+week, and deload whatever the profile says moves with the lifting
+(conditioning etc.).
 
 **Illness** — a week back after illness follows the return rule in
 `CLAUDE.md` "Coaching principles": its illness conditions (when

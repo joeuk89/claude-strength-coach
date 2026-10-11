@@ -11,6 +11,7 @@ from datetime import date, timedelta
 from typing import Callable, Optional
 
 from coach import flags as _flags
+from coach import stats as _stats
 from coach import validity as _validity
 
 API = 1
@@ -19,6 +20,7 @@ WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 STANDARD_DELOAD = {"set_factor": 0.67, "load_factor": 0.9, "rpe": 6}
 EMPTY_SCHEMA = {"type": "object", "additionalProperties": False, "properties": {}}
 DATE_PATTERN = "^\\d{4}-\\d{2}-\\d{2}$"
+E1RM_MODES = _stats.SERIES_MODES
 
 
 @dataclass(frozen=True)

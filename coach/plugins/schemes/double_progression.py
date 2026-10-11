@@ -19,12 +19,13 @@ FLAGS = {}
 CITES = ("rn:progression-training-age.2",)
 
 
-def _hit_top(source, prescribed):
+def _hit_top(source, prescribed, tops):
+    """`tops` come from the program, not `prescribed`: this scheme's own overlay lines ask for fixed reps below them."""
     logged = [s for s in source.sets if s.working]
-    if not prescribed or len(logged) < len(prescribed):
+    if not prescribed or not tops or len(logged) < len(prescribed):
         return False, "fewer working sets than prescribed"
-    for wanted, got in zip(prescribed, logged):
-        if (got.reps or 0) < (wanted.top_reps or 0):
+    for index, (wanted, got) in enumerate(zip(prescribed, logged)):
+        if (got.reps or 0) < (tops[min(index, len(tops) - 1)] or 0):
             return False, "short of the top of the range"
         if wanted.rpe is not None and got.rpe is not None and got.rpe > wanted.rpe:
             return False, f"over the target RPE {base.number(wanted.rpe)}"
@@ -46,7 +47,7 @@ def propose(ctx):
     bottom = working[0].target_reps if working else None
     top = working[0].top_reps if working else None
     load = source.top_load
-    hit, why = _hit_top(source, prescribed)
+    hit, why = _hit_top(source, prescribed, [s.top_reps for s in working])
     when = source.date.isoformat()
     if hit and load is not None:
         step = base.increment(ctx)

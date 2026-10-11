@@ -19,7 +19,7 @@ from coach import constraints as constraints_module
 from coach import dates, decisions, flags, history, jsonio, overlay, paths, patterns, plugins, program, research
 from coach import state as state_module
 from coach import stats, units, validity
-from coach.checks.instance import _cap as cap_for
+from coach.checks.instance import cap_for
 from coach.errors import ConfigError, RefusedError, UsageError, ValidationError
 from coach.library import Library
 from coach.plugins import base
@@ -234,7 +234,7 @@ class Run:
         return config_module.equipment_for(self.config, location)
 
     def increment(self, exercise_id, location):
-        return stats._increment(self.library, self.config, exercise_id, location) or 0
+        return stats.load_increment(self.library, self.config, exercise_id, location) or 0
 
     def research(self):
         """(notes by id, expired areas, local updates), or None when the instance has no research notes."""

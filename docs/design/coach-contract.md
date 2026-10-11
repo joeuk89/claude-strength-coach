@@ -2162,8 +2162,11 @@ def apply(ctx: SchemeContext, proposal: Proposal) -> Proposal        # transform
 ```
 
 **Purity.** Plugins do no I/O: no `open`, no imports beyond `coach.plugins.base`,
-`coach.stats` (e1RM functions), `math`, `dataclasses`, `typing`,
-`datetime`. They never build load objects or convert units. An AST test
+the pure e1RM functions `coach.stats.e1rm`, `load_for` and
+`implied_rpe` (not the module, whose other functions read the
+instance), `math`, `dataclasses`, `typing`, `datetime`. A dotted
+`import a.b` needs `as <name>`, since it would bind the whole `a`
+package. They never build load objects or convert units. An AST test
 covers `coach/plugins/**`; `plugins validate` runs the same scanner on
 instance plugins, plus the C5 ×2 scan.
 
@@ -2299,6 +2302,21 @@ and `plugins test` runs them. Loaded with
   core refuses a proposal derived from an excluded or suspect exposure.
 - `last_prescription` is `{overlay_id, session_id, date, exercise_id,
   load_mode, sets, override}` with `sets` as `base.SetSpec`s.
+- A scheme may define `LOAD_MODES`, a tuple of the load modes it can
+  program (absent: every mode). `program validate` refuses a slot whose
+  `load_mode` it leaves out, at `$.sessions[i].exercises[j].scheme.name`,
+  and `plugins show` lists it as `load_modes`. `fixed_reps_rpe` takes
+  `base.E1RM_MODES` (`total`, `per_hand_x2`, `single_implement`): a
+  bodyweight or assisted e1RM is of the system load, not the added load
+  or assistance the line prescribes.
+- `double_progression` judges "reached the top" against the slot's
+  program rep range, and takes only the RPE targets and set count from
+  the exposure's `prescribed`: its own overlay lines ask for fixed reps
+  below the top.
+- The pipeline reads caps through `coach.checks.instance.cap_for(config,
+  exercise_id, mode, location)` (R-16's `load_caps` rule) and increments
+  through `coach.stats.load_increment(library, config, exercise_id,
+  location)`; R-24's validator calls the same two.
 - A schedule rule may define `problems(params, program) -> [(path,
   message)]` for what its schema cannot say (session ids the program
   lacks); `program validate` reports them under `$.schedule.params`.

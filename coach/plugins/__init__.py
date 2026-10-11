@@ -15,14 +15,15 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from coach import flags, paths
+from coach import flags, paths, units
 from coach.validate import SchemaError, check_schema
 from coach.validate import validate as validate_schema
 
 API = 1
 FRAMEWORK_DIR = Path(__file__).resolve().parent
 INSTANCE_PREFIX = "custom_"
-ALLOWED_IMPORTS = frozenset({"coach.plugins.base", "coach.stats", "math", "dataclasses", "typing", "datetime"})
+ALLOWED_IMPORTS = frozenset({"coach.plugins.base", "coach.stats.e1rm", "coach.stats.load_for",
+                             "coach.stats.implied_rpe", "math", "dataclasses", "typing", "datetime"})
 FORBIDDEN_CALLS = frozenset({"open", "exec", "eval", "compile", "__import__", "input", "breakpoint", "globals",
                              "locals", "vars", "getattr", "setattr", "delattr"})
 MODULE_KEYS = ("API", "KIND", "NAME", "SUMMARY", "PARAMS", "FLAGS", "CITES")
@@ -85,14 +86,26 @@ def _constant(node):
     return None
 
 
-def _imported(node):
-    """The dotted names an import statement brings in."""
-    if isinstance(node, ast.Import):
-        return [alias.name for alias in node.names]
-    if node.level:
-        return [f"relative import {'.' * node.level}{node.module or ''}"]
-    return [f"{node.module}.{alias.name}" if f"{node.module}.{alias.name}" in ALLOWED_IMPORTS else node.module
-            for alias in node.names]
+def _allowed(name):
+    """True when the dotted name, or a package or module it lies inside, is on the allowed list."""
+    parts = name.split(".")
+    return any(".".join(parts[:end]) in ALLOWED_IMPORTS for end in range(1, len(parts) + 1))
+
+
+def _import_problems(node):
+    """What an import statement brings in that a plugin may not have."""
+    allowed = ", ".join(sorted(ALLOWED_IMPORTS))
+    if isinstance(node, ast.ImportFrom):
+        if node.level:
+            return [f"imports relative import {'.' * node.level}{node.module or ''}; plugins import only {allowed}"]
+        found = [f"imports the private name {a.name}" for a in node.names if a.name.startswith("_")]
+        names = [f"{node.module}.{alias.name}" for alias in node.names]
+    else:
+        names = [alias.name for alias in node.names]
+        found = [f"import {a.name} binds the whole {a.name.split('.')[0]} package; write import {a.name} as <name>"
+                 for a in node.names
+                 if a.asname is None and "." in a.name and _allowed(a.name) and not _allowed(a.name.split(".")[0])]
+    return found + [f"imports {name}; plugins import only {allowed}" for name in names if not _allowed(name)]
 
 
 def scan_source(source, filename="<plugin>"):
@@ -104,12 +117,7 @@ def scan_source(source, filename="<plugin>"):
     found = []
     for node in ast.walk(tree):
         if isinstance(node, (ast.Import, ast.ImportFrom)):
-            for name in _imported(node):
-                if name not in ALLOWED_IMPORTS:
-                    found.append((node.lineno, f"imports {name}; plugins import only {', '.join(sorted(ALLOWED_IMPORTS))}"))
-            if isinstance(node, ast.ImportFrom):
-                found += [(node.lineno, f"imports the private name {a.name}") for a in node.names
-                          if a.name.startswith("_")]
+            found += [(node.lineno, problem) for problem in _import_problems(node)]
         elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in FORBIDDEN_CALLS:
             found.append((node.lineno, f"calls {node.func.id}(); plugins do no I/O and no introspection"))
         elif isinstance(node, ast.Attribute) and node.attr.startswith("_"):
@@ -228,6 +236,10 @@ def _shape_problems(plugin, kind):
                 problems.append(problem)
             elif validate_schema(state["initial"], state["schema"]):
                 problems.append("STATE initial does not validate against STATE schema")
+    modes = getattr(module, "LOAD_MODES", None)
+    if modes is not None and (not isinstance(modes, tuple) or not modes
+                              or any(m not in units.LOAD_MODES for m in modes)):
+        problems.append(f"LOAD_MODES must be a tuple of load modes from {', '.join(units.LOAD_MODES)}")
     problems += _flag_problems(plugin, module.FLAGS)
     problems += _cite_problems(module.CITES)
     for name in kind.required:
@@ -328,7 +340,8 @@ def state_errors(plugin, data):
 
 
 def program_problems(doc, registry):
-    """(JSONPath, message) for every scheme, schedule rule and deload rule the registry lacks or whose params fail."""
+    """(JSONPath, message) for every scheme, schedule rule and deload rule the registry lacks or whose params fail,
+    and every slot whose load mode its scheme's LOAD_MODES leaves out."""
     found = []
 
     def check(kind, name, params, path):
@@ -345,7 +358,12 @@ def program_problems(doc, registry):
     for s_index, session in enumerate(doc["sessions"]):
         for e_index, exercise in enumerate(session["exercises"]):
             scheme = exercise["scheme"]
-            check("scheme", scheme["name"], scheme["params"], f"$.sessions[{s_index}].exercises[{e_index}].scheme")
+            path = f"$.sessions[{s_index}].exercises[{e_index}].scheme"
+            plugin = check("scheme", scheme["name"], scheme["params"], path)
+            modes = getattr(plugin.module, "LOAD_MODES", None) if plugin else None
+            if modes is not None and exercise["load_mode"] not in modes:
+                found.append((f"{path}.name", f"{scheme['name']} programs only {', '.join(modes)} lines; this slot "
+                                              f"is {exercise['load_mode']}"))
     schedule = doc["schedule"]
     plugin = check("schedule", schedule["rule"], schedule["params"], "$.schedule")
     if plugin is not None and not any(p.startswith("$.schedule.params") for p, _ in found):

@@ -259,7 +259,7 @@ def overlay_library_consistency(ctx):
     return results
 
 
-def _cap(config, exercise_id, mode, location):
+def cap_for(config, exercise_id, mode, location):
     """(cap, where it comes from) in athlete units, or (None, None) when nothing caps the line."""
     caps = config.get("caps") or {}
     if exercise_id in caps:
@@ -285,7 +285,7 @@ def load_caps(ctx):
     for rel, doc in found:
         for where, session, line in _lines(doc):
             try:
-                cap, source = _cap(config, line["exercise_id"], line["load_mode"], session["location"])
+                cap, source = cap_for(config, line["exercise_id"], line["load_mode"], session["location"])
             except ConfigError:
                 continue
             if cap is None:

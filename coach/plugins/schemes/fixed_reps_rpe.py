@@ -2,8 +2,8 @@
 
 from dataclasses import replace
 
-from coach import stats
 from coach.plugins import base
+from coach.stats import load_for
 
 API = 1
 KIND = "scheme"
@@ -12,6 +12,7 @@ SUMMARY = "Keeps the program's reps and RPE and sets each load from the best e1R
 PARAMS = {"schema": base.EMPTY_SCHEMA, "defaults": {}}
 STATE = {"schema": base.EMPTY_SCHEMA, "initial": {}}
 FLAGS = {}
+LOAD_MODES = base.E1RM_MODES
 CITES = ("rn:autoregulation.1",)
 
 
@@ -26,7 +27,7 @@ def propose(ctx):
     found = []
     for s in sets:
         if s.working and s.target_reps is not None:
-            s = replace(s, load=stats.load_for(ctx.e1rm, s.target_reps, s.rpe))
+            s = replace(s, load=load_for(ctx.e1rm, s.target_reps, s.rpe))
         found.append(s)
     first = next((s for s in found if s.working), None)
     words = (f"{first.target_reps} reps at RPE {base.number(first.rpe)}" if first and first.rpe is not None
