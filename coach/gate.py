@@ -40,6 +40,10 @@ _CURL_SHORT_WITH_VALUE = set("AbcCdDeEFHKmoPQrtTuUwxXyYz")
 _WGET_DATA = {"--post-data", "--post-file", "--body-data", "--body-file"}
 _HTTPIE = {"http", "https", "xh", "xhs"}
 _MAX_DEPTH = 4
+_PLACEHOLDER = re.compile(r"__coach_gate_(?:sub|doc)_\d+__")
+_HEREDOC_PLACEHOLDER = "__coach_gate_doc_"
+_HEREDOC_OPERATOR = re.compile(r"(?<!<)<<(-?)[ \t]*(['\"]?)\\?([A-Za-z0-9_.-]+)\2")
+_QUOTED_DELIMITER = re.compile(r"<<-?[ \t]*['\"\\]([^\s'\"]+)")
 
 _UNAVAILABLE = ("Approval gate: summary unavailable ({}). This command writes to Hevy; allow it only if the "
                 "athlete approved this exact write.")
@@ -144,13 +148,19 @@ class _Scanner:
 
     def writes(self, command, cwd, shell_vars, depth=0):
         text = _FD_BEFORE_REDIRECT.sub("", command.replace("\\\n", " "))
+        inner = {}
         try:
+            text = _lift_substitutions(_lift_heredocs(text, inner), inner)
             tokens = _tokens(text)
         except ValueError as exc:
             if self._mentions_write(command):
                 yield _Unreadable(str(exc))
             return
-        for words in _segments(tokens):
+        for words, targets in _segments(tokens):
+            for name in _PLACEHOLDER.findall(" ".join(words + targets)):
+                for script in inner.get(name, ()):
+                    yield from self._nested(script, cwd, shell_vars, depth)
+            words = [word for word in words if not word.startswith(_HEREDOC_PLACEHOLDER)]
             local = {}
             while words and _ASSIGNMENT.match(words[0]):
                 name, value = _ASSIGNMENT.match(words[0]).groups()
@@ -169,10 +179,7 @@ class _Scanner:
             variables = dict(shell_vars, **local)
             nested = _nested_script(words)
             if nested is not None:
-                if depth < _MAX_DEPTH:
-                    yield from self.writes(nested, cwd, dict(variables), depth + 1)
-                elif self._mentions_write(nested):
-                    yield _Unreadable("shell commands nested too deeply")
+                yield from self._nested(nested, cwd, variables, depth)
                 continue
             argv = _coach_argv(words)
             if argv is not None:
@@ -181,6 +188,12 @@ class _Scanner:
             http = _http_write(words)
             if http:
                 yield _HttpWrite(*http)
+
+    def _nested(self, script, cwd, variables, depth):
+        if depth < _MAX_DEPTH:
+            yield from self.writes(script, cwd, dict(variables), depth + 1)
+        elif self._mentions_write(script):
+            yield _Unreadable("shell commands nested too deeply")
 
     def _coach(self, argv, cwd, variables):
         from coach import cli, commands
@@ -195,7 +208,8 @@ class _Scanner:
         except SystemExit:
             return
         except UsageError as exc:
-            if self._mentions_write(" ".join(argv)) or any("$" in word or "`" in word for word in argv):
+            line = " ".join(argv)
+            if self._mentions_write(line) or "$" in line or "`" in line or _PLACEHOLDER.search(line):
                 yield _Unreadable(exc.message)
             return
         cmd = self._commands[args._command]
@@ -226,23 +240,153 @@ def _tokens(text):
     return list(lexer)
 
 
+def _lift_heredocs(text, inner):
+    """`text` with each heredoc body swapped for a placeholder line naming, in `inner`, the scripts it runs.
+
+    A body read by a shell is a script. Any other reader runs only the command substitutions in its body,
+    and none when the delimiter is quoted.
+    """
+    lines, kept, chunk, index = text.split("\n"), [], [], 0
+    while index < len(lines):
+        chunk.append(lines[index])
+        index += 1
+        joined = "\n".join(chunk)
+        try:
+            tokens = _tokens(joined)
+        except ValueError:
+            continue
+        chunk = []
+        kept.append(joined)
+        quoted = set(_QUOTED_DELIMITER.findall(joined))
+        read_by_shell = any(os.path.basename(token) in _SHELLS for token in tokens)
+        for position, token in enumerate(tokens[:-1]):
+            if not token.endswith("<<") or token.endswith("<<<"):
+                continue
+            delimiter = tokens[position + 1]
+            strip_tabs = delimiter.startswith("-")
+            if delimiter == "-" and position + 2 < len(tokens):
+                delimiter = tokens[position + 2]
+            elif strip_tabs:
+                delimiter = delimiter[1:]
+            body = []
+            while index < len(lines):
+                line = lines[index]
+                index += 1
+                if (line.lstrip("\t") if strip_tabs else line) == delimiter:
+                    break
+                body.append(line)
+            body = "\n".join(body)
+            name = f"{_HEREDOC_PLACEHOLDER}{len(inner)}__"
+            if read_by_shell:
+                inner[name] = [body]
+            elif delimiter in quoted:
+                inner[name] = []
+            else:
+                substitutions = {}
+                _lift_substitutions(body, substitutions, heredoc=True)
+                inner[name] = [script for scripts in substitutions.values() for script in scripts]
+            kept.append(name)
+    if chunk:
+        kept.append("\n".join(chunk))
+    return "\n".join(kept)
+
+
+def _lift_substitutions(text, inner, heredoc=False):
+    """`text` with each backquote and each double-quoted `$(...)` swapped for a placeholder naming its script.
+
+    An unquoted `$(...)` stays, because the tokenizer splits it at its parentheses. In a heredoc body quotes
+    are literal, so every `$(...)` is lifted.
+    """
+    out, index, single, double = [], 0, False, False
+    while index < len(text):
+        char, start = text[index], index
+        if single:
+            single = char != "'"
+        elif char == "\\":
+            index += 1
+        elif char == "'" and not double and not heredoc:
+            single = True
+        elif char == '"' and not heredoc:
+            double = not double
+        elif char == "`" or (text.startswith("$(", index) and (double or heredoc)):
+            begin = index + (1 if char == "`" else 2)
+            end = _closing_backquote(text, begin) if char == "`" else _closing_paren(text, begin)
+            name = f"__coach_gate_sub_{len(inner)}__"
+            inner[name] = [text[begin:end]]
+            out.append(name)
+            index = end + 1
+            continue
+        out.append(text[start:index + 1])
+        index += 1
+    return "".join(out)
+
+
+def _closing_backquote(text, index):
+    while index < len(text):
+        if text[index] == "`":
+            return index
+        index += 2 if text[index] == "\\" else 1
+    raise ValueError("No closing backquote")
+
+
+def _closing_paren(text, index):
+    depth, single, double, heredocs = 1, False, False, []
+    while index < len(text):
+        char = text[index]
+        operator = None if single or double else _HEREDOC_OPERATOR.match(text, index)
+        if single:
+            single = char != "'"
+        elif char == "\\":
+            index += 1
+        elif operator:
+            heredocs.append((operator.group(3), bool(operator.group(1))))
+            index = operator.end() - 1
+        elif char == "\n" and heredocs:
+            for delimiter, strip_tabs in heredocs:
+                index = _heredoc_end(text, index + 1, delimiter, strip_tabs)
+            heredocs = []
+            continue
+        elif char == "'" and not double:
+            single = True
+        elif char == '"':
+            double = not double
+        elif char in "()" and not double:
+            depth += 1 if char == "(" else -1
+            if depth == 0:
+                return index
+        index += 1
+    raise ValueError("No closing parenthesis")
+
+
+def _heredoc_end(text, index, delimiter, strip_tabs):
+    """The index of the newline after the delimiter line of a heredoc whose body starts at `index`."""
+    while index < len(text):
+        end = text.find("\n", index)
+        end = len(text) if end < 0 else end
+        if (text[index:end].lstrip("\t") if strip_tabs else text[index:end]) == delimiter:
+            return end
+        index = end + 1
+    return len(text)
+
+
 def _segments(tokens):
-    """Simple commands, split at separators, with redirections and their targets left out."""
-    words, skip_next = [], False
+    """Simple commands, split at separators, as (words, redirection targets)."""
+    words, targets, skip_next = [], [], False
     for token in tokens:
         if skip_next:
             skip_next = False
+            targets.append(token)
             continue
-        if token and set(token) <= _SEPARATOR_CHARS:
-            if words:
-                yield words
-            words = []
+        if token and (set(token) <= _SEPARATOR_CHARS or token in ("<(", ">(")):
+            if words or targets:
+                yield words, targets
+            words, targets = [], []
         elif token and set(token) <= set(_PUNCTUATION):
             skip_next = True
         else:
             words.append(token)
-    if words:
-        yield words
+    if words or targets:
+        yield words, targets
 
 
 def _change_dir(cwd, args):

@@ -23,6 +23,14 @@ PUSH = f"python3 -m coach routines push --overlay {WEEKLY}"
 SETTINGS = REPO_ROOT / ".claude" / "settings.json"
 HOOK_COMMAND = 'cd "$CLAUDE_PROJECT_DIR" && python3 -m coach gate pretooluse'
 GIT_WRITES_ALLOWED = {"pages publish"}
+SUBSTITUTED_PUSHES = (
+    f'out="$({PUSH})"',
+    f'echo "$({PUSH})"',
+    f"echo `{PUSH}`",
+    f'git commit -m "$({PUSH})"',
+    f'echo "$(echo "$({PUSH})")"',
+    f'echo x > "$({PUSH})"',
+)
 
 
 def hook_input(command, cwd, mode="default", tool="Bash"):
@@ -108,7 +116,8 @@ class PushDecisionTest(GateCase):
     def test_the_root_follows_cd_and_root_options(self):
         for command in (f"cd instance && {PUSH}",
                         f"python3 -m coach --root instance routines push --overlay {WEEKLY}",
-                        f"COACH_ROOT=instance python3 -m coach routines push --overlay {WEEKLY}"):
+                        f"COACH_ROOT=instance python3 -m coach routines push --overlay {WEEKLY}",
+                        f'cd instance && echo "$({PUSH})"'):
             with self.subTest(command=command):
                 decision = output(self.decide(command, cwd=self.root.parent))
                 self.assertEqual(decision["permissionDecision"], "ask")
@@ -144,9 +153,19 @@ class CommandShapeTest(GateCase):
             f"python3 -X utf8 -I -m coach routines push --overlay {WEEKLY}",
             f"python3 -mcoach routines push --overlay {WEEKLY}",
             f"{PUSH} --refresh",
+            f"cat <({PUSH})",
+            f"cat <<EOF\n$({PUSH})\nEOF",
+            f"bash <<'EOF'\n{PUSH}\nEOF",
+            *SUBSTITUTED_PUSHES,
         ):
             with self.subTest(command=command):
                 self.assert_decision(command)
+
+    def test_substituted_pushes_are_denied_in_bypass_mode(self):
+        for command in SUBSTITUTED_PUSHES:
+            with self.subTest(command=command):
+                decision = output(self.decide(command, mode="bypassPermissions"))
+                self.assertEqual(decision["permissionDecision"], "deny")
 
     def test_reads_and_dry_runs_have_no_opinion(self):
         for command in (
@@ -159,6 +178,9 @@ class CommandShapeTest(GateCase):
             "curl https://api.hevyapp.com/v1/routines/z",
             "curl -X GET https://api.hevyapp.com/v1/routines/z",
             "python3 -m unittest discover -s tests -t .",
+            f"grep -rn '$({PUSH})' .",
+            f"git commit -m \"$(cat <<'EOF'\nMake the gate's check stricter\n\nRun `{PUSH}` after (it asks).\nEOF\n)\"",
+            f"git commit -F - <<'EOF'\nThe gate's check\n{PUSH}\nEOF",
         ):
             with self.subTest(command=command):
                 self.assert_no_opinion(command)
