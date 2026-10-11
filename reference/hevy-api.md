@@ -1,6 +1,10 @@
 # Hevy API cheatsheet
 
-How this repo reads and writes the athlete's Hevy data. Full docs:
+The `coach` commands do every Hevy read and write: `hevy pull` fills the
+local cache, and `routines diff`, `push`, `verify`, `create` and
+`retire` write routines from an approved overlay, logging each write in
+`data/hevy/writes.jsonl`. These notes describe the API under them, for
+debugging and for the [Manual fallback](#manual-fallback). Full docs:
 https://api.hevyapp.com/docs/ (spec is embedded in
 `https://api.hevyapp.com/docs/swagger-ui-init.js` — the docs page itself is
 JS-rendered, so fetch that file if you need schema detail).
@@ -79,8 +83,7 @@ performed **alternating** so one arm works per rep): **Hevy value = per hand**.
 Rules that follow:
 
 - **Never state a dumbbell load as a bare number** anywhere the athlete reads
-  it — `routine/` load columns, weekly overlays, `Target:` notes, check-in
-  tables. Carry both: `25/hand (Hevy: 50)`. A bare `50` is ambiguous mid-set
+  it — routine pages, overlays, `Target:` notes, check-in tables. Carry both: `25/hand (Hevy: 50)`. A bare `50` is ambiguous mid-set
   and that ambiguity is what corrupts the log.
 - **Decide from how the lift is actually performed**, not from the exercise
   name. Hevy's catalogue mixes them — some one-arm variants are separate
@@ -131,14 +134,12 @@ Cues: narrow grip · elbows tucked · feet planted
   from last week", "same as last time", "+1 rep" go stale the moment the
   week ends, and a surviving note then tells the athlete the wrong thing.
   Changes and their reasons belong in the coach's brief and the check-in.
-  Written by every programming pass; `/new-program` writes its own
-  targets at creation time.
+  Written by every programming pass, including the opening week's.
 - **Focus** — only when there's a weekly emphasis. Omit the line
   otherwise.
-- **Cues** — always. The canonical form cues, copied from the
-  exercise's `Cues:` line in `routine/*.md` (that line is the single
-  source of truth — changing how a lift is performed edits it there
-  first).
+- **Cues** — always. The canonical form cues, from the exercise's
+  `cues` in `data/program.json` (the single source of truth — changing
+  how a lift is performed edits it there first).
 
 ## Facts that bite
 
@@ -151,7 +152,7 @@ Cues: narrow grip · elbows tucked · feet planted
   logged should be 20lbs."* See "Dumbbell loads" below — this is the single
   easiest way to corrupt an athlete's log, and it is silent when it happens.
 - **Routine templates cannot store an RPE target** (logged workout sets *do*
-  carry `rpe`). RPE prescriptions live in the `routine/` files and the
+  carry `rpe`). RPE prescriptions live in the program and the
   overlay — and reach the athlete via each routine exercise's
   `notes` field in the standard format (see "Routine note format"
   above) whenever a routine is written to Hevy.
@@ -169,10 +170,31 @@ Cues: narrow grip · elbows tucked · feet planted
   null set fields: only send keys that have values.
 - **Writes are rate-limited** — ~7 rapid PUTs trigger 429s. Space writes a few
   seconds apart and back off ~30 s on a 429.
-- Routine ↔ plan mapping lives in **`routine/hevy-map.json`** — routine UUIDs
-  (stable) mapped to repo file + heading. Trust IDs, not titles (titles can be
-  renamed in the app). If the map and the live routine list disagree, heal the
-  map with the athlete before doing anything else.
-  A `temporary` section holds the "One-off weeks" folder ID and its
-  reusable routine IDs (written by `/one-off-week`) — `/hevy-sync`
-  ignores those routines entirely.
+- Routine ↔ plan mapping lives in **`data/state.json`** under `hevy`:
+  `routines` maps each routine UUID (stable) to its program session. Trust
+  IDs, not titles (titles can be renamed in the app). If the map and the
+  live routine list disagree, heal the map with the athlete before doing
+  anything else. `folders` holds the program and "One-off weeks" folder
+  IDs, and `temporary_routines` the reusable one-off routines `routines
+  create` writes — `/hevy-sync` ignores those routines entirely.
+
+## Manual fallback
+
+Only when a `coach` command keeps failing (not when a guard refuses a
+write with exit 3 — fix the cause instead) and the athlete agrees to a
+hand-built call. The approval gate's hook prompts on every raw write to
+the API, with a warning; nothing the athlete hasn't approved goes out.
+
+1. **Read** with `curl` and the auth block above; GET the routine before
+   any write.
+2. **Loads** still come from `coach` output: `python3 -m coach overlay
+   notes <id>` gives each exercise's note, and `python3 -m coach units
+   format --mode <load mode> --value <load>` gives each set's Hevy value
+   (`hevy_kg` in its `load`). Never convert or double a load by hand.
+3. **Write** the whole routine back with `PUT /v1/routines/{id}` (only
+   keys with values, no routine-level `notes`), spacing writes a few
+   seconds apart.
+4. **Re-sync:** run `python3 -m coach hevy pull`, then `python3 -m coach
+   routines verify --overlay <id>` to confirm the routine now matches
+   the overlay. Raw calls skip the audit log, so say in the check-in
+   record which routine was written by hand and why.
