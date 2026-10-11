@@ -95,7 +95,7 @@ when chronic) its load limits (a recovery cap, no added load, a load
 cap) apply to every matching line the proposal step writes. A niggle is
 never deleted, never diagnosed, and one reported three check-ins
 running, or worsening to aggravated, means recommending a qualified
-professional.
+professional (never for a chronic niggle, a known lasting limitation).
 _Avoid_: injury (a diagnosis the coach does not make), limitation (use
 chronic niggle), pain point
 

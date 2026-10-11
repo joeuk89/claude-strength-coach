@@ -2526,6 +2526,8 @@ is the single function R-23a's pipeline, R-31's niggle trigger and R-43's
   open before D has no event dated D. Each needs one of resolve, drop
   (with reason), or defer/keep (with a new `review_at`). `render` only
   prints (read-only); the coach puts its text in the record.
+- `coach.followups.due(doc, today)` and `coach.followups.render_deep(doc,
+  day)` take the loaded document first, as `active_constraints` does.
 - Commands (R-27): `followups add --text T --review-at D --source S
   [--raised D]`, `followups resolve ID [--note]`, `followups drop ID
   --reason T`, `followups defer ID --to D [--kept] [--note]`. Events are

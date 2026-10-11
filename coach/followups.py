@@ -174,7 +174,7 @@ def undisposed(doc, day):
 
 
 def deep_items(doc, day):
-    """(item, disposition) for each item the deep record lists: everything settled on the day or raised on it."""
+    """(item, disposition, note) for each item the deep record lists: everything settled on the day or raised on it."""
     on = day.isoformat()
     found = []
     for item in doc["items"]:

@@ -390,6 +390,22 @@ class StatusTest(HistoryCase):
         self.assertIn("synthetic left knee", sections["niggles"]["lines"][0])
         self.assertIn("qualified professional", " ".join(sections["niggles"]["lines"]))
 
+    def test_the_aggravated_line_says_whether_a_limit_is_in_force(self):
+        history = [{"date": "2026-10-11", "status": "aggravated", "note": None}]
+        cap = [{"kind": "rpe_cap", "value": 7}]
+        write_json(self.root / "data" / "niggles.json", {"schema_version": 1, "niggles": [
+            niggle("n-0001", "aggravated", history=history, area="synthetic left knee"),
+            niggle("n-0002", "aggravated", history=history, constraints=cap, area="synthetic right hip"),
+            niggle("n-0003", "aggravated", history=history, constraints=cap, constrain_while=["watching"],
+                   area="synthetic left wrist")]})
+        sections = {s["id"]: s for s in self.coach("status")["data"]["sections"]}
+        lines = {line.split()[1]: line for line in sections["niggles"]["lines"]}
+        self.assertIn("no limit set", lines["n-0001"])
+        self.assertIn("niggles update n-0001 --constraint", lines["n-0001"])
+        self.assertIn("constraints apply to every proposal", lines["n-0002"])
+        self.assertIn("not in force", lines["n-0003"])
+        self.assertIn("niggles update n-0003 --constrain-while", lines["n-0003"])
+
 
 class SkillTest(unittest.TestCase):
     def read(self, skill):
