@@ -982,7 +982,13 @@ for every non-GET request, success or failure, once its retries are over.
   regions are snapshots with no freshness check (late syncs must not fail
   old records).
 - **The sweep** (R-16 `render_fresh_sweep`) reads every `*.md` under the
-  root outside dot-directories. It finds a kind's renderer as the first
+  root outside dot-directories, except framework files: those tracked at
+  the template commit `.claude/framework-sync.json` records, which the
+  athlete cannot fix because the next sync overwrites them. A marker is
+  a region marker only when it starts its own line (up to three spaces
+  of indent) outside a fenced code block and an inline code span, so
+  docs that show markers as examples hold no regions. It finds a kind's
+  renderer as the first
   top-level `coach` module (alphabetical) defining `render_<kind>`, with
   hyphens as underscores; R-33b has no `render_card(root, id)`, so the
   sweep builds one from `coach.recipes`. It leaves a region to its owner's
@@ -1142,13 +1148,22 @@ JSONPath or line, and the offending value.
 or lb (and not Hevy), or a number in an arrow chain (`45 → 50`). It is
 in the two-number form when it, or another figure in its chain, says per
 hand (`/hand`, `per hand`, `each`) or gives the Hevy value (`(Hevy: 50)`).
-Ranges, dates, sets × reps, RPE, durations and distances are not load
-figures. The check reads a `per_hand_x2` overlay line's `target_note`,
-`change`, `cues`, `focus` and `override.reason`, and the prose of
-`profile.md` and `check-ins/*.md` outside rendered regions. In prose a
-figure belongs to the nearest exercise named before it on its line (a
-table row inherits the row above), else the first named after it;
-library names, aliases, Hevy titles and ids name exercises, and
+In a table, a figure is also in the two-number form when its column
+header says per hand (`Per hand (kg)`, `Load/hand (kg)`), when it sits
+in a Hevy-headed column, or, in a load column, when the same row has a
+number in a Hevy-headed column (`| DB bench press | 25 | 50 |` under
+`| Exercise | Per hand (kg) | Hevy (kg) |`). Ranges, dates, sets × reps,
+RPE, durations and distances are not load figures. The check reads a
+`per_hand_x2` overlay line's `target_note`, `change`, `cues`, `focus`
+and `override.reason`, and the prose of `profile.md` and
+`check-ins/*.md` outside rendered regions. In prose a figure belongs to
+the nearest exercise named before it on its line, and to no exercise
+when none is. A table row's figures belong to the exercise named before
+them on the row, else to the exercise in the row's exercise cell (the
+column headed exercise, lift or movement, else the first). A row whose
+exercise cell is empty continues the row above and takes its exercise;
+a row whose exercise cell names nothing the library knows has none.
+Library names, aliases, Hevy titles and ids name exercises, and
 "dumbbell" or "DB" alone means `per_hand_x2`. Only `per_hand_x2`
 figures can be bare: a single implement's two numbers match.
 

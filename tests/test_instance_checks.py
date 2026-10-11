@@ -8,7 +8,7 @@ from pathlib import Path
 
 from coach import overlay
 from coach.checks import instance
-from tests.support import INSTANCES, VALID, run_cli, run_module
+from tests.support import INSTANCES, REPO_ROOT, VALID, run_cli, run_module
 
 NOW = {"COACH_NOW": "2026-10-11T18:00:00Z"}
 OVERLAY = "data/overlays/2026-10-12-weekly.json"
@@ -320,6 +320,7 @@ class GitRepo:
         self.git("config", "core.excludesFile", os.devnull)
         self.git("config", "user.name", "Test")
         self.git("config", "user.email", "test@example.invalid")
+        self.git("config", "commit.gpgsign", "false")
 
     def git(self, *argv):
         subprocess.run(["git", "-C", str(self.root), *argv], check=True, capture_output=True)
@@ -419,6 +420,45 @@ class BareHevyValuesTest(unittest.TestCase):
         self.assertIn("line 6", failed[0]["message"])
         self.assertIn("line 7", failed[1]["message"])
 
+    def test_figures_belong_only_to_an_exercise_named_before_them(self):
+        with TempCopy() as tmp:
+            tmp.write("profile.md", "# Profile\n\nSquat up to 100 kg; DB bench stays 25/hand (Hevy: 50).\n"
+                                    "Aim for 50 kg on the DB bench.\n")
+            code, results, _ = check(tmp.root, "bare_hevy_values")
+        self.assertEqual(code, 0, failures(results, "bare_hevy_values"))
+
+    def test_table_rows_carry_an_exercise_only_into_empty_exercise_cells(self):
+        record = (
+            "# Check-in\n\n| Exercise | Load |\n| --- | --- |\n| DB bench press | 25/hand (Hevy: 50) |\n"
+            "| Squat | 100 kg |\n|  | 90 kg |\n| DB bench | 45 kg |\n|  | 40 kg |\n"
+        )
+        with TempCopy() as tmp:
+            tmp.write("check-ins/2026-10-04.md", record)
+            _, results, _ = check(tmp.root, "bare_hevy_values")
+        failed = failures(results, "bare_hevy_values")
+        self.assertEqual([row["message"].split(":")[0] for row in failed],
+                         ["check-ins/2026-10-04.md line 8", "check-ins/2026-10-04.md line 9"])
+
+    def test_tables_that_give_both_numbers_in_their_columns_pass(self):
+        tables = (
+            "| Exercise | Per hand (kg) | Hevy (kg) |\n| --- | --- | --- |\n| DB bench press | 25 | 50 |\n",
+            "| Exercise | Load/hand (kg) |\n| --- | --- |\n| DB bench press | 25 |\n",
+            "| Exercise | Load (kg) | Hevy |\n| --- | --- | --- |\n| DB bench press | 22.5 → 25 | 45 → 50 |\n",
+        )
+        for table in tables:
+            with self.subTest(table), TempCopy() as tmp:
+                tmp.write("check-ins/2026-10-04.md", "# Check-in\n\n" + table)
+                code, results, _ = check(tmp.root, "bare_hevy_values")
+                self.assertEqual(code, 0, failures(results, "bare_hevy_values"))
+
+    def test_a_load_column_without_its_hevy_value_fails(self):
+        table = "| Exercise | Load (kg) | Hevy |\n| --- | --- | --- |\n| DB bench press | 25 |  |\n"
+        with TempCopy() as tmp:
+            tmp.write("check-ins/2026-10-04.md", "# Check-in\n\n" + table)
+            _, results, _ = check(tmp.root, "bare_hevy_values")
+        [row] = failures(results, "bare_hevy_values")
+        self.assertIn("'25'", row["message"])
+
     def test_rendered_regions_are_not_scanned(self):
         with TempCopy() as tmp:
             record = (tmp.root / "check-ins/2026-10-11.md").read_text(encoding="utf-8")
@@ -502,6 +542,37 @@ class RenderFreshSweepTest(unittest.TestCase):
             code, results, _ = check(tmp.root, "render_fresh_sweep")
         self.assertEqual(code, 0)
         self.assertEqual(statuses(results, "render_fresh_sweep"), ["warn"])
+
+    def test_markers_shown_as_examples_are_not_regions(self):
+        with TempCopy() as tmp:
+            card = tmp.root / "nutrition/menu/chicken-rice-bowl.md"
+            card.write_text(card.read_text(encoding="utf-8").replace("servings = 1", "servings = 2", 1),
+                            encoding="utf-8")
+            for name in ("recipe-cards.md", "research-notes.md"):
+                shutil.copy(REPO_ROOT / "reference" / name, tmp.root / "reference" / name)
+            tmp.write("notes/inline.md", "Write regions as text <!-- coach:begin card whey-shake --> mid-line.\n")
+            _, results, _ = check(tmp.root, "render_fresh_sweep")
+        self.assertEqual(statuses(results, "render_fresh_sweep"), ["pass"])
+
+    @unittest.skipUnless(shutil.which("git"), "needs git")
+    def test_framework_files_are_left_out(self):
+        stale = "<!-- coach:begin card whey-shake -->\nstale\n<!-- coach:end card whey-shake -->\n"
+        with GitRepo() as repo:
+            (repo.root / "reference" / "guide.md").write_text(stale, encoding="utf-8")
+            repo.git("add", "reference/guide.md")
+            repo.git("commit", "-q", "-m", "template")
+            commit = subprocess.run(["git", "-C", str(repo.root), "rev-parse", "HEAD"], check=True,
+                                    capture_output=True, text=True).stdout.strip()
+            (repo.root / "notes").mkdir()
+            (repo.root / "notes" / "mine.md").write_text(stale, encoding="utf-8")
+            _, before, _ = check(repo.root, "render_fresh_sweep")
+            (repo.root / ".claude").mkdir()
+            (repo.root / ".claude" / "framework-sync.json").write_text(
+                json.dumps({"template_commit": commit, "synced_at": "2026-10-11"}), encoding="utf-8")
+            _, after, _ = check(repo.root, "render_fresh_sweep")
+        self.assertEqual(sorted(row["path"] for row in failures(before, "render_fresh_sweep")),
+                         ["notes/mine.md", "reference/guide.md"])
+        self.assertEqual([row["path"] for row in failures(after, "render_fresh_sweep")], ["notes/mine.md"])
 
     def test_valid_regions_are_fresh(self):
         _, results, _ = check(VALID, "render_fresh_sweep")

@@ -1,4 +1,5 @@
-"""Whole-instance checks that cut across items (contract C13, R-16).
+"""Whole-instance checks: schema versions, cross-file references, caps, .env safety, bare Hevy values and
+rendered regions (contract C13).
 
 Checks about a prescription (routine ids, library consistency, caps, bare
 Hevy values in overlays) read only overlays whose span runs to today or
@@ -33,6 +34,7 @@ OVERLAY_TEXT_FIELDS = ("target_note", "change", "cues", "focus")
 TWO_NUMBER_EXAMPLE = "25/hand (Hevy: 50)"
 MIGRATE_RUN = "run python3 -m coach migrate run"
 REBUILD_HEVY_CACHE = "rebuild the cache with python3 -m coach hevy pull --full"
+FRAMEWORK_SYNC_MARKER = ".claude/framework-sync.json"
 
 
 def _rel(ctx, path):
@@ -455,17 +457,15 @@ class _Mentions:
 
 def _attribute(position, mentions, carried):
     before = [m for m in mentions if m[1] <= position]
-    if before:
-        return before[-1]
-    if carried is not None:
-        return carried
-    after = [m for m in mentions if m[0] >= position]
-    return after[0] if after else None
+    return before[-1] if before else carried
 
 
 _REGION = re.compile(r"<!-- coach:begin ([a-z-]+) (\S+) -->.*?<!-- coach:end \1 \2 -->", re.DOTALL)
 _TABLE_SEPARATOR = re.compile(r"^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$")
 _LOAD_HEADER = re.compile(r"\b(?:load|weight|kgs?|lbs?)\b", re.IGNORECASE)
+_PER_HAND_HEADER = re.compile(r"/\s*hand\b|\bper\s+hand\b|\beach\b", re.IGNORECASE)
+_HEVY_HEADER = re.compile(r"\bhevy\b", re.IGNORECASE)
+_EXERCISE_HEADER = re.compile(r"\b(?:exercises?|lifts?|movements?)\b", re.IGNORECASE)
 
 
 def _without_regions(text):
@@ -478,36 +478,73 @@ def _cells(line):
     return list(zip(bars, bars[1:]))
 
 
+@dataclass(frozen=True)
+class _Table:
+    """What a markdown table's header says about its columns."""
+
+    load: frozenset = frozenset()
+    per_hand: frozenset = frozenset()
+    hevy: frozenset = frozenset()
+    exercise: int = 0
+
+    @classmethod
+    def from_header(cls, line):
+        headers = [line[a + 1:b] for a, b in _cells(line)]
+        hevy = {i for i, h in enumerate(headers) if _HEVY_HEADER.search(h)}
+        named = [i for i, h in enumerate(headers) if _EXERCISE_HEADER.search(h)]
+        return cls(load=frozenset(i for i, h in enumerate(headers) if _LOAD_HEADER.search(h) and i not in hevy),
+                   per_hand=frozenset(i for i, h in enumerate(headers) if _PER_HAND_HEADER.search(h)),
+                   hevy=frozenset(hevy), exercise=named[0] if named else 0)
+
+
+def _row_figures(line, table):
+    """[(figure, offset in line)] for the bare figures in a table row."""
+    cells = [(i, a + 1, b) for i, (a, b) in enumerate(_cells(line))]
+    paired = any(i in table.hevy and re.search(r"\d", line[a:b]) for i, a, b in cells)
+    found = []
+    for column, start, end in cells:
+        if column in table.hevy or column in table.per_hand or (paired and column in table.load):
+            continue
+        found += [(f, start + f.start) for f in bare_figures(line[start:end], load_column=column in table.load)]
+    return found
+
+
 def _prose_results(rel, text, mentions):
     results = []
     lines = _without_regions(text).split("\n")
-    load_columns, carried, in_table = set(), None, False
+    table, carried = None, None
     for number, line in enumerate(lines, 1):
         is_row = line.lstrip().startswith("|")
         if not is_row:
-            in_table, carried = False, None
+            table, carried = None, None
         if is_row and _TABLE_SEPARATOR.match(line):
             continue
-        if is_row and not in_table:
-            in_table, carried = True, None
+        if is_row and table is None:
             following = lines[number] if number < len(lines) else ""
             if _TABLE_SEPARATOR.match(following):
-                load_columns = {i for i, (a, b) in enumerate(_cells(line))
-                                if _LOAD_HEADER.search(line[a + 1:b]) and "hevy" not in line[a + 1:b].lower()}
+                table = _Table.from_header(line)
                 continue
-            load_columns = set()
+            table = _Table()
         found = mentions.find(line)
-        spans = [(i, a + 1, b) for i, (a, b) in enumerate(_cells(line))] if is_row else [(None, 0, len(line))]
+        if is_row:
+            cells = _cells(line)
+            name_cell = ""
+            if table.exercise < len(cells):
+                a, b = cells[table.exercise]
+                name_cell = line[a + 1:b]
+            if name_cell.strip():
+                named = mentions.find(name_cell)
+                carried = named[-1] if named else None
+            figures = _row_figures(line, table)
+        else:
+            figures = [(f, f.start) for f in bare_figures(line)]
         bare = {}
-        for column, start, end in spans:
-            for figure in bare_figures(line[start:end], load_column=column in load_columns):
-                mention = _attribute(start + figure.start, found, carried if is_row else None)
-                if mention and mention[3] == PER_HAND_X2:
-                    bare.setdefault(mention[2], []).append(figure)
-        for exercise, figures in bare.items():
-            results.append(Result("fail", _bare_message(rel, f"line {number}", figures, exercise, line), rel))
-        if is_row and found:
-            carried = found[-1]
+        for figure, position in figures:
+            mention = _attribute(position, found, carried if is_row else None)
+            if mention and mention[3] == PER_HAND_X2:
+                bare.setdefault(mention[2], []).append(figure)
+        for exercise, listed in bare.items():
+            results.append(Result("fail", _bare_message(rel, f"line {number}", listed, exercise, line), rel))
     return results
 
 
@@ -581,11 +618,61 @@ def _markdown_files(root):
                 yield Path(directory) / name
 
 
+def _framework_files(ctx):
+    """The paths tracked at the template commit /framework-sync last synced to; empty when that is unknown."""
+    try:
+        commit = json.loads((ctx.root / FRAMEWORK_SYNC_MARKER).read_text(encoding="utf-8"))["template_commit"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return frozenset()
+    if not isinstance(commit, str) or not commit or commit.startswith("-") or shutil.which("git") is None:
+        return frozenset()
+    listed = _git(ctx, "ls-tree", "-r", "-z", "--name-only", commit, "--")
+    if listed.returncode != 0:
+        return frozenset()
+    return frozenset(name for name in listed.stdout.split("\0") if name)
+
+
+_FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+_CODE_SPAN = re.compile(r"(`+)(?!`)(?:(?!\n[ \t]*\n).)+?(?<!`)\1(?!`)", re.DOTALL)
+_ANY_MARKER = re.compile(r"<!-- coach:(?:begin|end) [a-z-]+ \S+ -->")
+
+
+def _blank(text):
+    return re.sub(r"[^\n]", " ", text)
+
+
+def _live_markup(text):
+    """`text` with code blocks, code spans and markers that do not start their line blanked, offsets kept.
+
+    Framework docs show region markers as examples inside code; those are not regions.
+    """
+    lines, fence = text.split("\n"), None
+    for index, line in enumerate(lines):
+        opening = _FENCE.match(line)
+        if fence is None and opening:
+            fence = opening.group(1)
+            lines[index] = _blank(line)
+        elif fence is not None:
+            if opening and opening.group(1)[0] == fence[0] and len(opening.group(1)) >= len(fence) \
+                    and not line[opening.end():].strip():
+                fence = None
+            lines[index] = _blank(line)
+    text = _CODE_SPAN.sub(lambda m: _blank(m.group(0)), "\n".join(lines))
+    out, position = [], 0
+    for match in _ANY_MARKER.finditer(text):
+        indent = text[text.rfind("\n", 0, match.start()) + 1:match.start()]
+        if len(indent) > 3 or indent.strip():
+            out += [text[position:match.start()], _blank(match.group(0))]
+            position = match.end()
+    return "".join(out) + text[position:]
+
+
 def _region_results(ctx, rel, text):
     results, checked = [], 0
-    for kind in sorted(set(_KIND_MARKER.findall(text))):
+    live = _live_markup(text)
+    for kind in sorted(set(_KIND_MARKER.findall(live))):
         try:
-            regions = render.find_regions(text, kind)
+            regions = render.find_regions(live, kind)
         except ValueError as exc:
             results.append(Result("fail", f"{rel}: {exc}", rel))
             continue
@@ -617,8 +704,12 @@ def _region_results(ctx, rel, text):
 @check(id="render_fresh_sweep", owner=OWNER)
 def render_fresh_sweep(ctx):
     results, checked = [], 0
+    framework = _framework_files(ctx)
     for path in _markdown_files(ctx.root):
-        found, count = _region_results(ctx, _rel(ctx, path), path.read_bytes().decode("utf-8"))
+        rel = _rel(ctx, path)
+        if rel in framework:
+            continue
+        found, count = _region_results(ctx, rel, path.read_bytes().decode("utf-8"))
         results += found
         checked += count
     return results or [Result("pass", f"{checked} rendered region(s) outside their owners' checks are fresh.")]
