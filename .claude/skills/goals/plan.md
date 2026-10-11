@@ -1,5 +1,9 @@
 # Research, then agree the plan
 
+When an outside running plan or endurance event is relevant, consult
+[runner review](../../../reference/runner-review.md) before agreeing the
+strategy. Otherwise skip runner-specific research and fuelling questions.
+
 When the specific decision (rates, target ranges for their stats) needs
 evidence, follow `CLAUDE.md` "Researching current best practice": read
 the notes for the area (`protein`, `energy_balance`, `sleep`) first,
