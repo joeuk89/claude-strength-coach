@@ -12,8 +12,9 @@ from tests.support import INSTANCES, REPO_ROOT, VALID, run_cli
 
 NOW = {"COACH_NOW": "2026-10-11T18:00:00Z"}
 SHIPPED = {
-    "scheme": ["double_progression", "fixed_reps_rpe", "hold", "linear"],
-    "schedule": ["alternating_external_anchor", "fixed_weekdays"],
+    "scheme": ["assistance_ladder", "double_progression", "fixed_reps_rpe", "hold", "linear", "maintenance",
+               "rpe_anchored", "wave_531"],
+    "schedule": ["alternating_external_anchor", "explicit_calendar", "fixed_weekdays", "next_in_sequence"],
     "transform": ["scheme", "standard"],
 }
 R23A_CODES = {"no_data": ("warn",), "stalled": ("warn",), "rpe_drift": ("warn",), "return_week": ("info",),
