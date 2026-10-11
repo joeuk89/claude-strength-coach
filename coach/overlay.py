@@ -97,8 +97,13 @@ def in_force(root, day):
     session, the latest created covering overlay is in force with session
     None.
     """
+    return pick_in_force(list(root), day)
+
+
+def pick_in_force(docs, day):
+    """`in_force` over overlays already loaded."""
     day = _as_date(day).isoformat()
-    covering = [doc for doc in list(root) if doc["span"]["start"] <= day <= doc["span"]["end"]]
+    covering = [doc for doc in docs if doc["span"]["start"] <= day <= doc["span"]["end"]]
     with_session = [doc for doc in covering if any(s["date"] == day for s in doc["sessions"])]
     pool = with_session or covering
     if not pool:

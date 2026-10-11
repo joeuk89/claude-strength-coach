@@ -1239,6 +1239,7 @@ files to it; nobody edits another item's files.
 | program and state (R-17a) | `data/program.json`: Session A squat 3×5 RPE 7 from 100, DB bench 3×8–10 RPE 8 from 25/hand; Session B row 3×10 RPE 8 from 30, pull-up 3×8 RPE 8 at BW; `fixed_weekdays` mon/thu; no external sessions; `data/state.json` mapping both C14 routines, folder 1; `routine/` pages rendered from it |
 | overlay | `2026-10-12-weekly`, span 2026-10-12 to 2026-10-18, approved; Session A 2026-10-12 (squat 100, DB bench 25/hand (Hevy: 50)), Session B 2026-10-15 (row 30 (Hevy: 30), pull-up BW); built from `tests/fixtures/overlay/draft-kg.json` |
 | check-in (R-13) | `check-ins/2026-10-11.md` holding the rendered region of `2026-10-12-weekly` |
+| profile (R-26b) | `profile.md`: two lines of synthetic prose, no load figures and no claim references, so `status` sees a set-up instance |
 | `COACH_NOW` | `2026-10-11T18:00:00Z` |
 | activities (R-42a) | `manual:2026-10-08-run-1` run 5 km, 30 min, RPE 6; Hevy workout `00000000-0000-4000-8000-0000000000c1` "Conditioning", all-conditioning, starting 6 min after `manual:2026-10-10-conditioning-1` (the dedup pair); `[activity] enabled = true` in `config.toml`; `data/activity/sync.json` with the Hevy workout seen at 2026-10-11T12:00:00Z. The Hevy workout lives in `tests/fixtures/hevy/conditioning/` (below), not in a cache in `valid/` |
 | wellness (R-42a) | in `.coach/activity/wellness.jsonl`: daily `apple_health` records 2026-10-05 to 2026-10-10 with sleep; one manual span record `manual:2026-10-05..2026-10-11-wellness` at 7.0 h |
@@ -4621,16 +4622,22 @@ def overlay(ctx) -> Section | None: ...
 - Providers are discovered with `pkgutil.iter_modules` over
   `coach/status/`, like checks (C13). An item adds a module; it never
   edits another provider or the registry.
+- `coach.status.collect(root, today, env=None, stderr=None,
+  providers=None) -> list[Section]` runs them in `order` (ties by id);
+  each provider's `ctx.today()` is `today`. R-26b's orders: `instance`
+  10, `checks` 20, `overlay` 30, `program` 40, `checkin` 50, `hevy` 60.
 - `lines` are plain sentences for a human, at most three per provider,
   loads only through `units.format_load`. `level` is `attention` when
   the coach should raise it in the first reply.
 - A provider that raises is reported as one `attention` line
   ("<id>: unavailable (<error class>)") and the rest still run. A missing
-  file or module drops its lines, not the command.
-- Output: `data.sections` (in `order`), `data.instance`
-  (`template`, `uninitialised` or `instance`) and `data.today`. The
-  template repo is recognised by a `tests/` directory with no
-  `profile.md`.
+  file or module drops its lines, not the command. A provider that raises
+  `ConfigError` (no `config.toml`, or an invalid one) drops its section:
+  `instance` and `checks` already report that.
+- Output: `data.sections` (in `order`, each `{id, level, lines,
+  data}`), `data.instance` (`template`, `uninitialised` or `instance`)
+  and `data.today`. The template repo is recognised by a `tests/`
+  directory with no `profile.md`.
 
 Providers R-26b ships:
 
@@ -4639,9 +4646,9 @@ Providers R-26b ships:
 | `instance` | uninitialised (no `config.toml` or no `profile.md`): "run /setup"; files behind their schema version: "run python3 -m coach migrate run" |
 | `checks` | the `coach check` summary and the ids of any `fail` or `warn` |
 | `hevy` | cache age against `[hevy] cache_max_age_hours`; skipped when Hevy is disabled |
-| `overlay` | the overlay in force today (id, kind, span), whether it is approved, pushed and verified (from `writes.jsonl`), the next one or two planned sessions, and whether any day of the coming week has no overlay |
-| `program` | rotation position and whether it is confirmed (from R-25's `header_facts` when present, else C16 `state.json`); hard weeks completed and deload status (`state.json`) |
-| `checkin` | last check-in, days since, due date, tier and mode (`first`, `weekly`, `deep`, `catch_up`) from R-25's `header_facts`; before R-25 merges, the newest record in `check-ins/` and "due" at 7 or more days |
+| `overlay` | the overlay in force today (id, kind, span), else the next to start with its first session; whether it is approved, pushed and verified (a routine counts as verified when its latest `verify` line for the overlay's id and approval hash says so; Hevy off: approved only); the next one or two planned sessions; and the days of the coming week no overlay covers. The coming week is the week holding tomorrow (`[athlete] week_starts`), from today on: the rest of this week, or all of next week on its last day. Invalid overlays are skipped (`checks` names them) |
+| `program` | rotation position and whether it is confirmed (from R-25's `header_facts` when present, else C16 `state.json`); hard weeks completed and deload status (`state.json`); `attention` when the position is unconfirmed or the deload is `due` or `in_progress` |
+| `checkin` | last check-in, days since, due date, tier and mode (`first`, `weekly`, `deep`, `catch_up`) from R-25's `header_facts`; before R-25 merges, the newest record in `check-ins/` dated today or earlier, "due" at 7 or more days, and mode `first` (no record) or `weekly` |
 
 Later items add a provider when they own a fact the coach should see at
 session start: R-21b (next check-in runs in catch-up mode), R-23a (an
@@ -4665,14 +4672,18 @@ rule (hooks run outside the permission layer); `status` gets one. R-15's
 `PreToolUse` entry uses the same `cd` form.
 
 - **`hooks sessionstart`** (all session sources: `startup`, `resume`,
-  `clear`, `compact`). Prints
+  `clear`, `compact`, `fork`; the entry has no matcher). Prints
   `{"hookSpecificOutput": {"hookEventName": "SessionStart",
   "additionalContext": "<text>"}}`, where the text is the `status`
   lines, `attention` first, at most 12 lines and about 1,000
-  characters, ending "Detail: python3 -m coach status". In the template
-  repo it prints nothing. On any failure, including Python older than
-  3.11, it prints one line saying the coach scripts are unavailable and
-  why.
+  characters, ending "Detail: python3 -m coach status". The first line
+  is "Coach status for <today> (items needing attention first):"; when
+  the lines do not fit, the last kept line says how many were dropped.
+  In the template repo it prints nothing. On any failure, including
+  Python older than 3.11, it prints one line saying the coach scripts
+  are unavailable and why. `coach/__main__.py` answers both hook
+  commands under an old Python, or when the CLI fails before the hook
+  runs (sessionstart: that line; posttooluse: nothing), and exits 0.
 - **`hooks posttooluse`** (matcher `Write|Edit`; hand edits only, since
   `coach` commands validate their own output). Reads
   `tool_input.file_path`, makes it relative to the root (it may arrive
@@ -4680,25 +4691,43 @@ rule (hooks run outside the permission layer); `status` gets one. R-15's
 
   | Path | Checks run (`check --only`) |
   |---|---|
-  | `config.toml` | config |
-  | `data/exercises.json` | R-11's library checks |
+  | `config.toml` | config, `nutrition_template` |
+  | `data/exercises.json` | R-11's library checks, `overlay_library_consistency` |
   | `data/program.json`, `data/state.json` | R-17a's program and state checks |
   | `routine/*.md` | `routine_render_fresh` |
-  | `data/overlays/*.json` | R-13's overlay checks, `load_caps`, `dangling_exercise_ids` |
-  | `check-ins/*.md` | `overlay_render_fresh`, `bare_hevy_values` |
-  | `profile.md` | `bare_hevy_values` |
+  | `data/overlays/*.json` | R-13's overlay checks, `load_caps`, `dangling_exercise_ids`, `dangling_routine_ids`, `overlay_library_consistency` |
+  | `check-ins/*.md` | `overlay_render_fresh`, `bare_hevy_values`, `research_citations` |
+  | `profile.md` | `bare_hevy_values`, `research_citations` |
+  | `data/hevy/writes.jsonl` | `schema_versions` |
+  | `data/activity/*.jsonl`, `data/activity/sync.json`, `.coach/activity/wellness.jsonl` | `activity_records_valid`, `activity_wellness_location` |
+  | `data/nutrition/readings.json` | `nutrition_readings` |
+  | `data/nutrition/plans/*.json` | `meal_plans`, `meal_plan_render_fresh` |
+  | `nutrition/plans/*.md` | `meal_plan_render_fresh` |
+  | `nutrition/menu/index.md` | `recipe_index_fresh` |
+  | `nutrition/menu/*.md` | `recipe_cards`, `recipe_render_fresh`, `recipe_index_fresh`, `nutrition_template` |
+  | `research/local/*.md` | `research_notes`, `research_render_fresh`, `research_citations` |
+  | `research/*.md` | `research_notes`, `research_render_fresh` |
+
+  The first matching row wins; `*` matches within one path segment.
+  R-26b added the rows after `profile.md`, and R-16's and R-33c's checks
+  in the earlier rows, for the items that merged before the map existed.
 
   Any `fail`: `{"decision": "block", "reason": "<path> failed <id>:
   <message>. Fix the data file or re-render; don't leave it."}`, which
   reaches the coach next to the tool result (the edit has already
-  happened; the hook cannot undo it). `warn` only: the same text as
-  `additionalContext`. All pass, an unmapped path, or a hook error:
+  happened; the hook cannot undo it). `warn` only: the same text with
+  "has a warning from" for "failed", as
+  `{"hookSpecificOutput": {"hookEventName": "PostToolUse",
+  "additionalContext": ...}}`. Up to five results are named, then "and N
+  more". All pass, an unmapped path, or a hook error:
   nothing on stdout (errors get one `coach:` line on stderr). Only
   checks that read local files are mapped.
 - The path map lives in `coach/hooks.py`, built on C13's `--only`, so no
   item edits the check registry. An item that adds a data path in C6 adds
   its row to the map in its own PR. A test asserts every mapped check id
-  is registered.
+  is registered, and that every C6 path has a row or a stated reason
+  in `tests/test_hooks.py` `NOT_MAPPED`; an item that adds checks for an
+  unmapped path moves it into the map.
 
 ## C54. Profile facts (R-10, R-11 own; R-17a, R-20, R-22, R-23a, R-24, R-30a, R-40a, R-41a, R-41b read)
 
