@@ -78,6 +78,7 @@ coach/                       # framework: synced to instances
   block.py                   # block ledger, light weeks, status line                    (R-31)
   nutrition.py               # nutrition config, readings, status                        (R-33a)
   protein.py                 # protein reference mass, floor, target, stretch            (R-33a)
+  calories.py                # no-app starting calorie estimate per phase                (R-33a)
   recipes.py                 # recipe cards, index, import                               (R-33b)
   meals.py                   # meal plans, shopping list                                 (R-33c)
   log.py, sheets.py          # manual log and session sheets                             (R-40c)
@@ -218,7 +219,7 @@ Phase 2 to 4 command inventory. No command here writes to Hevy.
 | `block status` | R-31 | |
 | `block close --week W [--readiness poor\|ok] [--sleep poor\|ok] [--deep]`, `block decide --outcome adopted\|declined [--type deload\|light\|return] [--week W] [--reason T]`, `block init --hard-weeks N [--through W] [--started D] [--reason T]` | R-31 | W |
 | `nutrition status`, `nutrition readings [--last N]` | R-33a | |
-| `nutrition targets [--bodyweight X] [--goal-weight X] [--body-fat PCT --body-fat-source credible\|rough] [--sex male\|female] [--height N [--height-unit cm\|in]] [--recent-intake G]` | R-33a | |
+| `nutrition targets [--bodyweight X] [--goal-weight X] [--body-fat PCT --body-fat-source credible\|rough] [--sex male\|female] [--height N [--height-unit cm\|in]] [--recent-intake G] [--app macrofactor\|none] [--age N] [--activity sedentary\|active\|vigorous] [--phase PHASE:RATE]...` | R-33a | |
 | `nutrition record`, `nutrition import --input FILE` | R-33a | W |
 | `recipes list`, `recipes show`, `recipes validate`, `recipes import --html FILE`, `recipes draft --input FILE` | R-33b | |
 | `recipes render [SLUG]`, `recipes convert (--parse \| --apply --input FILE)` | R-33b | W (`--parse` writes nothing; one command, so it carries `writes`) |
@@ -3579,8 +3580,10 @@ dates unique:
   `trend_weight`, `scale_weight` or `avg_protein_g` is set. `window` is
   optional.
 - Written only by `nutrition record` and `nutrition import`. Nothing
-  computes expenditure or a calorie target; those fields are the app's
-  numbers.
+  computes expenditure or a calorie target for an app user; those fields
+  are the app's numbers. The one calorie figure the package computes is
+  `nutrition targets`' starting estimate for `app = "none"`, and only
+  `coach/calories.py` names a calorie equation.
 - `nutrition status` flags: `protein_floor_raise`, `override_expired`,
   `override_renewed_twice`, `app_protein_mismatch`, `logging_incomplete`,
   `no_recent_reading`. It returns `data.brief_line` and `data.questions`;
@@ -3635,8 +3638,9 @@ dates unique:
   until D | what, from D | expired D>`; with no reading it says "no
   reading yet", with no protein figure "last week not tracked". With a
   `plan`, the line ends ` · plan: <path>` (R-33c).
-- `nutrition targets` (`coach/protein.py`) computes the protein numbers
-  `/goals` quotes; it reads, never writes, and runs with nutrition off.
+- `nutrition targets` (`coach/protein.py`, `coach/calories.py`) computes
+  the protein numbers and the no-app calorie estimate `/goals` quotes; it
+  reads, never writes, and runs with nutrition off.
   Inputs: each flag, else bodyweight from the newest reading of the last
   14 days with a weight in `bodyweight_units` (its `trend_weight`, else
   its `scale_weight`), recent intake from the newest reading of the last
@@ -3647,8 +3651,10 @@ dates unique:
   Data: `inputs` (`bodyweight` and `goal_weight` as `{value, unit,
   from}`, `recent_intake_g` as `{value, from}`, `from` being `flag`,
   `config` or `reading D`; `body_fat` `{pct, source}`; `sex`;
-  `height_m`; each null when absent), `reference`, `protein` and
-  `missing`.
+  `height_m`; `age`; `activity`; `phases` as `{value: [[phase,
+  rate]...], from}`, from `--phase` or `[nutrition] phase` and
+  `target_rate_per_week`; each null when absent), `reference`,
+  `protein`, `calories` and `missing`.
   - `reference`: `{basis, mass, unit, mass_kg, reason, refs, bmi}`. The
     first rule that applies: a credible reading gives `fat_free_mass`
     (bodyweight × (1 − body fat)); high body fat gives `goal_weight`;
@@ -3667,9 +3673,22 @@ dates unique:
     raised to `g_min` (`clamped: "min"`) or cut to the target (`clamped:
     "target"`); `g` and `from_intake_g` are null with no intake. Null
     when `reference` is.
+  - `calories`: the app comes from `--app`, else `[nutrition] app`. An
+    app set gives `{"by": "app"}` and no figure; no app known gives null
+    and names `app` in `missing`. `app = "none"` gives `{by: "estimate",
+    method, resting_kcal, activity_level, maintenance_kcal, estimates,
+    refs}`: resting rate by Mifflin–St Jeor from bodyweight, height, age
+    and sex (rounded to 1 kcal), times the activity level (`sedentary`
+    1.53, `active` 1.76, `vigorous` 2.25) for maintenance, and one
+    `{phase, rate_per_week, unit, adjustment_kcal, kcal}` per phase,
+    where the adjustment is the rate in kg × 7700 ÷ 7 and `maintenance_kcal`
+    and `kcal` round to the nearest 50 kcal. The numbers are null and
+    `estimates` empty while an input is missing. Refs: claims 14–16.
   - `missing`: `{input, flag, why}` for each input the rules still need,
     in order: `bodyweight`, then the one the basis needs next (`sex`,
-    `height` or `goal_weight`), then `recent_intake`. Nothing is guessed.
+    `height` or `goal_weight`), then `recent_intake`, then any the
+    calorie estimate needs (`app`, or `sex`, `height`, `age`, `activity`,
+    `phase`) not already named. Nothing is guessed.
   - `refs` are `rn:protein-energy-deficit` claims: 3 with 4 (a rough
     reading) or 5 (no reading) for the basis; 1, 2 and 6 (fat-free mass)
     for target and stretch; 8 and 7 for the floor.

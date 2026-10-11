@@ -1,8 +1,9 @@
 import json
 from pathlib import Path
 
-from coach import dates, nutrition, paths, protein, units
+from coach import calories, dates, nutrition, paths, protein, units
 from coach.commands import arg, command
+from coach.config_tables.nutrition import APPS, PHASES
 from coach.errors import ConfigError, ValidationError
 
 _REPLACE = arg("--replace", action="store_true", help="overwrite a reading already on file for the same date")
@@ -80,6 +81,31 @@ def _value(given):
     return None if given is None else given["value"]
 
 
+def _phase(text):
+    name, _, rate = text.partition(":")
+    try:
+        rate = float(rate)
+    except ValueError:
+        rate = None
+    if name not in PHASES or rate is None:
+        raise ValidationError(f"--phase takes PHASE:RATE, a phase of {', '.join(PHASES)} and its weekly rate in "
+                              f"bodyweight units (cut:-0.5), found {text!r}")
+    return [name, units.json_number(rate)]
+
+
+def _calories(args, table, inputs, unit):
+    app = args.app or table.get("app")
+    if app is None:
+        return None, [{"input": "app", "flag": "--app", "why": "only an athlete with no nutrition app gets a "
+                       "calorie estimate"}]
+    if app != "none":
+        return {"by": "app"}, []
+    estimate = calories.estimates(unit=unit, sex=args.sex, bodyweight=_value(inputs["bodyweight"]),
+                                  height_m=inputs["height_m"], age=args.age, activity=args.activity,
+                                  phases=_value(inputs["phases"]))
+    return estimate, estimate.pop("missing")
+
+
 @command(
     "nutrition targets",
     help="The protein reference mass and the floor, target and stretch set from it; names any input still missing",
@@ -96,6 +122,14 @@ def _value(given):
         arg("--height-unit", choices=units.HEIGHT_UNITS, help="default: cm with kg bodyweight, in with lb"),
         arg("--recent-intake", type=float, metavar="G", help="recent average protein a day, g (default: the newest "
             "reading's 7-day average from the last 14 days)"),
+        arg("--app", choices=APPS, help="the nutrition app (default: [nutrition] app); only \"none\" gets a "
+            "calorie estimate"),
+        arg("--age", type=float, metavar="YEARS", help="for the calorie estimate"),
+        arg("--activity", choices=tuple(calories.ACTIVITY_LEVEL), help="for the calorie estimate: sedentary (a "
+            "seated job, little activity beyond training), active (an hour or so of exercise or walking most days), "
+            "vigorous (hard physical work or several hours of sport a day)"),
+        arg("--phase", action="append", metavar="PHASE:RATE", help="a phase and its weekly rate in bodyweight "
+            "units, such as cut:-0.5; repeat for each phase (default: [nutrition] phase and target_rate_per_week)"),
     ),
 )
 def targets(args, ctx):
@@ -106,9 +140,15 @@ def targets(args, ctx):
     for name, value in (("--bodyweight", args.bodyweight), ("--goal-weight", args.goal_weight),
                         ("--height", args.height), ("--recent-intake", args.recent_intake)):
         _positive(name, value)
+    _positive("--age", args.age)
+    phases = [_phase(text) for text in args.phase or ()]
 
     unit = ctx.config["athlete"]["bodyweight_units"]
-    goal_on_file = (ctx.config.get("nutrition") or {}).get("goal_weight")
+    table = ctx.config.get("nutrition") or {}
+    goal_on_file = table.get("goal_weight")
+    phase_on_file = None
+    if table.get("phase") is not None and table.get("target_rate_per_week") is not None:
+        phase_on_file = ([[table["phase"], units.json_number(table["target_rate_per_week"])]], "config")
     series = nutrition.readings(ctx.root)
     today = ctx.today()
     weight = _fresh(series, today, _weight(unit))
@@ -120,12 +160,19 @@ def targets(args, ctx):
                                                         "source": args.body_fat_source},
         "sex": args.sex,
         "height_m": _height_m(args.height, args.height_unit, unit),
-        "recent_intake_g": _given(args.recent_intake, _fresh(series, today, lambda reading: reading["avg_protein_g"])),
+        "recent_intake_g": _given(args.recent_intake,
+                                  _fresh(series, today, lambda reading: reading["avg_protein_g"])),
+        "age": None if args.age is None else units.json_number(args.age),
+        "activity": args.activity,
+        "phases": _given(phases or None, phase_on_file),
     }
     result = protein.targets(unit=unit, bodyweight=_value(inputs["bodyweight"]),
                              goal_weight=_value(inputs["goal_weight"]), body_fat_pct=args.body_fat,
                              body_fat_source=args.body_fat_source, sex=args.sex, height_m=inputs["height_m"],
                              recent_intake_g=_value(inputs["recent_intake_g"]))
+    result["calories"], needed = _calories(args, table, inputs, unit)
+    named = {item["input"] for item in result["missing"]}
+    result["missing"] += [item for item in needed if item["input"] not in named]
     return {"inputs": inputs, **result}
 
 

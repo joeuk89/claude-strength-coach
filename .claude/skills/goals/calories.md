@@ -11,13 +11,14 @@ estimate of the day or the missed meal; never leave a day half-logged.
 Calories are whatever the app sets; never state a calorie target or
 band of your own.
 
-**Everyone else:** give **one starting calorie estimate per phase**,
-from a transparent method — a quick bodyweight × activity-factor figure,
-or a standard equation like Mifflin–St Jeor from the profile stats —
-plus the phase adjustment, with the method shown. Say plainly it's a
-rough starting point. After that, calories change **only from the
-weight trend**: when a 2–3-week trend misses the target rate,
-`/check-in` moves the target by ~100–150 kcal/day in the direction the
-trend needs. Never re-derive it from an equation mid-phase; a new
+**Everyone else:** run `python3 -m coach nutrition targets --app none`
+with `--sex`, `--age`, `--activity` and one `--phase PHASE:RATE` for
+each agreed phase, and quote `calories`: one starting estimate per
+phase, with its `method` and inputs shown. `--help` describes each
+activity level; ask the athlete which fits their week. When `missing`
+names an input, ask for it and run again. Say plainly it's a rough
+starting point. After that, calories change **only from the weight
+trend**: when a 2–3-week trend misses the target rate, `/check-in` moves
+the target by ~100–150 kcal/day in the direction the trend needs. A new
 estimate comes only with a new phase. State the protein numbers and how
 to track both.

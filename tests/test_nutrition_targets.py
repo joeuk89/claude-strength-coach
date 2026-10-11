@@ -3,7 +3,7 @@
 import json
 import unittest
 
-from coach import protein, research
+from coach import calories, protein, research
 from tests.support import INSTANCES, REPO_ROOT, VALID, run_cli
 from tests.test_nutrition import InstanceCopy, edit_config
 
@@ -198,6 +198,54 @@ class ClaimTest(unittest.TestCase):
                 self.assertIn(needle, self.claim(n))
         self.assertEqual((protein.HIGH_BMI, protein.GOAL_GAP_PCT, protein.FLOOR_ABOVE_INTAKE_G), (30, 10, 15))
 
+    def test_each_calorie_number_is_the_one_its_claim_states(self):
+        for n, needle in ((14, "10 × weight in kg + 6.25 × height in cm − 5 × age in years, + 5 for men or − 161 "
+                                "for women"), (15, "1.53"), (15, "1.76"), (15, "2.25"), (16, "7700 kcal"),
+                          (16, "nearest 50 kcal")):
+            with self.subTest(claim=n, needle=needle):
+                self.assertIn(needle, self.claim(n))
+
+
+def estimate(**inputs):
+    inputs.setdefault("unit", "kg")
+    return calories.estimates(**inputs)
+
+
+class CalorieTest(unittest.TestCase):
+    MAN = {"sex": "male", "bodyweight": 80, "height_m": 1.8, "age": 30, "activity": "active"}
+
+    def test_one_estimate_per_phase_with_the_method_shown(self):
+        result = estimate(**self.MAN, phases=[("cut", -0.5), ("maintain", 0), ("bulk", 0.25)])
+        self.assertEqual((result["resting_kcal"], result["activity_level"], result["maintenance_kcal"]),
+                         (1780, 1.76, 3150))
+        rows = [(e["phase"], e["rate_per_week"], e["adjustment_kcal"], e["kcal"]) for e in result["estimates"]]
+        self.assertEqual(rows, [("cut", -0.5, -550, 2600), ("maintain", 0, 0, 3150), ("bulk", 0.25, 275, 3400)])
+        self.assertIn("Mifflin", result["method"])
+        self.assertEqual(result["refs"], [REF + "14", REF + "15", REF + "16"])
+        self.assertEqual(result["missing"], [])
+
+    def test_a_sedentary_woman(self):
+        result = estimate(sex="female", bodyweight=60, height_m=1.65, age=40, activity="sedentary",
+                          phases=[("cut", -0.4)])
+        self.assertEqual((result["resting_kcal"], result["maintenance_kcal"]), (1270, 1950))
+        self.assertEqual(result["estimates"][0]["kcal"], 1500)
+
+    def test_pounds(self):
+        result = estimate(unit="lb", sex="male", bodyweight=176.4, height_m=1.8, age=30, activity="active",
+                          phases=[("cut", -1)])
+        self.assertEqual(result["estimates"][0]["adjustment_kcal"], -499)
+        self.assertEqual(result["estimates"][0]["unit"], "lb")
+
+    def test_missing_inputs_are_named(self):
+        result = estimate(sex=None, bodyweight=80, height_m=None, age=None, activity=None, phases=[])
+        self.assertEqual([m["input"] for m in result["missing"]], ["sex", "height", "age", "activity", "phase"])
+        self.assertIsNone(result["maintenance_kcal"])
+        self.assertEqual(result["estimates"], [])
+
+    def test_the_activity_levels_are_the_fao_reference_lifestyles(self):
+        self.assertEqual(calories.ACTIVITY_LEVEL, {"sedentary": 1.53, "active": 1.76, "vigorous": 2.25})
+        self.assertEqual(calories.KCAL_PER_KG, 7700)
+
 
 def run(root, *argv, env=NOW):
     code, envelope, stderr = run_cli(["--root", str(root), "nutrition", "targets", *argv], env=env)
@@ -284,6 +332,45 @@ class CliTest(unittest.TestCase):
                      "rough"), ("--bodyweight", "-1"), ("--height", "0"), ("--recent-intake", "-5")):
             with self.subTest(argv=argv):
                 code, envelope = run(VALID, *argv)
+                self.assertEqual(code, 1, envelope)
+
+    def test_an_app_athlete_gets_no_calorie_figure(self):
+        data = self.ok(VALID, "--height", "180", "--age", "30", "--sex", "male", "--activity", "active")
+        self.assertEqual(data["calories"]["by"], "app")
+        self.assertNotIn("kcal", json.dumps(data["calories"]))
+
+    def test_a_no_app_athlete_gets_an_estimate_for_the_phase_on_file(self):
+        with InstanceCopy() as root:
+            edit_config(root, 'app = "macrofactor"', 'app = "none"')
+            edit_config(root, "target_rate_per_week = 0.0", "target_rate_per_week = -0.5")
+            edit_config(root, 'phase = "recomp"', 'phase = "cut"')
+            data = self.ok(root, "--height", "180", "--age", "30", "--sex", "male", "--activity", "active")
+            self.assertEqual(data["calories"]["by"], "estimate")
+            self.assertEqual([(e["phase"], e["rate_per_week"]) for e in data["calories"]["estimates"]],
+                             [("cut", -0.5)])
+            self.assertEqual(data["inputs"]["phases"], {"value": [["cut", -0.5]], "from": "config"})
+
+    def test_phases_from_flags(self):
+        data = self.ok(INSTANCES / "empty", "--app", "none", "--bodyweight", "80", "--height", "180", "--age", "30",
+                       "--sex", "male", "--activity", "active", "--recent-intake", "100",
+                       "--phase", "cut:-0.5", "--phase", "maintain:0")
+        self.assertEqual([e["kcal"] for e in data["calories"]["estimates"]], [2600, 3150])
+        self.assertEqual(missing(data), [])
+
+    def test_no_app_on_file_or_in_flags_is_named(self):
+        data = self.ok(INSTANCES / "empty", "--bodyweight", "80", "--height", "180", "--recent-intake", "100")
+        self.assertIsNone(data["calories"])
+        self.assertEqual(missing(data), ["app"])
+
+    def test_calorie_inputs_are_named_once(self):
+        data = self.ok(INSTANCES / "empty", "--app", "none", "--bodyweight", "80", "--recent-intake", "100",
+                       "--phase", "cut:-0.5")
+        self.assertEqual(missing(data), ["height", "sex", "age", "activity"])
+
+    def test_a_bad_phase_exits_1(self):
+        for value in ("cut", "shred:-0.5", "cut:fast"):
+            with self.subTest(value=value):
+                code, envelope = run(VALID, "--phase", value)
                 self.assertEqual(code, 1, envelope)
 
     def test_output_is_json_serialisable(self):
