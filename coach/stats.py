@@ -1,0 +1,437 @@
+"""Stats derived from the resolved history: e1RM, adherence, dose, durations, audit (contract C18).
+
+Every read applies annotations (C17). Loads are the coaching number in
+athlete units: per hand for per-hand modes, the total otherwise, the added
+load for bodyweight and the assistance for assisted. This module is the
+only place an e1RM is computed.
+"""
+
+from datetime import date, datetime, timedelta, timezone
+from decimal import ROUND_HALF_UP, Decimal
+
+from coach import config as config_module
+from coach import dates, flags, history, overlay, program, state, units
+from coach.config_tables.sessions import cap_minutes
+from coach.errors import ConfigError
+from coach.hevy.cache import HevyCache
+from coach.library import Library
+
+MAX_REPS_TO_FAILURE = 12
+EASY_RPE = 5
+BODYWEIGHT_WINDOW_DAYS = 14
+SERIES_MODES = ("total", "per_hand_x2", "single_implement")
+BODYWEIGHT_MODES = ("bodyweight", "assisted")
+PRIMARY_WEIGHT = 1.0
+SECONDARY_WEIGHT = 0.5
+_EQUIPMENT_INCREMENT = {
+    "dumbbell": "dumbbell_increment", "kettlebell": "dumbbell_increment", "barbell": "barbell_increment",
+    "ez_bar": "barbell_increment", "trap_bar": "barbell_increment", "smith_machine": "barbell_increment",
+    "plate": "barbell_increment", "machine": "machine_increment", "cable": "cable_increment",
+}
+
+
+def _round(value, places=2):
+    """Round half up, as a JSON number."""
+    quantised = Decimal(str(value)).quantize(Decimal(1).scaleb(-places), rounding=ROUND_HALF_UP)
+    return units.json_number(float(quantised))
+
+
+def _reps_to_failure(reps, rpe):
+    return reps + (10 - rpe) if rpe is not None else reps
+
+
+def e1rm(load, reps, rpe=None):
+    """Epley e1RM, with reps in reserve (10 − RPE) added when RPE is logged; None past 12 reps to failure."""
+    if load is None or reps is None or reps < 1:
+        return None
+    n = _reps_to_failure(reps, rpe)
+    if n > MAX_REPS_TO_FAILURE:
+        return None
+    return load if n <= 1 else load * (1 + n / 30)
+
+
+def load_for(e1rm_value, reps, rpe=None):
+    """The load that gives `reps` at `rpe` for an e1RM: the inverse of `e1rm`."""
+    n = _reps_to_failure(reps, rpe)
+    return e1rm_value if n <= 1 else e1rm_value / (1 + n / 30)
+
+
+def implied_rpe(e1rm_value, load, reps):
+    """The RPE a set implies at an e1RM; above 10 means the load is beyond failure for those reps."""
+    n = 30 * (e1rm_value / load - 1)
+    if load <= e1rm_value:
+        n = max(1, n)
+    return 10 - (n - reps)
+
+
+def set_weights(entry):
+    """{muscle: weight} for one set of a library entry: 1.0 per primary muscle, 0.5 per secondary."""
+    weights = {muscle: SECONDARY_WEIGHT for muscle in entry["muscles"]["secondary"]}
+    weights.update({muscle: PRIMARY_WEIGHT for muscle in entry["muscles"]["primary"]})
+    return weights
+
+
+def _today(config, now=None):
+    zone_name = config.athlete.timezone
+    moment = now or datetime.now(timezone.utc)
+    return moment.astimezone(dates.zone(zone_name) if zone_name else None).date()
+
+
+def _as_date(value):
+    if value is None or isinstance(value, date):
+        return value
+    return dates.parse_date(value)
+
+
+def _span(value):
+    if value is None or isinstance(value, dates.Span):
+        return value
+    start, end = value
+    return dates.Span(_as_date(start), _as_date(end))
+
+
+def _bodyweights(root, unit):
+    found = []
+    for reading in HevyCache(root).body_measurements():
+        if reading.get("weight_kg") and reading.get("date"):
+            weight = units.from_hevy_kg(reading["weight_kg"], "total", unit)
+            found.append((dates.parse_date(reading["date"][:10]), weight))
+    return found
+
+
+def _bodyweight_on(readings, day):
+    near = [(abs((when - day).days), when, weight) for when, weight in readings
+            if abs((when - day).days) <= BODYWEIGHT_WINDOW_DAYS]
+    return min(near)[2] if near else None
+
+
+def _formula_load(exposure, logged, readings):
+    load = logged["load"]
+    if load is None:
+        return None
+    if exposure["load_mode"] in SERIES_MODES:
+        return history.coaching_number(load)
+    bodyweight = _bodyweight_on(readings, dates.parse_date(exposure["date"]))
+    if bodyweight is None:
+        return None
+    if exposure["load_mode"] == "bodyweight":
+        return bodyweight + load["hevy_total"]
+    return bodyweight - load["hevy_total"]
+
+
+def e1rm_series(root, exercise_id=None, since=None, include_unsynced=False, now=None):
+    """{series, best, delta} per exercise: the best set of each usable exposure, oldest first."""
+    config = config_module.load(root)
+    readings = _bodyweights(root, config.athlete.units)
+    since = str(since) if since else None
+    series = {}
+    for exposure in history.all_exposures(root, include_unsynced, now):
+        if exercise_id and exposure["exercise_id"] != exercise_id:
+            continue
+        if since and exposure["date"] < since:
+            continue
+        if exposure["excluded"] or exposure["suspect"]:
+            continue
+        if exposure["load_mode"] not in SERIES_MODES + BODYWEIGHT_MODES:
+            continue
+        best = None
+        for logged in exposure["sets"]:
+            if logged["discounted"] or logged["convention_unknown"]:
+                continue
+            number = _formula_load(exposure, logged, readings)
+            value = e1rm(number, logged["reps"], logged["rpe"]) if number is not None else None
+            if value is not None and (best is None or value > best[0]):
+                best = (value, number, logged)
+        if best is None:
+            continue
+        value, number, logged = best
+        series.setdefault(exposure["exercise_id"], []).append({
+            "date": exposure["date"], "e1rm": _round(value),
+            "method": "epley_rir" if logged["rpe"] is not None else "epley",
+            "workout_id": exposure["workout_id"], "set_index": logged["index"], "load": _round(number),
+            "reps": logged["reps"], "rpe": logged["rpe"],
+        })
+    best, delta = {}, {}
+    for key, points in series.items():
+        top = max(points, key=lambda p: (p["e1rm"], p["date"]))
+        best[key] = {"e1rm": top["e1rm"], "date": top["date"]}
+        delta[key] = _round(points[-1]["e1rm"] - points[-2]["e1rm"]) if len(points) > 1 else None
+    return {"series": series, "best": best, "delta": delta}
+
+
+def _half(increment):
+    return increment / 2
+
+
+def _increment(library, config, exercise_id, location):
+    unit = config.athlete.units
+    step = library.increment(exercise_id, unit)
+    if step is not None:
+        return step
+    entry = library.get(exercise_id)
+    key = _EQUIPMENT_INCREMENT.get(entry["equipment"]) if entry else None
+    if key is None:
+        return 0
+    try:
+        return config_module.equipment_for(config, location).get(key, 0)
+    except ConfigError:
+        return config_module.equipment_for(config).get(key, 0)
+
+
+def _target_reps(prescribed):
+    if prescribed.get("reps") is not None:
+        return prescribed["reps"]
+    if prescribed.get("rep_range"):
+        return prescribed["rep_range"]["start"]
+    return None
+
+
+def _exercise_status(line, logged_sets, increment):
+    prescribed = [s for s in line["sets"] if overlay.is_working(s)]
+    logged = [s for s in logged_sets if s["type"] in history.WORKING_SET_TYPES]
+    result = {"exercise_id": line["exercise_id"], "sets_prescribed": len(prescribed), "sets_logged": len(logged),
+              "rpe_delta": None}
+    if not logged:
+        return dict(result, status="missing")
+    tolerance = _half(increment)
+    under = len(logged) < len(prescribed)
+    over = len(logged) > len(prescribed)
+    deltas = []
+    for want, got in zip(prescribed, logged):
+        target = _target_reps(want)
+        if target is not None and (got["reps"] is None or got["reps"] < target):
+            under = True
+        want_load, got_load = history.coaching_number(want.get("load")), history.coaching_number(got["load"])
+        if want_load is not None and got_load is not None:
+            if want_load - got_load > tolerance:
+                under = True
+            elif got_load - want_load > tolerance:
+                over = True
+        if want.get("rpe") is not None and got["rpe"] is not None:
+            deltas.append(got["rpe"] - want["rpe"])
+    if deltas:
+        result["rpe_delta"] = _round(sum(deltas) / len(deltas))
+    return dict(result, status="under" if under else "over" if over else "hit")
+
+
+def _planned(root, overlays, overlay_id, span):
+    if overlay_id:
+        doc = overlay.load(root, overlay_id)
+        planned = []
+        for session in doc["sessions"]:
+            found = overlay.pick_in_force(overlays, session["date"])
+            if found and found[0]["id"] == doc["id"]:
+                planned.append((doc, session))
+        return planned, dates.Span(dates.parse_date(doc["span"]["start"]), dates.parse_date(doc["span"]["end"]))
+    planned = []
+    for day in span.days():
+        found = overlay.pick_in_force(overlays, day)
+        if found:
+            planned += [(found[0], s) for s in overlay.sessions_on(found[0], day)]
+    return planned, span
+
+
+def _nearest(items, day, key):
+    return min(items, key=lambda item: (abs((dates.parse_date(key(item)) - day).days), key(item)), default=None)
+
+
+def adherence(root, overlay_id=None, span=None, include_unsynced=False, today=None, now=None):
+    """Planned sessions against logged workouts, per session and exercise (C18 adherence per overlay)."""
+    if (overlay_id is None) == (span is None):
+        raise ValueError("give an overlay id or a span, not both")
+    config = config_module.load(root)
+    today = _as_date(today) or _today(config, now)
+    overlays = overlay.list(root)
+    planned, window = _planned(root, overlays, overlay_id, _span(span))
+    state_doc, program_doc = history.load_optional(state, root), history.load_optional(program, root)
+    library = Library.load(root)
+
+    spans = [window] + [dates.Span(dates.parse_date(d["span"]["start"]), dates.parse_date(d["span"]["end"]))
+                        for d, _ in planned]
+    found = history.workouts(root, min(s.start for s in spans), max(s.end for s in spans), include_unsynced, now)
+    found = {w["workout_id"]: w for w in found}
+
+    pairs = []
+    for position, (doc, session) in enumerate(planned):
+        routine = history.routine_of(doc, session, state_doc)
+        for workout in found.values():
+            if not doc["span"]["start"] <= workout["date"] <= doc["span"]["end"]:
+                continue
+            carries = (routine is not None and workout["routine_id"] == routine if workout["source"] == "hevy"
+                       else workout["session_id"] == session["session_id"])
+            if carries:
+                gap = abs((dates.parse_date(workout["date"]) - dates.parse_date(session["date"])).days)
+                pairs.append((gap, workout["date"], position, workout["workout_id"]))
+    matched, used = {}, set()
+    for _, _, position, workout_id in sorted(pairs):
+        if position not in matched and workout_id not in used:
+            matched[position] = workout_id
+            used.add(workout_id)
+
+    unlogged_notes = history.annotations(root, "trained_unlogged")
+    misses = history.annotations(root, "miss")
+    sessions, used_notes, miss_pairs = [], set(), []
+    for position, (doc, session) in enumerate(planned):
+        day = dates.parse_date(session["date"])
+        in_span = (lambda a, d=doc: d["span"]["start"] <= a["date"] <= d["span"]["end"]
+                   and a["session_id"] == session["session_id"])
+        row = {"session_id": session["session_id"], "date": session["date"], "title": session["title"],
+               "overlay_id": doc["id"], "status": None, "workout_id": None, "workout_date": None, "moved": False,
+               "unlogged": False, "tag": None, "exercises": []}
+        conditioning = history.is_conditioning(row, program_doc)
+        note = None
+        if position not in matched:
+            note = _nearest([a for a in unlogged_notes if in_span(a) and a["id"] not in used_notes], day,
+                            lambda a: a["date"])
+        if position in matched:
+            workout = found[matched[position]]
+            row.update(status="trained", workout_id=workout["workout_id"], workout_date=workout["date"],
+                       moved=workout["date"] != session["date"])
+            if not conditioning:
+                location = session.get("location")
+                for line in session["exercises"]:
+                    logged = [s for e in workout["exercises"] if e["exercise_id"] == line["exercise_id"]
+                              for s in e["sets"]]
+                    increment = _increment(library, config, line["exercise_id"], location)
+                    row["exercises"].append(_exercise_status(line, logged, increment))
+        elif note is not None:
+            used_notes.add(note["id"])
+            row.update(status="trained", unlogged=True, workout_date=note["date"],
+                       moved=note["date"] != session["date"])
+            if not conditioning:
+                row["exercises"] = [{"exercise_id": line["exercise_id"], "status": "unknown",
+                                     "sets_prescribed": sum(1 for s in line["sets"] if overlay.is_working(s)),
+                                     "sets_logged": None, "rpe_delta": None} for line in session["exercises"]]
+        elif day > today:
+            row["status"] = "upcoming"
+        else:
+            row.update(status="missed", tag="untagged")
+            miss_pairs += [(abs((dates.parse_date(a["date"]) - day).days), a["date"], position, a["id"], a)
+                           for a in misses if in_span(a)]
+        if conditioning:
+            row["conditioning"] = True
+        sessions.append(row)
+    tagged, used_misses = set(), set()
+    for _, _, position, miss_id, miss in sorted(miss_pairs, key=lambda p: p[:4]):
+        if position not in tagged and miss_id not in used_misses:
+            sessions[position]["tag"] = miss.get("tag") or "untagged"
+            tagged.add(position)
+            used_misses.add(miss_id)
+
+    extra = [{"workout_id": w["workout_id"], "date": w["date"], "title": w["title"], "session_id": w["session_id"],
+              "unsynced": w["unsynced"]}
+             for w in found.values() if w["workout_id"] not in used and window.contains(dates.parse_date(w["date"]))]
+    summary = {
+        "planned": sum(1 for s in sessions if s["status"] != "upcoming"),
+        "trained": sum(1 for s in sessions if s["status"] == "trained"),
+        "missed": {}, "missed_total": sum(1 for s in sessions if s["status"] == "missed"),
+        "upcoming": sum(1 for s in sessions if s["status"] == "upcoming"),
+        "exercises": {status: 0 for status in ("hit", "under", "over", "missing", "unknown")},
+    }
+    for row in sessions:
+        if row["status"] == "missed":
+            summary["missed"][row["tag"]] = summary["missed"].get(row["tag"], 0) + 1
+        for line in row["exercises"]:
+            summary["exercises"][line["status"]] += 1
+    return {"overlay_id": overlay_id, "span": window.to_json(), "today": today.isoformat(), "sessions": sessions,
+            "extra": sorted(extra, key=lambda w: (w["date"], w["workout_id"])), "summary": summary}
+
+
+def _week_label(span):
+    try:
+        return span.label()
+    except ValueError:
+        return None
+
+
+def _add(muscles, muscle, direct, fractional):
+    entry = muscles.setdefault(muscle, {"direct": 0, "fractional": 0})
+    entry["direct"] += direct
+    entry["fractional"] += fractional
+
+
+def _rounded(muscles):
+    return {m: {"direct": v["direct"], "fractional": _round(v["fractional"])} for m, v in sorted(muscles.items())}
+
+
+def _workout_dose(workout, library):
+    muscles = {}
+    for exercise in workout["exercises"]:
+        entry = library.get(exercise["exercise_id"]) if exercise["exercise_id"] else None
+        if entry is None:
+            continue
+        hard = sum(1 for s in exercise["sets"]
+                   if s["type"] in history.WORKING_SET_TYPES and (s["rpe"] is None or s["rpe"] > EASY_RPE))
+        if not hard:
+            continue
+        for muscle, weight in set_weights(entry).items():
+            _add(muscles, muscle, hard if weight == PRIMARY_WEIGHT else 0, hard * weight)
+    return muscles
+
+
+def dose(root, week=None, span=None, include_unsynced=False, now=None):
+    """Hard sets delivered per muscle, direct and fractional, for a week or span (C18 dose)."""
+    config = config_module.load(root)
+    week_starts = config.athlete.week_starts
+    if week is not None:
+        window = dates.parse_week(str(week), week_starts) if not isinstance(week, dates.Span) else week
+    else:
+        window = _span(span)
+    library = Library.load(root)
+    totals, by_workout, weekly = {}, {}, {}
+    for workout in history.workouts(root, window.start, window.end, include_unsynced, now):
+        if workout["conditioning"]:
+            continue
+        muscles = _workout_dose(workout, library)
+        week_span = dates.week_span(dates.parse_date(workout["date"]), week_starts)
+        for muscle, value in muscles.items():
+            _add(totals, muscle, value["direct"], value["fractional"])
+            _add(weekly.setdefault(week_span, {}), muscle, value["direct"], value["fractional"])
+        by_workout[workout["workout_id"]] = {"date": workout["date"], "session_id": workout["session_id"],
+                                             "muscles": _rounded(muscles)}
+    weeks = []
+    day = window.start
+    while day <= window.end:
+        week_span = dates.week_span(day, week_starts)
+        weeks.append({"week": week_span.label(), "span": week_span.to_json(),
+                      "muscles": _rounded(weekly.get(week_span, {}))})
+        day = week_span.end + timedelta(days=1)
+    return {"week": _week_label(window), "span": window.to_json(), "muscles": _rounded(totals),
+            "by_workout": by_workout, "weeks": weeks}
+
+
+def durations(root, span=None, include_unsynced=False, now=None):
+    """Each workout's minutes against its session cap (C19), with a duration_over_cap flag per breach."""
+    config = config_module.load(root)
+    window = _span(span)
+    found = history.workouts(root, window.start if window else None, window.end if window else None,
+                             include_unsynced, now)
+    rows, raised = [], []
+    for workout in found:
+        cap = cap_minutes(config, workout["session_id"])
+        minutes = workout["duration_minutes"]
+        over = minutes is not None and cap is not None and minutes > cap
+        rows.append({"workout_id": workout["workout_id"], "date": workout["date"], "title": workout["title"],
+                     "session_id": workout["session_id"], "minutes": minutes, "cap_minutes": cap, "over_cap": over})
+        if over:
+            raised.append(flags.make("duration_over_cap", session_id=workout["session_id"],
+                                     message=f"{workout['date']} {workout['title']}: {minutes} min against a "
+                                             f"{cap} min cap"))
+    return {"span": window.to_json() if window else None, "workouts": rows, "flags": raised}
+
+
+def audit(root, weeks=8, include_unsynced=False, today=None, now=None):
+    """Convention-slip candidates over the last `weeks` weeks, with a convention_slip flag per open one."""
+    config = config_module.load(root)
+    today = _as_date(today) or _today(config, now)
+    start = today - timedelta(weeks=weeks)
+    exposures = history.all_exposures(root, include_unsynced, now)
+    candidates = [c for c in history.slip_candidates(exposures, history.annotations(root))
+                  if start.isoformat() <= c["date"] <= today.isoformat()]
+    raised = [flags.make("convention_slip", session_id=c["session_id"], exercise_id=c["exercise_id"],
+                         message=f"{c['exercise_id']} on {c['date']}: top load {c['top_load']} is {c['ratio']}× "
+                                 f"{c['previous']['top_load']} on {c['previous']['date']} at the same reps and RPE; "
+                                 "confirm or discount it with python3 -m coach history annotate")
+              for c in candidates if c["status"] == "open"]
+    return {"weeks": weeks, "span": {"start": start.isoformat(), "end": today.isoformat()},
+            "candidates": candidates, "flags": raised}

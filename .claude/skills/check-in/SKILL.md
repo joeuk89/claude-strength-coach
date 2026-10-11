@@ -73,7 +73,9 @@ gap brings in that rule's illness conditions too. Program-week applies
 the rule.
 
 **With Hevy:** run `python3 -m coach hevy pull`, then `python3 -m coach
-hevy status` for the cache's age and counts. Read the window's workouts
+history sync` to resolve the new workouts into `data/history/` (it lists
+any exercise it could not match in `data.unresolved`), then `python3 -m
+coach hevy status` for the cache's age and counts. Read the window's workouts
 from the cache (`.coach/cache/hevy/workouts/`). **Read every workout's
 `description` and each exercise's `notes`** — these are the athlete's
 own words on how the session went (fatigue, sleep, a target that was
@@ -212,7 +214,11 @@ or one-off overlay `/one-off-week` wrote. With an overlay, adherence is
 concrete: did the athlete hit the prescribed load × reps @ RPE?
 
 **Weekly tier** — keep it light:
-- Adherence: sessions trained vs. planned, including coach-led ones as
+- Adherence: run `python3 -m coach stats adherence --overlay <id>` for
+  each overlay in the window. It gives each planned session's status
+  (trained, missed with its miss tag or `untagged`, upcoming) and each
+  exercise's result against the prescription (hit, under, over,
+  missing). Sessions trained vs. planned, including coach-led ones as
   the reply confirmed them (that's the "n of ~m" in the record header;
   note cardio separately); which days slipped, with their miss tags.
 - Notable sets: PRs, rep-range top-outs due a load increase, anything way
@@ -228,17 +234,23 @@ concrete: did the athlete hit the prescribed load × reps @ RPE?
   drift patterns (Coach's notes).
 
 **Deep tier** — all of the above, plus:
-- Per main lift: loads/reps across the window, Epley e1RM trend
-  (`weight × (1 + reps/30)`) — trend, not gospel. Flag stalls (same
-  load+reps 3+ sessions) and progression-scheme violations.
+- Per main lift: loads/reps across the window, and the e1RM trend from
+  `python3 -m coach stats e1rm --since <last deep check-in>` (each
+  lift's series, best and latest change) — trend, not gospel. Flag
+  stalls (same load+reps 3+ sessions) and progression-scheme violations.
 - **Sanity-check dumbbell loads before reading anything into them.** An
   exact-2× (or ½ ×) step in a dumbbell exercise at unchanged reps *and*
   unchanged RPE is a logging-convention slip, not a strength change —
   Hevy stores the combined total across both arms, and single-arm work is
-  the exception. Cross-check sibling exercises on the same dates: a slip
-  usually shows up in more than one lift at once. Never let one set an
-  e1RM or a PR. When history looks contaminated, confirm the actual
-  per-hand weights with the athlete, correct the record, and say which
+  the exception. `python3 -m coach stats audit` lists every such step in
+  the last eight weeks, with the sibling exercises that jumped on the
+  same date: a slip usually shows up in more than one lift at once. An
+  open candidate stays out of the e1RM series until it is settled. When
+  history looks contaminated, confirm the actual per-hand weights with
+  the athlete and record the answer with `python3 -m coach history
+  annotate`: `--kind discount --workout <id> --exercise <id> --reason
+  <text>` for a slip, `--kind confirm` for a real jump, `--kind repair
+  --set <n> --field <field> --value <v>` for a mistyped value. Say which
   prescriptions were derived from the bad data.
 - Exercise drift vs. the plan — structural drift means `/hevy-sync` is
   due; offer it (Hevy users only).

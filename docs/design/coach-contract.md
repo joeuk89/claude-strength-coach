@@ -191,9 +191,9 @@ Phase 2 to 4 command inventory. No command here writes to Hevy.
 
 | Command | Owner | |
 |---|---|---|
-| `history show [--since D] [--until D]`, `history annotations` | R-20 | |
+| `history show [--since D] [--until D] [--include-unsynced]`, `history annotations [--kind K] [--all]` | R-20 | |
 | `history sync`, `history rebuild --month YYYY-MM`, `history annotate ...` | R-20 | W |
-| `stats e1rm`, `stats adherence`, `stats dose`, `stats durations`, `stats audit` | R-20 | |
+| `stats e1rm [--exercise ID] [--since D]`, `stats adherence (--overlay ID \| --span A..B)`, `stats dose (--week W \| --span A..B)`, `stats durations [--week W \| --span A..B]`, `stats audit [--weeks N]`; each takes `--include-unsynced` | R-20 | |
 | `prescription check (--overlay ID \| --file PATH)` | R-24 | W with `--write` |
 | `plugins list`, `plugins show NAME`, `plugins validate` | R-23a | |
 | `plugins test` | R-23a | runs instance plugin tests; never allowlisted |
@@ -1258,7 +1258,7 @@ workouts; ids `10000000-0000-4000-8000-00000000000N`):
 |---|---|---|---|
 | 1 | 2026-09-28 | Session A | squat 3×5 @ 95 RPE 7; DB bench 3×10 @ Hevy 45 (22.5/hand) RPE 8 |
 | 2 | 2026-10-01 | Session B | row 3×10 @ 30 RPE 8; pull-up 3×8 BW |
-| 3 | 2026-10-05 | Session A | squat 3×5 @ 97.5 RPE 7.5; DB bench 3×10 @ Hevy 45 RPE 8 |
+| 3 | 2026-10-05 | Session A | squat 3×5 @ 97.5 RPE 7.5; DB bench 3×10 @ Hevy 45 RPE 8; 18:00 to 18:58 UTC (58 minutes) |
 | 4 | 2026-10-08 | Session B | row 3×10 @ 30 RPE 8.5; pull-up 3×8 BW |
 
 Further fixture instances, each owned by the item that first needs it.
@@ -1267,7 +1267,9 @@ Unless stated, each is a copy of `valid/` plus what is listed.
 | Instance | Owner | Holds |
 |---|---|---|
 | `layoff/` | R-24 | same program; last workout 2026-09-14, so 28 days off before 2026-10-12 |
-| `slip/` | R-20 | DB bench logged Hevy 45 on 2026-09-28 and Hevy 90 on 2026-10-05 at the same reps and RPE, and DB shoulder press doubling on the same date |
+| `slip/` | R-20 | DB bench logged Hevy 45 on 2026-09-28 and Hevy 90 on 2026-10-05 at the same reps and RPE, and DB shoulder press (template `F0000005`, confirmed `per_hand_x2`) Hevy 30 then 60 on the same dates. Not a full copy: `valid/`'s config, program, state and overlay, the library plus DB shoulder press, and `data/history/2026-09.json` and `2026-10.json` resolved by `history sync`; no Hevy cache |
+| `history-bad-schema/`, `history-unresolved/`, `annotations-invalid/` | R-20 | not copies of `valid/`: `valid/`'s config and `slip/`'s `2026-10.json`, with one fault each: a set with an unknown key `weight`; workout 3's squat as an unmatched "Mystery Lift"; an annotation discounting a workout the history lacks |
+| `flag-unknown/` | R-20 | not a copy of `valid/`: its config and its overlay, unapproved, carrying a flag with the unregistered code `no_such_code` |
 | `checkin/` | R-21a | external session `pt-tue` (Tue) in the program; approved overlay `2026-10-05-weekly` (span 2026-10-05..2026-10-11: Session A 2026-10-05 squat 3×5 @ 97.5 RPE 7.5, DB bench 3×10 @ 22.5/hand (Hevy: 45) RPE 8; Session B 2026-10-08 row 3×10 @ 30 RPE 8, pull-up 3×8 BW; Session A 2026-10-10 as on 10-05); records `check-ins/2026-09-06.md` (deep) and `check-ins/2026-10-04.md` (weekly); `[sessions.cap_minutes] session-a = 45`; `writes.jsonl` verify lines for both routines at 2026-10-04T19:00:00Z; cached routine `...0002` with `updated_at` 2026-10-07T07:00:00Z and one extra exercise |
 | `gap/` | R-21b | same program as `checkin/`; record `check-ins/2026-09-13.md` (weekly); last workout 2026-09-14 (squat 3×5 @ 100), none after; no overlay after 2026-09-20 |
 | `missed/` | R-22 | program with rules `miss-b` (fold row, 2 sets, into Session A), `miss-a` (shift to sat, then thu); approved overlay `2026-10-12-weekly` re-dated: Session A 2026-10-12, Session B 2026-10-14, Session A 2026-10-17; workout for Session A on 2026-10-12 only |
@@ -1602,6 +1604,7 @@ local start date (`[athlete] timezone`):
     {
       "workout_id": "10000000-0000-4000-8000-000000000003",
       "source": "hevy",
+      "source_version": "2026-10-05T18:40:00Z",
       "hevy_updated_at": "2026-10-05T18:40:00Z",
       "resolved_at": "2026-10-11T18:00:00Z",
       "date": "2026-10-05",
@@ -1616,6 +1619,7 @@ local start date (`[athlete] timezone`):
       "exercises": [
         {
           "exercise_id": "db_bench_press",
+          "title": "Bench Press (Dumbbell)",
           "hevy_template_id": "F0000002",
           "load_mode": "per_hand_x2",
           "load_mode_source": "overlay",
@@ -1635,6 +1639,15 @@ local start date (`[athlete] timezone`):
 - `source`: `hevy` or `manual`. Manual workouts (C46) have
   `hevy_updated_at` and `routine_id` null, and `workout_id` is the log id
   (`manual:2026-10-12-session-a-1`).
+- `source_version` is the source module's `version(workout)` when it was
+  resolved (`hevy_updated_at` for Hevy), so a changed manual entry is
+  noticed too. Exercise `title` is the logged title, so `history rebuild`
+  can match an exercise by title without the cache, and an unresolved one
+  can be named.
+- `session_id` matching: of the overlay in force on `date`, the session
+  whose routine is `routine_id` (its `hevy_routine_id`, else the routine
+  `data/state.json` maps to it, as C12 resolves it), nearest in date when
+  several carry it.
 - `session_id` and `overlay_id`: from the overlay in force on `date`
   (C10) whose session carries this `routine_id`; else null. A manual
   workout carries its own `session_id` and `overlay_id`. A workout with no
@@ -1650,12 +1663,19 @@ local start date (`[athlete] timezone`):
 - **Sources.** `history sync` gathers input workouts from source modules
   in `coach/history_sources/` (C1 registry rule). R-20 ships `hevy`; R-40c
   adds `manual`. A source module exposes `workouts(root) ->
-  list[SourceWorkout]` and `version(workout) -> str`; a changed version
-  re-resolves the workout.
+  list[SourceWorkout] | None` and `version(workout) -> str`; a changed
+  version re-resolves the workout. The module's name is its workouts'
+  `source`. `None` means the source holds no data in this instance (Hevy:
+  no cache `meta.json`), so sync removes nothing it stored from that
+  source: clearing the gitignored cache never deletes committed history.
+  `SourceWorkout` (in `coach/history_sources/__init__.py`) carries the
+  record's fields before resolution; a manual exercise gives its own
+  `exercise_id`, `load_mode` and `unit`, and each set its `value`.
 - **Freezing.** `history sync` resolves source workouts not yet in a month
   file, and re-resolves one only when its version (`hevy_updated_at` for
   Hevy) changed; a re-resolve keeps each exercise's stored `load_mode`
-  unless a `load_mode` annotation now covers it. A workout deleted at the
+  unless a `load_mode` annotation now covers it, or the stored mode came
+  from an annotation that no longer covers it. A workout deleted at the
   source is removed and reported. `history rebuild --month M` re-resolves
   a month under current rules; it is the only path that can reinterpret,
   and `--dry-run` shows the per-set differences.
@@ -1707,6 +1727,18 @@ local start date (`[athlete] timezone`):
 
 - Ids are `a-NNNN`, never reused. Annotations are appended; a wrong one is
   withdrawn by a later annotation of the same kind with `"withdraws": "a-0003"`.
+  A withdrawing annotation that carries its kind's fields also takes
+  effect (a corrected repair); one without them only withdraws.
+  `coach.history.annotations()` returns the annotations in force;
+  `history annotations --all` lists every one, each marked `in_force`.
+- Fields per kind: `discount` `workout_id`, `exercise_id`, `set_index`
+  (null: the whole exposure); `repair` those plus `field` and `value`;
+  `load_mode` `exercise_id`, `span`, `load_mode`; `unknown_convention`
+  `exercise_id`, `span`; `confirm` `workout_id`, `exercise_id`; `miss`
+  `date`, `session_id`, `tag` (null: untagged); `external` `date`,
+  `external_id`, `done`, `note`; `trained_unlogged` `date`, `session_id`,
+  `note`. Every annotation has `id`, `kind`, `created_at`, `source` and
+  `reason` (nullable). `set_index` is the set's `index` in the month file.
 - `history annotate` takes flags (`--kind`, `--workout`, `--exercise`,
   `--set`, `--date`, `--session`, `--tag`, `--reason` ...) or `--input FILE`
   for a batch. Claude Code's Bash tool has no stdin, so no prompt reads it.
@@ -1720,7 +1752,10 @@ workout with at least one non-warm-up set left after annotations.
 coach.history.workouts(root, since=None, until=None, include_unsynced=False) -> list[ResolvedWorkout]   # annotations applied
 coach.history.exposures(root, exercise_id, before=None) -> list[Exposure]       # newest first
 # Exposure: date, workout_id, session_id, exercise_id, load_mode, sets (working sets only),
-#           suspect (open convention_slip candidate), excluded (discount / unknown_convention)
+#           suspect (open convention_slip candidate), excluded (discount / unknown_convention),
+#           discounted, convention_unknown (which of the two)
+# Read workouts and their sets carry discounted, convention_unknown and repaired (the fields a
+# repair replaced); each workout carries unsynced and conditioning (C17 conditioning rule).
 coach.history.last_lifting_date(root, before) -> date | None                    # any workout with a lifting exercise
 coach.history.annotations(root, kind=None) -> list[dict]
 ```
@@ -1763,8 +1798,12 @@ coach.stats.implied_rpe(e1rm, load, reps) -> float       # R-24
 
 `stats e1rm [--exercise ID] [--since D]` →
 `data.series[exercise_id] = [{date, e1rm, method, workout_id, set_index, load, reps, rpe}]`
-(best set per exposure), plus `best` `{e1rm, date}` over the window and
-`delta` (latest minus previous point).
+(best set per exposure, oldest first), plus `data.best[exercise_id]`
+`{e1rm, date}` over the window and `data.delta[exercise_id]` (latest
+minus previous point, null with one point). `e1rm` and `load` are
+rounded half up to 2 decimals; `load` is the number the formula used
+(bodyweight plus added load for `bodyweight`). Body-measurement weights
+come from the Hevy cache.
 
 **Adherence per overlay.** `stats adherence (--overlay ID | --span A..B)`:
 
@@ -1774,7 +1813,9 @@ coach.stats.implied_rpe(e1rm, load, reps) -> float       # R-24
   or for a manual workout its `session_id`, inside the overlay span,
   matched once, nearest date first; `moved: true` when the date differs;
   or a `trained_unlogged` annotation, with `unlogged: true`), `missed`
-  (with `tag` from a `miss` annotation, else `untagged`), `upcoming`.
+  (with `tag` from a `miss` annotation for that session inside the
+  overlay span, each matched once, nearest date first; else `untagged`),
+  `upcoming`.
   Workouts matching no planned session are listed as `extra`.
 - Exercise `status` for a trained session, comparing working sets in order:
   `missing` (no logged working set of that exercise), `under` (any
@@ -1785,8 +1826,17 @@ coach.stats.implied_rpe(e1rm, load, reps) -> float       # R-24
   Every exercise of a `trained_unlogged` session is `unknown`.
 - Each exercise also carries `rpe_delta` (mean logged minus target over
   sets with both) and `sets_prescribed`, `sets_logged`.
-- `data.summary`: sessions planned, trained, missed (by tag), and
-  exercise counts by status.
+- "Half the increment" uses `Library.increment`, else the equipment
+  increment for the session's location (`equipment_for`, C54).
+- Each session row: `session_id`, `date`, `title`, `overlay_id`,
+  `status`, `workout_id`, `workout_date`, `moved`, `unlogged`, `tag` and
+  `exercises`. A matching `miss` or `trained_unlogged` annotation names
+  the session and a date inside its overlay's span. A conditioning
+  session (C17) has `conditioning: true` and no exercises.
+- `data.summary`: `planned` (sessions dated today or earlier),
+  `trained`, `missed` (counts by tag), `missed_total`, `upcoming`, and
+  `exercises` (counts by status). `data.extra` lists workouts in the
+  window that matched no planned session.
 
 **Delivered sets per muscle (dose).** `stats dose (--week W | --span A..B)`:
 
@@ -1798,13 +1848,18 @@ coach.stats.implied_rpe(e1rm, load, reps) -> float       # R-24
 - `direct`: hard sets where the muscle is a primary muscle of the
   exercise. `fractional`: hard sets weighted by `set_weights`.
 - Output per week and per workout:
-  `{"week": "2026-W41", "muscles": {"chest": {"direct": 6, "fractional": 7.5}}, "by_workout": {...}}`.
+  `{"week": "2026-W41", "muscles": {"chest": {"direct": 6, "fractional": 7.5}}, "by_workout": {...}}`,
+  plus `span` and `weeks` (one entry per week the span touches); `week`
+  is null for a span that is not one week. A muscle with no hard set is
+  left out.
 - Logged workouts only. Coach-led sessions not logged in Hevy are added
   from `program.external_sessions` estimates by R-30a (C41), not here.
 
-**Durations.** `stats durations --span A..B` → per workout
-`{workout_id, date, session_id, minutes, cap_minutes, over_cap}` (cap from
-C19). A logged workout over its cap gets flag `duration_over_cap` (info).
+**Durations.** `stats durations [--week W | --span A..B]` (default:
+every workout) → per workout
+`{workout_id, date, title, session_id, minutes, cap_minutes, over_cap}`
+(cap from C19; null for no cap). A logged workout over its cap gets flag
+`duration_over_cap` (info), in `data.flags`.
 
 **Convention-jump audit.** `stats audit [--weeks 8]`:
 
@@ -1813,10 +1868,19 @@ C19). A logged workout over its cap gets flag `duration_over_cap` (info).
 - Candidate: an exposure whose top working load is 2× (±1 %) or 0.5×
   (±1 %) the previous exposure's, at the same top-set reps and the same
   RPE (or both unlogged).
-- Each candidate lists `siblings`: other candidates on the same date.
-- Status `open` until a `discount` or `confirm` annotation names it.
-  Open candidates are `suspect` exposures (C17) and raise
-  `convention_slip` (warn).
+- Each candidate lists `siblings`: the exercise ids of other candidates
+  on the same date.
+- Status `open` until a `discount` or `confirm` annotation names it
+  (`discounted`, `confirmed`). Open candidates are `suspect` exposures
+  (C17) and raise `convention_slip` (warn), in `data.flags`. Suspect
+  exposures are found over the whole history; the command lists those
+  in the window.
+- The previous exposure is the newest earlier one that is a usable
+  baseline: not discounted, not in an `unknown_convention` span, and not
+  an open or discounted candidate.
+- A candidate: `exercise_id`, `date`, `workout_id`, `session_id`,
+  `load_mode`, `top_load`, `reps`, `rpe`, `ratio`, `previous` `{date,
+  workout_id, top_load}`, `status`, `annotation_id`, `siblings`.
 
 **Python API**, mirrored by the commands:
 `coach.stats.e1rm_series`, `adherence`, `dose`, `durations`, `audit`,

@@ -11,7 +11,10 @@ UNITS_MODULE = "coach/units.py"
 
 # (path, stripped source line) pairs allowed to double, halve or convert
 # outside coach/units.py. Adding one is a reviewed change to this test.
-ALLOWLIST = set()
+ALLOWLIST = {
+    # Half the progression increment: the adherence tolerance on a load (C18), not a load conversion.
+    ("coach/stats.py", "return increment / 2"),
+}
 
 _DOUBLING = {2, 0.5}
 _HALVING = {2}

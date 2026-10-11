@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "exercises": {
+    "bb_back_squat": {
+      "hevy_template_id": "F0000001",
+      "load_mode": "total",
+      "load_mode_proposed": "total",
+      "confidence": "high",
+      "avoid": null
+    },
+    "db_bench_press": {
+      "hevy_template_id": "F0000002",
+      "load_mode": "per_hand_x2",
+      "load_mode_proposed": "per_hand_x2",
+      "confidence": "high",
+      "avoid": null
+    },
+    "db_single_arm_row": {
+      "hevy_template_id": "F0000003",
+      "load_mode": "single_implement",
+      "load_mode_proposed": "single_implement",
+      "confidence": "high",
+      "avoid": null
+    },
+    "pull_up": {
+      "hevy_template_id": "F0000004",
+      "load_mode": "bodyweight",
+      "load_mode_proposed": "bodyweight",
+      "confidence": "high",
+      "avoid": null
+    },
+    "db_shoulder_press": {
+      "hevy_template_id": "F0000005",
+      "load_mode": "per_hand_x2",
+      "load_mode_proposed": "per_hand_x2",
+      "confidence": "high",
+      "avoid": null
+    }
+  }
+}
