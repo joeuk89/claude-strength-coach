@@ -518,17 +518,17 @@ def owned_codes():
     return {code for code, entry in flags.registry().items() if entry.owner == OWNER}
 
 
-def _flag_key(flag):
+def flag_key(flag):
     return flag["code"], flag["severity"], flag["session_id"], flag["exercise_id"], flag["message"]
 
 
 def merge_flags(doc, found):
     """The overlay's flags with every earlier R-24 flag replaced by `found`, keeping the resolution of identical ones."""
     owned = owned_codes()
-    earlier = {_flag_key(f): f for f in doc["flags"] if f["code"] in owned}
+    earlier = {flag_key(f): f for f in doc["flags"] if f["code"] in owned}
     merged = [f for f in doc["flags"] if f["code"] not in owned]
     for flag in found:
-        before = earlier.get(_flag_key(flag))
+        before = earlier.get(flag_key(flag))
         if before is not None:
             flag = dict(flag, resolved=before["resolved"], resolution=before["resolution"])
         merged.append(flag)
@@ -537,8 +537,8 @@ def merge_flags(doc, found):
 
 def unresolved_blocks(doc, found):
     """The blocking findings in `found` that the overlay does not hold as resolved."""
-    resolved = {_flag_key(f) for f in doc["flags"] if f["resolved"]}
-    return [f for f in found if f["severity"] == "block" and _flag_key(f) not in resolved]
+    resolved = {flag_key(f) for f in doc["flags"] if f["resolved"]}
+    return [f for f in found if f["severity"] == "block" and flag_key(f) not in resolved]
 
 
 def fill_provenance(doc, lines):

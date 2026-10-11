@@ -309,7 +309,7 @@ class Registry:
     plugins: list
 
     def get(self, kind, name):
-        """The valid plugin of a kind (scheme, schedule, transform, interference) with this name, or None."""
+        """The valid plugin of a kind (scheme, schedule, transform, interference, conditioning) with this name, or None."""
         return next((p for p in self.plugins if p.kind == kind and p.name == name and p.valid), None)
 
     def find(self, name):
@@ -357,8 +357,8 @@ def state_errors(plugin, data):
 
 
 def program_problems(doc, registry):
-    """(JSONPath, message) for every scheme, schedule rule, deload rule and interference rule the registry lacks or
-    whose params fail, and every slot whose load mode its scheme's LOAD_MODES leaves out."""
+    """(JSONPath, message) for every scheme, session scheme, schedule rule, deload rule and interference rule the
+    registry lacks or whose params fail, and every slot whose load mode its scheme's LOAD_MODES leaves out."""
     found = []
 
     def check(kind, name, params, path):
@@ -381,6 +381,16 @@ def program_problems(doc, registry):
             if modes is not None and exercise["load_mode"] not in modes:
                 found.append((f"{path}.name", f"{scheme['name']} programs only {', '.join(modes)} lines; this slot "
                                               f"is {exercise['load_mode']}"))
+    for s_index, session in enumerate(doc["sessions"]):
+        scheme = session.get("scheme")
+        if scheme is None or session["kind"] != "conditioning":
+            continue
+        path = f"$.sessions[{s_index}].scheme"
+        plugin = check("conditioning", scheme["name"], scheme["params"], path)
+        hook = getattr(plugin.module, "problems", None) if plugin else None
+        if hook is not None and not any(p.startswith(f"{path}.params") for p, _ in found):
+            merged, _ = merged_params(plugin, scheme["params"])
+            found.extend((f"{path}.params{where[1:]}", message) for where, message in hook(merged, session))
     schedules = [(doc["schedule"], "$.schedule")]
     if doc.get("minimum_week"):
         schedules.append((doc["minimum_week"]["schedule"], "$.minimum_week.schedule"))

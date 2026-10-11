@@ -77,6 +77,19 @@ def resolve(args, ctx):
 
 
 @command(
+    "propose restore",
+    help="Put back a conditioning session the drop rule removed from a proposal, resolving its flag with the reason",
+    args=(_PROPOSAL,
+          arg("--session", required=True, metavar="S", help="program session id of the dropped session"),
+          arg("--reason", required=True, metavar="TEXT", help="why the session goes back in")),
+    writes=True,
+)
+def restore(args, ctx):
+    return propose.restore(ctx.root, ctx.config, args.proposal, args.session, args.reason, ctx.now(), ctx.today(),
+                           args.dry_run)
+
+
+@command(
     "propose finalize",
     help="Write the proposal as data/overlays/<id>.json, with its decisions and pending scheme state",
     args=(_PROPOSAL,),
