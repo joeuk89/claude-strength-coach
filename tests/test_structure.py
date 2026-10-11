@@ -310,6 +310,22 @@ class WeekTest(StructureCase):
                          [("session_volume_high", "info", "session-a")])
 
 
+    def test_a_planned_overlay_session_over_11_sets_for_a_muscle_is_flagged_warn(self):
+        def bench_sets(count):
+            def change(doc):
+                session = next(s for s in doc["sessions"] if s["session_id"] == "session-a")
+                bench = next(e for e in session["exercises"] if e["exercise_id"] == "db_bench_press")
+                working = next(s for s in bench["sets"] if s["type"] == "normal")
+                bench["sets"] = [dict(working) for _ in range(count)]
+            return change
+
+        self.edit("data/overlays/2026-10-05-weekly.json", bench_sets(12))
+        data = self.data("structure", "week", "--week", "2026-W41")
+        self.assertEqual([(f["code"], f["severity"], f["session_id"]) for f in data["flags"]],
+                         [("session_volume_high", "warn", "session-a")])
+        self.edit("data/overlays/2026-10-05-weekly.json", bench_sets(11))
+        self.assertEqual(self.data("structure", "week", "--week", "2026-W41")["flags"], [])
+
 class PlannedEqualsDeliveredTest(StructureCase):
     def test_the_same_sets_give_the_same_dose_through_set_weights(self):
         overlay_doc = read_json(self.root / "data" / "overlays" / "2026-10-05-weekly.json")
@@ -354,6 +370,12 @@ class DecideTest(StructureCase):
         self.assertNotIn("restructure_required", codes(after["flags"]))
         self.assertIn("adherence_low", codes(after["flags"]))
         self.assertEqual(after["decision"]["id"], stored[0]["id"])
+
+    def test_made_at_is_stored_in_utc_when_the_clock_has_an_offset(self):
+        self.data("structure", "decide", "--rule", "restructure", "--outcome", "adopted",
+                  now="2026-10-11T20:00:00+02:00")
+        stored = read_json(self.root / "data" / "decisions.json")["decisions"]
+        self.assertEqual(stored[0]["made_at"], "2026-10-11T18:00:00Z")
 
     def test_declined_holds_until_four_ordinary_weeks_close_after_it(self):
         self.write_decisions({"made_at": "2026-09-20T18:00:00Z", "outcome": "declined", "reason": "busy month"})

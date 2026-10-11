@@ -1397,7 +1397,7 @@ version bump (below).
 
 ```json
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "name": "Upper/lower, 4 days",
   "sessions": [
     {
@@ -1429,6 +1429,7 @@ version bump (below).
   "external_sessions": [
     {"id": "pt-tue", "title": "PT", "weekday": "tue", "estimated_sets": {"chest": 3}}
   ],
+  "dose_targets": {"chest": 10, "quadriceps": 8},
   "schedule": {"rule": "fixed_weekdays", "params": {}},
   "blocks": {"hard_weeks_ceiling": 6, "deload_rule": {"name": "standard", "params": {}}},
   "missed_day_rules": [
@@ -1437,9 +1438,10 @@ version bump (below).
 }
 ```
 
-- Every key shown is required except session `location`. A session
-  without it reads as `location: null`; `coach.program.load(root)` fills
-  it, so readers always see the key.
+- Every key shown is required except session `location` and
+  `dose_targets` (C40). A session without `location` reads as
+  `location: null`, and a program without `dose_targets` reads as `{}`;
+  `coach.program.load(root)` fills both, so readers always see the keys.
 - `kind`: `lifting`, `conditioning`. `tier`: `core`, `optional`. `status`:
   `active`, `parked`, `standby`. A session needs at least one exercise.
 - Session ids are unique and never `program` (its page would overwrite
@@ -4337,7 +4339,8 @@ coach.structure.ordinary_weeks(root, until, n=4, reach=12) -> list[str]
 - `muscles[m].planned`: core sessions and external estimates;
   `delivered`: logged core workouts plus `done` external estimates;
   `bonus`: logged optional and `extra` workouts.
-- `by_session` and `session_volume_high` (info) use logged workouts.
+- `by_session` and `session_volume_high` (info) use logged workouts;
+  `session_volume_high` (warn) uses the sessions the overlay plans.
 
 **`structure adherence [--until D]`** → `{weeks: [...], planned, trained,
 pct, insufficient_weeks, flags, decision}`, using the last four ordinary
@@ -4369,8 +4372,10 @@ Exercise swaps are not affected.
 
 - `session_volume_high`: more than 11.0 fractional sets for one muscle in
   one session, the per-session figure from Remmert, Pelland et al. 2025
-  (SportRxiv preprint, doi 10.51224/SRXIV.537). Warn on a planned session
-  (program or overlay), info on a logged workout.
+  (SportRxiv preprint, doi 10.51224/SRXIV.537). Warn on a planned session:
+  each active lifting program session in `structure balance`, and each
+  lifting session an overlay plans in `structure week`. Info on a logged
+  workout in `structure week`.
 - `structure decide` appends the C25 `adherence_trigger` decision and
   prints R-02's line ("Adherence trigger: 58 % over 4 weeks: deferred to
   2026-11-02") for the check-in record.

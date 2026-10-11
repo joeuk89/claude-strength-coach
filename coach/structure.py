@@ -362,6 +362,13 @@ def _report(inst, span, rows, extra, sessions_by_key, workouts):
                 counted_trained += row["status"] == "trained"
             if inst.is_lifting(row["session_id"]):
                 _add(planned_dose_, session_dose(inst.library, sessions_by_key[(row["date"], row["session_id"])]))
+        if row["overlay_id"] is not None and inst.is_lifting(row["session_id"]):
+            over = _over_ceiling(session_dose(inst.library, sessions_by_key[(row["date"], row["session_id"])]))
+            if over:
+                raised.append(flags.make(
+                    "session_volume_high", "warn", session_id=row["session_id"],
+                    message=f"{row['date']} {row['session_id']}: {_ceiling_text(over)} fractional sets planned in "
+                            f"one session, above about {_round(SESSION_CEILING)}; move the excess to another session"))
         if workout is not None:
             muscles = _workout_muscles(inst, workout)
             _add(delivered if tier == "core" else bonus, muscles)
@@ -656,7 +663,7 @@ def decide(root, rule, outcome, reason=None, revisit_on=None, *, today=None, now
     moment = inst.now or datetime.now(timezone.utc)
     made_on = inst.today
     decision = {
-        "id": None, "kind": "adherence_trigger", "made_at": moment.strftime("%Y-%m-%dT%H:%M:%SZ"), "overlay_id": None,
+        "id": None, "kind": "adherence_trigger", "made_at": moment.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "overlay_id": None,
         "scope": {}, "outcome": outcome, "reason": reason, "standing": False,
         "until": (made_on + timedelta(days=OVERRIDE_DAYS)).isoformat() if rule == "add_session" else None,
         "revisit_on": revisit_text, "proposed_sets": None, "chosen_sets": None,
