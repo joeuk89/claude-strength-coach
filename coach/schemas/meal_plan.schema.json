@@ -1,5 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "x-coach-paths": ["data/nutrition/plans/*.json"],
   "title": "Meal plan, data/nutrition/plans/<id>.json (contract C34)",
   "type": "object",
   "required": ["schema_version", "id", "span", "created_at", "style", "targets", "input", "days", "pool",

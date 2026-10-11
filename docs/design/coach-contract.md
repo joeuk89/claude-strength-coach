@@ -750,7 +750,7 @@ none and `bodyweight`, `assisted`, `duration` or `distance`; band and
   runner owns are found through its registry (C16 `FILES`). A schema for
   any other instance document (append-only JSONL logs, `.coach/` caches,
   and committed documents no runner subpackage declares yet: the
-  readings series and the activity sync map) carries a top-level
+  readings series, the activity sync map and meal plans) carries a top-level
   `"x-coach-paths"`: globs relative to the instance root
   (`["data/hevy/writes.jsonl"]`). The validator treats it as an
   annotation, so adding it bumps no version. `schema_versions` reads both;
