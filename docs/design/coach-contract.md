@@ -172,8 +172,8 @@ Command inventory (owner in brackets). Read-only unless marked W
 | `hevy record-fixtures --out DIR` | R-12 | W (GET only, needs a real key) |
 | `overlay list`, `overlay current [--date D]`, `overlay validate [ID \| --file PATH]` (no argument: every overlay), `overlay notes ID [--session S]` | R-13 | |
 | `overlay build --input FILE`, `overlay render ID [--into FILE]`, `overlay approve ID` | R-13 | W |
-| `routines diff --overlay ID`, `routines verify --overlay ID` | R-14 | |
-| `routines push --overlay ID`, `routines retire --overlay ID` | R-14 | H |
+| `routines diff --overlay ID [--refresh]`, `routines verify --overlay ID [--refresh]` | R-14 | W with `--refresh` (gitignored cache only) |
+| `routines push --overlay ID [--refresh]`, `routines retire --overlay ID [--refresh]` | R-14 | H |
 | `routines create --overlay ID [--dry-run]` | R-14b | H |
 | `gate pretooluse` | R-15 | |
 | `program show`, `program validate`, `state show`, `migrate status` | R-17a | |
@@ -771,8 +771,28 @@ Schemas: `hevy_cache_file` and `hevy_cache_meta`.
 `kind` is `write`, `verify` or `retire`. The client appends a `write` line
 for every non-GET request, success or failure, once its retries are over.
 `status` is the final HTTP status, or null when no response arrived
-(timeout, unreachable). Schema: `hevy_write_line` (R-14 adds the `verify`
-and `retire` line schemas). The API key never appears.
+(timeout, unreachable). Schemas: `hevy_write_line`, `hevy_verify_line` and
+`hevy_retire_line` (R-14). The API key never appears.
+
+- A `retire` line has the `verify` line's shape with `kind: "retire"`. Its
+  `overlay_hash` is the overlay's C10 content hash (equal to
+  `approval.hash` while the approval holds), so an unapproved one-off
+  overlay can still be retired.
+- `diff` holds the changes left after the read-back: empty exactly when
+  `verified` is true. A change is
+  `{routine_id, class, path, before, after}`: `path` is relative to the
+  routine (`title`, `exercises[1].notes`, `exercises[1].sets[2].weight_kg`,
+  or `exercises[1].sets[3]` for a whole set added or removed), `before` is
+  Hevy's value and `after` the intended one. `class` is `prescription`
+  for `weight_kg` and `notes`, which every programming pass rewrites, and
+  `structural` for everything else: title, folder, exercises, their
+  order, set count, set type, reps, rep range, duration, distance, rest
+  and superset (R-03's in-app edit check).
+- `routines push` appends a `write` and a `verify` line per routine it
+  writes. A routine that already matched gets one `verify` line, the first
+  time it is pushed for that overlay and hash, so every routine in the
+  span has a `verified: true` line once a push succeeds. `routines
+  verify` appends nothing.
 
 ## C10. Overlay document (R-13 owns; R-14, R-15, R-16 read)
 
@@ -961,6 +981,59 @@ Cues: <cues>
   spot a stale note mid-session. It is always the week focus; a session's
   own emphasis goes in its exercises' `Focus:` lines.
 
+**Routine body, diff and push (R-14).** `coach.routines`:
+
+- `intended_body(overlay, session, cached_routine)` is the PUT body
+  `{"routine": {...}}`. Title: the session's for a `temporary` session,
+  else the routine's own. `folder_id` is kept from the cached routine
+  when it has one, since a PUT may move a routine. Each exercise sends
+  `exercise_template_id` (the line's `hevy_template_id`; a line without
+  one is a validation error), `superset_id` and `rest_seconds` when set,
+  the C12 note, and its sets. A set sends `type`, `weight_kg` (the load's
+  `hevy_kg` only), `reps` or `rep_range`, `duration_seconds`,
+  `distance_meters`, each only when it has a value. No set sends
+  `weight_kg` for a null load or an unweighted `bodyweight` load
+  (`hevy_kg` 0). The body never holds a null or a routine-level `notes`.
+- `diff(intended, actual)` compares by position (C9 change shape).
+  Absent equals null, and `weight_kg` matches within 0.001 kg. A
+  different template at a position is one structural change for the
+  whole exercise. Hevy fields the body never sends (`custom_metric`,
+  `index`, exercise `title`) are not compared.
+- **Which session a routine carries.** One routine per id in the
+  overlay's span. A routine that serves several sessions carries the
+  next one dated today or later, or the last one when all have passed,
+  and the command warns. A session with a null `hevy_routine_id` makes
+  `diff`, `verify` and `push` exit 1 until R-14b.
+- **Push guards** (exit 3, before any request, and under `--dry-run`
+  too): no approval; approval hash broken; an unresolved `block` flag;
+  span ended before today; a routine's chosen session dated today or
+  later is in force (C10) under a different overlay. Then push GETs
+  every routine in the span. It refuses (exit 3) before any PUT if any
+  live `updated_at` differs from the cached one; `--refresh` re-reads
+  the cache first. A PUT, GET back and diff follow per changed routine,
+  in overlay order. The read-back replaces the cached routine. A
+  read-back that differs logs `verified: false`, stops the push and
+  exits 1 with the report in `data`. Re-running after success sends no
+  PUT.
+- `routines diff` and `routines verify` read the cache. With `--refresh`
+  they GET the span's routines first and write them into the cache
+  (unless `--dry-run`). `verify` exits 0 and reports `verified` per
+  routine and overall.
+- `routines retire` refuses (exit 3) unless the overlay's span ended
+  before today. For each `temporary` session's routine it GETs the live
+  routine and PUTs it back titled `(unused)` with its exercises as they
+  are, then reads it back. It skips a routine already titled `(unused)`
+  and a routine that any overlay whose span has not ended still names.
+- The report (`data`) holds `action`, `overlay_id`, `overlay_hash`,
+  `approved`, `unit`, `dry_run`, `routines` (per routine: `routine_id`,
+  `session_id`, `date`, `carries`, `title`, `temporary`, `status`,
+  `verified`, `changes`, `exercises`), `changes` (every routine's,
+  flattened), `writes`, `summary`, and `verified` for `verify`.
+  `summary(report)` is the plain text R-15 shows. It names each changed
+  routine and prints old Hevy values through `units.from_hevy_kg` and new
+  loads through `units.format_load`, so a dumbbell line reads
+  `22.5/hand (Hevy: 45) → 25/hand (Hevy: 50)`.
+
 ## C13. Checks (R-10 registry; every item adds its own)
 
 ```python
@@ -983,7 +1056,10 @@ R-10 registers `python_floor` and `config` in `coach/checks/environment.py`.
 
 C5 (the exercise library, R-11) and the sections from C17 on name the checks their owners register. R-32a
 registers `research_notes`, `research_citations`, `research_render_fresh`
-and `research_expiry`.
+and `research_expiry`. R-14 registers `overlay_hevy_drift`: per routine of
+the overlay in force today (else the next to start), `warn` when the cached
+routine differs from it; `skip` when Hevy is off, there is no routine
+cache or no such overlay.
 
 ## C14. Shared test fixture ids
 
@@ -1042,6 +1118,7 @@ Unless stated, each is a copy of `valid/` plus what is listed.
 | `research-bad/` | R-32a | not a copy of `valid/`: the valid config; `fixture-dose` with a hand-edited claims table; `fixture-broken` with two claims numbered 1; `fixture-old` expired 2026-10-01 (area `sleep`); `reference/fixture-guide.md` citing a missing claim |
 | `interference/` | R-44a | a planned quality run on 2026-10-11 and Session A (squat at RPE 7) on 2026-10-12 |
 | `overlay-bad-schema/`, `overlay-bad-arithmetic/`, `overlay-stale-render/` | R-13 | `config.toml` plus the valid overlay with one fault each: Session B dated outside the span; DB bench working sets at `hevy_total` 25 for 25/hand; a hand-edited check-in region |
+| `routines-drift/`, `routines-pushed/` | R-14 | not copies of `valid/`: its `config.toml`, the valid overlay and a Hevy cache (`meta.json`, `routines.json`). `routines-drift/` caches the synthetic routines as pulled; `routines-pushed/` caches them after `routines push` of the valid overlay to the fake |
 
 `dose/` weeks:
 
