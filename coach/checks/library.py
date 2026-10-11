@@ -5,6 +5,7 @@ import json
 from coach import library, paths
 from coach.checks import Result, check
 from coach.errors import ValidationError
+from coach.hevy.cache import HevyCache
 from coach.library import Library
 
 _LIBRARY = paths.EXERCISES.as_posix()
@@ -47,7 +48,7 @@ def _overlay_exercises(root):
 def load_modes_confirmed(ctx):
     try:
         lib = Library.load(ctx.root)
-        routines = library.read_hevy_cache(ctx.root, "routines") or []
+        routines = HevyCache(ctx.root).routines()
     except ValidationError as exc:
         return [Result("fail", f"cannot read the library or the Hevy cache ({exc.message}); see library_valid",
                        _LIBRARY)]

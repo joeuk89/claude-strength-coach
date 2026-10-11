@@ -8,7 +8,6 @@ touches it. See contract C5 ("Exercise library") and C54.
 
 import copy
 import functools
-import json
 import re
 from pathlib import Path
 
@@ -409,20 +408,6 @@ def custom_entry(template_id, title, template, load_mode):
         "substitutes": [],
         "hevy_template_id": template_id,
     }
-
-
-def read_hevy_cache(root, name):
-    """The `data` list of one cached Hevy collection (contract C8), or None when it is not cached."""
-    path = Path(root) / paths.HEVY_CACHE_DIR / f"{name}.json"
-    if not path.exists():
-        return None
-    try:
-        doc = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        raise ValidationError(f"{path} is not valid JSON: {exc}") from None
-    if not isinstance(doc, dict) or not isinstance(doc.get("data"), list):
-        raise ValidationError(f"{path} is not a Hevy cache collection: expected an object whose data is a list")
-    return doc["data"]
 
 
 def routine_exercises(routines):

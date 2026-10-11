@@ -151,17 +151,17 @@ class LoadModesConfirmedCheckTest(CliMixin, unittest.TestCase):
 
     def test_overlay_exercise_without_a_confirmed_mode_fails(self):
         with Instance(VALID) as root:
-            overlay = {"schema_version": 1, "id": "2026-10-12-weekly", "sessions": [
+            overlay = {"schema_version": 1, "id": "2026-10-19-weekly", "sessions": [
                 {"session_id": "session-a", "exercises": [{"exercise_id": "db_bench_press"}, {"exercise_id": "db_curl"}]},
             ]}
-            path = root / "data" / "overlays" / "2026-10-12-weekly.json"
-            path.parent.mkdir(parents=True)
+            path = root / "data" / "overlays" / "2026-10-19-weekly.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(json.dumps(overlay), encoding="utf-8")
             envelope = self.run_fail(1, root, "check", "--only", "load_modes_confirmed")
         failures = [r for r in self.results(envelope) if r["status"] == "fail"]
         self.assertEqual(len(failures), 1)
         self.assertIn("db_curl", failures[0]["message"])
-        self.assertIn("2026-10-12-weekly", failures[0]["message"])
+        self.assertIn("2026-10-19-weekly", failures[0]["message"])
 
     def test_invalid_library_fails(self):
         envelope = self.run_fail(1, INVALID, "check", "--only", "load_modes_confirmed")

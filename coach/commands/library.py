@@ -3,6 +3,7 @@ import copy
 from coach import jsonio, library, paths, units
 from coach.commands import arg, command
 from coach.errors import ConfigError, UsageError, ValidationError
+from coach.hevy.cache import HevyCache
 from coach.library import Library
 
 
@@ -68,10 +69,11 @@ def _sorted(doc):
     writes=True,
 )
 def seed(args, ctx):
-    routines = library.read_hevy_cache(ctx.root, "routines")
-    if routines is None:
+    cache = HevyCache(ctx.root)
+    if cache.read("routines") is None:
         raise ConfigError("there are no cached Hevy routines to seed from; run python3 -m coach hevy pull first")
-    templates = library.read_hevy_cache(ctx.root, "exercise_templates")
+    routines = cache.routines()
+    templates = cache.exercise_templates() if cache.read("exercise_templates") is not None else None
     if templates is None:
         ctx.warn("no cached Hevy exercise templates, so proposals use routine titles only, without Hevy's "
                  "exercise type or equipment; run python3 -m coach hevy pull for better proposals")

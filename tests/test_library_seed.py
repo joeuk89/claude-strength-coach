@@ -4,6 +4,7 @@ import json
 import unittest
 
 from coach import library
+from coach.hevy.cache import HevyCache
 from coach.library import Library
 from tests.support import INSTANCES, run_cli
 from tests.test_library import CliMixin, Instance, read_library, write_library
@@ -241,6 +242,16 @@ class SeedCommandTest(CliMixin, unittest.TestCase):
         twin_proposal = [p for p in data["proposals"] if p["hevy_template_id"] == "C0000002"][0]
         self.assertEqual(twin_proposal["matched_id"], "custom_tyre_flip")
         self.assertEqual(lib.by_hevy_template_id("C0000002")["id"], "custom_tyre_flip")
+
+
+class FixtureCacheTest(unittest.TestCase):
+    def test_library_fixture_caches_are_valid_hevy_cache_files(self):
+        for name, collections in (("library-seed", ("routines", "exercise_templates")),
+                                  ("library-unconfirmed", ("routines",))):
+            cache = HevyCache(INSTANCES / name)
+            for collection in collections:
+                with self.subTest(fixture=name, collection=collection):
+                    self.assertTrue(cache.read(collection)["data"])
 
 
 if __name__ == "__main__":
