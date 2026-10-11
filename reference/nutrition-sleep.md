@@ -1,4 +1,4 @@
-# Nutrition sleep gate
+# Sleep gate
 
 Read this before agreeing a deficit in `/goals`, when checking an active
 deficit, or when a sleep gate is `pending measurement` at `/check-in`.
@@ -26,7 +26,7 @@ with `python3 -m coach wellness add --date YYYY-MM-DD --sleep-hours H`.
 Record a period mean once with `wellness add --from START --to END
 --sleep-hours H`; never expand it into invented nightly entries.
 Run `python3 -m coach wellness summary --from START --to END` for the
-14 calendar dates ending on the assessment date. Read `nutrition_gate`
+14 calendar dates ending on the assessment date. Read `sleep_gate`
 and `sleep.evidence`, `covered_dates`, `missing_dates` and `nights`.
 
 A complete diary or complete non-overlapping period means can settle
@@ -44,7 +44,8 @@ or missing nightly hours rather than estimating them.
   at 7.2 h, offer `/goals` to reconsider a deficit if desired.
 - Incomplete coverage: keep `pending measurement`, state which dates
   are missing and which source spans are unusable. An incomplete diary
-  does not become a complete measured period.
+  does not become a complete measured period. During a deficit, ask for
+  the missing nights before changing a recorded `passed` status.
 - No hours source: ask how they sleep. Reported short sleep or a sleep
   limiter in Recovery defaults to maintenance, `pending measurement`;
   otherwise a deficit may proceed, `not evaluated` (rn:sleep-dieting.4).
@@ -58,4 +59,4 @@ obtain athlete approval. Passing this gate does not change the phase.
 
 The separate seven-day fatigue decision counts individual short nights.
 A period mean cannot establish that count, even when it settles this
-fourteen-day nutrition gate. Do not copy this gate's status into fatigue.
+fourteen-day sleep gate. Do not copy this gate's status into fatigue.

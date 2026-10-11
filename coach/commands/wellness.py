@@ -38,7 +38,7 @@ def summary(args, ctx):
     else:
         gate["status"] = "recomp" if sleep["avg_asleep_hours"] < 7 else "passed"
         gate["reason"] = "maintenance" if gate["status"] == "recomp" else "offer goals review before a deficit"
-    return {"span": span.to_json(), "sleep": sleep, "nights": nights, "nutrition_gate": gate}
+    return {"span": span.to_json(), "sleep": sleep, "nights": nights, "sleep_gate": gate}
 
 
 @command(

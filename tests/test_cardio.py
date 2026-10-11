@@ -420,6 +420,13 @@ class CardPartTest(CardioCase):
         self.assertIn("4 under 7 h", fields["sleep"]["prefill"])
         self.assertIn("sleep_debt", self.codes(card["flags"]))
 
+    def test_a_period_mean_leaves_the_stated_nightly_average_and_count_alone(self):
+        self.drop_lines(".coach/activity/wellness.jsonl", lambda r: r["span"]["start"] in ("2026-10-10", "2026-10-11"))
+        self.coach("wellness", "add", "--from", "2026-10-10", "--to", "2026-10-11", "--sleep-hours", "6")
+        card = self.data("checkin", "prepare", "--tier", "weekly")["card"]
+        fields = {f["id"]: f for f in card["fields"]}
+        self.assertIn("Recorded: 6.68 h a night over 5 nights, 4 under 7 h.", fields["sleep"]["prefill"])
+
 
 class EvidenceTest(unittest.TestCase):
     def setUp(self):

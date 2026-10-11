@@ -171,10 +171,10 @@ class ActivityStore:
                 covered.extend(original_dates)
                 weighted_hours += Fraction(str(item["asleep_hours"])) * len(original_dates)
             if item["kind"] == "nightly":
-                nightly_hours.append(item["asleep_hours"])
+                nightly_hours.append(Fraction(str(item["asleep_hours"])))
         missing = sorted({day.isoformat() for day in span.days()} - set(covered))
         return {"avg_asleep_hours": _floor_hundredths(weighted_hours / len(covered)) if covered else None,
-                "nightly_avg_asleep_hours": (round(sum(nightly_hours) / len(nightly_hours), 2)
+                "nightly_avg_asleep_hours": (_floor_hundredths(sum(nightly_hours) / len(nightly_hours))
                                              if nightly_hours else None),
                 "nights": len(nightly_hours), "nights_in_span": len(span.days()),
                 "covered_dates": sorted(covered), "missing_dates": missing, "complete": not missing,
