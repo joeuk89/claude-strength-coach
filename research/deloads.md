@@ -99,6 +99,13 @@ text = "A light week for poor readiness or sleep keeps two thirds of the working
 basis = "heuristic"
 sources = []
 status = "current"
+
+[[claims]]
+n = 11
+text = "A trained session counts as trained as prescribed when at least two thirds of its prescribed working sets were logged and its mean logged RPE was no more than 1.5 below target; a coach-led session counts when it happened."
+basis = "heuristic"
+sources = []
+status = "current"
 -->
 <!-- coach:begin research deloads -->
 
@@ -116,6 +123,7 @@ status = "current"
 | 8 | A deload lowers training stress by cutting sets, taking sets further from failure and usually lowering loads, while keeping the same exercises and training days. | consensus | bell-2023, rogerson-2024 | current |
 | 9 | The standard deload keeps two thirds of the working sets, takes 10 % off loads and puts every set at RPE 6. | heuristic | rogerson-2024 | current |
 | 10 | A light week for poor readiness or sleep keeps two thirds of the working sets and the loads, with no set above RPE 8. | heuristic | none | current |
+| 11 | A trained session counts as trained as prescribed when at least two thirds of its prescribed working sets were logged and its mean logged RPE was no more than 1.5 below target; a coach-led session counts when it happened. | heuristic | none | current |
 
 | Source | Citation | Type | Year |
 | --- | --- | --- | --- |
@@ -147,9 +155,10 @@ adds a reason not to take a week off by habit: resistance-trained adults
 who stopped lifting for one week midway through a 9-week program gained
 less lower-body strength than those who trained on, and no more muscle.
 
-**Claim 2.** No study defines a "hard week". The 75 % and 50 % lines are
-coaching rules chosen so a block counts training that happened, not weeks
-that passed.
+**Claims 2 and 11.** No study defines a "hard week" or a session
+"trained as prescribed". The 75 % and 50 % lines, and the two-thirds and
+1.5 RPE tests, are coaching rules chosen so a block counts training that
+happened, not weeks that passed.
 
 **Claim 3.** bell-2023 describes deloading as "generally undertaken every
 4–6 weeks" and regular pre-planned deloading as "every 4–8 weeks".
@@ -186,14 +195,15 @@ rogerson-2024 report, but no study compares them with other sizes.
 ## Applying it
 
 - `/check-in` keeps the hard-week count, checks the four triggers and
-  proposes a light week by claims 3 to 5. The definitions live once in
+  proposes a light week by claims 3 to 5, counting a session as trained
+  by claim 11. The definitions live once in
   `CLAUDE.md` "Coaching principles" → Fatigue management.
 - `/one-off-week` builds a deload from the program's deload policy, or
   from claim 9 when the program has none.
 - Claim 10 is the lighter option when the triggers are readiness and sleep
   rather than RPE drift or a niggle: the loads stay, so strength is kept,
   and the reduced sets and RPE ceiling let recovery catch up.
-- Treat claims 2 and 4 to 7 as rules of thumb. If the athlete's history
+- Treat claims 2, 4 to 7 and 11 as rules of thumb. If the athlete's history
   shows they do not fit, write a local note that supersedes them.
 
 ## Open questions
