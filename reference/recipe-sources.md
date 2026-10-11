@@ -14,19 +14,41 @@ no-method cards skip it.
    built from the athlete's brief and goals — e.g.
    `site:bbcgoodfood.com high protein chicken traybake` or a plain query
    plus "recipe".
-2. **WebFetch** the candidate page and extract the embedded
-   **schema.org/Recipe JSON-LD** (a `<script type="application/ld+json">`
-   block on most major recipe sites). It carries name, ingredient lines,
-   instructions, servings (`recipeYield`), and usually per-serving
-   nutrition (`nutrition` → calories, proteinContent, …).
-3. **Normalise** into a draft card per `reference/recipe-cards.md`:
-   convert to metric quantities, per-serving amounts, record the URL in
-   `source`, and set `nutrition: published` if the site's numbers were
-   used — but per that doc's rule, an ingredient swap drops it back to
-   `estimated` (a pure unit/portion conversion keeps `published`).
-4. If a page has **no structured data**, fall back to reading the page
-   text; mark `nutrition: estimated` and sanity-check the estimate
-   against the ingredient list.
+2. **Save the candidate page** to `.coach/drafts/` (gitignored), e.g.
+   `mkdir -p .coach/drafts && curl -sL -A "Mozilla/5.0" "<url>" -o .coach/drafts/<slug>.html`.
+   Some meal-kit sites (Gousto, for one) add their recipe data with
+   JavaScript, so a plain download has none. For those, ask the athlete
+   to open the page in a browser and save it ("Save Page As…"), then
+   use that file.
+3. **Import it:** `python3 -m coach recipes import --html <file> --url
+   <url>`. It reads the page's embedded **schema.org/Recipe JSON-LD**
+   (a `<script type="application/ld+json">` block on most major recipe
+   sites) and returns a draft card in the format of
+   `reference/recipe-cards.md`, the method as prose, and flags to
+   resolve before the athlete sees the card:
+   - `unparsed_ingredients`: lines it could not turn into an exact
+     quantity, unit and item (ranges, "to taste"). Make each exact or
+     drop it.
+   - `missing_nutrition`: the page has no per-serving macros. Estimate
+     them from the ingredients and set `nutrition = "estimated"`.
+   - `per_serving_doubt`: an ambiguous yield ("2 or 4 servings") or a
+     figure too large for one serving. Check the numbers are per serving.
+   - `macro_sum`: the published kcal disagrees with 4/4/9. Find out why
+     rather than copying it.
+   - `slot_guessed`, `servings_missing`, `time_missing`,
+     `aisle_guessed`: fields it had to guess.
+   Then normalise: metric quantities, per-serving amounts for `servings`,
+   and `nutrition = "published"` only while the site's numbers still
+   describe the food. Per `reference/recipe-cards.md`, an ingredient swap
+   drops it to `estimated`; a pure unit or portion conversion keeps
+   `published`.
+4. **Draft the card:** save `{"slug": ..., "card": ..., "prose": ...}` to
+   `.coach/drafts/` and run `python3 -m coach recipes draft --input
+   <file>`. It returns the full card text, validated, to show the
+   athlete.
+5. If a page has **no structured data** (`recipes import` exits 1 saying
+   so), read the page text instead, mark `nutrition = "estimated"`, and
+   sanity-check the estimate against the ingredient list.
 
 ## Reliable sources
 
@@ -57,7 +79,9 @@ Before searching, derive the brief from `profile.md`:
 
 ## Quality checks before drafting a card
 
-- Nutrition is **per serving**, not per recipe — check `recipeYield`.
+- Nutrition is **per serving**, not per recipe — check `recipeYield`
+  (`recipes import` flags a doubtful yield).
 - Ingredient quantities are exact and shoppable after conversion.
-- Sanity-check published kcal against the macros (4/4/9); flag weird
-  numbers rather than copying them.
+- Published kcal agrees with the macros (4/4/9): `recipes import` and
+  `recipes validate` flag a gap; explain weird numbers rather than
+  copying them.

@@ -48,3 +48,21 @@ dumbbells = []                # per-hand dumbbell weights available; [] = not ch
 # dumbbell exercises, total otherwise.
 [caps]
 # db_bench_press = 30.0
+
+# Recipe bank checks (/recipes). Left commented, the values shown apply;
+# uncomment [nutrition.bank] to change them.
+#   aisles: the shopping walk order; every ingredient names one.
+#   min_protein_per_100kcal: warn when a card for that slot has less protein
+#     per 100 kcal; 0 = not checked. A heuristic, not an evidence-based cut-off.
+#   macro_sum_*_pct: how far a card's kcal may sit from 4 x protein +
+#     4 x carbs + 9 x fat (grams) before `recipes validate` warns or fails.
+#   slot_notes: one line printed under each slot in nutrition/menu/index.md.
+#
+# [nutrition.bank]
+# aisles = ["produce", "bakery", "meat-fish", "dairy-eggs", "chilled", "frozen", "tins-jars-dry", "snacks", "drinks", "household"]
+# min_protein_per_100kcal = {breakfast = 5.0, lunch = 5.0, dinner = 5.0, snack = 0.0}
+# macro_sum_warn_pct = 10
+# macro_sum_fail_pct = 20
+#
+# [nutrition.bank.slot_notes]
+# breakfast = "must be fast or it gets skipped"

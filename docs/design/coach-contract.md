@@ -216,8 +216,8 @@ Phase 2 to 4 command inventory. No command here writes to Hevy.
 | `block close --week W [--readiness poor\|ok] [--sleep poor\|ok] [--deep]`, `block decide`, `block init` | R-31 | W |
 | `nutrition status`, `nutrition readings [--last N]` | R-33a | |
 | `nutrition record`, `nutrition import --input FILE` | R-33a | W |
-| `recipes list`, `recipes show`, `recipes validate`, `recipes import --html FILE`, `recipes draft --input FILE`, `recipes convert --parse` | R-33b | |
-| `recipes render [SLUG]`, `recipes convert --apply --input FILE` | R-33b | W |
+| `recipes list`, `recipes show`, `recipes validate`, `recipes import --html FILE`, `recipes draft --input FILE` | R-33b | |
+| `recipes render [SLUG]`, `recipes convert (--parse \| --apply --input FILE)` | R-33b | W (`--parse` writes nothing; one command, so it carries `writes`) |
 | `meals template [--week D]`, `meals show ID`, `meals validate ID`, `meals shopping ID [--format markdown\|issue]` | R-33c | |
 | `meals build --input FILE`, `meals render ID`, `meals approve ID` | R-33c | W |
 | `config suggest --unit kg\|lb [--gym commercial\|home]` | R-40a | |
@@ -367,7 +367,15 @@ after_days = 2              # first nudge when days since the last check-in reac
 
 **Nutrition keys** (R-33a, R-33b, R-33c). An absent `[nutrition]` table
 means nutrition is disabled. Weights are in `[athlete] bodyweight_units`.
-No key holds a calorie figure the nutrition app owns.
+No key holds a calorie figure the nutrition app owns. All three items
+declare their keys in one module, `coach/config_tables/nutrition.py`
+(R-33b created it with `[nutrition.bank]`; R-33a and R-33c add theirs to
+it). The recipe bank works with nutrition disabled: with no
+`[nutrition.bank]` table, `coach.recipes.bank_settings(config)` returns
+the defaults below. `min_protein_per_100kcal` keeps its four defaults
+for any slot left out and accepts other configured slots;
+`slot_notes` keys are slots. Until R-33c adds `[nutrition.template]
+slots`, the slots are `breakfast`, `lunch`, `dinner`, `snack`.
 
 ```toml
 [nutrition]                     # R-33a
@@ -654,10 +662,10 @@ none and `bodyweight`, `assisted`, `duration` or `distance`; band and
 | `research/local/<id>.md` | local research notes | committed (instance) | the coach with the Write tool (data block), `research render` (region) |
 | `plugins/<kind>/<name>.py`, `plugins/tests/test_<name>.py` | instance plugins and their tests | committed | the athlete, as a code change |
 | `.coach/cache/hevy/` | raw Hevy cache, rebuildable with `hevy pull --full` | **gitignored** | R-12 |
-| `.coach/backups/<UTC timestamp>/` | pre-migration copies | gitignored | R-17a |
+| `.coach/backups/<UTC timestamp>/` | pre-migration copies; old recipe cards and index before conversion | gitignored | R-17a; R-33b (`recipes convert --apply`) |
 | `.coach/proposals/<id>.json`, `<id>.proposed.json` | editable proposal draft and its untouched original | gitignored | R-23a |
 | `.coach/plans/<week start>-<name>.json` | schedule plans handed to `propose week --plan` | gitignored | R-30b; R-22 may |
-| `.coach/drafts/` | drafts the coach edits before a command applies them (program drafts, log drafts), and the scheduled run's `checkin-<date>.md` | gitignored | R-40c, R-41a, R-41b, R-45 |
+| `.coach/drafts/` | drafts the coach edits before a command applies them (program drafts, log drafts, recipe drafts and saved recipe pages), and the scheduled run's `checkin-<date>.md` | gitignored | R-40c, R-41a, R-41b, R-45; the coach (R-33b recipe pages) |
 | `.coach/nudge.json` | nudge state | gitignored | R-45 |
 | `.coach/logs/nudge.log` | scheduled run output | gitignored | the recipe (R-45) |
 
@@ -901,7 +909,9 @@ and `retire` line schemas). The API key never appears.
   kind, id, region)` (R-13) find and replace marked regions for every
   renderer. `splice_region` replaces the region in place; when the file has
   none, it adds the region at the end of the `## The week ahead` section,
-  or at the end of the file, and changes nothing else.
+  or at the end of the file, and changes nothing else. A recipe card
+  (C33) finds its region with `find_regions` but places a missing one
+  right after its data block, so it does not use `splice_region`.
 - **Archive rule:** `week-review` regions in any record but the newest are
   archive. `render_week_review(id)` returns them unchanged, so R-16's sweep
   never fails an old record because history was later corrected. `cardio`
@@ -916,8 +926,10 @@ and `retire` line schemas). The API key never appears.
   regions or both.
 - One parser reads every kind: `coach.datablock.read(path, kind) ->
   (data: dict, rest: str)`, raising a validation error that names the file
-  for a missing opener, a missing closer, a wrong kind or invalid TOML.
-  Whichever of R-32a and R-33b merges first adds it; the other reuses it.
+  for a missing opener, a missing closer, a wrong kind, a `-->` inside the
+  block, or invalid TOML. Whichever of R-32a and R-33b merges first adds
+  it; the other reuses it. (R-32a added it; R-33b reuses it unchanged and
+  finds where a card's block ends as `len(text) - len(rest)`.)
 - Scripts never rewrite a hidden data block (ADR-0001: scripts don't write
   TOML). A command that needs one prints its text for the coach to write.
   The exceptions are named in the owning section.
@@ -2429,6 +2441,71 @@ delta = {kcal = -105, protein_g = 0, carbs_g = -22, fat_g = 0}
   Two variations that change the same item cannot stack.
 - Checks: `recipe_cards` (schema, macro sum, density per slot,
   variations), `recipe_render_fresh`, `recipe_index_fresh`.
+
+Settled while building R-33b (`coach/schemas/recipe_card.schema.json` is
+the block after TOML parsing):
+
+- Required keys: `schema_version`, `title`, `slots` (at least one),
+  `servings` (integer, at least 1), `prep`, `time_min` (integer), `status`,
+  `nutrition`, `per_serving`. Optional: `source` (http or https URL),
+  `tags` (`^[a-z0-9]+(-[a-z0-9]+)*$`), `ingredients`, `variations`. Item
+  strings have no capitals; aisles are lowercase with hyphens; a variation
+  `name` matches `^[a-z0-9+][a-z0-9+-]*$` (so `+egg` is allowed); every
+  table is closed (`additionalProperties: false`).
+- Macro sum: `gap = |kcal − (4·protein + 4·carbs + 9·fat)|`, a percentage
+  of the stated `kcal`. Warn when `gap > kcal × warn_pct / 100`, fail when
+  `gap > kcal × fail_pct / 100`. A variation `delta` is checked the same
+  way, with both limits raised to at least 20 kcal.
+- Density: protein per 100 kcal against each slot of the card; a warn,
+  never a fail.
+- Ingredients: an item appears once per card; a `prep = "eat-out"` card
+  has none and every other card has at least one. A change to an existing
+  item uses that item's unit and may not take it below zero; a change to
+  an unknown item must be positive and carry `aisle`. A variation of a
+  non-eat-out card with no `changes` warns (shopping lists ignore it).
+  Aisles outside `[nutrition.bank] aisles` warn.
+- Slots outside the configured slots fail.
+- The rendered region sits after the block; `recipes render` inserts it
+  there when a card has none. `render_card_region(card)` is the freshness
+  reference and, as in C11, runs from the start of the begin marker to the
+  end of the end marker; the line ending after the end marker belongs to
+  the prose. `coach.render.find_regions` locates it. A begin or end marker
+  naming another slug, or a second region, is an error.
+- The index (C11 header, source `nutrition/menu/`, command `recipes
+  render`) has one `## ` section per configured slot in order, the slot
+  note under it, then a table of the cards in that slot: active cards by
+  title, then benched cards. A slot with no cards says so.
+- `recipes import` returns `data: {slug, card, toml, prose, flags}`.
+  `slug` is a suggestion from the title; `card` is the draft block;
+  `prose` is the method as `## Method` steps. Flag codes:
+  `unparsed_ingredients` (with `lines`), `missing_nutrition`,
+  `per_serving_doubt`, `macro_sum` (with `severity`), `slot_guessed`,
+  `servings_missing`, `time_missing`, `aisle_guessed`. A draft without
+  all four macros leaves out `per_serving`. A page host of a known meal
+  kit (`gousto`, `hellofresh`) adds the tags `meal-kit` and the provider.
+- `recipes draft --input FILE` takes `{slug, card, prose}` (the import
+  output works as is) and returns `{slug, path, exists, text, results}`;
+  a failing draft exits 1.
+- `recipes convert --parse` returns `{cards: [{slug, card, toml}], review,
+  slot_notes, slot_notes_toml, slot_notes_unplaced, table}`. Each review
+  row: `slug`, `title`, the four macros, `ingredients` (count), `unparsed`
+  (lines), `guessed_aisles` (`{item, aisle, matched}`), `variations`
+  (count), `variations_to_fill` (names; none on eat-out cards), `notes`
+  (including every front-matter line it could not read and every key it
+  does not carry over). `slot_notes` maps each configured slot to the prose
+  under its heading in the old hand-kept index; `slot_notes_toml` is that
+  map as a `[nutrition.bank.slot_notes]` table for the coach to add to
+  `config.toml`; `slot_notes_unplaced` lists `{heading, note}` for prose
+  under no slot heading. The table lists the slot notes after the cards.
+  `--apply --input FILE` takes `{cards: [{slug, card}]}`, refuses (exit 1,
+  nothing written) a card that fails validation or is not an old YAML
+  card, backs up the old cards and index, and keeps every section of the
+  old body except the title, stats table, `## Ingredients` and
+  `## Variations`. It re-renders the index only once no old cards remain,
+  and lists the rest under `still_old_format`. It warns about, and returns
+  as `slot_notes_missing`, each old slot note that config lacks.
+- An old YAML card fails `recipe_cards` with a message that names
+  `recipes convert`.
 
 ## C34. Meal plan (R-33c owns; R-25 and R-45 read)
 

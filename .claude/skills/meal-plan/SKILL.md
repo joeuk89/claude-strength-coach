@@ -41,14 +41,16 @@ continue. Never plan from an empty bank, and never dead-end the athlete.
 Read `profile.md` (Nutrition & goals, Food & eating, the training week),
 `routine/program.md` (training days, double days, rest days — count
 cardio), `nutrition/menu/index.md`, and the newest dated plan in
-`nutrition/`. Spot-check the index against the card filenames; flag
-drift.
+`nutrition/`. If `python3 -m coach check --only
+recipe_index_fresh,recipe_render_fresh` fails, run `python3 -m coach
+recipes render` before reading the index.
 
 ## 2. Review the last plan (feedback loop)
 
 Open with a quick review of the most recent dated plan: what got eaten,
 skipped, swapped, disliked? Agree any card status changes (bench /
-un-bench) and apply them — card + index in the same operation.
+un-bench) and apply them: set `status` in each card's data block, then
+run `python3 -m coach recipes render`.
 
 Then a **bank-fit check** against the current phase: if `/goals` has
 changed the phase since the bank was last touched and the bank skews
@@ -212,7 +214,7 @@ Timing cues, batch-cook schedule, anything decided this run.
 | --- | --- |
 ```
 
-Then close out: apply any remaining card/index status changes agreed
-this run; update Food & eating for any preference the athlete confirmed
+Then close out: apply any remaining card status changes agreed this
+run (then `recipes render`); update Food & eating for any preference the athlete confirmed
 changed; remind the athlete that logging (MacroFactor, if used) stays
 the ground truth — the next `/check-in` reviews how the plan went.
