@@ -847,6 +847,13 @@ for every non-GET request, success or failure, once its retries are over.
   time it is pushed for that overlay and hash, so every routine in the
   span has a `verified: true` line once a push succeeds. `routines
   verify` appends nothing.
+- `routines create` (R-14b) appends a `write` line for each POST or PUT,
+  the one-off folder's POST included, and a `verify` line per routine it
+  creates or reuses, carrying the overlay's id and approval hash. The
+  `write` line of a `POST /v1/routines` names the new routine's id, taken
+  from Hevy's answer (`coach.hevy.client.created_routine`, which accepts
+  the routine bare or in a one-item list); it is null only when the
+  answer names none.
 
 ## C10. Overlay document (R-13 owns; R-14, R-15, R-16 read)
 
@@ -1071,11 +1078,20 @@ Cues: <cues>
   different template at a position is one structural change for the
   whole exercise. Hevy fields the body never sends (`custom_metric`,
   `index`, exercise `title`) are not compared.
+- **Which routine a session has** (`session_routines(root, overlay)`,
+  R-14b). The overlay's `hevy_routine_id` first. When it is null,
+  `data/state.json` decides (C16): a `temporary` session takes the
+  `hevy.temporary_routines` entry whose `overlay_id` is this overlay and
+  whose `session_id` is the session's; any other session takes the
+  `hevy.routines` id mapped to its session id. Two routines for one
+  session is a validation error (exit 1). State is read only when a
+  session's id is null. `diff`, `verify`, `push`, `retire` and the
+  `overlay_hevy_drift` check all resolve this way.
 - **Which session a routine carries.** One routine per id in the
   overlay's span. A routine that serves several sessions carries the
   next one dated today or later, or the last one when all have passed,
-  and the command warns. A session with a null `hevy_routine_id` makes
-  `diff`, `verify` and `push` exit 1 until R-14b.
+  and the command warns. A session with no routine either way makes
+  `diff`, `verify` and `push` exit 1, naming `routines create`.
 - **Push guards** (exit 3, before any request, and under `--dry-run`
   too): no approval; approval hash broken; an unresolved `block` flag;
   span ended before today; a routine's chosen session dated today or
@@ -1094,6 +1110,35 @@ Cues: <cues>
   they GET the span's routines first and write them into the cache
   (unless `--dry-run`). `verify` exits 0 and reports `verified` per
   routine and overall.
+- **`routines create --overlay ID`** (R-14b; H, gated like push). It
+  gives every session with no routine one, one routine per session id.
+  Same refusals as push, before any request and under `--dry-run` (exit
+  3), with the sessions to be created counted in the supersession check.
+  It needs `data/state.json` (exit 1 when absent), and a non-temporary
+  session must be a session of `data/program.json` when one exists (exit
+  1). A `temporary` session reuses the first `hevy.temporary_routines`
+  entry, in state order, that carries no session of this overlay and no
+  session dated today or later of another overlay in force that day; it
+  GETs that routine and PUTs the session over it (`intended_body` with
+  the live routine, so the folder is kept). With none left it POSTs a new
+  routine to `hevy.folders.one_off`, POSTing the folder `One-off weeks`
+  first when that is null. Any other session gets a new routine in
+  `hevy.folders.program` (no `folder_id` when null). The folder follows
+  the session's `temporary` flag rather than the overlay kind, so a
+  deload overlay of program sessions files a missing program routine
+  with the program. Each new id goes into state.json at once (the folder
+  in `folders.one_off`, a program routine in `hevy.routines`, a
+  temporary one as its `temporary_routines` entry with this overlay and
+  session), never into the overlay, so the approval hash holds. Each
+  routine is then read back, cached and verified as push does; a
+  read-back that differs exits 1 with the report, the ids already
+  recorded kept. A second run finds every session and writes nothing.
+  The report adds `folder` (`title`, `id`, `status`: `not_needed`,
+  `exists`, `would_create`, `created`) and, per routine, `reuse` (null
+  or the reused routine's old `title`), `folder_id` and `targets` (each
+  exercise's C12 Target line); `routine_id` is null for a routine not
+  yet created. Statuses: `would_create`, `would_reuse`, `created`,
+  `reused`, `failed`, `not_reached`.
 - `routines retire` refuses (exit 3) unless the overlay's span ended
   before today. For each `temporary` session's routine it GETs the live
   routine and PUTs it back titled `(unused)` with its exercises as they
@@ -1417,7 +1462,7 @@ version bump (below).
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "rotation": {"position": "week-a", "confirmed": true, "confirmed_at": "2026-10-11"},
   "block": {
     "started": "2026-09-01",
@@ -1428,8 +1473,11 @@ version bump (below).
   "scheme_state": {"session-a/bb_back_squat": {}},
   "hevy": {
     "routines": {"00000000-0000-4000-8000-000000000001": {"session_id": "session-a"}},
-    "folders": {"program": 1, "one_off": null},
-    "temporary_routines": []
+    "folders": {"program": 1, "one_off": 2},
+    "temporary_routines": [
+      {"routine_id": "00000000-0000-4000-8000-0000000000a1", "overlay_id": "2026-10-19-one-off",
+       "session_id": "travel-a"}
+    ]
   }
 }
 ```
@@ -1444,6 +1492,11 @@ version bump (below).
 - `hevy.routines` replaces `routine/hevy-map.json`; each `session_id`
   names a program session. Folder ids are Hevy's integers or null. R-14b's
   `routines create` records new routine ids here, never in the overlay.
+- `hevy.temporary_routines` (v2, R-14b): the reusable temporary routines,
+  in reuse order. Each entry is `{"routine_id", "overlay_id",
+  "session_id"}`: the overlay session it last carried, or both null when
+  it has carried none. The migration from v1 turns each id into an entry
+  with both null.
 
 **Reading and validating.** `coach.program.load(root)` and
 `coach.state.load(root)` return the schema-checked document (ValidationError,
@@ -1517,8 +1570,9 @@ skip when there is no `data/program.json` (`state_schema`: no
 - `/framework-sync` runs the dry run after copying files, shows it, runs
   `migrate run`, and commits the staged files with the framework.
 
-**Schema versions.** R-17a ships program and state v1; R-23a takes both to
-v2 (C23). Every later bump takes the next free version when it merges and
+**Schema versions.** R-17a ships program and state v1. R-14b takes state
+to v2 (`temporary_routines` entries). R-23a takes program to v2 and state
+to the next free version (C23). Every later bump takes the next free version when it merges and
 adds one step to the R-17a migration chain, so the chain stays linear.
 Program bumps: R-22 (executable `missed_day_rules`, C37), R-30a
 (`dose_targets`, C40), R-30b (`priority`, `minimum_week`, C40), R-44a
@@ -2089,7 +2143,7 @@ and `plugins test` runs them. Loaded with
 `importlib.util.spec_from_file_location`. Check `plugins_valid` runs
 `plugins validate`.
 
-**Program and state v2** (R-23a bumps C16, migration steps through R-17a):
+**Program v2 and the next state version** (R-23a bumps C16, migration steps through R-17a):
 
 - `program.json` 2: `scheme.name`, `schedule.rule` and
   `blocks.deload_rule.name` are any registered plugin name of the right
@@ -2097,7 +2151,7 @@ and `plugins test` runs them. Loaded with
   `PARAMS` by `program validate`; exercise `constraints` items take the
   C26 shape. Migration: names unchanged, `constraints` emptied with a
   report row for any v1 free-form entry.
-- `state.json` 2: `scheme_state["<session_id>/<exercise_id>"]` becomes
+- `state.json`, the next free version (R-14b took 2): `scheme_state["<session_id>/<exercise_id>"]` becomes
   `{"scheme": name, "data": {...}, "pending": null | {"overlay_id": id, "data": {...}}}`;
   `data` validated against the scheme's `STATE`. Migration wraps v1
   entries.
@@ -4717,7 +4771,7 @@ athlete's instance, a real key, a live session or a purchase):
 | R-26b follow-up (#54) | R-26b | Human: verify the hooks in a live session. |
 | R-20 (#16) | R-11, R-12, R-13 | History, stats, session caps, flag registry (C17–C20). Merges after R-26a (it rewires skills R-26a also edits). |
 | R-24 (#20) | R-11, R-13, R-17a, R-20 | Overlay v2 and validity (C21, C22). Lands before R-23a. Merges after R-26a (it rewires skills R-26a also edits). |
-| R-23a (#19) | R-17a, R-20, R-24 | Plugins, proposal pipeline, decisions, load constraints (C23–C26); program and state v2. Merges after R-26a (it rewires skills R-26a also edits). |
+| R-23a (#19) | R-17a, R-20, R-24 | Plugins, proposal pipeline, decisions, load constraints (C23–C26); program v2 and the next state version. Merges after R-26a (it rewires skills R-26a also edits). |
 | R-23b (#37) | R-23a | Remaining schemes and schedule rules. |
 | R-27 (#23) | R-17a, R-23a | Follow-ups and niggles (C27). |
 | R-21a (#17) | R-13, R-14, R-17a, R-20 | Card, records, skeleton (C36). |
