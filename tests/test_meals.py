@@ -367,6 +367,27 @@ class BuildTest(CliMixin, unittest.TestCase):
         self.assertIn(("2026-10-16", "lunch"), opened)
         self.assertIn(("2026-10-15", "lunch"), opened)
 
+    def test_office_change_that_meets_two_rows_needs_an_exception(self):
+        with InstanceCopy() as root:
+            set_config(root, 'pool = ["chicken-rice-bowl"]',
+                       'pool = ["chicken-rice-bowl"]\n\n[[nutrition.template.standing]]\ndays = ["fri"]\n'
+                       'slot = "lunch"\nrecipe = "turkey-chilli"')
+            flip = {"date": "2026-10-16", "office": True}
+            with self.assertRaises(ValidationError) as caught:
+                build(draft_with(exceptions=[flip], assignments=[], use_up=[]), root)
+            self.assertIn("standing[1]", caught.exception.message)
+            cover = {"date": "2026-10-16", "slot": "lunch", "entry": {"recipe": "turkey-chilli"}}
+            plan = build(draft_with(exceptions=[flip, cover], assignments=[], use_up=[]), root)
+        self.assertEqual(items(plan, "2026-10-16", "lunch")[0]["source"], "exception")
+
+    def test_an_anchor_naming_a_card_is_shopped(self):
+        with InstanceCopy() as root:
+            set_config(root, "kcal = 150\nprotein_g = 30\n", 'recipe = "whey-shake"\n')
+            plan = build(root=root)
+        anchor = items(plan, "2026-10-12", "snack")[0]
+        self.assertEqual((anchor["source"], anchor["name"], anchor["kcal"]), ("anchor", "Whey shake", 150))
+        self.assertEqual(buy(plan, "whey protein powder")["qty"], 266)
+
     def test_rebuilding_an_approved_plan_is_refused(self):
         with InstanceCopy() as root:
             self.run_ok(root, "meals", "approve", PLAN_ID)

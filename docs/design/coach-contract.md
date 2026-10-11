@@ -397,7 +397,17 @@ must say `enabled`, so the numbers are never silently ignored. With
 `nutrition.kcal_target`; `floor_g <= target_g <= stretch_g`; an
 override's `expires` is after `start` and at most 21 days after it;
 `renewal` is 0, 1 or 2; an anchor names at least one day. Weights are
-in `[athlete] bodyweight_units`.
+in `[athlete] bodyweight_units`. R-33c's rules: an anchor gives `kcal`
+and `protein_g`, or `recipe` (a card slug), not both; a standing row
+sets exactly one of `recipe`, `pool` or `cover`, a cover row carries
+`kcal` and `protein_g` and no other row does; with a template, every
+standing row's and anchor's `slot` is one of its `slots`; and two
+standing rows whose days meet (`daily` is every day, `office` the
+`office_days`, `home` the rest) may not fill the same slot, an error at
+the later row that names both. `[nutrition.template]` defaults: `slots`
+the four below, `office_days` and `staples` empty, `kcal_tolerance_pct`
+15, `shopping_issue` false, `standing` empty; `plan_style` has no
+default value in config (C34 says how the plan picks one).
 No key holds a calorie figure the nutrition app owns. All three items
 declare their keys in one module, `coach/config_tables/nutrition.py`
 (R-33b created it with `[nutrition.bank]`; R-33a and R-33c add theirs to
@@ -1188,8 +1198,9 @@ files to it; nobody edits another item's files.
 | planned (R-42a) | `manual:2026-10-14-run-1` "Easy 5 km", `manual:2026-10-16-run-1` "Intervals" `quality: true` |
 | nutrition (R-33a) | `[nutrition]` enabled, app macrofactor, phase recomp, target rate 0.0, reference mass 80, floor 110, target 128, stretch 176, `floor_since` 2026-09-28, one anchor "Whey shake" 150 kcal / 30 g daily snack |
 | readings (R-33a) | 2026-09-28 (avg protein 104), 2026-10-04 (112), 2026-10-11 (115), app target protein 110; trend weights 82.6, 82.5, 82.4; 7 days logged and anchors yes each week. Seed input for `nutrition import`: `tests/fixtures/nutrition/seed.json` (2026-09-07, 09-14, 09-21) |
-| cards (R-33b) | `chicken-rice-bowl` lunch 610/50/55/18 with `light` variation; `overnight-oats` breakfast; `whey-shake` snack |
-| meal plan (R-33c) | `2026-10-12`, span 2026-10-12 to 2026-10-18 |
+| cards (R-33b) | `chicken-rice-bowl` lunch 610/50/55/18 with `light` variation; `overnight-oats` breakfast; `whey-shake` snack. R-33c adds `spinach-omelette` (breakfast, dinner; 3 eggs, 80 g spinach) and `turkey-chilli` (lunch, dinner; `servings = 4`) |
+| template (R-33c) | `[nutrition.template]`: office days tue, thu; staples eggs, rolled oats, olive oil; standing breakfast `overnight-oats` daily, office lunch pool `chicken-rice-bowl`, dinner covered by `family` (900 kcal, 40 g) Monday to Thursday |
+| meal plan (R-33c) | `2026-10-12`, span 2026-10-12 to 2026-10-18, built from `tests/fixtures/meals/draft-2026-10-12.json` and rendered, not approved |
 | research (R-32a) | template note `research/fixture-dose.md` (area `volume`, claims 1 and 2 current, `review_by` 2028-03-01); local note `research/local/local-fixture-knee.md` (area `rehab`, `updates = ["rn:fixture-dose.2"]`); `reference/fixture-guide.md` citing claim 1 of `fixture-dose`; record `check-ins/2026-08-30.md` (weekly) citing claim 1 of `local-fixture-knee` |
 
 Logged workouts in the valid instance (R-20 adds them as synthetic Hevy
@@ -1228,6 +1239,9 @@ Unless stated, each is a copy of `valid/` plus what is listed.
 | `interference/` | R-44a | a planned quality run on 2026-10-11 and Session A (squat at RPE 7) on 2026-10-12 |
 | `nutrition-bad-readings/` | R-33a | the valid config; a readings series with 2026-10-04 twice, the second with no weight and no protein |
 | `nutrition-override/` | R-33a | the valid config plus `[nutrition.override]` 2026-10-01 to 2026-10-22, renewal 1; no readings |
+| `meals-template-overlap/` | R-33c | not a copy of `valid/`: the valid config plus a fourth standing row filling Monday dinner |
+| `meals-bad-template/` | R-33c | not a copy of `valid/`: the valid config with the standing breakfast naming the missing card `porridge` and the anchor naming the benched card `protein-bar`; a menu of `chicken-rice-bowl` and `protein-bar` |
+| `meals-bad-arithmetic/`, `meals-stale-render/` | R-33c | not copies of `valid/`: the valid config and the valid plan, with one fault each: Monday's kcal total 100 over its items; a hand-edited Monday row in the rendered plan |
 | `overlay-bad-schema/`, `overlay-bad-arithmetic/`, `overlay-stale-render/` | R-13 | `config.toml` plus the valid overlay with one fault each: Session B dated outside the span; DB bench working sets at `hevy_total` 25 for 25/hand; a hand-edited check-in region |
 | `routines-drift/`, `routines-pushed/` | R-14 | not copies of `valid/`: its `config.toml`, the valid overlay and a Hevy cache (`meta.json`, `routines.json`). `routines-drift/` caches the synthetic routines as pulled; `routines-pushed/` caches them after `routines push` of the valid overlay to the fake |
 | `program-bad-schema/`, `program-misspelt-key/`, `program-unknown-exercise/`, `program-avoided/`, `program-stale-render/`, `program-top-set/`, `state-bad-schema/` | R-17a | not copies of `valid/`: `config.toml` plus the valid program with one change each: DB bench without `load_mode`; squat `rest_secs`; squat as `no_such_exercise`; an instance library marking DB bench `avoid`; the valid routine pages with one character of `session-a.md` edited; squat as a 1×3 top set and 3×5 back-offs; a state with deload status `pending` |
@@ -3022,6 +3036,71 @@ picks for open slots:
   `meal_plans` (schema, arithmetic), `meal_plan_render_fresh`,
   `nutrition_template` (template and anchors name existing, active cards).
 
+Settled while building R-33c (`coach/schemas/meal_plan.schema.json`,
+`coach/schemas/meal_plan_draft.schema.json`):
+
+- **Draft.** `span` is required; `exceptions`, `assignments`, `use_up`
+  and `notes` are optional, and an optional `schema_version` is 1. An
+  exception is `{date, slot, entry, note}` or `{date, office, note}`,
+  never both; at most one per date and slot and one office change per
+  date. An exception replaces everything the template puts in its slot
+  that day, anchors included. An assignment `{date, slot, entry, note}`
+  adds an item to its slot, so several may share a slot (a top-up beside
+  a covered dinner); it fills a pool slot, and it may not land on a
+  slot an exception skips. An entry sets exactly one of `recipe`,
+  `cover` (with `kcal` and `protein_g`) or `skip: true`; `variations`,
+  `covered_by` and `lock` belong only with `recipe`. Dates lie in the
+  span and slots in `[nutrition.template] slots`. Any of these problems
+  exits 1 before anything is built. An office change that makes two
+  standing rows meet on a date exits 1 unless an exception covers that
+  slot.
+- **Item.** Every item carries `slot`, `source`, `recipe`, `title` (the
+  card's, snapshotted), `variations`, `covered_by`, `cover`, `name` (an
+  anchor's), `skip`, `lock`, `note` (the exception's or assignment's),
+  `kcal` and `protein_g`. A recipe's macros are its per-serving numbers
+  plus the deltas of the variations that apply. An unknown recipe has
+  null macros, counted as 0 in totals. Macros and totals are rounded to
+  0.01.
+- **Pool.** One entry per (recipe, sorted variations, `covered_by`):
+  `recipe`, `title`, `variations`, `count`, `covered_by`, `servings`,
+  `batches` (null when covered or the card is unknown), and the
+  per-serving `kcal` and `protein_g`. Anchors that name a card are in the
+  pool and the shopping list; inline anchors are in neither.
+- **Shopping.** Variations apply to a batch's ingredients in order; one
+  that conflicts with an earlier one is skipped. `use_up` comes off the
+  matching (item, unit) line; `used_up` records the amount taken off.
+  A use-up item the plan needs only in another unit gives `units_mixed`
+  and takes nothing off; one the plan does not need gives
+  `use_up_unmatched`. An item needed in two units gives one
+  `units_mixed` and keeps a line per unit. Staples match items exactly
+  and are listed in `staples` order; `buy` follows `[nutrition.bank]
+  aisles`, unknown aisles last, then item name.
+- **Targets.** `kcal` is the `target_kcal` of the newest reading that
+  has one (`kcal_source` `"reading <date>"`) when an app is in use, or
+  `kcal_target` (`"kcal_target"`) without one, else null with a
+  `no_target` flag. `protein_floor_g` is `[nutrition.protein] floor_g`.
+  `kcal_off_target` fires when a day's total is further from `kcal` than
+  `kcal_tolerance_pct`.
+- **Flags** are `{code, severity, date, slot, message, resolved,
+  resolution}`. Severities are fixed per code: `recipe_unknown`,
+  `variation_unknown` and `variation_conflict` are `block`, the rest
+  `warn`. `slot_open` fires for a slot with no item and for a pool slot
+  with no assignment.
+- **Style.** `plan_style` when set; otherwise `loose` when a standing
+  row covers dinner, else `strict`.
+- **Commands.** `meals template` defaults to the first whole week after
+  today and returns `span`, `week`, `style`, `slots`, `office_days`,
+  `staples`, `kcal_tolerance_pct`, `shopping_issue`, `targets`, `days`
+  (each slot's template and anchor `entries` and `open`) and
+  `open_slots`. `meals build` reads `--input` relative to the working
+  directory, returns `{id, path, written, plan, rendered}`, and refuses
+  (exit 3) to rebuild a plan that carries an approval. `meals shopping`
+  returns `{text}` for markdown, or `{title, body, shopping_issue}` for
+  an issue; the body's Buy lines are `- [ ] ` items under `### <aisle>`
+  headings, then a `### Check you have` section. Neither `meals
+  render`'s output nor the issue body reads a card: a card edited after
+  the build changes nothing.
+
 ## C35. Nutrition readings series (R-33a owns; R-21a, R-25, R-33c read)
 
 `data/nutrition/readings.json`, one entry per check-in, sorted by date,
@@ -3069,7 +3148,9 @@ dates unique:
   `protein` (the `[nutrition.protein]` table), `anchors`, `override`
   (the table plus `state`: `upcoming`, `active` or `expired`; null when
   none), `template` (whether `[nutrition.template]` exists),
-  `latest_reading`, `trend`, `flags`, `brief_line`, `questions`.
+  `latest_reading`, `trend`, `flags`, `plan` (R-33c: the rendered path
+  of the meal plan whose span holds today, the latest-starting one when
+  several do, else null), `brief_line`, `questions`.
   Disabled: `{"enabled": false, "brief_line": null, "questions": []}`.
 - `trend`: `{basis, rate_per_week, span, days, target_rate_per_week}`.
   `basis` is `trend_weight` with an app and `scale_weight` without one.
@@ -3100,7 +3181,8 @@ dates unique:
   `template` is true. `brief_line` reads `Food: protein floor <g> g,
   last week <g> g · anchors: <names or none> · override: <none | what,
   until D | what, from D | expired D>`; with no reading it says "no
-  reading yet", with no protein figure "last week not tracked".
+  reading yet", with no protein figure "last week not tracked". With a
+  `plan`, the line ends ` · plan: <path>` (R-33c).
 - Readers: R-25 reads C4 `phase` and may read C35 weights for
   `progress.md`'s bodyweight trend; R-40a reads `[nutrition] enabled` and
   writes the table at setup; R-45 reads the card's nutrition question and
