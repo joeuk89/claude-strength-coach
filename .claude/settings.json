@@ -1,7 +1,47 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:api.hevyapp.com)"
+      "WebFetch(domain:api.hevyapp.com)",
+      "Bash(python3 -m coach check:*)",
+      "Bash(python3 -m coach units format:*)",
+      "Bash(python3 -m coach units convert:*)",
+      "Bash(python3 -m coach units round:*)",
+      "Bash(python3 -m coach dates week:*)",
+      "Bash(python3 -m coach dates span:*)",
+      "Bash(python3 -m coach config show:*)",
+      "Bash(python3 -m coach config validate:*)",
+      "Bash(python3 -m coach version:*)",
+      "Bash(python3 -m coach library list:*)",
+      "Bash(python3 -m coach library show:*)",
+      "Bash(python3 -m coach library search:*)",
+      "Bash(python3 -m coach library validate:*)",
+      "Bash(python3 -m coach library seed:*)",
+      "Bash(python3 -m coach library confirm:*)",
+      "Bash(python3 -m coach library set-mode:*)",
+      "Bash(python3 -m coach hevy status:*)",
+      "Bash(python3 -m coach hevy pull:*)",
+      "Bash(python3 -m coach overlay list:*)",
+      "Bash(python3 -m coach overlay current:*)",
+      "Bash(python3 -m coach overlay validate:*)",
+      "Bash(python3 -m coach overlay notes:*)",
+      "Bash(python3 -m coach overlay build:*)",
+      "Bash(python3 -m coach overlay render:*)",
+      "Bash(python3 -m coach overlay approve:*)",
+      "Bash(python3 -m coach routines diff:*)",
+      "Bash(python3 -m coach routines verify:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && python3 -m coach gate pretooluse"
+          }
+        ]
+      }
     ]
   }
 }
