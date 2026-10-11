@@ -357,6 +357,20 @@ logged) or `program` (the coach writes the planned activities). How much
 the data says comes from the activity sources, not the tier.
 _Avoid_: cardio mode, cardio level
 
+**Interference rule**:
+A program rule on spacing lifting and quality activities: lift first with
+at least 6 hours before a same-day quality activity, and no quality
+activity in the 24 hours before a heavy lower session. A broken rule
+raises a `collision` flag; the coach and athlete decide what moves.
+Easy activities never trigger one.
+_Avoid_: conflict, spacing rule
+
+**Heavy lower session**:
+A lifting session with a compound squat or hinge exercise that has a
+working set at RPE 7 or more, or of 6 reps or fewer when no RPE is set.
+Coach-led sessions never count as one.
+_Avoid_: leg day, heavy day
+
 **Research note**:
 A dated, cited answer to one coaching question, with a confidence and a
 review-by date (`review_by`), that the coach consults before deciding in
