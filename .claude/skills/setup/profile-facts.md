@@ -14,6 +14,9 @@ The answers that scripts read go into config and data, not prose:
   offer conservative beginner-style re-entry while retaining the history;
   there is no years-off-to-level formula. Old working weights are historical,
   not current start loads; use calibration unless current loads are confirmed.
+  A skill exercise they do now for working sets (strict pull-ups, chin-ups,
+  dips, Nordic curls, hanging leg raises) goes in `[athlete]
+  demonstrated_exercises` by library id; experience alone confirms none.
 - **Question 4** → `[athlete] desired_sessions` (1–7), `available_days`
   (`"mon"` .. `"sun"`) and `session_minutes`. Desired sessions are the total
   weekly target, including coach-led sessions; settle their share before
@@ -24,12 +27,16 @@ The answers that scripts read go into config and data, not prose:
   `barbell`, `ez_bar`, `trap_bar`, `dumbbell`, `kettlebell`, `machine`,
   `smith_machine`, `cable`, `plate`, `band`, `suspension`, `bodyweight`,
   `cardio_machine` and `other`; an empty list assumes every piece),
+  `apparatus` (the benches, bars and supports there: `flat_bench`,
+  `incline_bench`, `pull_up_bar`, `dip_station`, `nordic_anchor`, `box`;
+  once `available` lists the kit, an unlisted one is missing),
   `dumbbells` (per-hand weights, when the set is limited), `dumbbell_max`
   and `plates`. If the main place is a home gym, run `python3 -m coach
   config suggest --unit <kg|lb> --gym home` and use its values instead.
   Each other place gets one `[equipment.locations.<name>]` table
   (lowercase letters, digits and hyphens) holding only the keys that
-  differ from `[equipment]`.
+  differ from `[equipment]`; one that lists its own `available` also
+  lists its own `apparatus`.
 - **Question 6** → a lasting limitation becomes a niggle: `python3 -m
   coach niggles add --area "<where>" --status chronic --pattern
   <patterns> --constraint <kind=value> --constrain-while chronic --notes

@@ -23,9 +23,9 @@ class CatalogueTest(unittest.TestCase):
     def test_every_entry_validates(self):
         self.assertEqual(validate(self.doc, jsonio.load_schema("exercise_catalogue")), [])
 
-    def test_size_is_about_80_to_120(self):
+    def test_size_is_about_80_to_130(self):
         self.assertGreaterEqual(len(self.entries), 80)
-        self.assertLessEqual(len(self.entries), 120)
+        self.assertLessEqual(len(self.entries), 130)
 
     def test_ids_are_unique_and_never_custom(self):
         ids = [entry["id"] for entry in self.entries]
@@ -96,6 +96,8 @@ class SchemaEnumTest(unittest.TestCase):
                 self.assertEqual(tuple(defs["muscle"]["enum"]), library.MUSCLES)
                 self.assertEqual(tuple(defs["equipment"]["enum"]), library.EQUIPMENT)
                 self.assertEqual(tuple(defs["load_mode"]["enum"]), units.LOAD_MODES)
+        self.assertEqual(tuple(jsonio.load_schema("exercise_catalogue")["$defs"]["apparatus"]["enum"]),
+                         library.APPARATUS)
 
     def test_muscles_are_hevys_with_shoulders_split(self):
         self.assertNotIn("shoulders", library.MUSCLES)

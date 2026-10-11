@@ -17,15 +17,17 @@ def _equipment(text):
 @command(
     "starters list",
     help="The starter programs that fit a day count and the equipment (default: [equipment] available), with the "
-         "ones that suit [athlete] experience marked",
+         "swaps each needs and the ones that suit [athlete] experience and fit the kit marked",
     args=(
         arg("--days", type=int, metavar="N", help="training days a week; lists starters that take N days"),
         arg("--equipment", metavar="E,...", help="equipment ids available; default: [equipment] available"),
+        arg("--location", metavar="NAME", help="judge the kit at [equipment.locations.NAME] instead of the main "
+                                               "place"),
     ),
 )
 def list_starters(args, ctx):
     equipment = _equipment(args.equipment) if args.equipment is not None else None
-    return starters.listing(ctx.config, args.days, equipment)
+    return starters.listing(ctx.root, ctx.config, args.days, equipment, args.location, ctx.today())
 
 
 @command(
@@ -47,6 +49,8 @@ def show(args, ctx):
                                                   "else the starter's own"),
         arg("--start-load", action="append", metavar="EXERCISE=VALUE",
             help="a known working load in your units (per hand for dumbbells); repeat for each lift"),
+        arg("--location", metavar="NAME", help="train every session at [equipment.locations.NAME] and fit the "
+                                               "draft to its kit"),
         arg("--out", metavar="FILE", help="where to write the draft"),
     ),
     writes=True,
@@ -54,7 +58,8 @@ def show(args, ctx):
 def draft(args, ctx):
     days = starters.parse_days(args.days) if args.days is not None else None
     found, chosen = starters.draft(ctx.root, args.id, days, starters.parse_start_loads(args.start_load),
-                                   now=ctx.now(), config=ctx.config)
+                                   now=ctx.now(), config=ctx.config, location=args.location,
+                                   today=ctx.today())
     out = Path(args.out) if args.out else Path(ctx.root) / program_drafts.DEFAULT_OUT
     jsonio.write_doc(out, found, args.dry_run)
     shown = args.out if args.out else program_drafts.DEFAULT_OUT.as_posix()

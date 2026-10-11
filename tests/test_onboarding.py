@@ -79,6 +79,12 @@ class SuggestTest(unittest.TestCase):
         self.assertEqual(data["values"]["equipment"]["dumbbell_increment"], 2.5)
         self.assertIn("equipment.dumbbell_max", [note["key"] for note in data["notes"]])
 
+    def test_every_gym_asks_which_benches_bars_and_supports_it_has(self):
+        for gym in ("commercial", "home"):
+            data = self.suggest("--unit", "kg", "--gym", gym)
+            self.assertIn("equipment.apparatus", [note["key"] for note in data["notes"]])
+            self.assertNotIn("apparatus", data["values"]["equipment"])
+
     def test_every_note_names_a_key_and_says_what_to_confirm(self):
         for unit in ("kg", "lb"):
             for gym in ("commercial", "home"):

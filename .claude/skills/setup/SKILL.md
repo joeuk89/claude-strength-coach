@@ -67,13 +67,13 @@ Use these six groups: 1 to 3, then 4 to 6.
 2. **Goal:** what they want from training, in their own words.
 3. **Training history and current level:** past training, recent consistency,
    time off, and known current working weights (weight and reps). Confirm
-   today's programming level; history alone does not set it.
+   today's programming level; history alone does not set it. Ask which
+   strict pull-ups or dips they can do now.
 4. **The training week:** desired weekly sessions, available weekdays,
    minutes per session, any coach-led sessions (PT, team training) and their days,
    any classes, any runs.
-5. **Equipment, per place they train:** the main place and what it has,
-   and each other place with what differs; plus whatever
-   `config suggest`'s notes said to confirm.
+5. **Equipment, per place they train:** what each place has, benches,
+   bars and supports too; plus what `config suggest`'s notes said to confirm.
 6. **Injuries and limitations:** anything that hurts or limits training
    now or keeps coming back, and any exercise they cannot or will not
    do.

@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 
 from coach import config as config_module
-from coach import jsonio, migrate, plugins, program, program_drafts, units
+from coach import fit, jsonio, migrate, niggles, plugins, program, program_drafts, structure, units
 from coach.errors import ValidationError
 from coach.library import Library
 from coach.plugins.base import WEEKDAYS
@@ -17,6 +17,9 @@ from coach.validate import validate as validate_schema
 
 SCHEMA = "starter"
 STARTERS_DIR = Path(__file__).resolve().parent / "starters"
+MAJOR_MUSCLES = ("chest", "upper_back", "lats", "front_delts", "side_delts", "quadriceps", "hamstrings", "glutes",
+                 "biceps", "triceps")
+OTHER_TARGET_CAP = 6
 
 
 def _path(starter_id, directory):
@@ -70,16 +73,24 @@ def load_all(directory=STARTERS_DIR):
     return [load(starter_id, directory) for starter_id in ids(directory)]
 
 
-def _kit(config):
-    return list(config_module.equipment_for(config).get("available") or [])
+def _fit(root, config, library, location=None, available=None, day=None):
+    kit = fit.Kit(config, location, available)
+    rows = niggles.load(root, library)["niggles"] if niggles.exists(root) else []
+    return fit.Fit(library, kit, rows, day)
 
 
-def _row(starter, experience):
+def _lacking(starter, kit):
+    return [piece for piece in starter["equipment_required"] if kit.available and piece not in kit.available]
+
+
+def _row(starter, experience, report):
+    swaps = sum(row["kind"] == "swapped_exercise" for row in report)
+    unmatched = sum(row["kind"] == "no_substitute" for row in report)
     return {
         "id": starter["id"], "title": starter["title"], "summary": starter["summary"], "level": starter["level"],
         "days": starter["days"], "minutes": starter["minutes_per_session"],
-        "equipment_required": starter["equipment_required"],
-        "recommended": experience in starter["level"],
+        "equipment_required": starter["equipment_required"], "swaps": swaps, "unmatched": unmatched,
+        "recommended": experience in starter["level"] and unmatched == 0,
     }
 
 
@@ -87,25 +98,30 @@ def _order(starter):
     return len(starter["days"]["default"]), starter["id"]
 
 
-def listing(config, days=None, equipment=None, directory=STARTERS_DIR):
-    """Starters that fit `days` and `equipment` (default: `[equipment] available`; empty means every piece).
+def listing(root, config, days=None, equipment=None, location=None, today=None, directory=STARTERS_DIR):
+    """Starters that fit `days` and the kit (default: `[equipment] available`; empty means every piece).
 
-    `recommended` marks each starter whose level suits `[athlete] experience`
-    and `recommended_id` names the first of them in list order; it is advice
-    and filters nothing.
+    Each row counts the lines a draft would swap (`swaps`) and those with no
+    fitting substitute (`unmatched`). `recommended` marks each starter whose
+    level suits `[athlete] experience` and whose every line fits, directly
+    or by a swap; `recommended_id` names the first of them in list order. It
+    is advice and filters nothing.
     """
-    kit = _kit(config) if equipment is None else list(equipment)
+    library = Library.load(root)
+    fitter = _fit(root, config, library, location, equipment, today)
+    registry = plugins.load(root)
     experience = config.athlete.experience
     found = []
     for starter in sorted(load_all(directory), key=_order):
         if days is not None and not starter["days"]["min"] <= days <= starter["days"]["max"]:
             continue
-        if kit and any(piece not in kit for piece in starter["equipment_required"]):
+        if _lacking(starter, fitter.kit):
             continue
-        found.append(_row(starter, experience))
+        report, _ = _swap_all(copy.deepcopy(starter["program"]), library, fitter, registry)
+        found.append(_row(starter, experience, report))
     recommended = next((row["id"] for row in found if row["recommended"]), None)
-    return {"starters": found, "days": days, "equipment": kit, "experience": experience,
-            "recommended_id": recommended}
+    return {"starters": found, "days": days, "equipment": fitter.kit.available, "location": location,
+            "experience": experience, "recommended_id": recommended}
 
 
 def show(starter_id, library, unit, directory=STARTERS_DIR):
@@ -188,61 +204,98 @@ def _position(schedule):
     return None
 
 
-def _why_not(entry, library, kit):
-    """Why a line cannot stay as it is (avoided, or kit the athlete lacks), or None."""
-    avoid = library.avoided(entry["id"])
-    if avoid:
-        return f"marked avoid in the exercise library ({avoid['reason']})"
-    if kit and entry["equipment"] not in kit:
-        return f"needs {entry['equipment']}, which [equipment] available does not list"
-    return None
-
-
 def _load_mode(library, entry):
     return library.effective_load_mode(entry["id"]) or entry["load_mode_default"]
 
 
-def _fits(candidate, library, kit, taken, scheme_modes):
-    if candidate is None or candidate["id"] in taken or _why_not(candidate, library, kit):
-        return False
-    return scheme_modes is None or _load_mode(library, candidate) in scheme_modes
+def _passed_over(passed):
+    return f" (passed over {'; '.join(passed)})" if passed else ""
 
 
-def _substitute(session, line, library, kit, registry, rows):
-    """Swap one line for its first fitting library substitute, or report that none fits. Returns the new id or None."""
+def _substitute(session, line, library, fitter, registry, rows):
+    """Swap one line for its first fitting library substitute, or report that none fits. Returns the new id or None.
+
+    The report row names every substitute passed over and why.
+    """
     entry = library.get(line["exercise_id"])
-    reason = _why_not(entry, library, kit)
+    reason = fitter.why_not(entry)
     if reason is None:
         return None
-    plugin = registry.get("scheme", line["scheme"]["name"])
+    scheme = line["scheme"]["name"]
+    plugin = registry.get("scheme", scheme)
     scheme_modes = getattr(plugin.module, "LOAD_MODES", None) if plugin else None
     taken = {other["exercise_id"] for other in session["exercises"]}
+    passed = []
     for candidate_id in entry["substitutes"]:
         candidate = library.get(candidate_id)
-        if _fits(candidate, library, kit, taken, scheme_modes):
-            mode = _load_mode(library, candidate)
-            line.update(exercise_id=candidate_id, load_mode=mode, cues=None,
-                        start_load=0 if mode == "bodyweight" else None)
-            rows.append(program_drafts.report_row(
-                "swapped_exercise", f"{entry['name']} → {candidate['name']}: {entry['name']} {reason}; set the "
-                                    "cues with the athlete", session["id"], entry["id"]))
-            return candidate_id
+        if candidate_id in taken:
+            why = "already in this session"
+        else:
+            why = fitter.why_not(candidate, replacing=entry)
+        mode = _load_mode(library, candidate)
+        if why is None and scheme_modes is not None and mode not in scheme_modes:
+            why = f"the {scheme} scheme does not take its load mode {mode}"
+        if why:
+            passed.append(f"{candidate['name']}: {why}")
+            continue
+        line.update(exercise_id=candidate_id, load_mode=mode, cues=None, start_load=0 if mode == "bodyweight" else None)
+        rows.append(program_drafts.report_row(
+            "swapped_exercise", f"{entry['name']} → {candidate['name']}: {entry['name']} {reason}"
+                                f"{_passed_over(passed)}; set the cues with the athlete", session["id"], entry["id"]))
+        return candidate_id
     rows.append(program_drafts.report_row(
-        "no_substitute", f"{entry['name']} {reason}, and none of its library substitutes fits; swap or drop it with "
-                         "the athlete", session["id"], entry["id"]))
+        "no_substitute", f"{entry['name']} {reason}, and none of its library substitutes fits{_passed_over(passed)}; "
+                         "swap or drop it with the athlete", session["id"], entry["id"]))
     return None
 
 
-def _swap_all(doc, library, kit, registry):
-    """(report rows, {old id: new id}) after swapping every line the athlete's kit or avoid list rules out."""
+def _swap_all(doc, library, fitter, registry):
+    """(report rows, {old id: new id}) after swapping every line the kit, the athlete or the avoid list rules out."""
     rows, swapped = [], {}
     for session in doc["sessions"]:
         for line in session["exercises"]:
             old = line["exercise_id"]
-            new = _substitute(session, line, library, kit, registry, rows)
+            new = _substitute(session, line, library, fitter, registry, rows)
             if new is not None and session["status"] == "active":
                 swapped.setdefault(old, new)
     return rows, swapped
+
+
+def _weekly_dose(doc, library):
+    """Fractional hard sets per muscle a week on the program's active core lifting sessions, at its schedule."""
+    params = doc["schedule"]["params"]
+    if doc["schedule"]["rule"] == "fixed_weekdays":
+        per_week = {}
+        for session_id in params["days"].values():
+            per_week[session_id] = per_week.get(session_id, 0) + 1
+    else:
+        share = len(params["days"]) / len(params["sequence"])
+        per_week = {}
+        for session_id in params["sequence"]:
+            per_week[session_id] = per_week.get(session_id, 0) + share
+    totals = {}
+    for session in doc["sessions"]:
+        if session["status"] != "active" or session["tier"] != "core" or session["kind"] != "lifting":
+            continue
+        for muscle, sets in structure.session_dose(library, session).items():
+            totals[muscle] = totals.get(muscle, 0.0) + sets * per_week.get(session["id"], 0)
+    return totals
+
+
+def _retarget(doc, library):
+    """Re-derive the starter's targets for muscles other than the major ones after swaps.
+
+    As the starter files do: each other primary muscle of an active exercise
+    gets its planned weekly sets, capped, so it never falls back to the
+    default target; a muscle no longer trained as a primary loses its target.
+    """
+    weekly = _weekly_dose(doc, library)
+    primary = {muscle for session in doc["sessions"] if session["status"] == "active"
+               for line in session["exercises"] for muscle in library.get(line["exercise_id"])["muscles"]["primary"]}
+    targets = {muscle: value for muscle, value in (doc.get("dose_targets") or {}).items() if muscle in MAJOR_MUSCLES}
+    for muscle in primary - set(MAJOR_MUSCLES):
+        targets[muscle] = min(units.json_number(round(weekly.get(muscle, 0.0), 1)), OTHER_TARGET_CAP)
+    doc["dose_targets"] = dict(sorted(targets.items()))
 
 
 def _follow_priority(doc, swapped):
@@ -274,35 +327,46 @@ def _apply_start_loads(doc, start_loads):
             line["start_load"] = load
 
 
-def draft(root, starter_id, days=None, start_loads=None, now=None, directory=STARTERS_DIR, config=None):
+def draft(root, starter_id, days=None, start_loads=None, now=None, directory=STARTERS_DIR, config=None,
+          location=None, today=None):
     """A program draft from a starter, on the athlete's days and kit, for `program adopt`.
 
-    Raises ValidationError (exit 1) for an unknown starter, a day count the
-    starter does not take, required equipment the athlete lacks, or a start
-    load for an exercise the draft does not hold.
+    With `location`, that place's kit decides the swaps and every session
+    trains there. Niggles open on `today` (default: the date of `now`) keep
+    a swap from bringing in a movement they cover. Raises ValidationError
+    (exit 1) for an unknown starter, a day count the starter does not take,
+    required equipment the athlete lacks, or a start load for an exercise
+    the draft does not hold.
     """
     root = Path(root)
     config = config if config is not None else config_module.load(root, today=now)
     library = Library.load(root)
     starter = load(starter_id, directory)
     chosen = _days_for(starter, days, config)
-    kit = _kit(config)
-    missing = [piece for piece in starter["equipment_required"] if kit and piece not in kit]
+    created_at = program_drafts.timestamp(now)
+    fitter = _fit(root, config, library, location, day=today or created_at[:10])
+    missing = _lacking(starter, fitter.kit)
     if missing:
-        raise ValidationError(f"{starter_id} needs {', '.join(missing)} for its main lifts, and [equipment] available "
-                              f"lists only {', '.join(kit)}; pick a starter that fits the kit")
+        raise ValidationError(f"{starter_id} needs {', '.join(missing)} for its main lifts, and {fitter.kit.table} "
+                              f"available lists only {', '.join(fitter.kit.available)}; pick a starter that fits "
+                              "the kit")
 
     doc = copy.deepcopy(starter["program"])
     doc["name"] = starter["title"]
     doc["schedule"] = _remapped_schedule(doc["schedule"], chosen)
     doc["minimum_week"] = _remap_minimum_week(doc.get("minimum_week"), chosen)
-    rows, swapped = _swap_all(doc, library, kit, plugins.load(root))
+    if location is not None:
+        for session in doc["sessions"]:
+            session["location"] = location
+    rows, swapped = _swap_all(doc, library, fitter, plugins.load(root))
+    if swapped:
+        _retarget(doc, library)
     _follow_priority(doc, swapped)
     _apply_start_loads(doc, start_loads or {})
     return {
         "schema_version": jsonio.current_version(jsonio.load_schema(program_drafts.SCHEMA)),
         "source": f"starter:{starter_id}",
-        "created_at": program_drafts.timestamp(now),
+        "created_at": created_at,
         "program": doc,
         "position": _position(doc["schedule"]),
         "hevy_routines": {},
