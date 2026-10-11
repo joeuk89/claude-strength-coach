@@ -1991,7 +1991,7 @@ Reserved codes:
 | `no_data` | warn | R-23a | | No usable exposure and no start load; load left empty for the coach. |
 | `stalled` | warn | R-23a | | No load or rep gain over three exposures running. |
 | `rpe_drift` | warn | R-23a | | Compound or recovery-capped exercise: logged RPE at least 1 over target on two or more working sets of the last exposure. |
-| `return_week` | info | R-23a | | Decay applied; names the band and days off. |
+| `return_week` | info | R-23a | | Decay applied; names the band and days off. A lifting line's flag adds the load change (`loads × 0.9`, or `assistance held` on an `assisted` line), the set change and any RPE cap. |
 | `return_after_illness` | warn | R-23a | | An `ill` miss or status day in the gap: confirm `SYMPTOM_FREE_HOURS` (48) hours symptom-free; first session capped at RPE `ILLNESS_RPE_CAP` (7). |
 | `constraint_applied` | info | R-23a | | A cap, a slot constraint or a niggle constraint changed the proposal. |
 | `override_standing` | info | R-23a | | A standing override was applied again instead of the scheme's proposal. |
@@ -2211,9 +2211,10 @@ instance plugins, plus the C5 ×2 scan.
 
 **Units.** Every load a plugin sees or returns is the coaching number in
 athlete units (C18). The core then applies, in order: decay, the week's
-transform, constraints (C26), caps, rounding to increments (down when
-the load is below the derived-from load, nearest otherwise), and only
-then `units.make_load`. A plugin therefore cannot double a load.
+transform, constraints (C26), caps, rounding to increments (toward the
+lighter lift when the load is below the derived-from load, nearest
+otherwise), and only then `units.make_load`. A plugin therefore cannot
+double a load.
 
 ```python
 @dataclass(frozen=True)
@@ -2378,8 +2379,13 @@ and `plugins test` runs them. Loaded with
   the location's `dumbbells` when that list is set; any other load
   rounds to the increment (`Library.increment`, else the equipment
   increment) on a grid anchored at the derived-from load (else the last
-  approved load, else the start load, else 0). A load clipped by a cap or
-  a load constraint is not rounded up, and no rounding goes past the cap.
+  approved load, else the start load, else 0). A load below the
+  derived-from load, or one the proposal marks `round_down`, rounds
+  toward the lighter lift: down, or up for `assisted`, where more
+  assistance is a lighter lift. A load clipped by a cap or a load
+  constraint is not rounded toward the heavier lift. No rounding goes
+  past the cap, even when that leaves assistance below the derived-from
+  least assistance.
 
 **Built with R-23b** (the remaining schemes and schedule rules):
 

@@ -483,8 +483,9 @@ def propose_line(run, session, day, exercise, ctx_extra):
         decay = {"days_off": days_off, "band": band.id, "load_factor": band.load_factor, "set_delta": band.set_delta,
                  "rpe_cap": band.rpe_cap}
         adjusted.append(f"return band {band.id} after {days_off} days off")
-        line_flags.append(line_flag("return_week", f"{days_off} days off: return band {band.id} (loads × "
-                                                   f"{band.load_factor}, set change {band.set_delta}"
+        load_words = "assistance held" if info.load_direction < 0 else f"loads × {band.load_factor}"
+        line_flags.append(line_flag("return_week", f"{days_off} days off: return band {band.id} ({load_words}, "
+                                                   f"set change {band.set_delta}"
                                                    f"{f', RPE cap {band.rpe_cap}' if band.rpe_cap else ''})"))
 
     transform = ctx_extra["transform"]
@@ -499,7 +500,7 @@ def propose_line(run, session, day, exercise, ctx_extra):
     except ConfigError:
         cap, cap_source = None, None
     references = _reference_loads(source, ctx, exercise)
-    rounding = (run, entry, exercise_id, location, mode, cap, references, source)
+    rounding = (run, entry, exercise_id, location, mode, cap, references, source, info.load_direction)
 
     def limited(sets, round_down):
         """Constraints, the illness cap, caps and rounding: what every load passes after its scheme."""
@@ -707,8 +708,11 @@ def _reference_loads(source, ctx, exercise):
 
 
 def _rounded(sets, clipped, round_down, rounding):
-    """Each load snapped to the kit: down below the derived-from load, nearest otherwise; never past a cap (C23)."""
-    run, entry, exercise_id, location, mode, cap, references, source = rounding
+    """Each load snapped to the kit: lighter below the derived-from load, nearest otherwise; never past a cap (C23).
+
+    More assistance is a lighter lift, so assistance rounds up where other loads round down.
+    """
+    run, entry, exercise_id, location, mode, cap, references, source, load_direction = rounding
     if mode not in units.LOADED_MODES:
         return tuple(replace(s, load=None) for s in sets)
     kit = run.kit(location)
@@ -723,8 +727,8 @@ def _rounded(sets, clipped, round_down, rounding):
             found.append(s)
             continue
         value = max(0, s.load)
-        down = round_down or (derived is not None and value < derived - 1e-9)
-        direction = "down" if down or index in clipped else "nearest"
+        lighter = round_down or (derived is not None and value < derived - 1e-9) or index in clipped
+        direction = ("down" if load_direction > 0 else "up") if lighter else "nearest"
         if by_list:
             value = _from_list(value, dumbbells, direction)
             if cap is not None and value > cap + 1e-9:
