@@ -38,6 +38,14 @@ class AvailableLoadsTest(unittest.TestCase):
         cfg.declared_equipment.pop("dumbbell_increment")
         self.assertEqual(stats.load_increment(library, cfg, "db_bench_press", None), 2)
 
+    def test_a_declared_dumbbell_step_does_not_define_the_kettlebell_grid(self):
+        cfg = config.load(VALID)
+        library = Library.load(VALID)
+        self.assertEqual(cfg.declared_equipment["dumbbell_increment"], 2.5)
+        step = stats.load_increment(library, cfg, "kb_swing", None)
+        self.assertEqual(step, 4)
+        self.assertIsNone(loads.AvailableLoads("kettlebell", "single_implement", {}, step).problem(24))
+
     def test_smith_base_is_optional_nonnegative_and_location_specific(self):
         raw = {"schema_version": 1, "athlete": {"units": "kg"},
                "equipment": {"smith_base_weight": 15, "locations": {"home": {"smith_base_weight": 7}}}}

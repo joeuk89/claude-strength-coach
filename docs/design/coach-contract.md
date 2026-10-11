@@ -616,7 +616,8 @@ merges them; with no instance file the catalogue stands alone.
   the per-hand modes, the total otherwise, null for `band`, `duration`
   and `distance`. `Library.increment(id, unit)` returns null when the
   entry has none. A declared equipment increment from `equipment_for`
-  (C54) takes precedence over this fallback; scheme parameters request a
+  (C54) takes precedence over this fallback (not for a kettlebell, which
+  only borrows the dumbbell step); scheme parameters request a
   progression step but never define physically available loads.
 - Optional `e1rm: "unsupported"` marks a lift whose external load is too
   small a share of the mass moved for any e1RM: the dumbbell split squat,
@@ -2542,7 +2543,9 @@ coach.validity.estimate_minutes(root, session) -> int
   and leaves representability unknown; an ordinary bar is never inferred.
   Without an enumerated rack or plates, the declared location equipment
   increment defines the physical grid; the library increment is fallback,
-  then the equipment default. Grids start at zero, or the known base mass
+  then the equipment default. A kettlebell has no increment key of its
+  own: `dumbbell_increment` is only its default, so a declared dumbbell
+  step never defines its grid. Grids start at zero, or the known base mass
   for a bar/Smith total. Other loaded equipment uses its corresponding
   increment when known. Historical off-grid loads are checked too. A load
   already over its cap is flagged `load_cap` only for representability.

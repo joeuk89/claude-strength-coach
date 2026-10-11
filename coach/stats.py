@@ -278,7 +278,8 @@ def load_increment(library, config, exercise_id, location):
     declared = dict(config.declared_equipment)
     if location is not None:
         declared.update(declared.get("locations", {}).get(location, {}))
-    if key in declared:
+    # Kettlebells borrow the dumbbell step only as a default: a declared dumbbell step says nothing about them.
+    if key in declared and entry["equipment"] != "kettlebell":
         return kit[key]
     step = library.increment(exercise_id, config.athlete.units)
     return step if step is not None else kit.get(key, 0)
