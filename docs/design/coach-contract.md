@@ -1521,6 +1521,15 @@ exit 1, when absent, malformed or at another version).
 `(kind, Error)` pairs; `coach.state.problems(doc, program)` adds dates and
 references into the program. `program validate` reports all of them;
 `state show` refuses an invalid state the same way.
+`coach.program.warnings(doc)` lists what a valid program may keep but
+should not, each warning starting with its code. `program validate`
+puts them in the envelope's `warnings` and still exits 0. One code so
+far: `fixed_reps_no_e1rm`, for a `fixed_reps_rpe` slot with a working
+group past `stats.MAX_REPS_TO_FAILURE` reps to failure (its reps, or
+its range's start, plus 10 − RPE). Its sets give no e1RM, so its load
+holds unless another line of the exercise supplies one. The warning
+names the exercise, the session and the reps to failure, and suggests
+`double_progression`.
 
 **Rendered pages.** `coach.program.render_all(root) -> {path: text}` gives
 `routine/program.md` (sessions with links, schedule rule, coach-led
@@ -5057,8 +5066,11 @@ R-14b's `routines create`; adopt itself never calls Hevy.
 | `upper-lower-4` | 4 fixed | `double_progression` | `double_progression` | beginner to intermediate |
 | `push-pull-legs` | 3–6 rolling | `double_progression` | `double_progression` | intermediate |
 | `wave-3wk` ("3-week wave (5/3/1-style)") | 4 fixed | `wave_531` | `double_progression` | intermediate, barbell |
-| `rpe-full-body-3` | 3 fixed | `rpe_anchored` | `fixed_reps_rpe` | intermediate to advanced |
+| `rpe-full-body-3` | 3 fixed | `rpe_anchored` | `fixed_reps_rpe`; `double_progression` for 12- and 15-rep lines | intermediate to advanced |
 
+- No starter raises a `program validate` warning. `rpe-full-body-3`'s
+  12- and 15-rep accessories are too high-rep for an e1RM, so they use
+  `double_progression` at 10–12 and 12–15 reps, RPE 8.
 - Each starter declares its main lifts in `priority`, its weekly dose in
   `dose_targets` and a `minimum_week` (C40); `structure balance --variant
   minimum` must pass on it.

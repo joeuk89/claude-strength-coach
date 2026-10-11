@@ -19,6 +19,8 @@ def validate(args, ctx):
     if errors:
         raise ValidationError(f"{paths.PROGRAM} is not valid ({len(errors)} problem(s))",
                               details=[error.to_json() for error in errors])
+    for warning in program.warnings(doc):
+        ctx.warn(warning)
     return {"valid": True, "path": paths.PROGRAM.as_posix(), "sessions": [s["id"] for s in doc["sessions"]]}
 
 

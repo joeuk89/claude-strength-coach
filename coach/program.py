@@ -20,6 +20,7 @@ from coach.validate import validate as validate_schema
 SCHEMA = "program"
 SCHEMA_PROBLEM = "schema"
 EXERCISE_PROBLEM = "exercise_ids"
+NO_E1RM_WARNING = "fixed_reps_no_e1rm"
 RENDER_COMMAND = "program render"
 PROGRAM_PAGE = paths.ROUTINE_PROGRAM_PAGE.as_posix()
 
@@ -110,6 +111,25 @@ def problems(doc, config=None, library=None, root=None):
 
 def validate(doc, config=None, library=None, root=None):
     return [error for _, error in problems(doc, config, library, root)]
+
+
+def warnings(doc):
+    """Warnings for a valid program, each starting with its code: a fixed_reps_rpe line too high-rep for an e1RM."""
+    from coach import stats
+    from coach.plugins import base
+
+    found = []
+    for _, _, session, exercise in slots(doc):
+        if exercise["scheme"]["name"] != "fixed_reps_rpe":
+            continue
+        to_failure = [stats.reps_to_failure(s.target_reps, s.rpe)
+                      for s in base.expand(exercise["sets"]) if s.working and s.target_reps is not None]
+        worst = max(to_failure, default=0)
+        if worst > stats.MAX_REPS_TO_FAILURE:
+            found.append(f"{NO_E1RM_WARNING}: {exercise['exercise_id']} in {session['id']} is "
+                         f"{units.json_number(worst)} reps to failure, past the {stats.MAX_REPS_TO_FAILURE} an e1RM "
+                         "allows, so fixed_reps_rpe gets no e1RM from it and holds its load; use double_progression")
+    return found
 
 
 def _version_error(doc):

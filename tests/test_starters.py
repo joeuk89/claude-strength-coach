@@ -114,6 +114,11 @@ class StarterFilesTest(Case):
         self.assertEqual(self.starters["push-pull-legs"]["program"]["schedule"]["rule"], "next_in_sequence")
         self.assertEqual(self.starters["wave-3wk"]["program"]["blocks"]["deload_rule"]["name"], "scheme")
 
+    def test_no_starter_line_is_too_high_rep_for_its_scheme_to_progress(self):
+        for starter_id, doc in self.starters.items():
+            with self.subTest(starter=starter_id):
+                self.assertEqual(program.warnings(doc["program"]), [])
+
     def test_each_declares_priority_lifts_and_a_target_for_each_major_muscle_it_trains(self):
         for starter_id, doc in self.starters.items():
             prog = doc["program"]
@@ -400,6 +405,21 @@ class DraftTest(Case):
         found = self.ok(root, "starters", "draft", "full-body-3", "--dry-run")
         self.assertFalse(found["written"])
         self.assertFalse((root / ".coach").exists())
+
+    def test_the_rpe_starters_high_rep_accessories_progress_by_double_progression(self):
+        draft = self.draft(instance(self), "rpe-full-body-3")
+        found = {(session["id"], line["exercise_id"]): line for session, line in lines(draft["program"])
+                 if session["status"] == "active"}
+        expected = {("rpe-a", "db_lateral_raise"): (12, 15), ("rpe-a", "db_curl"): (10, 12),
+                    ("rpe-b", "db_lateral_raise"): (12, 15), ("rpe-b", "cable_triceps_pushdown"): (10, 12),
+                    ("rpe-c", "machine_seated_leg_curl"): (10, 12), ("rpe-c", "db_curl"): (10, 12),
+                    ("rpe-c", "face_pull"): (12, 15)}
+        for key, (start, end) in expected.items():
+            with self.subTest(line=key):
+                self.assertEqual(found[key]["scheme"]["name"], "double_progression")
+                self.assertEqual([(group["rep_range"], group["rpe"]) for group in found[key]["sets"]],
+                                 [({"start": start, "end": end}, 8)])
+                self.assertNotIn("reps", found[key]["sets"][0])
 
     def test_the_draft_leaves_the_starter_file_alone(self):
         before = copy.deepcopy(starters.load("full-body-3"))

@@ -37,7 +37,7 @@ def _round(value, places=2):
     return units.json_number(float(quantised))
 
 
-def _reps_to_failure(reps, rpe):
+def reps_to_failure(reps, rpe):
     return reps + (10 - rpe) if rpe is not None else reps
 
 
@@ -45,7 +45,7 @@ def e1rm(load, reps, rpe=None):
     """Epley e1RM, with reps in reserve (10 − RPE) added when RPE is logged; None past 12 reps to failure."""
     if load is None or reps is None or reps < 1:
         return None
-    n = _reps_to_failure(reps, rpe)
+    n = reps_to_failure(reps, rpe)
     if n > MAX_REPS_TO_FAILURE:
         return None
     return load if n <= 1 else load * (1 + n / 30)
@@ -53,7 +53,7 @@ def e1rm(load, reps, rpe=None):
 
 def load_for(e1rm_value, reps, rpe=None):
     """The load that gives `reps` at `rpe` for an e1RM: the inverse of `e1rm`."""
-    n = _reps_to_failure(reps, rpe)
+    n = reps_to_failure(reps, rpe)
     return e1rm_value if n <= 1 else e1rm_value / (1 + n / 30)
 
 

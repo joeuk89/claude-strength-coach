@@ -150,7 +150,10 @@
               {
                 "count": 4,
                 "type": "normal",
-                "reps": 15,
+                "rep_range": {
+                  "start": 12,
+                  "end": 15
+                },
                 "rpe": 8
               }
             ],
@@ -159,7 +162,7 @@
             "cues": "lead with the elbows · stop at shoulder height · no swing",
             "constraints": [],
             "scheme": {
-              "name": "fixed_reps_rpe",
+              "name": "double_progression",
               "params": {}
             },
             "start_load": null
@@ -171,7 +174,10 @@
               {
                 "count": 2,
                 "type": "normal",
-                "reps": 12,
+                "rep_range": {
+                  "start": 10,
+                  "end": 12
+                },
                 "rpe": 8
               }
             ],
@@ -180,7 +186,7 @@
             "cues": "elbows still at the sides · full stretch at the bottom · no swing",
             "constraints": [],
             "scheme": {
-              "name": "fixed_reps_rpe",
+              "name": "double_progression",
               "params": {}
             },
             "start_load": null
@@ -300,7 +306,10 @@
               {
                 "count": 4,
                 "type": "normal",
-                "reps": 15,
+                "rep_range": {
+                  "start": 12,
+                  "end": 15
+                },
                 "rpe": 8
               }
             ],
@@ -309,7 +318,7 @@
             "cues": "lead with the elbows · stop at shoulder height · no swing",
             "constraints": [],
             "scheme": {
-              "name": "fixed_reps_rpe",
+              "name": "double_progression",
               "params": {}
             },
             "start_load": null
@@ -321,7 +330,10 @@
               {
                 "count": 3,
                 "type": "normal",
-                "reps": 12,
+                "rep_range": {
+                  "start": 10,
+                  "end": 12
+                },
                 "rpe": 8
               }
             ],
@@ -330,7 +342,7 @@
             "cues": "elbows pinned at the sides · lock out fully",
             "constraints": [],
             "scheme": {
-              "name": "fixed_reps_rpe",
+              "name": "double_progression",
               "params": {}
             },
             "start_load": null
@@ -429,7 +441,10 @@
               {
                 "count": 4,
                 "type": "normal",
-                "reps": 12,
+                "rep_range": {
+                  "start": 10,
+                  "end": 12
+                },
                 "rpe": 8
               }
             ],
@@ -438,7 +453,7 @@
             "cues": "hips down on the seat · full range · control the return",
             "constraints": [],
             "scheme": {
-              "name": "fixed_reps_rpe",
+              "name": "double_progression",
               "params": {}
             },
             "start_load": null
@@ -471,7 +486,10 @@
               {
                 "count": 3,
                 "type": "normal",
-                "reps": 12,
+                "rep_range": {
+                  "start": 10,
+                  "end": 12
+                },
                 "rpe": 8
               }
             ],
@@ -480,7 +498,7 @@
             "cues": "elbows still at the sides · full stretch at the bottom · no swing",
             "constraints": [],
             "scheme": {
-              "name": "fixed_reps_rpe",
+              "name": "double_progression",
               "params": {}
             },
             "start_load": null
@@ -492,7 +510,10 @@
               {
                 "count": 2,
                 "type": "normal",
-                "reps": 15,
+                "rep_range": {
+                  "start": 12,
+                  "end": 15
+                },
                 "rpe": 8
               }
             ],
@@ -501,7 +522,7 @@
             "cues": "pull to the eyes · elbows high · rotate the hands back",
             "constraints": [],
             "scheme": {
-              "name": "fixed_reps_rpe",
+              "name": "double_progression",
               "params": {}
             },
             "start_load": null
