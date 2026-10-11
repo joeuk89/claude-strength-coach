@@ -33,7 +33,14 @@
       "Bash(python3 -m coach program validate:*)",
       "Bash(python3 -m coach program render:*)",
       "Bash(python3 -m coach state show:*)",
-      "Bash(python3 -m coach migrate status:*)"
+      "Bash(python3 -m coach migrate status:*)",
+      "Bash(python3 -m coach meals template:*)",
+      "Bash(python3 -m coach meals show:*)",
+      "Bash(python3 -m coach meals validate:*)",
+      "Bash(python3 -m coach meals shopping:*)",
+      "Bash(python3 -m coach meals build:*)",
+      "Bash(python3 -m coach meals render:*)",
+      "Bash(python3 -m coach meals approve:*)"
     ]
   },
   "hooks": {

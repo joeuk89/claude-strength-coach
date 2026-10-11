@@ -1,5 +1,6 @@
 """The meal-plan skill and the glossary follow the meals commands (contract preamble, C34)."""
 
+import json
 import re
 import unittest
 
@@ -28,6 +29,16 @@ class GlossaryTest(unittest.TestCase):
             match = re.search(rf"^\*\*{term}\*\*:\n(.*?)(?=\n\n|\Z)", text, re.M | re.S)
             self.assertIsNotNone(match, term)
             self.assertIn("_Avoid_:", match.group(1))
+
+
+class AllowlistTest(unittest.TestCase):
+    def test_every_meals_command_is_allowlisted(self):
+        from coach import commands
+
+        rules = json.loads((REPO_ROOT / ".claude" / "settings.json").read_text(encoding="utf-8"))["permissions"]["allow"]
+        for cmd in commands.discover():
+            if cmd.name.startswith("meals "):
+                self.assertIn(f"Bash(python3 -m coach {cmd.name}:*)", rules)
 
 
 if __name__ == "__main__":
