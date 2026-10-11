@@ -111,6 +111,24 @@ Send **one** message that pre-fills what the log shows and asks only what
 it can't, then wait for the athlete's single reply. They answer by number.
 This replaces an interview: no question-by-question turns.
 
+Run `python3 -m coach checkin prepare` and send its `data.text` as the
+Sunday message. You may tighten the wording, and drop a field that
+cannot apply or that the athlete's opening message already answers,
+renumbering the rest. Never change the card's figures or the order of
+the fields. `data.card` holds the same week as data: the
+window (the day after the last record to today), each planned session
+trained, missed (with any tag on file) or trained but not logged, with
+durations against the session cap; each exercise's result against the
+prescription; e1RM changes; flags (`convention_slip`,
+`duration_over_cap`, `stale_routine`); and each Hevy routine's state
+(`edited_in_app` routines end the card with a keep-or-replace field,
+settled in program-week). The card picks the tier (`mode`, with
+`tier_reasons`: no record yet, or the last deep record 42 or more days
+old). When step 1 picks deep for a reason the card can't see, run it
+with `--tier deep`; `--tier weekly` overrides a due deep review. A
+`catch_up_pending` warning means 11 or more days since the last
+check-in: apply the gap check in step 2.
+
 The first line names the window and the tier with its reason. Then the
 fields, always in this order:
 
@@ -151,26 +169,6 @@ stated for confirmation, not asked.** If the athlete's opening message
 already covers the fields, don't send the template; leave out any single
 field it already answers.
 
-Reference template (wording may be tightened; the fields and their order
-are fixed; the Food field's a/b/c wording comes from `data.questions`):
-
-```
-Check-in for <window> (<weekly|deep> — <reason>).
-1. Sessions. Hevy shows: Mon Lower A ✔, Tue PT (logged: bench, rows), Thu Upper B ✔.
-   Not logged: Wed Pull, Sat Arms. Tag each miss: time / sleep / ill / family / skipped / other.
-   Add anything you trained but didn't log.
-2. Coach-led. What did PT Tue cover? From the log it looks like chest/back, so next week is Week B. Correct me if not.
-3. Runs. How many, and total distance?
-4. Sleep. One line: average hours a night (from your watch or phone if it tracks sleep), and how it felt.
-5. Niggles. Anything new? Left knee (watching): quiet or still there?
-6. Food.
-   a. MacroFactor: trend weight · expenditure · targets (kcal/protein) · 7-day average (kcal/protein) · days logged. A screenshot works.
-      (No app: this week's morning weigh-ins · average daily protein, if you track it.)
-   b. Anchors most days (y/n)? Anything in the plan that didn't work?
-   c. (only with a standing weekly template) Food exceptions next week: who cooks which nights, office-day changes, meals out?
-7. Next week. Anything different: travel, schedule, kit, illness?
-```
-
 **Deep tier:** the same message. Any deep-only asks follow the last field,
 numbered on.
 
@@ -198,6 +196,23 @@ the disagreement.
 
 **Missed sessions** get the one-word tag and nothing more: no follow-up on
 the reason. A miss the reply leaves untagged is recorded as `untagged`.
+
+**Record the reply** in one batch before analysing it. Write the facts
+it gives as a JSON list to `.coach/drafts/checkin-<date>-reply.json` and
+run `python3 -m coach history annotate --input <that file>`, with
+`"source": "check-in <date>"` on each:
+
+- `{"kind": "miss", "date": D, "session_id": S, "tag": T}` for each
+  tagged miss (no annotation for one left untagged);
+- `{"kind": "trained_unlogged", "date": D, "session_id": S, "note": N}`
+  for a planned session trained but not logged: it counts as trained,
+  with no results and no e1RM;
+- `{"kind": "external", "date": D, "external_id": E, "done": true|false,
+  "note": N}` for each coach-led session, the note one line on what it
+  covered.
+
+Exit 1 names each annotation that doesn't fit; fix the file and run it
+again. Then run `checkin prepare` again: the card now carries the reply.
 
 **At most one follow-up turn**, and only for a gap that blocks
 programming: an unresolved rotation position, a new niggle's severity, or
@@ -238,6 +253,10 @@ concrete: did the athlete hit the prescribed load × reps @ RPE?
   `python3 -m coach stats e1rm --since <last deep check-in>` (each
   lift's series, best and latest change) — trend, not gospel. Flag
   stalls (same load+reps 3+ sessions) and progression-scheme violations.
+- Missed sessions since the last deep check-in: `python3 -m coach
+  checkin misses` counts them by tag and by session (the deep card's
+  `misses` holds the same tally). A tag that keeps coming back (`time`,
+  `sleep`) is a schedule or recovery question for Block planning.
 - **Sanity-check dumbbell loads before reading anything into them.** An
   exact-2× (or ½ ×) step in a dumbbell exercise at unchanged reps *and*
   unchanged RPE is a logging-convention slip, not a strength change —
@@ -406,52 +425,65 @@ If a dated plan in `nutrition/` covers (part of) this window, the Food
 field's habits question said how it went — note learnings for the next
 `/meal-plan` run (recipe-bank changes belong in `/recipes`, not here).
 
-Record the numbers in the check-in's Weight & nutrition section; the
-readings series holds them, so they no longer go into `profile.md`.
+Record the numbers in the weight and nutrition lines of the record's
+Coach's read (step 6); the readings series holds them, so they no longer go into `profile.md`.
 
 ## 6. Write the record
 
-Create `check-ins/YYYY-MM-DD.md`. Weekly template:
+Run `python3 -m coach history sync`, then `python3 -m coach checkin
+skeleton --date <today>`. It writes `check-ins/<today>.md`, titled with
+the card's tier (`--tier` overrides), holding:
 
-```markdown
-# Check-in — YYYY-MM-DD (weekly)
+- **Week in review** — a rendered region: the window, sessions n of m
+  core, the `Missed:` line with each miss's tag, the sessions, results
+  and e1RM tables, and the flags; on a deep record, the misses since the
+  last deep check-in. It reads synced history only, so the command warns
+  when a workout in the window is not synced yet.
+- **Coach's read**, **Decisions** and **Next week** — empty, for your
+  prose. Deep records add **Block planning** after Decisions.
 
-**Window:** <start> → <end> · **Sessions:** n of ~m planned · **Missed:** <day> <session> (<tag>), … or none
-Block <n> · <count> of <ceiling> hard weeks · triggers <k> of 4 (<names>) · light week: <state>
+Exit 1 means the record exists. Never edit inside a rendered region:
+correct the data (`history annotate`), then run `checkin skeleton --date
+<today> --refresh`, which re-renders the regions and leaves every other
+byte as it was. Once the week's overlay is approved (step 7), run it
+with `--refresh --overlay <id>` to put the prescription in a collapsed
+appendix; it also collapses a region `overlay render --into` already
+wrote.
 
-## Headline
-1–2 sentences: the state of the week in plain words.
+Write the prose, each section short:
 
-## Training
-Adherence, notable sets, anything off-plan worth naming.
+- **Coach's read** — 1–2 sentences on the state of the week, then what
+  the region can't say: adherence as the reply confirmed it, notable
+  sets, anything off-plan; the athlete's read (sleep, runs, niggles, next
+  week — a field the reply didn't answer reads "not supplied"); and
+  weight and nutrition:
 
-## Weight & nutrition
-Weight (trend or scale) · targets · adherence. Trend vs. target rate — on track?
-Protein: <7-day avg> g vs floor <g> (<n> of 2 toward a raise | raised to <g> | under) · days logged <n>/7 · anchors most days: y/n
-Override: none | active, expires <date> | expired <date> | renewal flagged · Sleep gate: <status> (deficit only)
+  ```markdown
+  Weight (trend or scale) · targets · adherence. Trend vs. target rate — on track?
+  Protein: <7-day avg> g vs floor <g> (<n> of 2 toward a raise | raised to <g> | under) · days logged <n>/7 · anchors most days: y/n
+  Override: none | active, expires <date> | expired <date> | renewal flagged · Sleep gate: <status> (deficit only)
+  ```
 
-## Athlete's read
-Sleep, runs, niggles, next week — their words, summarized. A field the
-reply didn't answer reads "not supplied".
+- **Decisions** — first the block status line, then what changed and why
+  (or "stay the course"), anything deferred, and the adherence decision
+  line when it applies:
 
-## Decisions
-What changed and why (or "stay the course"). Anything deferred.
-Adherence trigger: <n> % over 4 weeks: adopted | declined: <reason> | deferred to <date>
+  ```markdown
+  Block <n> · <count> of <ceiling> hard weeks · triggers <k> of 4 (<names>) · light week: <state>
+  Adherence trigger: <n> % over 4 weeks: adopted | declined: <reason> | deferred to <date>
+  ```
 
-## The week ahead — <dates>
-| Day | Session |
-| --- | --- |
-| Mon | ... |
-One-off changes called out. On normal weeks `/program-week` renders the
-overlay's per-exercise tables into this section (`overlay render
---into`). The section always ends with one line: the focus of the week.
-```
+- **Next week** — a Day / Session table, one-off changes called out, and
+  one closing line: the focus of the week.
 
-**The block status line** is the second header line, written after this
-check-in updates `block` in `data/state.json` (step 7): the block number
-carried from the last record's line (one more when this check-in starts
-a new block), the count from `hard_weeks_completed`, and the ceiling
-from the program's `blocks.hard_weeks_ceiling`.
+Keep the prose outside the regions under 600 words (1,000 on a deep
+record); `python3 -m coach check` warns past that.
+
+**The block status line** opens Decisions, written after this check-in
+updates `block` in `data/state.json` (step 7): the block number carried
+from the last record's line (one more when this check-in starts a new
+block), the count from `hard_weeks_completed`, and the ceiling from the
+program's `blocks.hard_weeks_ceiling`.
 `<names>` lists the fatigue triggers that fired this week (none → `triggers
 0 of 4`). `<state>` is one of: `not due`, `watch`, `skipped (<n> hard
 weeks)`, `proposed for wk of <D Mon> (<type>, <reason>)`, `agreed:
@@ -472,7 +504,7 @@ smaller-schedule decision. An override line (one with `(override: …)`)
 records the added session only: it never holds back or starts the
 under-70 % trigger, and never goes to `/new-program`.
 
-Deep records use the same skeleton titled `(deep)`, with **Training**
+Deep records use the same skeleton titled `(deep)`, with **Coach's read**
 expanded to the full analysis (e1RM trends per lift, drift, balance,
 intensity honesty) and a **Block planning** section: the light-week
 outlook from the hard-week count, whether the goals/phase plan in

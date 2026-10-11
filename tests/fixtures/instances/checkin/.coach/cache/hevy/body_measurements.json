@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "fetched_at": "2026-10-11T12:00:00Z",
+  "source": "hevy",
+  "data": [
+    {
+      "date": "2026-09-28",
+      "weight_kg": 80.0,
+      "lean_mass_kg": null,
+      "fat_percent": null
+    },
+    {
+      "date": "2026-10-05",
+      "weight_kg": 80.4,
+      "lean_mass_kg": null,
+      "fat_percent": null
+    }
+  ]
+}

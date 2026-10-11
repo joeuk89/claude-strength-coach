@@ -52,7 +52,11 @@
       "Bash(python3 -m coach stats dose:*)",
       "Bash(python3 -m coach stats durations:*)",
       "Bash(python3 -m coach stats audit:*)",
-      "Bash(python3 -m coach prescription check:*)"
+      "Bash(python3 -m coach prescription check:*)",
+      "Bash(python3 -m coach checkin prepare:*)",
+      "Bash(python3 -m coach checkin misses:*)",
+      "Bash(python3 -m coach checkin due:*)",
+      "Bash(python3 -m coach checkin skeleton:*)"
     ]
   },
   "hooks": {
