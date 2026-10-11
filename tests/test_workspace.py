@@ -47,6 +47,10 @@ class WorkspaceTest(unittest.TestCase):
 
         self.git(athlete, "remote", "set-url", "origin", "git@github.com:joeuk89/claude-strength-coach.git")
         self.assertEqual(status.instance_kind(athlete), status.TEMPLATE)
+        for unknown in ("", "unknown"):
+            self.git(athlete, "config", "--local", "coach.workspace", unknown)
+            self.assertEqual(status.instance_kind(athlete), status.UNINITIALISED)
+            self.assertIn("run /setup", context_of(run_hook("sessionstart", athlete, session_input())[1]))
         self.git(athlete, "config", "--local", "coach.workspace", "athlete")
         self.assertEqual(status.instance_kind(athlete), status.UNINITIALISED)
         self.assertIn("run /setup", context_of(run_hook("sessionstart", athlete, session_input())[1]))
