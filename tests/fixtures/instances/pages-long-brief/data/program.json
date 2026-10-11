@@ -1,5 +1,5 @@
 {
-  "schema_version": 6,
+  "schema_version": 7,
   "name": "Two-session fixture program",
   "sessions": [
     {
@@ -10,6 +10,7 @@
       "status": "active",
       "location": null,
       "focus": null,
+      "scheme": null,
       "exercises": [
         {
           "exercise_id": "bb_back_squat",
@@ -47,6 +48,7 @@
       "status": "active",
       "location": null,
       "focus": null,
+      "scheme": null,
       "exercises": [
         {
           "exercise_id": "db_single_arm_row",

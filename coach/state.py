@@ -11,6 +11,7 @@ from coach.validate import validate as validate_schema
 
 SCHEMA = "state"
 _SLOT_KEY = re.compile(r"^([a-z0-9-]+)/([a-z0-9_]+)$")
+SESSION_SLOT = "_session"
 
 
 def path_for(root):
@@ -93,11 +94,16 @@ def _dates(doc):
 def _references(doc, program_doc):
     errors = []
     sessions = {s["id"]: {e["exercise_id"] for e in s["exercises"]} for s in program_doc["sessions"]}
+    kinds = {s["id"]: s["kind"] for s in program_doc["sessions"]}
     for key in doc["scheme_state"]:
         path = _child("$.scheme_state", key)
         match = _SLOT_KEY.fullmatch(key)
         if not match:
-            errors.append(Error(path, f"a scheme_state key is <session id>/<exercise id>, found {key!r}"))
+            errors.append(Error(path, "a scheme_state key is <session id>/<exercise id> or "
+                                      f"<session id>/{SESSION_SLOT}, found {key!r}"))
+        elif match.group(2) == SESSION_SLOT:
+            if kinds.get(match.group(1)) != "conditioning":
+                errors.append(Error(path, f"the program has no conditioning session {match.group(1)}"))
         elif match.group(2) not in sessions.get(match.group(1), ()):
             errors.append(Error(path, f"the program has no exercise {match.group(2)} in session {match.group(1)}"))
     for routine_id, entry in doc["hevy"]["routines"].items():
