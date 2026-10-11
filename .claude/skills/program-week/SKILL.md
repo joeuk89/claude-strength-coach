@@ -91,9 +91,14 @@ Work through every session in the span, every exercise in each:
 
 - **Load** — from the log and the program's progression rules: top of
   the rep range at or under target RPE → add load (the program's
-  increment); reps missed → hold; logged RPE drifting over prescription
-  → hold or back off. Reason per lift — a formula applied blindly is
-  not coaching. Display in the athlete's units.
+  increment); reps missed → hold; RPE drift (logged RPE 1 or more over
+  the target on 2 or more working sets of one exposure) on a compound
+  lift or a set carrying a **recovery cap** → hold or back off. Compound
+  means a multi-joint squat, hinge, lunge, press or pull pattern. RPE drift
+  alone never holds back isolation work: it progresses on reps as the
+  scheme says, unless the athlete's notes report pain or form breakdown.
+  Reason per lift — a formula applied blindly is not coaching. Display
+  in the athlete's units.
   **Dumbbell exercises carry two numbers** — per hand and the Hevy value
   (`25/hand (Hevy: 50)`) — because Hevy stores the combined total across
   both arms. Get the per-hand figure out of the logged value *before*

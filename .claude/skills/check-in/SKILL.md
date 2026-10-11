@@ -131,6 +131,20 @@ Check-in for <window> (<weekly|deep> — <reason>).
 **Deep tier:** the same message. Any deep-only asks follow the last field,
 numbered on.
 
+**Body composition** (waist, body fat, progress photos) is a deep-only
+ask, never a weekly one. Ask it only when both hold:
+
+- the goals or a phase trigger in `profile.md` use waist, body fat or
+  photos, or the phase is a cut or recomp; and
+- no deep record has a reading yet, or the last reading is 4 or more
+  weeks old (the newest deep record's **Body composition** line says).
+
+Ask for waist, a body-fat reading if they have one, and their own
+one-line read of their progress photos. **Photos stay with the athlete
+and never go into the repo** — record only their read. A reading the
+reply leaves out is recorded once as "not supplied" and not asked again
+before the next deep check-in.
+
 **Rotation position.** If the program rotates, infer where the coming
 week lands and state it for confirmation — never ask it as its own
 question. Sources, in order: the coach-led session's log, the
@@ -161,7 +175,13 @@ concrete: did the athlete hit the prescribed load × reps @ RPE?
   the reply confirmed them (that's the "n of ~m" in the record header;
   note cardio separately); which days slipped, with their miss tags.
 - Notable sets: PRs, rep-range top-outs due a load increase, anything way
-  off prescription (RPE 9.5s against a prescribed 7).
+  off prescription.
+- RPE drift: check only **compound lifts** (multi-joint squat, hinge,
+  lunge, press and pull patterns) and sets carrying a **recovery cap**.
+  An exercise drifts when logged RPE is 1 or more over the target on 2
+  or more working sets of one exposure. Drift on isolation work gets one
+  summary line in the record ("isolation RPE ran about 1 high on curls
+  and raises") and never drives a decision.
 - Priority work: if `routine/program.md` names priority lifts or
   protocols, did they happen as written? Watch for this athlete's known
   drift patterns (Coach's notes).
@@ -182,8 +202,12 @@ concrete: did the athlete hit the prescribed load × reps @ RPE?
   See `reference/hevy-api.md` → "Dumbbell loads".
 - Exercise drift vs. the plan — structural drift means `/hevy-sync` is
   due; offer it (Hevy users only).
-- Intensity honesty (logged vs. prescribed RPE), session durations vs. the
-  time limits in `profile.md`, junk volume.
+- Intensity honesty: the RPE drift check on each exposure in the
+  window, same scope and threshold — compound lifts and recovery-capped
+  sets, 1 or more over the target on 2 or more working sets of one
+  exposure. Sustained drift means drift in consecutive exposures of the
+  same lift. Isolation drift stays one summary line, not a decision.
+- Session durations vs. the time limits in `profile.md`, junk volume.
 - Weekly balance: does the program's balance picture still match what's
   actually being trained?
 
@@ -208,6 +232,10 @@ check-ins against the target trend rate in `profile.md`.
 
 If `profile.md` shows nutrition setup still TBD, just record the scale
 weight and prompt `/goals` to get set up.
+
+**Deep tier, body composition:** when the reply carries a reading, read
+it against the goal or phase trigger that uses it and against the last
+reading. A trigger that fires sends the athlete to `/goals`.
 
 If a dated plan in `nutrition/` covers (part of) this window, the Meal
 plan field said how it went — note learnings for the next `/meal-plan`
@@ -254,7 +282,19 @@ Deep records use the same skeleton titled `(deep)`, with **Training**
 expanded to the full analysis (e1RM trends per lift, drift, balance,
 intensity honesty) and a **Block planning** section: deload timing,
 whether the goals/phase plan in `profile.md` is stale (if so, prompt
-`/goals`), and what the next block should emphasize.
+`/goals`), and what the next block should emphasize. When body
+composition applies (step 3), Block planning ends with one line that
+says when the next reading is due — the next check-in reads it:
+
+```markdown
+**Body composition:** waist <reading, "not supplied" or "not due"> · body fat <reading, "not supplied" or "not due"> · photos: <"athlete's one-line read", "not supplied" or "not due"> · **Last reading:** <date> · **Next reading due:** first deep check-in on or after <last reading + 4 weeks>
+```
+
+A reading taken today makes today the **Last reading** date. "Not
+supplied" means it was asked and the reply left it out; "not due" means
+it wasn't asked (step 3). Either way, carry the previous **Last reading**
+date forward; with no reading ever, write "none" and make the next deep
+check-in the due one.
 
 ## 7. Act on it
 

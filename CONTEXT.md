@@ -51,6 +51,13 @@ prescription: double progression, linear, wave, RPE-anchored, assistance
 ladder, hold. Every exercise in a program has one.
 _Avoid_: progression model, autoregulation (one kind of scheme)
 
+**Recovery cap**:
+An RPE ceiling written into an exercise's prescription to protect
+recovery or a niggle: every working set stays at or under it. RPE drift
+on a capped set counts like drift on a compound lift, whatever the
+exercise.
+_Avoid_: RPE ceiling, cap (ambiguous with a load cap)
+
 **Schedule rule**:
 The named rule that decides which session lands on which day: fixed
 weekdays, alternating templates anchored to an external session,
