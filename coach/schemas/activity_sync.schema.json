@@ -1,0 +1,21 @@
+{
+  "title": "data/activity/sync.json: each activity source's last sync and its own cursor state (contract C31)",
+  "type": "object",
+  "required": ["schema_version", "sources"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": 1},
+    "sources": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["last_sync_at", "state"],
+        "additionalProperties": false,
+        "properties": {
+          "last_sync_at": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"},
+          "state": {"type": "object"}
+        }
+      }
+    }
+  }
+}

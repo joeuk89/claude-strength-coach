@@ -1,0 +1,15 @@
+{
+  "title": "A void line in any activity-source file (contract C29): removes the record from every view, keeps its history",
+  "type": "object",
+  "required": ["schema_version", "op", "id", "source", "recorded_at", "reason", "by"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": 1},
+    "op": {"const": "void"},
+    "id": {"type": "string", "pattern": "^[a-z_]+:[A-Za-z0-9._:-]+$"},
+    "source": {"type": "string", "pattern": "^[a-z_]+$"},
+    "recorded_at": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"},
+    "reason": {"type": "string", "pattern": "\\S"},
+    "by": {"enum": ["athlete", "sync"]}
+  }
+}

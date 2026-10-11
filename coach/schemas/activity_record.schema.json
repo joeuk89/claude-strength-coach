@@ -1,0 +1,37 @@
+{
+  "title": "One upsert line in data/activity/activities.jsonl (contract C29, C30)",
+  "type": "object",
+  "required": ["schema_version", "op", "id", "source", "recorded_at", "kind", "start", "local_date",
+               "duration_seconds", "content_hash"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": 1},
+    "op": {"const": "upsert"},
+    "id": {"type": "string", "pattern": "^[a-z_]+:[A-Za-z0-9._:-]+$"},
+    "source": {"type": "string", "pattern": "^[a-z_]+$"},
+    "source_id": {"type": ["string", "null"]},
+    "recorded_at": {"$ref": "#/$defs/timestamp"},
+    "kind": {"$ref": "#/$defs/kind"},
+    "name": {"type": ["string", "null"]},
+    "indoor": {"type": ["boolean", "null"]},
+    "start": {"$ref": "#/$defs/timestamp"},
+    "end": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"},
+    "utc_offset": {"type": ["string", "null"], "pattern": "^[+-]\\d{2}:\\d{2}$"},
+    "local_date": {"$ref": "#/$defs/date"},
+    "duration_seconds": {"type": "integer", "minimum": 0},
+    "distance_meters": {"type": ["number", "null"], "minimum": 0},
+    "elevation_gain_meters": {"type": ["number", "null"]},
+    "avg_hr": {"type": ["integer", "null"], "minimum": 0},
+    "max_hr": {"type": ["integer", "null"], "minimum": 0},
+    "active_kcal": {"type": ["number", "null"], "minimum": 0},
+    "rpe": {"type": ["number", "null"], "minimum": 0, "maximum": 10},
+    "device": {"type": ["string", "null"]},
+    "notes": {"type": ["string", "null"]},
+    "content_hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  },
+  "$defs": {
+    "timestamp": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"},
+    "date": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+    "kind": {"enum": ["run", "ride", "swim", "row", "walk", "hike", "conditioning", "sport", "mobility", "other"]}
+  }
+}

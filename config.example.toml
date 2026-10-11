@@ -66,3 +66,16 @@ dumbbells = []                # per-hand dumbbell weights available; [] = not ch
 #
 # [nutrition.bank.slot_notes]
 # breakfast = "must be fast or it gets skipped"
+
+# Activity sources: runs, rides, conditioning and wellness (sleep, resting
+# heart rate, steps, body mass) logged outside the lifting log. Manual entry
+# is always available; each [sources.<name>] table below turns on one source.
+[activity]
+enabled = false               # true to use the activity, wellness and planned commands
+wellness_in_git = false       # false: wellness lives in .coach/activity/ (gitignored); true: data/activity/ (committed)
+dedup_window_minutes = 15     # records of one kind starting this close are one Activity
+precedence = ["manual", "apple_health", "hevy_conditioning"]  # which source wins each field; list "manual" and every enabled source once
+gap_warn_days = 3             # `coach check` warns when an enabled source's newest day is older than this
+
+[sources.hevy_conditioning]   # Hevy workouts made only of conditioning exercises; reads the Hevy cache, never the API
+enabled = true                # also needs [hevy] enabled = true
