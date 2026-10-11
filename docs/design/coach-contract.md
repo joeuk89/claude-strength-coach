@@ -1274,7 +1274,7 @@ Unless stated, each is a copy of `valid/` plus what is listed.
 | `checkin/` | R-21a | external session `pt-tue` (Tue) in the program; approved overlay `2026-10-05-weekly` (span 2026-10-05..2026-10-11: Session A 2026-10-05 squat 3×5 @ 97.5 RPE 7.5, DB bench 3×10 @ 22.5/hand (Hevy: 45) RPE 8; Session B 2026-10-08 row 3×10 @ 30 RPE 8, pull-up 3×8 BW; Session A 2026-10-10 as on 10-05); `valid/`'s two records replaced by `check-ins/2026-09-06.md` (deep) and `check-ins/2026-10-04.md` (weekly, holding its week-review region); `[sessions.cap_minutes] session-a = 45`; `writes.jsonl` verify lines for both routines, `2026-10-05-weekly` and its approval hash, at 2026-10-04T19:00:00Z; a Hevy cache holding the four C14 workouts and the two routines as that overlay writes them, `...0002` with `updated_at` 2026-10-07T07:00:00Z and one extra exercise (DB bench); `data/history/2026-09.json` and `2026-10.json` from `history sync`; `miss` annotations 2026-09-14 Session A `sleep`, 2026-09-17 Session B `sleep`, 2026-09-21 Session A `time` |
 | `gap/` | R-21b | same program as `checkin/`; record `check-ins/2026-09-13.md` (weekly); last workout 2026-09-14 (squat 3×5 @ 100), none after; no overlay after 2026-09-20 |
 | `missed/` | R-22 | program with rules `miss-b` (fold row, 2 sets, into Session A), `miss-a` (shift to sat, then thu); approved overlay `2026-10-12-weekly` re-dated: Session A 2026-10-12, Session B 2026-10-14, Session A 2026-10-17; workout for Session A on 2026-10-12 only |
-| `dose/` | R-30a | program with `pt-tue` estimated at `{"chest": 3, "lats": 3}`; weekly overlays for 2026-W36 to 2026-W41; workouts and `external` annotations giving the weeks below (planned = Session A, Session B, PT = 3) |
+| `dose/` | R-30a | program with `pt-tue` estimated at `{"chest": 3, "lats": 3}`; approved weekly overlays for 2026-W36 to 2026-W41 built from `tests/fixtures/overlay/draft-kg.json` re-dated (Session A Monday, Session B Thursday, each created the Sunday before at 19:00Z); `data/history/2026-08.json` to `2026-10.json` from `history sync` of synthetic workouts `...0301` to `...0309` (Session A squat 3×5 @ 95 RPE 7, DB bench 3×10 @ Hevy 45 RPE 8; Session B row 3×10 @ 30 RPE 8, pull-up 3×8 BW), no Hevy cache; `miss` and `external` annotations made at each week's Sunday check-in, giving the weeks below (planned = Session A, Session B, PT = 3) |
 | `block/` | R-31 | program with `hard_weeks_ceiling` 6 and `pt-tue`; a ledger with block `b-0001` started 2026-08-31 and no closed weeks; weekly overlays for 2026-W36 to W41; workouts matching each overlay (every core session at the prescribed sets and RPE) plus `external` done annotations. Closing W36 to W41 gives six hard weeks |
 | `nohevy/` | R-40c | the valid program and overlay; `[hevy] enabled = false`; no Hevy cache; `data/log/workouts.jsonl` holding the two Session A workouts of the logged-workouts table, logged by hand (squat 3×5 @ 95 RPE 7, DB bench 3×10 @ 22.5/hand RPE 8; the same on 2026-10-05 at 97.5), with `overlay_id` null; `this-week-sheets.md` rendered at 2026-10-11T18:00:00Z |
 | `manual-log-invalid/` | R-40c | not a copy of `valid/`: `nohevy/`'s config, library, program and overlay, and a log whose line 2 repeats line 1's id, line 3 logs `no_such_lift` in session `session-z`, and line 4 voids `manual:2026-09-21-session-a-1`, which no line logs |
@@ -1593,10 +1593,10 @@ skip when there is no `data/program.json` (`state_schema`: no
 
 **Schema versions.** R-17a ships program and state v1. R-14b takes state
 to v2 (`temporary_routines` entries). R-23a took program to v2 and state
-to v3 (C23). Every later bump takes the next free version when it merges and
-adds one step to the R-17a migration chain, so the chain stays linear.
-Program bumps: R-22 (executable `missed_day_rules`, C37), R-30a
-(`dose_targets`, C40), R-30b (`priority`, `minimum_week`, C40), R-44a
+to v3 (C23). R-30a took program to v3 (`dose_targets`, C40). Every later
+bump takes the next free version when it merges and adds one step to the
+R-17a migration chain, so the chain stays linear.
+Program bumps: R-22 (executable `missed_day_rules`, C37), R-30b (`priority`, `minimum_week`, C40), R-44a
 (`interference`, C51), R-44b (session `scheme`, C51). State bump: R-31
 (`block`, C42). Overlay: R-24 takes it to v2 (C21) and R-22 to v3 (C37). A
 brief or section that names a version number means the next free one.
@@ -4229,8 +4229,13 @@ an optional top-level object; migration adds `{}`:
   0 to 40. A muscle with no key gets the default 10 when it is a primary
   muscle of any exercise in an active core session, and no target
   otherwise.
-- `coach.structure.targets(program) -> dict[muscle, float]` returns the
-  effective targets. Nothing else applies the default.
+- `coach.structure.targets(program, library=None) -> dict[muscle, float]`
+  returns the effective targets (`library` None: the catalogue alone).
+  Nothing else applies the default. A "core session" here is an active
+  `lifting` session of tier `core`.
+- `program.load` fills an absent `dose_targets` with `{}`. `program
+  validate` reports a key that is not an R-11 muscle (`key not allowed
+  here`) and a value outside 0 to 40, at `$.dose_targets.<key>`.
 - Targets are what weekly balance is judged on. They are coaching numbers,
   set when the program is designed and changed only by a program edit.
 
@@ -4371,8 +4376,87 @@ Exercise swaps are not affected.
   2026-11-02") for the check-in record.
 - Check `program_balance` (warn) runs the static balance on
   `data/program.json`.
-- R-30a's flags are registered in `coach/flags/structure.py` (C20). Its
-  `structure` reports present flags through `coach.flags.for_mode` (C44).
+- R-30a's flags are registered in `coach/flags/structure.py` (C20).
+  R-40b, which builds `coach.flags.for_mode` (C44), routes the `structure`
+  reports' flags through it; until then they carry their registered
+  severities.
+
+**Built with R-30a** (details the sections above leave open):
+
+- Signatures: `week(root, week_start, *, today=None, now=None)` takes a
+  date or a `Span` (the week holding it); `adherence`, `balance` and
+  `ordinary_weeks` take the same keyword `today` and `now`.
+  `coach.structure.session_dose(library, session)` is the planned dose of
+  one session in either shape (a program session's set groups count
+  `count` sets each; an overlay lists each set), and `planned_dose` sums
+  it. Planned sets follow C18's hard-set rule: working sets not
+  prescribed at RPE 5 or below.
+- Session status comes from `coach.stats.adherence_of(root, planned,
+  window, ...)`, the C18 matcher over given `(overlay, session)` pairs
+  (`stats.adherence` calls it). A day no overlay covers takes the
+  schedule rule's plan on the program, paired with a stand-in overlay
+  whose `id` is null (the row's `overlay_id` is null).
+- `structure week` rows: core and optional sessions carry `session_id`,
+  `date`, `tier`, `status`, `moved`, `workout_id`, `overlay_id`, plus
+  `tag` when missed and `unlogged: true` when trained unlogged. Coach-led
+  rows carry `external_id`, `title`, `date`, `status` and
+  `estimated_sets`. A coach-led session dated after today is `upcoming`.
+  A coach-led session with `weekday` null is placed on the dates of its
+  `external` annotations in the week. A placement takes the nearest
+  annotation for that session in the week; of two on one date, the
+  newest wins.
+- `muscles[m].planned` adds coach-led estimates that are `done`,
+  `not_done` or `upcoming` (an `unconfirmed` one is out of both sides).
+  Muscles listed: every muscle with a target or any non-zero value;
+  `target` null for a muscle without one. The output also carries
+  `label` (`2026-W41`). `by_session` is keyed by session id, or
+  `<session_id>@<date>` when a session is logged twice in the week.
+- **Layoff week**: no workout, trained-unlogged session or coach-led
+  session done in the week, and more than 10 days (the first C22 return
+  band) from the last training before it to the first after it (or to
+  the day after `until` when none follows yet). A week with no training
+  before it at all is a layoff week. Weeks ending before the earliest
+  overlay or workout are never scanned.
+- A light week by decision: an adopted `light_week` decision, not
+  withdrawn, whose `details.week` falls in the week.
+- `structure adherence` returns `until`, `weeks` (`{week, label,
+  planned, trained}` oldest first), `skipped` (`{week, label, kind}` for
+  the non-ordinary weeks passed over), `planned`, `trained`, `pct`
+  (rounded half up), `insufficient_weeks`, `flags` and `decision`. The
+  70 % and 80 % lines compare the unrounded ratio. Its delivered
+  `volume_undershoot` counts `delivered` plus `bonus` against the target.
+- Decisions in effect, judged at `until` and ignoring decisions made
+  after it: the newest `restructure` decision suppresses
+  `restructure_required` as above, counting only ordinary weeks that
+  start after the day it was made; an `add_session` decision is adopted
+  only and holds for 28 days (`until` is set to `made_at` + 28).
+  `withdrawn` decisions hold nothing.
+- `structure decide` refuses (exit 1) when there are fewer than four
+  ordinary weeks, `restructure` at 70 % or more, `add_session` at 80 % or
+  more or with an outcome other than `adopted`, `declined` or
+  `add_session` without `--reason`, `deferred` without a `--revisit`
+  after today, and `--revisit` on any other outcome. Without `--reason`,
+  `adopted` records "smaller schedule adopted" and `deferred` "deferred
+  to <date>". Lines: `adopted`, `declined: <reason>`, `deferred to
+  <date>`, and for an override `adopted (override: <reason>)`. Output:
+  `decision`, `line`, `adherence` (`pct`, `planned`, `trained`, `weeks`),
+  `written`.
+- `structure balance` plans the week holding tomorrow once per position
+  of the schedule rule (`positions(params)`, or one pass when it has
+  none), with the rotation set to that position. Every coach-led session
+  counts once per position. Output: `reference_week`, `positions`
+  (`{position, sessions, external, muscles}`), `average`, `targets`,
+  `muscles` (`{target, average, met}`; `met` null without a target),
+  `by_session` (each active lifting session's planned dose, either tier,
+  which `session_volume_high` judges), `added`, `adherence` (with FILE:
+  `pct`, `planned`, `trained`, `insufficient_weeks`) and `flags`. FILE is
+  validated like `program validate` (exit 1). `added` lists sessions
+  active in FILE but not active in `data/program.json`, then new
+  coach-led ids; `add_session_type_blocked` names each in `session_id`.
+  It is not raised with fewer than four ordinary weeks.
+- Check `program_balance` warns once per flag, as `<code>: <message>`;
+  it skips with no program, or one the balance cannot be worked out for
+  (`program_schema` reports why).
 
 ## C42. Block ledger and state (R-31; R-21a, R-25, R-26 read)
 
