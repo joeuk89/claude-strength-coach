@@ -131,9 +131,18 @@ anything. Rules that always apply:
 - Routine changes agreed here should be offered to Hevy (via `/hevy-sync`)
   so the app and the plan don't drift apart silently.
 - **When writing any routine to Hevy, fill each exercise's `notes`
-  field** in the standard three-line format (Target / Focus / Cues —
-  see `reference/hevy-api.md`) — that's how prescriptions the app can't
-  store structurally reach the athlete mid-session.
+  field** in the standard format (Target / Focus / Cues — see
+  `reference/hevy-api.md`) — that's how prescriptions the app can't
+  store structurally reach the athlete mid-session. Target lines state
+  the absolute prescription only (`3×8 @ 80 kg @ RPE 8`), never
+  relative wording like "add 2.5 kg from last week", which goes stale
+  in the app.
+- **Every programming pass rewrites every Hevy routine in its span,
+  changed or not**, so no routine keeps an old week's notes. The first
+  exercise of each routine written carries a dated week line —
+  `Wk of 12 Oct: <week focus>` — so the athlete can tell this week's
+  note from an old one. Routines the last pass didn't write show as
+  STALE in the next coach's brief.
 - **No Hevy?** The athlete describes their training at check-ins instead,
   and `/hevy-sync` doesn't apply.
 
@@ -209,15 +218,32 @@ best practice — **research it online** rather than relying on memory alone.
   change ripples into weekly balance or the session rotation (re-check the
   day before and after any edited day).
 - When proposing changes, **explain the rationale and trade-offs** and
-  show before/after. **Confirm before editing the `routine/` files**, and
-  confirm again before writing anything to Hevy.
+  show before/after. **Confirm before editing the `routine/` files** —
+  "go" to a coach's brief confirms the structural edits it names.
+- **One approval per programming pass.** The coach's brief
+  (`/program-week`, `/one-off-week`) ends with one line naming exactly
+  what will be written: each Hevy routine, and any `routine/` file with
+  a structural change. "go" (or a clear yes) approves the week and
+  those writes together — don't ask again before writing to Hevy.
+  Anything else is a tweak and gets a revised brief. Presenting and
+  writing still never happen in the same turn.
+- **Reversible writes need no separate confirmation**: git-tracked
+  records (check-in and overlay records, status lines in
+  `routine/program.md`) and structural `routine/` edits named in an
+  approved coach's brief. **Still ask first** for any Hevy write outside
+  an approved coach's brief, any `profile.md` change to stats, goals or
+  Coach's notes, and any new file outside the standard locations.
+  `/hevy-sync` still settles one discrepancy at a time, and
+  `/new-program` still confirms before writing.
 - Routines must be **concrete enough to train directly**: exercises, sets,
   reps, intensity/RPE, rest, and a clear progression scheme.
 - Keep `profile.md` current — when a check-in or conversation reveals a
   stat, constraint, or goal changed, update it (with the athlete's
   confirmation). Per-athlete patterns you learn (habits, tendencies,
   preferences) belong in its **Coach's notes** section.
-- **Ask before creating new files** or restructuring the repo.
+- **Ask before creating files outside the standard locations** (dated
+  records in `check-ins/` and `nutrition/`, recipe cards via `/recipes`)
+  or restructuring the repo.
 
 ## Safety & scope
 
