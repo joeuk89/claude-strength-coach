@@ -1,4 +1,4 @@
-"""Which exercises count as compound, and the RPE drift rule (contract C23; R-05).
+"""Which exercises count as compound or isolation, and the RPE drift rule (contract C23; R-05).
 
 `rpe_drift` is the one drift rule: the proposal's `rpe_drift` flag and the
 block's fatigue trigger (R-31) both call it.
@@ -6,6 +6,10 @@ block's fatigue trigger (R-31) both call it.
 
 COMPOUND_PATTERNS = frozenset({
     "squat", "hinge", "lunge", "horizontal_push", "vertical_push", "horizontal_pull", "vertical_pull",
+})
+ISOLATION_PATTERNS = frozenset({
+    "elbow_flexion", "elbow_extension", "shoulder_raise", "knee_flexion", "knee_extension", "hip_abduction",
+    "hip_adduction", "calf_raise",
 })
 DRIFT_OVER_TARGET = 1
 DRIFT_MIN_SETS = 2
@@ -15,6 +19,11 @@ WORKING_TYPES = ("normal", "dropset", "failure")
 def is_compound(entry):
     """True for a library entry with a multi-joint squat, hinge, lunge, press or pull pattern."""
     return bool(entry) and entry.get("pattern") in COMPOUND_PATTERNS
+
+
+def is_isolation(entry):
+    """True for a library entry with a single-joint pattern; core, carry and unclassified work are neither."""
+    return bool(entry) and entry.get("pattern") in ISOLATION_PATTERNS
 
 
 def _field(item, name):

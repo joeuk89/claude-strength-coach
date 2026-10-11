@@ -55,7 +55,7 @@ coach/                       # framework: synced to instances
   flags/__init__.py          # flag registry + auto-discovery                            (R-20)
   flags/<topic>.py           # one module per item that registers codes                  (each item)
   validity.py                # validity window, return bands, prescription checks        (R-24)
-  patterns.py                # COMPOUND_PATTERNS, is_compound(), rpe_drift()             (R-23a)
+  patterns.py                # COMPOUND_PATTERNS, is_compound(), is_isolation(), rpe_drift() (R-23a)
   plugins/__init__.py        # plugin loader: framework + instance, kinds by subpackage  (R-23a)
   plugins/base.py            # context and proposal types, default_decay                 (R-23a)
   plugins/schemes/<name>.py, plugins/schedules/<name>.py, plugins/transforms/<name>.py  (R-23a, R-23b, R-31)
@@ -2274,6 +2274,7 @@ Reserved codes:
 | `prescription_unknown` | warn | R-23a | | Historical prescription unknown; no prescribed hit or miss inferred. Prescription validation still runs. |
 | `linear_below_start` | info | R-23a | | Linear reset fell below the starting load; review progression without automatic adjustment. |
 | `rpe_drift` | warn | R-23a | | Compound or recovery-capped exercise: logged RPE at least 1 over target on two or more working sets of the last exposure. |
+| `range_effort_mismatch` | warn | R-23a | | Double progression held a load whose derived-from exposure had a working set below the program's rep range or 2 or more RPE over target; review a lighter load or a different rep range. |
 | `return_week` | info | R-23a | | Decay applied; names the band and days off. A lifting line's flag adds the load change (`loads × 0.9`, or `assistance held` on an `assisted` line), the set change and any RPE cap. |
 | `return_after_illness` | warn | R-23a | | An `ill` miss or status day in the gap: confirm `SYMPTOM_FREE_HOURS` (48) hours symptom-free; first session capped at RPE `ILLNESS_RPE_CAP` (7). |
 | `constraint_applied` | info | R-23a | | A cap, a slot constraint or a niggle constraint changed the proposal. |
@@ -2525,7 +2526,8 @@ double a load.
 class SchemeContext:
     today: date; session_date: date; unit: str; week_kind: str   # weekly | midweek | deload
     exercise: ExerciseInfo        # id, pattern, muscles, equipment, load_mode, increment, is_compound,
-                                  # load_direction (+1; −1 for assisted), e1rm_supported (C5)
+                                  # load_direction (+1; −1 for assisted), e1rm_supported (C5),
+                                  # is_isolation
     slot: SlotInfo                # session_id, set groups, rest_seconds, cues, constraints, start_load
     params: dict                  # validated, defaults filled
     state: dict                   # validated; INITIAL when absent or after a scheme change
@@ -2666,10 +2668,30 @@ and `plugins test` runs them. Loaded with
   `base.E1RM_MODES` (`total`, `per_hand_x2`, `single_implement`): a
   bodyweight or assisted e1RM is of the system load, not the added load
   or assistance the line prescribes.
-- `double_progression` judges "reached the top" against the slot's
-  program rep range, and takes only the RPE targets and set count from
-  the exposure's `prescribed`: its own overlay lines ask for fixed reps
-  below the top.
+- `double_progression` always proposes the slot's program sets: its rep
+  range (or fixed reps) at its target RPE. It never sets a fixed rep
+  target such as one more than the weakest set; the scheme decides only
+  the load. It judges "reached the top" against the program's range,
+  and takes only the RPE targets and set count from the exposure's
+  `prescribed`. The load step (rn:progression-training-age.2) needs
+  every working set at the top of the range; a set over its target RPE
+  also holds the load, except on isolation work
+  (`ExerciseInfo.is_isolation`: a library pattern in
+  `coach.patterns.ISOLATION_PATTERNS`, the single-joint patterns; core,
+  carry and unclassified work are not isolation) with no active
+  `rpe_cap` constraint, whose rationale then names the effort the step
+  went past. When it holds, the line raises `range_effort_mismatch` if
+  one of the derived-from exposure's working sets, up to the program's
+  set count, fell below the range's bottom or was logged 2 or more RPE
+  over its target (`base.RPE_STEP_BACK`, the framework's existing
+  step-back distance; a coaching heuristic, not a research threshold). The flag asks the coach to review a
+  lighter load or a different rep range; restating the range never
+  claims it is reachable. `LOAD_MODES` leaves out `duration` and
+  `distance`, which it cannot progress. A refused slot's message names
+  the path that works: for `duration`, `hold` and a `propose override
+  --sets "2x35s rpe7"`; otherwise the schemes that program the mode.
+  Band work has no load to add: at the top of the range the line holds
+  and its rationale asks the coach for a harder band.
 - The pipeline reads caps through `coach.checks.instance.cap_for(config,
   exercise_id, mode, location)` (R-16's `load_caps` rule) and increments
   through `coach.stats.load_increment(library, config, exercise_id,
@@ -2863,8 +2885,12 @@ constrained mode) stay coach-built through `overlay build`.
   `{"sessions": [{"date", "session_id"}], "flags": [...]}`; other keys
   are ignored and the rotation is left unchanged.
 - `propose override` takes `--sets SPEC`, comma-separated groups
-  `COUNTxREPS[-REPS][@LOAD][ rpeN]` (`"3x5@95 rpe7"`), which replace the
-  line's working sets and keep its warm-ups, or `--load N`. It re-runs
+  `COUNTxREPS[-REPS][@LOAD][ rpeN]` (`"3x5@95 rpe7"`) or, for a
+  `duration` line, `COUNTxSECONDSs[ rpeN]` (`"2x35s rpe7"`), which
+  replace the line's working sets and keep its warm-ups, or `--load N`.
+  A spec mixing reps and seconds, or a timed group with a range or a
+  load, exits 2; seconds on any other line, or reps on a `duration`
+  line, exit 1. Both refuse before anything is written. It re-runs
   the R-24 check and stores the merged flags in the draft, so a block an
   override creates can be resolved there. A standing override's decision
   is appended when the command runs.

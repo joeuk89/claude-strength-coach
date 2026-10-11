@@ -356,6 +356,15 @@ def state_errors(plugin, data):
     return validate_schema(data, plugin.module.STATE["schema"])
 
 
+def _supported_path(registry, mode):
+    """Where a slot of `mode` can go instead: a held duration changed by override, else the schemes that take it."""
+    if mode == "duration" and registry.get("scheme", "hold") is not None:
+        return '; use hold, and change the duration with propose override --sets "2x35s rpe7"'
+    names = [name for name in registry.names("scheme")
+             if mode in (getattr(registry.get("scheme", name).module, "LOAD_MODES", None) or units.LOAD_MODES)]
+    return f"; schemes that program it: {', '.join(names)}" if names else ""
+
+
 def program_problems(doc, registry):
     """(JSONPath, message) for every scheme, session scheme, schedule rule, deload rule and interference rule the
     registry lacks or whose params fail, and every slot whose load mode its scheme's LOAD_MODES leaves out."""
@@ -380,7 +389,8 @@ def program_problems(doc, registry):
             modes = getattr(plugin.module, "LOAD_MODES", None) if plugin else None
             if modes is not None and exercise["load_mode"] not in modes:
                 found.append((f"{path}.name", f"{scheme['name']} programs only {', '.join(modes)} lines; this slot "
-                                              f"is {exercise['load_mode']}"))
+                                              f"is {exercise['load_mode']}"
+                                              f"{_supported_path(registry, exercise['load_mode'])}"))
     for s_index, session in enumerate(doc["sessions"]):
         scheme = session.get("scheme")
         if scheme is None or session["kind"] != "conditioning":
