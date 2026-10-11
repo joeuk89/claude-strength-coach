@@ -57,10 +57,11 @@ line names only the days it rewrote, so it never makes the other
 routines STALE. List each STALE routine with its last-written date
 (its `updated_at`). No `**Written to Hevy:**` line in `check-ins/` yet
 → skip the check. On a normal week the list appears in program-week's
-coach's brief, which reuses these routines for its in-app edit check;
-the pass rewrites every routine in the span either way. Skip the check
-when the coming week is a deload or other one-off week —
-`/one-off-week` writes fresh temp routines for it.
+coach's brief (on a hold-steady week, its close-out), which reuses
+these routines for its in-app edit check; the pass rewrites every
+routine in the span either way. Skip the check when the coming week is
+a deload or other one-off week — `/one-off-week` writes fresh temp
+routines for it.
 
 **Without Hevy:** there is no log to pre-fill, so the Sessions field of
 the Sunday message asks the athlete to describe the week — which sessions

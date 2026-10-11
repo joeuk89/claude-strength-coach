@@ -82,10 +82,11 @@ every programming pass; the thing the athlete reads during the week.
 _Avoid_: dashboard, summary, this-week doc
 
 **Sunday message**:
-The check-in's single exchange about the week just trained: one message
-from the coach that states what the log shows and numbers what it cannot
-(sessions done, runs, sleep, niggles, nutrition readings, anything
-different next week), and the athlete's one reply. Replaces an interview.
+The one message the coach sends at check-in about the week just
+trained: it states what the log shows and numbers what it cannot
+(sessions, coach-led content, runs, sleep, niggles, nutrition readings,
+meal plan, anything different next week), for the athlete to answer in
+one reply. Replaces an interview.
 _Avoid_: check-in form, intake, questionnaire
 
 **Hold-steady week**:

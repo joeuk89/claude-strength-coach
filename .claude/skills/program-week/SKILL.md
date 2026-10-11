@@ -68,7 +68,8 @@ to Hevy:**` line anywhere in `check-ins/` yet → skip both checks.
   `**Written to Hevy:**` line doesn't name it, or names it with a
   timestamp after the routine's `updated_at`: that pass didn't write
   it, so the athlete would train from old notes. List each in the
-  coach's brief as STALE with its last-written date (its `updated_at`).
+  coach's brief (on a hold-steady week, its close-out) as STALE with its
+  last-written date (its `updated_at`).
 - **Edited in the app** — find the newest record whose `**Written to
   Hevy:**` line names the routine, and compare the routine structurally
   with what that pass wrote (its session in `routine/` with that
