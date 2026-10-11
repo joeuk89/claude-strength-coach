@@ -29,13 +29,17 @@ coach/                       # framework: synced to instances
   jsonio.py                  # read/write JSON, schema_version gate, atomic write, canonical hash (R-10)
   validate.py                # JSON-Schema-subset validator                              (R-10)
   config.py                  # config.toml loader and validator, equipment_for (C54)     (R-10)
+  config_tables/__init__.py  # config table discovery (C4)                               (R-10)
+  config_tables/<item>.py    # one module per item that adds config tables; R-10's is core.py
+  context.py                 # Context: root, env, config, now(), today(), warn(), log() (R-10)
   dates.py                   # ISO dates, weeks, spans                                   (R-10)
   units.py                   # the ONLY place for x2, /2, kg<->lb, rounding, load formatting (R-10)
   datablock.py               # hidden data block parser (C11)                            (R-32a or R-33b, first to merge)
   checks/__init__.py         # check registry + auto-discovery                           (R-10)
-  checks/<item>.py           # one module per item that adds checks
+  checks/<item>.py           # one module per item that adds checks; R-10's is environment.py
+  commands/__init__.py       # @command declaration helper + auto-discovery              (R-10)
   commands/<group>.py        # one module per CLI group, auto-discovered
-  schemas/<name>.schema.json # one file per JSON document type
+  schemas/<name>.schema.json # one file per JSON document type; envelope.schema.json (C3) is R-10's
   catalogue/exercises.json   # builtin exercise catalogue                                (R-11)
   library.py                                                                             (R-11)
   hevy/{client,transport,cache,ratelimit,anonymise,envfile}.py                           (R-12)
@@ -95,8 +99,8 @@ tests/                       # template only, never synced
 
 Rules that stop parallel agents colliding:
 
-- **Add files; don't edit shared registries.** CLI groups, checks, flag
-  codes, plugins, history sources, card parts, page parts, status
+- **Add files; don't edit shared registries.** CLI groups, checks, config
+  tables, flag codes, plugins, history sources, card parts, page parts, status
   providers, activity adapters and week-flag providers are discovered with
   `pkgutil.iter_modules` over their package. No item edits `cli.py`, a
   registry's `__init__.py` or another item's module.
@@ -116,6 +120,14 @@ Rules that stop parallel agents colliding:
   run from the instance root. Root resolution: `--root`, then env
   `COACH_ROOT`, then the current directory.
 - Two levels only: group, then command.
+- Commands are declared with `coach.commands.command` (R-10):
+  `@command("units format", help=..., args=(arg("--mode", ...), ...),
+  writes=False, hevy_write=False, network=False, git_write=False,
+  writes_scope=None)` on a function `(args, ctx) -> dict` that returns the
+  envelope's `data`. A one-word name is a top-level command (`check`,
+  `version`). The helper adds `--dry-run` to every command with `writes`,
+  `hevy_write` or `git_write`, and `Command.metadata()` gives the five
+  flags R-15 reads. `ctx` is `coach.context.Context`.
 - Every command module declares, per command: `writes` (touches local
   files), `hevy_write` (sends a non-GET request to Hevy), `network` (calls
   Hevy at all), `git_write` (commits or pushes; R-25) and `writes_scope`
@@ -147,9 +159,9 @@ Command inventory (owner in brackets). Read-only unless marked W
 
 | Command | Owner | |
 |---|---|---|
-| `units format [--no-hevy]`, `units convert`, `units round` | R-10 (`--no-hevy`: R-40c) | |
-| `dates week`, `dates span` | R-10 | |
-| `config show`, `config validate` | R-10 | |
+| `units format --mode M --value V [--unit U] [--no-hevy]`, `units convert --mode M (--from-hevy-kg X \| --value V) [--unit U]`, `units round --value V --increment I [--direction nearest\|down\|up]` | R-10 (`--no-hevy`: R-40c) | |
+| `dates week [--date D] [--week-starts S]`, `dates span (--week W \| --start D --end D) [--week-starts S]` | R-10 | |
+| `config show [--location NAME]`, `config validate` | R-10 | |
 | `check [--only ids] [--list]` | R-10 (framework), each item adds checks | |
 | `version` | R-10 | |
 | `library list [--avoided]`, `library show`, `library search`, `library validate` | R-11 | |
@@ -234,7 +246,9 @@ stdout carries exactly one JSON object per run, UTF-8, followed by a newline:
  "data": {}, "warnings": []}
 ```
 
-On failure `ok` is false, `data` is absent, and:
+On failure `ok` is false, `data` is absent (except for a command whose
+result is a report that explains the failure: `coach check` keeps
+`data.results` and `data.summary` next to `error`), and:
 
 ```json
 "error": {"code": "validation", "message": "one plain sentence",
@@ -270,6 +284,24 @@ stderr carries human-readable diagnostics and progress, each line prefixed
 - Commands that need config and find none exit 5 with "copy
   config.example.toml to config.toml". `units` commands take `--unit` and
   work without config.
+- **Required keys and defaults** (R-10): `schema_version` and `[athlete]
+  units` are required. Every other key takes the value shown below when
+  left out, except that `bodyweight_units` defaults to `units`, and with
+  `units = "lb"` the `[equipment]` increments, `dumbbell_max`,
+  `bar_weight` and `plates` have no default and must be set. Absent
+  `[caps]` and `[equipment.locations]` are empty. Keys inside a location
+  table have no defaults: a key left out keeps the main table's value.
+- **Declaring a table** (R-10): each top-level table is declared in a
+  module under `coach/config_tables/` that exports `TABLES = {"name":
+  Table(...)}`, built from `coach.config.Key` and `Table`. An item that
+  adds a table adds its own module; it does not edit `config.py`. A table
+  marked `optional=True` stays absent when the file leaves it out, so
+  `"nutrition" in config` tells a reader whether nutrition is enabled.
+- `coach.config.load(root) -> Config`. `Config` is a dict with attribute
+  access (`config.athlete.units`, `config["equipment"]`) and a `path`.
+- `plates` lists the plate sizes the athlete has in pairs, one per side;
+  `units.plate_breakdown` uses any number of each size and returns the
+  fewest plates, heaviest first.
 
 Phase 1 and profile-fact keys (R-10 defines all of them; later items read
 them; C54 says who reads the profile facts):
@@ -450,9 +482,16 @@ program start loads):
   `units.from_hevy_kg(weight_kg, load_mode, unit)` convert. The Hevy writer
   reads `hevy_kg` only. Renderers print via `units.format_load(load)` and
   compute nothing.
+- `per_hand` is null for every mode but `per_hand_x2` and
+  `single_implement`. `check_load(load)` returns one message per problem,
+  shaped `"<field>: expected <x>, found <y>"`.
+- `from_hevy_kg` rounds the athlete-units total to 3 decimals before
+  halving, which absorbs the 4-decimal kg rounding (`22.6796` → `25`/hand
+  in lb).
 - `format_load` never prints a unit; table headers and surrounding text
-  carry it. It prints at most two decimals and strips trailing zeros
-  (`22.5`, `1.25`, `25`).
+  carry it. It prints at most two decimals, rounding halves up, and strips
+  trailing zeros (`22.5`, `1.25`, `25`). It raises on a null load; callers
+  print what a null load means in their context (C12).
 - `format_load(load, show_hevy=True)` (R-40c). With `show_hevy` false,
   `per_hand_x2` prints `25/hand`, `single_implement` prints `25`, and
   `assisted` prints `BW-20 assist`. Renderers pass `config.hevy.enabled`;
@@ -748,6 +787,13 @@ def overlay_arithmetic(ctx) -> list[Result]: ...
 message, path}`) and `data.summary` (`{pass, warn, fail, skip}`). Exit 1 if
 any `fail`. Every check ships with a passing and a failing fixture
 instance under `tests/fixtures/instances/`.
+
+The registry (R-10) runs each check with a `Context`. A check that raises
+`ConfigError` (it read `ctx.config` and there is none, or it is invalid)
+becomes one `skip` result; any other exception becomes one `fail` result
+with the traceback on stderr; an empty list becomes one `pass` result.
+`--only` takes comma-separated ids and may repeat; an unknown id exits 2.
+R-10 registers `python_floor` and `config` in `coach/checks/environment.py`.
 
 The sections from C17 on name the checks their owners register. R-32a
 registers `research_notes`, `research_citations`, `research_render_fresh`
