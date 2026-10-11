@@ -278,8 +278,6 @@ def _validate_variation(variation, by_item, aisles, bank, prep, names, fail, war
         (fail if status == "fail" else warn)(message)
 
 
-# Rendering ----------------------------------------------------------------
-
 def region_markers(slug):
     return f"<!-- coach:begin card {slug} -->", f"<!-- coach:end card {slug} -->"
 
@@ -419,8 +417,6 @@ def render_index(bank, config):
     return "\n".join(lines).rstrip("\n") + "\n"
 
 
-# TOML ---------------------------------------------------------------------
-
 _BARE_KEY = re.compile(r"^[A-Za-z0-9_-]+$")
 _ESCAPES = {"\\": "\\\\", '"': '\\"', "\b": "\\b", "\t": "\\t", "\n": "\\n", "\f": "\\f", "\r": "\\r"}
 
@@ -494,8 +490,6 @@ def suggest_slug(title):
     slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
     return slug[:60].rstrip("-") or "recipe"
 
-
-# Ingredient lines ---------------------------------------------------------
 
 _FRACTIONS = {"½": 0.5, "¼": 0.25, "¾": 0.75, "⅓": 1 / 3, "⅔": 2 / 3}
 _QTY = re.compile(r"(\d+\s+\d+/\d+|\d+/\d+|\d+(?:[.,]\d+)?\s*[½¼¾⅓⅔]?|[½¼¾⅓⅔])")
@@ -610,8 +604,6 @@ def ingredient_with_aisle(line):
     aisle, matched = guess_aisle(parsed["item"])
     return {**parsed, "aisle": aisle}, matched
 
-
-# JSON-LD import -------------------------------------------------------------
 
 class _LdJsonScripts(HTMLParser):
     def __init__(self):
@@ -842,8 +834,6 @@ def import_jsonld(page_html, url=None):
                       "items": guessed})
     return draft, flags
 
-
-# Converting old YAML cards ---------------------------------------------------
 
 def _yaml_scalar(raw):
     value = raw.strip()
