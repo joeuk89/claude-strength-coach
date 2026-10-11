@@ -337,7 +337,7 @@ _Revised: YYYY-MM-DD_
 ```
 
 **If the phase is written in more than one place, sync them all in the
-same edit** (e.g. a phase word in `routine/program.md`'s header). Bump
+same edit** (`config.toml`'s `[nutrition] phase` and `profile.md`). Bump
 `profile.md`'s `_Last reviewed_` date. Check-ins take it from here: they
 record a reading each week, track the trend against this plan, apply the
 floor's habit progression, expire overrides, and send the athlete back

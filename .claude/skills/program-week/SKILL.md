@@ -8,35 +8,64 @@ description: Use when the coming week (or the rest of this week) needs programmi
 Turn the plan plus the latest review into concrete, coach-set
 prescriptions for the coming week — per session, per exercise: working
 load, rep target, RPE, a weekly focus where warranted, and the standing
-form cues. Hevy users get it written into their routines so the app
-shows exactly what the coach wants this week; everyone gets it recorded
-in the check-in history as the **overlay** — the effective
-prescription the next check-in judges adherence against.
+form cues. The pass is recorded as the **overlay**
+(`data/overlays/<id>.json`, rendered into the check-in history) — the
+effective prescription the next check-in judges adherence against. Hevy
+users get it written into their routines so the app shows exactly what
+the coach wants this week.
 
-`routine/` stays the block-level plan — never write weekly numbers into
-it. Structural changes (swaps, adds, set counts, execution changes) do
-edit `routine/` — plan first, then Hevy.
+The program (`data/program.json`, rendered to `routine/`) stays the
+block-level plan — never write weekly numbers into it. Structural
+changes (swaps, adds, set counts, execution changes) edit
+`data/program.json` — plan first, then Hevy. The `routine/*.md` pages
+are rendered by `program render`; never edit them by hand.
 
-Requires `profile.md` and `routine/program.md` — if missing, run
+Requires `profile.md` and `data/program.json` — if missing, run
 `/setup` / `/new-program` first.
+
+**Loads come from `coach` output; quote them.** Never convert kg and
+lb, split a dumbbell total or round a load by hand: `units convert`,
+`units format` and `units round` do it, and the overlay's rendered
+tables are the only loads the brief shows.
+
+## 0. Check the workspace
+
+Run `python3 -m coach check` and report every `fail` result to the
+athlete, with its message, before doing anything else. If `routine/`
+exists but `data/program.json` does not, this workspace still keeps its
+program as hand-written pages: say it needs its one-time bootstrap
+migration onto `data/program.json` first, and stop.
+
+When a command fails, tell the athlete what its exit code means, as
+`CLAUDE.md` "The coach scripts" sets out.
 
 ## 1. Read the context
 
-`profile.md` (units, constraints, niggle log, Coach's notes),
-`routine/program.md` (progression scheme, RPE targets, rotation) and
-its session files, the newest check-in (decisions, window, any overlay
-already written), `routine/hevy-map.json`, and recent Hevy logs for
-current working weights (`GET /v1/workouts`, newest first — API in
-`reference/hevy-api.md`; no Hevy → ask the athlete for their current
-weights). Read each logged workout's `description` and per-exercise
-`notes` too — the athlete's own account of how the sets felt ("target
-too high, did back-off sets", "wiped out after yesterday's run") should
-temper the next week's loads as much as the numbers do.
+`profile.md` (constraints, niggle log, Coach's notes), `python3 -m coach
+program show` (sessions, set groups, progression schemes, start loads,
+cues) and `python3 -m coach state show` (rotation, block, any one-off
+week), `routine/program.md` for the program at a glance, the newest
+check-in (decisions, window, any overlay already rendered), and
+`python3 -m coach overlay current` (the overlay in force today).
+
+**Logged workouts (Hevy users).** Run `python3 -m coach hevy pull`, then
+`python3 -m coach hevy status` for the cache's age and counts — when
+`/check-in` invoked this skill, its pull is fresh; don't pull again.
+Read recent workouts from the cache (`.coach/cache/hevy/workouts/`,
+newest first) for current working weights, turning each logged Hevy
+value into the athlete's number with `python3 -m coach units convert
+--mode <load mode> --from-hevy-kg <value>` (the load mode from `python3
+-m coach library show <id>`). No Hevy → ask the athlete for their
+current weights. Read each logged workout's `description` and
+per-exercise `notes` too — the athlete's own account of how the sets
+felt ("target too high, did back-off sets", "wiped out after
+yesterday's run") should temper the next week's loads as much as the
+numbers do.
 
 **Rotation position.** If the program rotates, infer which week is next
 and state it for confirmation — never ask it as its own question, and
 never assume it silently. Sources, in order: the coach-led session's log,
-the current-position line in `routine/program.md`, the newest check-in.
+`rotation.position` in `state show`, the newest check-in.
 When `/check-in` invoked this skill, its Sunday message already stated
 the position and the reply confirmed or corrected it — use that.
 Standalone, state it in the brief's week focus ("Week B, going by
@@ -53,45 +82,40 @@ illness conditions; standalone, ask whether illness caused the gap.
 
 **Brand-new program?** An empty `check-ins/` is normal — there's no
 overlay or decisions to read. With no logged workouts yet, working
-weights come from the starting loads agreed during program design (or
-ask the athlete), not from logs.
+weights come from the program's start loads (`program show`) or the
+athlete, not from logs.
 
-**Stand down if a one-off week is active.** If `routine/program.md`'s
-header carries a one-off/override pointer covering this span,
-`/one-off-week` owns it — say so and stop.
+**Stand down if a one-off week is active.** If `state show` has a
+`one_off` whose span covers this span, `/one-off-week` owns it — say so
+and stop.
 
 **Mid-week?** Invoked standalone partway through a trained week, first
 ask what prompted it (missed session, easy/hard day, schedule change),
 then reprogram only the remaining days.
 
-**Hevy freshness (Hevy users).** When `/check-in` invoked this skill,
-reuse the routines its data pull fetched; otherwise GET every mapped
-routine in the span. Judge each routine against its own baseline,
-never one shared "last pass": a mid-week reprogram writes only the
-remaining days, so its line names only those routines. No `**Written
-to Hevy:**` line anywhere in `check-ins/` yet → skip both checks.
+**Hevy freshness (Hevy users).** With an overlay in force, run
+`python3 -m coach routines verify --overlay <its id>` after the pull; no
+overlay yet → skip it. Each routine it reports with `verified: false`
+carries its `changes`:
 
-- **STALE** — find the newest overlay in `check-ins/` with a table for
-  the routine's session. The routine is STALE when that overlay's
-  `**Written to Hevy:**` line doesn't name it, or names it with a
-  timestamp after the routine's `updated_at`: that pass didn't write
-  it, so the athlete would train from old notes. List each in the
-  coach's brief (on a hold-steady week, its close-out) as STALE with its
-  last-written date (its `updated_at`).
-- **Edited in the app** — find the newest record whose `**Written to
-  Hevy:**` line names the routine, and compare the routine structurally
-  with what that pass wrote (its session in `routine/` with that
-  record's overlay applied): exercises, their order, set counts, rep
-  ranges, rest. Any difference is an in-app edit made since that pass.
-  **Load-only edits are overwritten without comment** — the log already
-  holds what was lifted, and this week's loads come from the log.
-  **Structural edits** go in the coach's brief as keep-or-replace
-  questions, settled by the same approval as the week.
+- **Edited in the app** — any change of class `structural` (exercises,
+  their order, set counts, reps or rep ranges, rest, supersets) is an
+  in-app edit made since that pass. **Structural edits** go in the
+  coach's brief as keep-or-replace questions, settled by the same
+  approval as the week.
+- **Load-only edits** — `prescription` changes to set loads only are
+  overwritten without comment: the log already holds what was lifted,
+  and this week's loads come from the log.
+- **STALE** — a `prescription` change to an exercise's notes: the
+  routine doesn't carry the overlay in force, so the athlete would
+  train from old notes. List each in the coach's brief (on a
+  hold-steady week, its close-out) as STALE.
 
-**First run: cue backfill.** If the session files have no `Cues:`
-lines, offer a one-time backfill before programming: agree the
-canonical form cues for each exercise with the athlete and add a
-`Cues:` line under each exercise in `routine/*.md`.
+**First run: cue backfill.** If the program's exercises have no `cues`,
+offer a one-time backfill before programming: agree the canonical form
+cues for each exercise with the athlete, write them into each
+exercise's `cues` in `data/program.json`, then run `python3 -m coach
+program validate` and `python3 -m coach program render`.
 
 ## 2. Compute the week — per session, per exercise
 
@@ -105,16 +129,13 @@ Work through every session in the span, every exercise in each:
   means a multi-joint squat, hinge, lunge, press or pull pattern. RPE drift
   alone never holds back isolation work: it progresses on reps as the
   scheme says, unless the athlete's notes report pain or form breakdown.
-  Reason per lift — a formula applied blindly is not coaching. Display
-  in the athlete's units.
-  **Dumbbell exercises carry two numbers** — per hand and the Hevy value
-  (`25/hand (Hevy: 50)`) — because Hevy stores the combined total across
-  both arms. Get the per-hand figure out of the logged value *before*
-  applying a progression rule, or the increment lands on the wrong
-  number. Rules and the two-arm/single-implement split:
-  `reference/hevy-api.md` → "Dumbbell loads". If the log shows an exact
-  2× jump at unchanged reps and RPE, that's a convention slip, not
-  progress — don't progress off it, raise it with the athlete.
+  Reason per lift — a formula applied blindly is not coaching. Work in
+  the athlete's units and the load mode's own number — per hand for
+  dumbbell work — taken from `units convert`, so the increment lands on
+  the right number; snap a new load to the kit with `python3 -m coach
+  units round --value <load> --increment <step>`. If the log shows an
+  exact 2× jump at unchanged reps and RPE, that's a convention slip,
+  not progress — don't progress off it, raise it with the athlete.
 - **Rep target / RPE** — move them where the block's scheme calls for
   it.
 - **Focus** — one per-exercise emphasis where warranted, drawn from
@@ -128,7 +149,7 @@ Work through every session in the span, every exercise in each:
   progresses from what the return week logged.
 - **Structural changes** — swaps or additions agreed at the check-in,
   or proposed now with rationale. These are plan changes: mark them
-  separately, they land in `routine/` too. Under 80 % adherence (as
+  separately, they land in `data/program.json` too. Under 80 % adherence (as
   `/check-in` step 4 defines it), propose no new recurring session —
   no new session or weekly slot, conditioning and optional ones
   included — and push back if the athlete asks; exercise swaps within a
@@ -138,7 +159,46 @@ Work through every session in the span, every exercise in each:
 Active niggles constrain everything: no added load on an aggravated
 pattern.
 
-## 3. Present the coach's brief — and stop
+## 3. Build the overlay
+
+1. **Where it renders.** When `/check-in` invoked this skill, its new
+   record's "The week ahead" section takes the overlay. Standalone, add
+   a section to the newest check-in — `## Week reprogrammed —
+   YYYY-MM-DD`, then `**Span:** <start> → <end> · **Reason:** <missed
+   session / …>`, then the new overlay's two region markers
+   (`<!-- coach:begin overlay <id> -->` and `<!-- coach:end overlay
+   <id> -->`, each on its own line) once `overlay build` gives the id. **No
+   check-in record yet** (brand-new program): create
+   `check-ins/YYYY-MM-DD.md` with a minimal first record — a header
+   noting the program start date and structure, then `## The week
+   ahead`. The first `/check-in` judges adherence against it.
+2. **Write the draft** at `.coach/drafts/overlay-<span start>.json`, in
+   the athlete's units (`coach/schemas/overlay_draft.schema.json`):
+   `kind` `weekly` (`midweek` for a mid-week reprogram), `span`, the
+   week `focus`, and per session its program `session_id`, `date` and
+   `title`; per exercise `exercise_id`, `hevy_template_id` (from
+   `library show`), `load_mode`, `rest_seconds`, `cues` (from the
+   program), `focus`, `target_note` and `change` (the brief's relative
+   wording — these never reach Hevy), and `sets`, each load a number:
+   per hand for per-hand modes, the added load for bodyweight, else the
+   total.
+3. `python3 -m coach overlay build --input <draft>` writes
+   `data/overlays/<id>.json` and gives the id.
+4. `python3 -m coach overlay validate <id>` — exit 1 lists each problem
+   by JSONPath. Fix the draft, put the id in it, and build again: a
+   draft that names an unapproved overlay rebuilds it.
+5. `python3 -m coach overlay render <id> --into <check-in record>`
+   fills the week-ahead region — the per-session tables the brief
+   shows.
+6. **Hevy users:** `python3 -m coach routines diff --overlay <id>`
+   lists every routine in the span by its Hevy title, with what "go"
+   would change. A session with no routine makes it exit 1 naming the
+   session: "go" creates its routine, so name it by its session title.
+
+A tweak to the coach's brief (step 4) means: edit the draft, then
+build, validate and render again.
+
+## 4. Present the coach's brief — and stop
 
 Talk the athlete through the week the way a coach would: narrative
 first, tables second.
@@ -149,30 +209,30 @@ first, tables second.
    its reason ("Squat 80 → 82.5 kg — you hit 5×5 @ RPE 7.5 last week,
    room to move"). Never restate every exercise here. If nothing
    changes, say so and why — that's still a decision worth explaining.
-3. **Per-session tables** — one per session: exercise · sets × reps @
-   load @ RPE · what changed vs. last week. A one-line session focus
-   above a table only where there's something to say — most sessions
-   most weeks won't have one. Dumbbell loads show both numbers
-   (`25/hand (Hevy: 50)`) — never a bare one, here or in the recorded
-   overlay.
+3. **Per-session tables** — the rendered region from `overlay render`,
+   as it stands: exercise · sets × reps · load · RPE · what changed vs.
+   last week. A one-line session focus above a table only where there's
+   something to say — most sessions most weeks won't have one. Dumbbell
+   loads show both numbers (`25/hand (Hevy: 50)`) because the renderer
+   prints them that way — never retype a load.
 4. **Structural changes** (if any) — their own short section with
    before/after and trade-offs.
 5. **Hevy housekeeping** (only when there's something to say) — each
-   STALE routine with its last-written date, and each structural in-app
-   edit with your keep-or-replace recommendation ("You swapped leg
-   press for hack squat in Lower A — keep it; I'll add it to
-   `routine/lower-a.md`"). A kept edit is a structural change and lands
-   in `routine/`; a replaced one is overwritten.
+   STALE routine, and each structural in-app edit with your
+   keep-or-replace recommendation ("You swapped leg press for hack
+   squat in Lower A — keep it; I'll add it to the program"). A kept
+   edit is a structural change and lands in `data/program.json`; a
+   replaced one is overwritten.
 6. **The write line** — the brief's last line names exactly what "go"
-   will write: each Hevy routine in the span by its Hevy title (every
-   one, changed or not), then each `routine/` file with a structural
-   change:
+   will write: each Hevy routine in the span by its Hevy title from
+   `routines diff` (every one, changed or not, plus any routine "go"
+   creates), then `data/program.json` when there's a structural change:
 
-   `Reply "go" to train this and write: Upper A, Lower A, Upper B (Hevy) · routine/upper-a.md (structural change).`
+   `Reply "go" to train this and write: Upper A, Lower A, Upper B (Hevy) · data/program.json (structural change).`
 
-   No structural change → drop the `routine/` part. Nothing going to
-   Hevy (the athlete doesn't use it) → the line says so:
-   `Reply "go" to train this and write: routine/upper-a.md (structural change). Nothing goes to Hevy (no Hevy).`
+   No structural change → drop the `data/program.json` part. Nothing
+   going to Hevy (the athlete doesn't use it) → the line says so:
+   `Reply "go" to train this and write: data/program.json (structural change). Nothing goes to Hevy (no Hevy).`
    or, with no structural change either,
    `Reply "go" to train this. Nothing goes to Hevy (no Hevy).`
 
@@ -196,7 +256,7 @@ collapse into one message, in this order:
 - **three sentences** — how the week went, leading with a win; what
   changes, or "nothing changes", and why; the focus;
 - the offer: "say 'tables' to see the full week" — per-session tables
-  are offered, not shown, but still go into the recorded overlay and
+  are offered, not shown, but still go into the rendered overlay and
   the Hevy `Target:` lines;
 - the write line above, unchanged;
 - "Reply go, or tell me what to change."
@@ -212,76 +272,58 @@ the week and every write the line names** — don't ask again before
 writing to Hevy. Anything else is a tweak: revise and present the brief
 again, write line included. Iterate until they would train it.
 
-## 4. Write
+## 5. Write
 
 **Only enter this step after the athlete has replied "go" (or a clear
 yes) to the brief above.** If no brief with a write line has been
-presented and approved this session, go back to step 3. Write exactly
+presented and approved this session, go back to step 4. Write exactly
 what the write line named — nothing more.
 
-1. **Structural changes first** — edit the `routine/*.md` files the
-   write line named (an execution change like grip width edits that
-   exercise's `Cues:` line), then re-check the day before and after
+1. **Structural changes first** — edit `data/program.json` as the write
+   line named (an execution change like grip width edits that
+   exercise's `cues`), then run `python3 -m coach program validate` and
+   `python3 -m coach program render`. Re-check the day before and after
    each edited session and the program's weekly balance.
-2. **Then Hevy** (key in `.env`). Note the current time in UTC before
-   the first write — that is this pass's timestamp. Write **every**
-   mapped routine in the span, **including unchanged ones**: a routine
-   left alone keeps last week's notes. For each, GET it, update its sets
-   (`weight_kg` converted from the athlete's units, `rep_range`) and
-   each exercise's `notes` in the standard format (see
-   `reference/hevy-api.md`):
-   - the **week line** on the first exercise: `Wk of <span start as D
-     Mon>: <week focus>`, about 80 characters at most;
-   - **Target** transcribed from the approved overlay — absolute
-     sets × reps @ load @ RPE, never relative or narrative wording;
-   - **Focus** where set, and **Cues** from `routine/`.
+2. `python3 -m coach overlay approve <id>` stamps the athlete's
+   approval. It exits 3 on an unresolved `block` flag: tell the athlete
+   why, settle it, and present the brief again.
+3. **Hevy users.** If `routines diff` named sessions with no routine,
+   run `python3 -m coach routines create --overlay <id>` first. Then
+   `python3 -m coach routines push --overlay <id>`: the permission
+   prompt shows what it will write, which is what the athlete approved.
+   It writes **every** routine in the span that differs from the
+   overlay, notes included: the week line, Target, Focus and Cues all
+   come from the overlay. A push that **exits 3** was
+   refused by a guard: report its reason to the athlete and never retry
+   it by hand. A routine edited in the app since the diff is the usual
+   one — run `python3 -m coach routines diff --overlay <id> --refresh`,
+   settle the edit with the athlete, and push again. Exit 1 means a
+   routine didn't read back as written; report it. Only when a command
+   keeps failing and the athlete agrees, use `reference/hevy-api.md` →
+   "Manual fallback".
+4. `python3 -m coach routines verify --overlay <id>` — the close-out
+   quotes its result for each routine.
+5. **An ended one-off week.** If `state show` has a `one_off` whose span
+   ended before today, run `python3 -m coach routines retire --overlay
+   <its overlay_id>` to retitle its temporary routines `(unused)`, then
+   set `one_off` to null in `data/state.json` and run `python3 -m coach
+   state show` to check it.
 
-   Then PUT the whole routine back and GET to verify. Space writes a few
-   seconds apart; back off ~30 s on a 429. **For dumbbell exercises
-   `weight_kg` is the Hevy value** (the combined total — double the
-   per-hand figure on two-arm work), and the `Target:` line states both
-   numbers so the athlete enters the right one.
-3. **Freshness check** — after the last write, GET every routine in the
-   span again and confirm each `updated_at` is after this pass's
-   timestamp. Name any that isn't in the close-out.
+**No Hevy?** Skip steps 3–5's Hevy commands — the rendered overlay is
+the deliverable, and the athlete trains from it.
 
-**No Hevy?** Skip the writes — the recorded overlay below is the
-deliverable, and the athlete trains from it.
+## 6. Record the overlay
 
-## 5. Record the overlay
+The overlay is already in the record: `overlay render --into` wrote the
+region in step 3. In a check-in's "The week ahead" section, the
+week-focus line follows the region and ends the section. The approval
+and every Hevy write and verification are logged in
+`data/hevy/writes.jsonl`; nothing else needs recording.
 
-Write the full per-exercise prescription into the newest check-in's
-"The week ahead" section — when `/check-in` invoked this skill, that
-section is being written now; fill it. Standalone runs append to the
-newest check-in instead:
-
-**No check-in record yet** (brand-new program): create
-`check-ins/YYYY-MM-DD.md` with a minimal first record — a header
-noting the program start date and structure, then "The week ahead"
-holding the overlay. The first `/check-in` judges adherence against
-it.
-
-Whichever record holds the overlay, put one line directly after the
-overlay tables stating when this pass wrote to Hevy (the timestamp
-from step 4, ISO 8601 UTC) and which routines it wrote — the next
-pass's STALE and in-app edit checks read it. In a check-in's "The week
-ahead" section, the week-focus line follows it and ends the section.
-No Hevy writes → leave the line out.
-
-```markdown
-## Week reprogrammed — YYYY-MM-DD
-
-**Span:** <start> → <end> · **Reason:** <missed session / …>
-
-(Per-session prescription tables underneath.)
-
-**Written to Hevy:** 2026-10-12T18:05:00Z · Upper A, Lower A, Upper B
-```
-
-## 6. Close out
+## 7. Close out
 
 Recap in plain words: what changed this week and why, what was written
-to Hevy (and any routine the freshness check found not updated by this
-pass, plus, on a hold-steady week, any routine that was STALE before
+to Hevy (quote `routines verify`: each routine verified, or not and
+why, plus, on a hold-steady week, any routine that was STALE before
 it), and the one thing to focus on. If a structural change landed,
 note it for the next check-in's Decisions section.

@@ -18,12 +18,22 @@ coach. One question at a time.
 
 ## 0. State check
 
-Look at what exists and what's been decided: `profile.md`,
-`routine/program.md`, a "Nutrition & goals" section with real content,
-and — on the profile's `Apps:` line — a recorded yes/no for each
-integration (Hevy, MacroFactor). A recorded **"no" counts as done**,
-not missing: never re-pitch an integration the athlete already declined. The workspace is fully set up when the profile and program
-exist, goals are set, and every integration has an answer. Report each
+Run `python3 -m coach check` and report every `fail` result to the
+athlete, with its message, before doing anything else. On a first run
+the `config` check fails because there is no `config.toml` yet — that
+is expected, and step 4 creates it. If `routine/` exists but
+`data/program.json` does not, this workspace still keeps its program as
+hand-written pages: say it needs its one-time bootstrap migration onto
+`data/program.json` first, and stop. When a command fails, tell the
+athlete what its exit code means, as `CLAUDE.md` "The coach scripts"
+sets out.
+
+Then look at what exists and what's been decided: `profile.md`,
+`config.toml`, `data/program.json`, a "Nutrition & goals" section with
+real content, and — on the profile's `Apps:` line — a recorded yes/no
+for each integration (Hevy, MacroFactor). A recorded **"no" counts as done**,
+not missing: never re-pitch an integration the athlete already declined. The workspace is fully set up when the profile, `config.toml`
+and program exist, goals are set, and every integration has an answer. Report each
 area's state, then continue from the first genuinely unfinished piece —
 or, if nothing's left, ask what the athlete wants to change (add an
 integration, refresh the profile).
@@ -48,16 +58,11 @@ engine (optional). And the rhythm: train and log, then a weekly
   `.env` (copy `.env.example`) and paste the key as `HEVY_API_KEY=...` —
   they paste it into the file themselves if they prefer; never echo the
   key back.
-- Verify it works:
-  ```bash
-  [ -f .env ] && { set -a; . ./.env; set +a; }
-  curl -s -H "api-key: $HEVY_API_KEY" "https://api.hevyapp.com/v1/user/info"
-  ```
-  A username back = success. A 401 = bad key; retry.
-- If they also want to coach from **Claude Code on the web**, point them at
-  the *Cloud sessions* section of `reference/hevy-api.md`: the key goes in
-  the cloud environment's variables (never in git), and `api.hevyapp.com`
-  must be added to a **Custom** network allowlist or every call fails.
+- Step 4 checks the key once `config.toml` exists.
+- If they also want to coach from **Claude Code on the web**: the key goes
+  in the cloud environment's variables (never in git), and the Hevy API's
+  host (the base URL in the Hevy API notes in `reference/`) must be on a
+  **Custom** network allowlist or every call fails.
 
 **MacroFactor:**
 - Ask whether they use it (or want to — it's paid, and the best-in-class
@@ -143,20 +148,47 @@ section. Starts empty.)
 
 Confirm the drafted profile with the athlete before writing the file.
 
-## 4. Goals
+## 4. Settings: `config.toml`
+
+Skip if `config.toml` exists and `python3 -m coach config validate`
+exits 0 (offer to change it instead). Otherwise copy
+`config.example.toml` to `config.toml` and set, from the answers
+already given:
+
+- `[athlete]`: `units` and `bodyweight_units` (the profile's preferred
+  units), `week_starts` (`"monday"` or `"sunday"`), `timezone` (an IANA
+  name such as `"Europe/London"`), and `available_days` and
+  `session_minutes` from the training week.
+- `[hevy]`: `enabled` — `false` unless they log in Hevy Pro.
+- `[equipment]`: `available` and `dumbbells` (per-hand weights) from the
+  Equipment section. With `units = "lb"`, uncomment every weight key
+  below them and set each in lb — the kg defaults don't apply. Other
+  places they train get an `[equipment.locations.<name>]` table.
+
+Leave every other table as the example has it. Run `python3 -m coach
+config validate`: exit 5 names the file and key to fix; fix it and run
+it again until it exits 0.
+
+**Hevy users:** run `python3 -m coach hevy status` — `key` must read
+`present` (else the key isn't in `.env` yet). Then `python3 -m coach
+hevy pull` checks the key works: exit 0 is success, exit 5 means Hevy
+rejected the key (re-copy it), exit 4 means Hevy couldn't be reached
+(try again shortly).
+
+## 5. Goals
 
 Invoke the **goals** skill (`/goals`) to set phase, targets, and — for
 MacroFactor users — its configuration. This fills "Goal & phase" and
 "Nutrition & goals".
 
-## 5. Program
+## 6. Program
 
 Offer the **new-program** skill (`/new-program`): import what they already
 run in Hevy, or design a program from scratch. It's fine to defer this to
 another session — if deferred, say plainly that the workspace isn't
 trainable until it runs.
 
-## 6. Close out
+## 7. Close out
 
 - Recap what was set up and what (if anything) was deferred.
 - State the weekly rhythm: train and log everything (including coach-led
@@ -164,4 +196,5 @@ trainable until it runs.
 - If they set up a Hevy key, remind them `.env` stays uncommitted
   (already gitignored).
 - Offer to commit: `git add -A` and show what's staged; commit with
-  message `Initial setup: profile and goals` after they approve.
+  message `Initial setup: profile, settings and goals` after they
+  approve.
