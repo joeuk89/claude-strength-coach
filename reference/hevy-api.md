@@ -45,7 +45,7 @@ Quote URLs with `?` in them — zsh globs them otherwise.
 | `GET /v1/workouts/count` | Total workout count | — |
 | `GET /v1/workouts/events?since=<ISO8601>&page=&pageSize=` | Workout updates/deletes since a date — use for "what's new since last check-in" | max 10/page |
 | `GET /v1/workouts/{id}` · `PUT /v1/workouts/{id}` | One workout — GET, or replace it. PUT is how a mis-logged past session gets repaired; it replaces the whole workout, so GET first, edit the JSON, PUT it back. Confirm with the athlete before any write | — |
-| `GET /v1/routines?page=&pageSize=` | Routine templates: exercises with `rest_seconds`, `notes`, `supersets_id`, sets with `rep_range {start,end}` / `reps` / `weight_kg` | max 10/page |
+| `GET /v1/routines?page=&pageSize=` | Routine templates: `updated_at` (ISO 8601, UTC — what the STALE check compares), exercises with `rest_seconds`, `notes`, `supersets_id`, sets with `rep_range {start,end}` / `reps` / `weight_kg` | max 10/page |
 | `POST /v1/routines` · `PUT /v1/routines/{id}` | Create / replace a routine (PUT replaces the whole exercise list) | — |
 | `GET /v1/routine_folders` | Routine folders (id + title) | max 10/page |
 | `POST /v1/routine_folders` | Create a routine folder (body `{"routine_folder": {"title": "…"}}`). `POST /v1/routines` takes a `folder_id` to file the new routine | — |
@@ -99,21 +99,40 @@ Rules that follow:
 
 ## Routine note format (standard)
 
-Every routine exercise `notes` field this repo writes uses this
-three-line format — hard cap three lines; a note nobody reads between
-sets is wasted:
+Every routine exercise `notes` field this repo writes uses this format —
+three lines, plus a week line on the first exercise only. A note nobody
+reads between sets is wasted:
 
 ```
-Target: 3×8 @ RPE 8 — add 2.5 kg from last week
+Wk of 12 Oct: heavier top sets, stop 1–2 reps short of failure
+Target: 3×8 @ 80 kg @ RPE 8
 Focus: pause 1s on the chest this week
 Cues: narrow grip · elbows tucked · feet planted
 ```
 
-- **Target** — always. This week's sets × reps @ RPE plus the load
-  instruction. Written weekly by `/program-week`; `/new-program` and
-  `/one-off-week` write their own targets at creation time. **On a
-  dumbbell exercise, give both numbers** — `3×8 @ 25/hand (Hevy: 50) @
-  RPE 8` — since the athlete reads this note while entering the set.
+- **Week line** — on the **first exercise of every routine a
+  programming pass writes** (`/program-week`, `/one-off-week`), and only
+  there: `Wk of <span start as D Mon>: <week focus>`, about 80
+  characters at most. The focus is the coach's brief's week focus,
+  shortened. Hevy drops routine-level notes on PUT, so this is the only
+  place the week's intent can live, and the date lets the athlete spot a
+  stale note mid-session. It is always the week focus — a session's own
+  emphasis goes in its exercises' `Focus:` lines. This line is the only
+  exception to the three-line cap.
+- **Target** — always. The **absolute** prescription only, transcribed
+  from the approved overlay in one fixed shape: sets × reps @ load @ RPE
+  (`3×8–10 @ 80 kg @ RPE 8`). Leave warm-up sets out; consecutive
+  working sets with the same reps, load and RPE collapse to `N×reps`, and
+  groups join with ` + ` (`1×5 @ 100 kg @ RPE 8 + 3×5 @ 90 kg @ RPE 7`).
+  **On a dumbbell exercise, give both numbers** — `3×8 @ 25/hand (Hevy:
+  50) @ RPE 8` — since the athlete reads this note while entering the
+  set. If the athlete picks the load, write the sets, reps and RPE, then
+  `· choose the load`. **No relative or narrative wording** — "add 2.5 kg
+  from last week", "same as last time", "+1 rep" go stale the moment the
+  week ends, and a surviving note then tells the athlete the wrong thing.
+  Changes and their reasons belong in the coach's brief and the check-in.
+  Written by every programming pass; `/new-program` writes its own
+  targets at creation time.
 - **Focus** — only when there's a weekly emphasis. Omit the line
   otherwise.
 - **Cues** — always. The canonical form cues, copied from the
@@ -133,17 +152,18 @@ Cues: narrow grip · elbows tucked · feet planted
   easiest way to corrupt an athlete's log, and it is silent when it happens.
 - **Routine templates cannot store an RPE target** (logged workout sets *do*
   carry `rpe`). RPE prescriptions live in the `routine/` files and the
-  weekly overlay — and reach the athlete via each routine exercise's
-  `notes` field in the standard three-line format (see "Routine note
-  format" above) whenever a routine is written to Hevy.
+  overlay — and reach the athlete via each routine exercise's
+  `notes` field in the standard format (see "Routine note format"
+  above) whenever a routine is written to Hevy.
 - **Set `type`** is one of `normal`, `warmup`, `dropset`, `failure`.
 - **PUT replaces the entire routine** — to change one exercise, GET the routine,
-  edit the JSON, PUT the whole thing back. Confirm with the athlete before any
-  write.
+  edit the JSON, PUT the whole thing back. Write only with the athlete's
+  approval: "go" to a coach's brief whose closing line named the routine, a
+  `/hevy-sync` decision, or `/new-program`'s confirmation before writing.
 - **Routine-level `notes` are silently ignored on PUT** — the schema documents
-  the field but writes don't persist it (verified 2026-07-18). Day-level intent
-  has to live in the first exercise's note instead: one extra line above its
-  Target line — the only exception to the three-line cap.
+  the field but writes don't persist it (verified 2026-07-18). The week focus
+  lives in the first exercise's note instead: the week line above its Target
+  line (see "Routine note format").
 - **Omit `rep_range` when unused** — sending `"rep_range": null` in a set gets
   the whole PUT rejected with "Expected object, received null". Same for other
   null set fields: only send keys that have values.
