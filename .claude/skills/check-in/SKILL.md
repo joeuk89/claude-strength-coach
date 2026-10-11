@@ -244,6 +244,12 @@ concrete: did the athlete hit the prescribed load × reps @ RPE?
 - Session durations vs. the time limits in `profile.md`, junk volume.
 - Weekly balance: does the program's balance picture still match what's
   actually being trained?
+- Research notes: run `python3 -m coach research status` and list every
+  area its `areas` marks `expired`, with the expired note ids, in one
+  line in Block planning (`Research: expired <area> (<note id>), …` or
+  `Research: nothing expired`). For an expired area the coming block
+  depends on, offer to refresh it as a local note (`CLAUDE.md`
+  "Researching current best practice").
 
 **Both tiers — the hard-week count.** Class each week the window closes
 by the rules in `CLAUDE.md` "Coaching principles" → Fatigue management:
@@ -450,7 +456,8 @@ Deep records use the same skeleton titled `(deep)`, with **Training**
 expanded to the full analysis (e1RM trends per lift, drift, balance,
 intensity honesty) and a **Block planning** section: the light-week
 outlook from the hard-week count, whether the goals/phase plan in
-`profile.md` is stale (if so, prompt `/goals`), and what the next block should emphasize. When body
+`profile.md` is stale (if so, prompt `/goals`), what the next block
+should emphasize, and the research line (step 4). When body
 composition applies (step 3), Block planning ends with one line that
 says when the next reading is due — the next check-in reads it:
 

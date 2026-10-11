@@ -24,10 +24,10 @@ missed meal (a quick-add of calories and protein). This follows
 MacroFactor's own guidance: a day logged by halves is what skews its
 targets most; an estimate within about 30 % of what was eaten is
 strongly preferred to a blank day; only a day they can't guess that
-closely is better left blank. The repo **never states its
-own calorie target or calorie band** for an app user and never runs a
-parallel calorie model. Any departure from the app's numbers is a dated
-nutrition override (step 7).
+closely is better left blank (rn:protein-energy-deficit.13). The repo
+**never states its own calorie target or calorie band** for an app user
+and never runs a parallel calorie model. Any departure from the app's
+numbers is a dated nutrition override (step 7).
 
 **Without a nutrition app:** the strategy is the same. The output is a
 transparent starting calorie estimate, given once per phase, plus the
@@ -75,13 +75,16 @@ some fat).
 
 ## 3. Research, then agree the plan
 
-Research current best practice online for the specific decision (rates,
-target ranges for their stats) and cite sources — don't rely on memory
-alone. Fixed points that must survive any research:
+When the specific decision (rates, target ranges for their stats) needs
+evidence, follow `CLAUDE.md` "Researching current best practice": read
+the notes for the area (`protein`, `energy_balance`, `sleep`) first,
+research and save a local note when none answers it, and cite claim ids.
+Fixed points that must survive any research:
 
 - No extreme cuts or bulks. Sustainable only.
-- Bulk: ~+0.25–0.5 lb/week. Cut: lose no faster than ~0.5–1%
-  bodyweight/week, slower when close to the goal. Recomp at maintenance is
+- Bulk: ~+0.25–0.5 lb/week (rn:protein-energy-deficit.12). Cut: lose no
+  faster than ~0.5–1% bodyweight/week, slower when close to the goal
+  (rn:protein-energy-deficit.11). Recomp at maintenance is
   a legitimate choice for a returning or newer lifter with elevated body
   fat.
 - Protein follows step 4: three numbers from a reference mass, never
@@ -94,20 +97,19 @@ phase that eats below maintenance), check sleep:
 
 - **With a sleep source** (a watch or phone that tracks sleep): a
   trailing 14-day average under ~7 h means **recomp at maintenance**
-  instead of a deficit. At or over ~7 h, the gate passes.
+  instead of a deficit. At or over ~7 h, the gate passes
+  (rn:sleep-dieting.3).
 - **No sleep source:** ask how they sleep. Reported short sleep, or a
   sleep limiter in the profile's **Recovery** section, defaults to recomp
   at maintenance with the gate recorded as `pending measurement`.
   Otherwise the deficit can go ahead with the gate recorded as
-  `not evaluated`.
+  `not evaluated` (rn:sleep-dieting.4).
 
-Why: in a 14-day crossover trial under the same moderate deficit, 5.5 h
-of sleep opportunity instead of 8.5 h cut the fat lost by 55 % and raised
-fat-free mass lost by 60 % (Nedeltcheva et al. 2010, *Ann Intern Med*
-153:435–441, https://doi.org/10.7326/0003-4819-153-7-201010050-00006).
-The ~7 h line is the AASM/SRS adult minimum (Watson et al. 2015, *J Clin
-Sleep Med* 11:591–592, https://doi.org/10.5664/jcsm.4758). `/check-in`
-re-checks the gate during a deficit once a sleep source exists.
+Why: under the same moderate deficit, 5.5 h of sleep opportunity
+instead of 8.5 h cut the fat lost by 55 % and raised fat-free mass lost
+by 60 % (rn:sleep-dieting.2). The ~7 h line is the adult minimum
+(rn:sleep-dieting.1). `/check-in` re-checks the gate during a deficit
+once a sleep source exists.
 
 Agree with the athlete: **goal weight** (or body-comp outcome), **phase
 sequence** with rough dates, **target trend rate per phase**, and **what
@@ -158,38 +160,32 @@ fat.
   number unless an active nutrition override covers protein (step 7).
 - Round to the nearest 5 g.
 
-Sources: Morton et al. 2018 (*Br J Sports Med* 52:376–384,
-https://doi.org/10.1136/bjsports-2017-097608) found gains in fat-free
-mass stopped rising at ~1.6 g/kg/day (95 % CI up to 2.2), which sets the
-target and the stretch. Helms et al. 2014 (*Int J Sport Nutr Exerc
-Metab* 24:127–138, https://doi.org/10.1123/ijsnem.2013-0054) put needs
-during a deficit at 2.3–3.1 g/kg of fat-free mass for lean trained
-lifters, which brackets the fat-free-mass stretch. The ISSN position
-stand (Jäger et al. 2017, *JISSN* 14:20,
-https://doi.org/10.1186/s12970-017-0177-8) gives 1.4–2.0 g/kg for most
-exercising people. For the floor, Weijs & Wolfe 2016 (*Clin Nutr*
-35:394–398, https://doi.org/10.1016/j.clnu.2015.02.016) found muscle gain
-during weight loss more likely above 1.2 g/kg (1.9 g/kg of fat-free
-mass), and Kokura et al. 2024 (*Clin Nutr ESPEN* 63:417–426,
-https://doi.org/10.1016/j.clnesp.2024.06.030) tied intakes under
-1.0 g/kg to more muscle loss in dieting adults with overweight or
-obesity. The ~25 %/~32 % body-fat lines are ACE's "obese" categories;
-research often uses ~25 % for men and ~35 % for women (Romero-Corral et
-al. 2008, *Int J Obes* 32:959–966, https://doi.org/10.1038/ijo.2008.11),
-which also found BMI ≥ 30 misses over half of people with excess fat —
-hence the goal-weight fallback.
+Why these numbers: gains in fat-free mass stop rising at ~1.6 g/kg/day,
+which sets the target (rn:protein-energy-deficit.1), and the top of the
+95 % confidence interval around that plateau, 2.2 g/kg, sets the stretch
+(rn:protein-energy-deficit.2). The fat-free-mass column sits inside the
+2.3–3.1 g/kg of fat-free mass that lean lifters likely need in a deficit
+(rn:protein-energy-deficit.6). The floor never drops under 1.2 g/kg
+because muscle loss during weight loss is more likely at lower intakes
+(rn:protein-energy-deficit.7), and starts from recent intake so it is
+reachable this week (rn:protein-energy-deficit.8). The reference mass
+keeps every figure reachable for an athlete carrying a lot of fat
+(rn:protein-energy-deficit.3). The ~25 %/~32 % body-fat lines are the
+obesity lines of common body-fat norms (rn:protein-energy-deficit.4),
+and BMI ≥ 30 alone misses over half of people with excess fat — hence
+the goal-weight fallback (rn:protein-energy-deficit.5).
 
 **Habit progression.** The floor moves up as the habit sticks: when
 the weekly average protein meets or beats the floor at **two
 consecutive check-ins** since the floor last changed, the floor rises by
-~10–15 g, **never above the target**. Missing the floor never lowers it;
-only `/goals` lowers it, with a reason. `/check-in` applies the raise.
-For MacroFactor users the athlete sets the app's protein to the new
-floor the same day. Whenever `/goals` changes `floor_g`, set
-`floor_since` to the day after the newest reading on file (`python3 -m
-coach nutrition readings --last 1`), or today if that is later: a
-reading already on file measured the old floor and must not count
-toward the next raise.
+~10–15 g, **never above the target** (rn:protein-energy-deficit.9).
+Missing the floor never lowers it; only `/goals` lowers it, with a
+reason. `/check-in` applies the raise. For MacroFactor users the athlete
+sets the app's protein to the new floor the same day. Whenever `/goals`
+changes `floor_g`, set `floor_since` to the day after the newest reading
+on file (`python3 -m coach nutrition readings --last 1`), or today if
+that is later: a reading already on file measured the old floor and must
+not count toward the next raise.
 
 ## 5. Agree the protein anchors
 
