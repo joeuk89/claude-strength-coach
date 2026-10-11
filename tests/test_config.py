@@ -2,8 +2,9 @@ import re
 import tomllib
 import unittest
 
-from coach import config
+from coach import config, library
 from coach.config import equipment_for
+from coach.config_tables import core
 from coach.errors import ConfigError
 from tests.support import MINIMAL_CONFIG, REPO_ROOT, VALID, TempInstance
 
@@ -101,8 +102,23 @@ class StrictnessTest(unittest.TestCase):
         self.assert_names(MINIMAL_CONFIG + "session_minutes = -5\n", "session_minutes")
 
     def test_available_is_distinct_strings(self):
-        self.assert_names(MINIMAL_CONFIG + '[equipment]\navailable = ["bench", "bench"]\n', "available", "repeat")
+        self.assert_names(MINIMAL_CONFIG + '[equipment]\navailable = ["cable", "cable"]\n', "available", "repeat")
         self.assert_names(MINIMAL_CONFIG + "[equipment]\navailable = [1]\n", "available", "string")
+
+    def test_available_holds_only_library_equipment(self):
+        for table, where in (("[equipment]", "equipment.available"),
+                             ("[equipment.locations.home]", "equipment.locations.home.available")):
+            with self.subTest(table=table):
+                exc = self.assert_names(MINIMAL_CONFIG + f'{table}\navailable = ["dumbbell", "bench"]\n',
+                                        f"{table} available", '"bench"', *library.EQUIPMENT)
+                self.assertEqual(exc.exit_code, 5)
+                self.assertEqual([d["path"] for d in exc.details], [where])
+
+    def test_available_takes_the_library_enum(self):
+        self.assertIs(core.EQUIPMENT_KEYS["available"].item_choices, library.EQUIPMENT)
+        listed = ", ".join(f'"{piece}"' for piece in library.EQUIPMENT)
+        cfg = load_text(MINIMAL_CONFIG + f"[equipment]\navailable = [{listed}]\n")
+        self.assertEqual(cfg.equipment.available, list(library.EQUIPMENT))
 
     def test_timezone(self):
         self.assert_names(MINIMAL_CONFIG + 'timezone = "Mars/Olympus"\n', "timezone", "Mars/Olympus")
@@ -188,6 +204,11 @@ class ExampleTest(unittest.TestCase):
             self.assertIn(key, raw["athlete"])
         for key in ("available", "dumbbells"):
             self.assertIn(key, raw["equipment"])
+
+    def test_example_lists_the_library_equipment(self):
+        text = EXAMPLE.read_text(encoding="utf-8")
+        listed = re.search(r"^# `available` takes only these values: (.*?)\.\n\[equipment\]", text, re.M | re.S)
+        self.assertEqual(tuple(re.findall(r'"([a-z_]+)"', listed.group(1))), library.EQUIPMENT)
 
     def test_example_switched_to_lb_stops_on_kg_equipment_numbers(self):
         text = EXAMPLE.read_text(encoding="utf-8").replace('units = "kg"', 'units = "lb"', 1)

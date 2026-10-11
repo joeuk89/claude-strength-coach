@@ -2,6 +2,7 @@
 
 from dataclasses import replace
 
+from coach import library
 from coach.config import OMIT, ByUnit, Key, Table
 from coach.dates import WEEK_STARTS, zone
 
@@ -40,7 +41,7 @@ HEVY = Table(
 )
 
 EQUIPMENT_KEYS = {
-    "available": Key("list", default=[], item="string", distinct=True),
+    "available": Key("list", default=[], item="string", item_choices=library.EQUIPMENT, distinct=True),
     "dumbbells": Key("list", default=[], item="number", distinct=True, positive=True),
     "dumbbell_increment": Key("number", default=ByUnit({"kg": 2.0}), positive=True),
     "dumbbell_max": Key("number", default=ByUnit({"kg": 40.0}), positive=True),

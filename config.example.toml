@@ -24,8 +24,11 @@ cache_max_age_hours = 24      # `coach check` warns when the Hevy cache is older
 # The weights below are commented out. With units = "kg", each one left
 # commented takes the kg value shown. With units = "lb", they have no
 # default: uncomment and set every one in lb, or validation stops.
+# `available` takes only these values: "barbell", "ez_bar", "trap_bar",
+# "dumbbell", "kettlebell", "machine", "smith_machine", "cable", "plate",
+# "band", "suspension", "bodyweight", "cardio_machine", "other".
 [equipment]
-available = []                # equipment the athlete has; [] = assume every piece (not checked)
+available = []                # equipment the athlete has; [] = assume every piece
 dumbbells = []                # per-hand dumbbell weights available; [] = not checked
 # dumbbell_increment = 2.0    # smallest per-hand dumbbell jump
 # dumbbell_max = 40.0         # heaviest per-hand dumbbell; prescriptions are capped here
@@ -40,7 +43,7 @@ dumbbells = []                # per-hand dumbbell weights available; [] = not ch
 # it replaces the main table's value, and keys left out keep it.
 #
 # [equipment.locations.home]
-# available = ["dumbbell", "bench", "band", "bodyweight"]
+# available = ["dumbbell", "band", "bodyweight"]
 # dumbbells = [5, 10, 15, 20]
 # dumbbell_max = 20.0
 
