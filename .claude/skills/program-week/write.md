@@ -12,8 +12,10 @@ write line named, nothing more.
    day before and after each edited session and the program's weekly
    balance.
 2. `python3 -m coach overlay approve <id>` stamps the athlete's
-   approval. It exits 3 on an unresolved `block` flag: tell the athlete
-   why, settle it, and present the brief again.
+   approval. It exits 3 on an unresolved `block` flag, or on a
+   `load_mode_unconfirmed` line whose exercise still has no confirmed
+   load mode: tell the athlete why, settle it, and present the brief
+   again.
 3. **An ended one-off week.** If `state show` has a `one_off` whose span
    ended before today, run `python3 -m coach routines retire --overlay
    <its overlay_id>`, which retitles its temporary routines `(unused)`

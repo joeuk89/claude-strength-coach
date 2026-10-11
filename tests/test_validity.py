@@ -18,8 +18,8 @@ OVERLAY = "data/overlays/2026-10-12-weekly.json"
 NOW = {"COACH_NOW": "2026-10-11T18:00:00Z"}
 LAYOFF = INSTANCES / "layoff"
 R24_CODES = {"stale_prescription": ("block",), "unearned_load": ("block",), "load_cap": ("block",),
-             "load_unrepresentable": ("block",), "load_mode_mismatch": ("block",), "rpe_infeasible": ("warn",),
-             "session_over_cap": ("warn",)}
+             "load_unrepresentable": ("block",), "load_mode_mismatch": ("block",), "load_mode_unconfirmed": ("block",),
+             "rpe_infeasible": ("warn",), "session_over_cap": ("warn",)}
 LOAD_CODES = ("stale_prescription", "unearned_load", "load_cap", "load_unrepresentable", "rpe_infeasible")
 
 

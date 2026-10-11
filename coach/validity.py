@@ -49,6 +49,8 @@ PACE_WORKOUTS = 4
 PACE_MIN_WORKOUTS = 2
 PACE_BOUNDS = (0.7, 1.5)
 
+UNCONFIRMED = "load_mode_unconfirmed"
+
 _LINE_PATH = re.compile(r"^\$\.sessions\[(\d+)\]\.exercises\[(\d+)\]")
 
 
@@ -254,7 +256,7 @@ class _Checker:
                                      exercise_id=line["exercise_id"] if line else None, message=message))
 
     def where(self, session, line):
-        return f"{line['exercise_id']} in {session['session_id']} on {session['date']}"
+        return _where(session, line)
 
     def sound(self, line, load):
         return (load is not None and load.get("mode") == line["load_mode"] and load.get("unit") == self.unit
@@ -286,6 +288,9 @@ class _Checker:
                 if found:
                     self.flag("load_mode_mismatch", session, line,
                               f"{self.where(session, line)}: {'; '.join(found)}")
+                if self.library and confirmed is None:
+                    self.flag(UNCONFIRMED, session, line, unconfirmed_message(
+                        self.library, line["exercise_id"], line["load_mode"], self.where(session, line)))
 
     def illness(self):
         """(date, reason) of the first session back when an `ill` miss or status day falls in the gap before it."""
@@ -498,6 +503,29 @@ class _Checker:
                       f"against a {cap} min cap")
 
 
+def unconfirmed_message(library, exercise_id, mode, where):
+    """Why a line's exercise is not ready, naming the command that settles it once the athlete agrees the mode."""
+    return (f"{where}: no confirmed load mode in the library; once the athlete confirms how they load it, run "
+            f"{library.mode_repair(exercise_id, mode)}")
+
+
+def unconfirmed_flags(root, doc):
+    """A `load_mode_unconfirmed` flag for each line whose exercise has no confirmed load mode.
+
+    Raises ValidationError when the library cannot be read.
+    """
+    library = Library.load(root)
+    return [flags.make(UNCONFIRMED, session_id=session["session_id"], exercise_id=line["exercise_id"],
+                       message=unconfirmed_message(library, line["exercise_id"], line["load_mode"],
+                                                   _where(session, line)))
+            for session in doc["sessions"] for line in session["exercises"]
+            if library.effective_load_mode(line["exercise_id"]) is None]
+
+
+def _where(session, line):
+    return f"{line['exercise_id']} in {session['session_id']} on {session['date']}"
+
+
 def _kit_name(session):
     return f"[equipment.locations.{session['location']}]" if session["location"] else "[equipment]"
 
@@ -540,9 +568,12 @@ def flag_key(flag):
 
 
 def merge_flags(doc, found):
-    """The overlay's flags with every earlier R-24 flag replaced by `found`, keeping the resolution of identical ones."""
+    """The overlay's flags with every earlier R-24 flag replaced by `found`, keeping the resolution of identical ones.
+
+    A missing load mode never keeps a resolution: only confirming the mode in the library settles it.
+    """
     owned = owned_codes()
-    earlier = {flag_key(f): f for f in doc["flags"] if f["code"] in owned}
+    earlier = {flag_key(f): f for f in doc["flags"] if f["code"] in owned and f["code"] != UNCONFIRMED}
     merged = [f for f in doc["flags"] if f["code"] not in owned]
     for flag in found:
         before = earlier.get(flag_key(flag))
@@ -554,7 +585,7 @@ def merge_flags(doc, found):
 
 def unresolved_blocks(doc, found):
     """The blocking findings in `found` that the overlay does not hold as resolved."""
-    resolved = {flag_key(f) for f in doc["flags"] if f["resolved"]}
+    resolved = {flag_key(f) for f in doc["flags"] if f["resolved"] and f["code"] != UNCONFIRMED}
     return [f for f in found if f["severity"] == "block" and flag_key(f) not in resolved]
 
 

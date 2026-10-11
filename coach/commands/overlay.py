@@ -2,7 +2,7 @@ import os
 import tempfile
 from pathlib import Path
 
-from coach import dates, jsonio, overlay, render
+from coach import dates, jsonio, overlay, render, validity
 from coach.commands import arg, command
 from coach.errors import RefusedError, UsageError, ValidationError
 from coach.validate import Error
@@ -70,6 +70,12 @@ def build(args, ctx):
                 f"Overlay {doc['id']} is approved, so it is not rebuilt; leave id out of the draft to build a new one."
             )
     jsonio.write_doc(path, doc, args.dry_run)
+    try:
+        unconfirmed = validity.unconfirmed_flags(ctx.root, doc)
+    except ValidationError:
+        unconfirmed = []
+    for flag in unconfirmed:
+        ctx.warn(flag["message"])
     return {"id": doc["id"], "path": _relative(ctx, path), "written": not args.dry_run, "overlay": doc}
 
 
@@ -200,6 +206,8 @@ def approve(args, ctx):
         return {"id": args.id, "hash": doc["approval"]["hash"], "approved_at": doc["approval"]["approved_at"],
                 "already_approved": True, "written": False}
     blocks = overlay.unresolved_blocks(doc)
+    stored = {validity.flag_key(f) for f in blocks}
+    blocks += [f for f in validity.unconfirmed_flags(ctx.root, doc) if validity.flag_key(f) not in stored]
     if blocks:
         raise RefusedError(
             f"Overlay {args.id} has {len(blocks)} unresolved block flag(s); resolve them before approval.",

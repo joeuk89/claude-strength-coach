@@ -63,13 +63,13 @@ def load_modes_confirmed(ctx):
                 "run python3 -m coach library seed, then library confirm"
             ), cache_path))
         elif lib.effective_load_mode(entry["id"]) is None:
-            results.append(Result("fail", _unconfirmed(entry["id"], f"'{title}' in routine {where}"), _LIBRARY))
-    for exercise_id, overlay_ids in _overlay_exercises(ctx.root).items():
-        if lib.effective_load_mode(exercise_id) is None:
-            results.append(Result("fail", _unconfirmed(exercise_id, f"in overlay {', '.join(overlay_ids)}"), _LIBRARY))
+            results.append(Result("fail", _unconfirmed(lib, entry["id"], f"'{title}' in routine {where}"), _LIBRARY))
+    overlays = _overlay_exercises(ctx.root)
+    for exercise_id in lib.unconfirmed(overlays):
+        where = f"in overlay {', '.join(overlays[exercise_id])}"
+        results.append(Result("fail", _unconfirmed(lib, exercise_id, where), _LIBRARY))
     return results
 
 
-def _unconfirmed(exercise_id, where):
-    return (f"{exercise_id} ({where}) has no confirmed load mode; run python3 -m coach library confirm {exercise_id}, "
-            f"or python3 -m coach library set-mode {exercise_id} MODE")
+def _unconfirmed(lib, exercise_id, where):
+    return f"{exercise_id} ({where}) has no confirmed load mode; run {lib.mode_repair(exercise_id)}"

@@ -32,6 +32,18 @@ slips in unnoticed, so snap each load to the kit with `python3 -m coach
 units round --value <load> --increment <step>` and let the renderer
 print both numbers.
 
+**Confirm the load mode of every exercise new to the athlete** before
+the draft, above all the temporary ones the standing program lacks
+(push-ups on the hotel floor, dumbbell RDLs in place of the barbell).
+Run `python3 -m coach library show <id>`: when `effective_load_mode` is
+null, ask the athlete how they load it. The catalogue's
+`load_mode_default` is only your suggestion. Record their answer with
+`python3 -m coach library set-mode <id> <mode>`, or, when the entry
+shows a `load_mode_proposed` they agree with, `python3 -m coach library
+confirm <id>`. The draft's line uses that confirmed mode. An exercise
+left unconfirmed gets a `load_mode_unconfirmed` block (build.md), and
+`overlay approve` refuses the overlay until each one is confirmed.
+
 ## Write the draft
 
 Write `.coach/drafts/overlay-<span start>.json` in the athlete's units

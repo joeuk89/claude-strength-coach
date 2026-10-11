@@ -701,7 +701,10 @@ none and `bodyweight`, `assisted`, `duration` or `distance`; band and
   `fail` per problem, with its JSONPath) and `load_modes_confirmed`
   (every exercise in the cached Hevy routines and in every overlay has a
   confirmed load mode; a routine exercise whose template id no entry
-  holds fails naming `library seed`).
+  holds fails naming `library seed`). An unconfirmed exercise's failure
+  names `library confirm ID` only when the instance holds a
+  `load_mode_proposed` for it, and always `library set-mode ID MODE`
+  (`Library.mode_repair`, shared with R-24's `load_mode_unconfirmed`).
 
 ## C6. Instance file layout
 
@@ -998,7 +1001,11 @@ for every non-GET request, success or failure, once its retries are over.
   `id` rebuilds that overlay, unless it is approved (exit 3).
 - `overlay approve ID` validates first (exit 1), refuses unresolved `block`
   flags (exit 3), and leaves an overlay whose approval still holds
-  untouched.
+  untouched. It also refuses (exit 3) while any line's exercise has no
+  confirmed load mode, whatever the stored flags say, listing a
+  `load_mode_unconfirmed` detail per line, so an overlay is never
+  approved while `load_modes_confirmed` would fail on it. An invalid
+  library exits 1. `overlay build` warns once per such line.
 - Later versions: v2 adds line `provenance` (R-24, C21); v3 adds line
   `fold` and session `moved_from` (R-22, C37).
 
@@ -2037,6 +2044,7 @@ Reserved codes:
 | `load_cap` | block | R-24 | | Load above `[caps]` or `dumbbell_max`. |
 | `load_unrepresentable` | block | R-24 | | Load cannot be built from the available increments, dumbbells or plates. |
 | `load_mode_mismatch` | block | R-24 | | Line's load mode or load arithmetic disagrees with the library or C5. |
+| `load_mode_unconfirmed` | block | R-24 | | Line's exercise has no confirmed load mode in the library; only confirming it clears the flag. |
 | `rpe_infeasible` | warn | R-24 | | RPE target more than 1 away from the RPE implied by load, reps and current e1RM. |
 | `session_over_cap` | warn | R-24 | | Estimated session duration above its cap. |
 | `no_data` | warn | R-23a | | No usable exposure and no start load; load left empty for the coach. |
@@ -2161,7 +2169,7 @@ coach.validity.estimate_minutes(root, session) -> int
   band has one. Loads compared are the coaching number (C18), the top
   working load on each side (the least assistance for `assisted`).
 - A line with a `no_data` flag (C10) gets no R-24 flag but
-  `load_mode_mismatch`.
+  `load_mode_mismatch` and `load_mode_unconfirmed`.
 - Illness (R-02, rn:detraining-return.4, a heuristic for mild illness
   above the neck): when an `ill` miss annotation or an `ill` status day
   (C50; `coach.statusdays.ill_in(root, span)`, added by R-43) falls in the
@@ -2209,6 +2217,14 @@ coach.validity.estimate_minutes(root, session) -> int
   load already over its cap is flagged `load_cap` only.
 - `load_mode_mismatch` reuses R-13's `overlay.validate` and R-11's
   `effective_load_mode`; R-24 adds no new arithmetic.
+- `load_mode_unconfirmed`: the line's exercise has no
+  `effective_load_mode` (the readable library's, as
+  `load_modes_confirmed` judges it). The message names the repair from
+  `Library.mode_repair` with the line's own mode: `library set-mode ID
+  MODE`, plus `library confirm ID` only when the instance holds a
+  proposal to confirm. Nothing marks a catalogue `load_mode_default` as
+  confirmed, and confirming changes no load: a confirmed mode that
+  differs from the line is `load_mode_mismatch`.
 
 `prescription check (--overlay ID | --file PATH) [--write] [--dry-run]`
 returns `data.flags`, `data.summary` (counts by severity) and
@@ -2220,11 +2236,13 @@ problem exits 1; load arithmetic problems become `load_mode_mismatch`
 flags. `--write` takes `--overlay` only (exit 2 otherwise); it merges
 its flags into the overlay (replacing earlier R-24 flags, keeping
 `resolved` and `resolution` on identical ones, which match on code,
-severity, session, exercise and message) and fills inferred provenance;
+severity, session, exercise and message, except `load_mode_unconfirmed`,
+which never keeps a resolution) and fills inferred provenance;
 it refuses (exit 3) on an overlay with any `approval`. Check
 `prescription_valid`: overlays in force on some day from today on have
 no R-24 `block` finding that the overlay does not hold as an identical,
-resolved flag (fail).
+resolved flag (fail); a `load_mode_unconfirmed` finding fails even when
+held resolved.
 
 ## C23. Plugin contract (R-23a; R-23b, R-30a, R-31, R-41b, R-43, R-44a, R-44b read)
 
