@@ -25,9 +25,9 @@ athlete hit the prescribed load × reps @ RPE?
   `collision` from the program's interference rules). Name each flag in
   the Coach's read.
 - When an outside running plan or endurance event is relevant, consult
-  [runner review](../../../reference/runner-review.md) for its strength and
-  fuelling claims, using the Sunday reply. Otherwise skip runner-specific
-  research and fuelling questions.
+  `reference/runner-review.md` for its strength and fuelling claims,
+  using the Sunday reply. Otherwise skip runner-specific research and
+  fuelling questions.
 - Notable sets: PRs, rep-range top-outs due a load increase, anything way
   off prescription.
 - RPE drift: check only **compound lifts** (multi-joint squat, hinge,

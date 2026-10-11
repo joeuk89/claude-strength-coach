@@ -1,8 +1,8 @@
 # Program: three paths
 
 When an outside running plan or endurance event is relevant, consult
-[runner review](../../../reference/runner-review.md) before choosing how
-lifting fits. Otherwise skip runner-specific research and fuelling questions.
+`reference/runner-review.md` before choosing how lifting fits. Otherwise
+skip runner-specific research and fuelling questions.
 
 Run `python3 -m coach starters list --days <desired solo sessions>`,
 then make the **new-program** skill's three-path offer in one message,

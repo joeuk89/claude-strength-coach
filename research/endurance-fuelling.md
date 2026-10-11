@@ -87,8 +87,11 @@ This note supplies no default carbohydrate dose or calorie target.
 
 **Claim 1.** The joint position and later athletics consensus cover varied
 training and competition settings, not a universal recreational-runner
-prescription. This note uses low confidence because it summarizes expert
-guidance and individual application remains uncertain.
+prescription. The joint position scales the case for carbohydrate during
+exercise with duration and intensity: brief or easy sessions need little
+or none, and prolonged demanding ones gain most. This note uses low
+confidence because it summarizes expert guidance and individual
+application remains uncertain.
 
 **Claim 2.** The athletics consensus distinguishes pre-event, within-event
 and between-event nutrition. The distance chapter covers runners and race
@@ -101,7 +104,7 @@ against practical costs and gastrointestinal discomfort. Ordinary foods or
 sports foods may suit different situations; this is not a supplement requirement.
 
 **Current-source and correction check (2026-10-11).** The
-[2017 erratum linked from PMID26920240](https://doi.org/10.1016/j.jand.2016.11.008)
+[2017 erratum linked from PMID 26920240](https://doi.org/10.1016/j.jand.2016.11.008)
 removes a postgraduate-course endorsement involving Sports Oracle because
 of an undisclosed potential conflict of interest; it does not amend the
 carbohydrate guidance. The older source is retained only for the general
@@ -123,12 +126,10 @@ No new numeric advice is adopted from it.
   dose. Any later numeric proposal needs a directly supporting source,
   evidence population, event duration/context, confidence and athlete review;
   save athlete-specific research in a local note.
-- Keep MacroFactor's calorie ownership and the existing calorie/protein
-  targets. A potential conflict goes through `/goals` and its existing
-  override process, never a silent extra target or automatic race plan.
-- With nutrition coaching declined or deferred, leave fuelling questions out
-  unless the athlete asks to revisit that choice. For medical nutrition
-  concerns or an individualized clinical plan, refer to a qualified dietitian.
+- `reference/runner-review.md` sets when to skip fuelling questions and
+  how calorie/protein targets and MacroFactor ownership stay unchanged.
+- For medical nutrition concerns or an individualized clinical plan, refer
+  to a qualified dietitian.
 
 ## Open questions
 

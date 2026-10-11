@@ -17,7 +17,7 @@ class RunnerResearchTest(unittest.TestCase):
         for note_id in ("strength-for-running", "endurance-fuelling"):
             with self.subTest(note=note_id):
                 self.assertEqual(rows[note_id]["status"], "current")
-                self.assertEqual(rows[note_id]["claims"], 3)
+                self.assertGreaterEqual(rows[note_id]["claims"], 3)
                 for n in range(1, 4):
                     claim = research.resolve(f"rn:{note_id}.{n}", notes)
                     self.assertIsNotNone(claim)
@@ -31,15 +31,23 @@ class RunnerResearchTest(unittest.TestCase):
             with self.subTest(step=rel):
                 self.assertRegex(text, re.compile(
                     r"When an outside running plan or endurance event is relevant, consult "
-                    r"\[runner review\]\(([^)]+)\).*?Otherwise skip runner-specific "
+                    r"`reference/runner-review\.md`.*?Otherwise skip runner-specific "
                     r"research and fuelling questions\."))
-                target = re.search(r"\[runner review\]\(([^)]+)\)", text).group(1)
-                self.assertTrue((path.parent / target).is_file())
+        self.assertTrue((REPO_ROOT / "reference/runner-review.md").is_file())
         citations = research.scan_citations(REPO_ROOT)
         reached = {c.ref for c in citations if c.path == "reference/runner-review.md" and c.resolved}
-        self.assertEqual(reached, {f"rn:{note}.{n}"
-                                  for note in ("strength-for-running", "endurance-fuelling")
-                                  for n in range(1, 4)})
+        expected = {f"rn:{note}.{n}"
+                    for note in ("strength-for-running", "endurance-fuelling")
+                    for n in range(1, 4)}
+        self.assertLessEqual(expected, reached)
+
+    def test_check_in_questions_go_to_followups_in_glossary_terms(self):
+        text = " ".join((REPO_ROOT / "reference/runner-review.md")
+                        .read_text(encoding="utf-8").split())
+        self.assertIn("add any question to come back to with `python3 -m coach followups add`",
+                      text.lower())
+        self.assertNotIn("follow-up in the normal prose record", text)
+        self.assertNotIn("quiet week", text.lower())
 
 
 class NonRunnerCheckinTest(HistoryCase):

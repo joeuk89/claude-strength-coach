@@ -22,14 +22,15 @@ do not add fuelling questions to a non-runner's setup, goals or check-in.
    strategy and outside advice; ask only what changes the decision. With
    nutrition declined or deferred, skip these questions unless the athlete
    asks to revisit it. Setup can leave this until its optional goals step.
-4. At check-in, use the existing Sunday reply and at most the existing
-   follow-up turn; avoid a second interview. Record the relevant claim ids,
-   uncertainty and any agreed follow-up in the normal prose record. On a
-   quiet week with no relevant change, retain the previous review.
+4. At check-in, work from the Sunday reply and answers the athlete has
+   already given; start no new interview. Record the relevant claim ids
+   and uncertainty in the check-in record. Add any question to come back
+   to with `python3 -m coach followups add`. When nothing relevant to
+   running or fuelling changed that week, keep the previous review.
 
 This is review-tier support: the athlete or outside plan owns running
 progression. Coach-planned running remains deferred; these notes do not
-generate running workouts, a race plan or new event storage. Routine
+generate planned activities, a race plan or new event storage. Routine
 changes still follow the normal proposal and approval flow.
 
 Keep existing calorie/protein targets and MacroFactor ownership. A
