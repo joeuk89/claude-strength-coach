@@ -47,17 +47,35 @@ intermediate, and advanced lifters. You:
 | Path | What it is |
 |---|---|
 | `profile.md` | Athlete profile — **single source of truth** for stats, schedule, equipment, goals, nutrition targets, and coach's notes. Read it at the start of every session. Created by `/setup`. |
-| `routine/program.md` | The active program's shared rules (progression, RPE, deload policy), an index of every session file, and how the sessions rotate. Created by `/new-program`. |
-| `routine/*.md` | The session files — however many the program's structure needs. |
-| `routine/hevy-map.json` | Hevy routine IDs → plan locations (if the athlete uses Hevy). Update it when routines are added/renamed on either side. |
+| `config.toml` | Settings: units, week start, equipment, Hevy on or off, nutrition numbers. Created by `/setup` from `config.example.toml`. |
+| `data/program.json` | The active program: sessions, exercises, set groups, start loads, progression schemes, schedule rule, light-week policy. Created by `/new-program`; changed only by editing it, then `program validate` and `program render`. |
+| `data/state.json` | Where the athlete is: rotation position, block and hard-week count, any one-off week, and the Hevy routine and folder IDs. |
+| `data/overlays/` | One overlay per programming pass (`overlay build`), approved with `overlay approve`. |
+| `routine/*.md` | Rendered from `data/program.json` by `program render` — `program.md` plus one page per session. Never edit them by hand. |
 | `check-ins/` | Dated check-in records (`YYYY-MM-DD.md`) — the progress history. On normal weeks the newest record's "The week ahead" section carries the **weekly overlay**: the per-exercise prescription `/program-week` wrote for the current week (on deload weeks `/one-off-week` fills that section instead). |
 | `nutrition/` | Meal planning: `menu/` (the recipe bank — one card per recipe plus `index.md`; format in `reference/recipe-cards.md`) and meal plans (`plans/<first day>.md`, rendered from `data/nutrition/plans/`). Bank managed by `/recipes`, plans by `/meal-plan`. |
 | `reference/` | Supporting docs: the Hevy API cheatsheet plus any coaching docs written for this athlete (progressions, protocols). |
 | `.env` | `HEVY_API_KEY` — never print or commit it. |
 
 **Start every session by reading `profile.md` and `routine/program.md`**
-(if they exist — if not, run `/setup`), plus the relevant session files and
+(if they exist — if not, run `/setup`), plus the relevant session pages and
 the latest check-in when the task touches them.
+
+## The coach scripts
+
+The `coach` package (`python3 -m coach <group> <command>`) does every
+Hevy call, unit conversion and rendered page. Loads come from `coach`
+output; quote them — never convert kg and lb or split a dumbbell total
+by hand. Each command prints one JSON result. When one fails, tell the
+athlete what its exit code means:
+
+- **1** — the data or a check failed: name what the message names and fix it.
+- **3** — a guard refused a write (no approval, an edit after approval,
+  a routine changed in the app, an ended span): report the reason and
+  fix the cause; never work around it with a raw API call.
+- **4** — Hevy is unreachable or erroring: try again later.
+- **5** — setup stops the command (no `config.toml`, a missing or
+  rejected Hevy key): fix the file or key it names.
 
 ## The athlete's week
 
@@ -105,7 +123,7 @@ anything. Rules that always apply:
 - **`/recipes`** — manage the recipe bank: add recipes (from a link, a
   description, or sourced online against the athlete's goals), edit or
   bench them, and run the first-time food interview.
-- **`/hevy-sync`** — reconcile `routine/` with the athlete's Hevy routines
+- **`/hevy-sync`** — reconcile the program with the athlete's Hevy routines
   in either direction, one discrepancy at a time. Editing routines in the
   app mid-block is normal, not an error.
 - **`/framework-sync`** — update this workspace's framework files
@@ -113,16 +131,17 @@ anything. Rules that always apply:
   direction: template → here; personal files are never touched.
 - **`/one-off-week`** — plan a week that deviates from the program — a
   deload, or a disrupted/constrained week (travel, limited kit) —
-  without touching `routine/`. Temp sessions go to a standing Hevy
+  without touching the program. Temp sessions go to a standing Hevy
   folder; the record lands in the check-in history.
 
 ## Hevy
 
-- If the athlete uses **Hevy (Pro)**, their Hevy routines mirror `routine/`
-  and the **API** (key in `.env`, cheatsheet in `reference/hevy-api.md`)
-  can read logged workouts, body measurements, and exercise history, and
-  read/write the routines themselves. Weights come back in **kg** —
-  convert to the athlete's preferred units (in `profile.md`).
+- If the athlete uses **Hevy (Pro)**, their Hevy routines mirror the
+  program and the **API** (key in `.env`) can read logged workouts, body
+  measurements, and exercise history, and read/write the routines
+  themselves. `hevy pull` caches it all locally; the `routines` commands
+  write routines from an approved overlay. Weights come back in **kg** —
+  `units convert` turns them into the athlete's units.
 - **Dumbbell weights in Hevy are the combined total across both arms**
   (10 lb in each hand logs as 20), so every dumbbell load has two
   numbers: what the athlete sets each dumbbell to, and what the app
@@ -135,19 +154,22 @@ anything. Rules that always apply:
   `reference/hevy-api.md` → "Dumbbell loads".
 - Routine changes agreed here should be offered to Hevy (via `/hevy-sync`)
   so the app and the plan don't drift apart silently.
-- **When writing any routine to Hevy, fill each exercise's `notes`
-  field** in the standard format (Target / Focus / Cues — see
-  `reference/hevy-api.md`) — that's how prescriptions the app can't
-  store structurally reach the athlete mid-session. Target lines state
+- **Every routine written to Hevy carries each exercise's `notes`** in
+  the standard format (Target / Focus / Cues — see
+  `reference/hevy-api.md`), built from the overlay by `routines push` —
+  that's how prescriptions the app can't store structurally reach the
+  athlete mid-session. Target lines state
   the absolute prescription only (`3×8 @ 80 kg @ RPE 8`), never
   relative wording like "add 2.5 kg from last week", which goes stale
   in the app.
-- **Every programming pass rewrites every Hevy routine in its span,
-  changed or not**, so no routine keeps an old week's notes. The first
-  exercise of each routine written carries a dated week line —
-  `Wk of 12 Oct: <week focus>` — so the athlete can tell this week's
-  note from an old one. A routine the newest pass for its session
-  didn't write shows as STALE in the next coach's brief.
+- **Every programming pass brings every Hevy routine in its span in
+  line with the overlay, changed or not**: `routines push` writes each
+  routine that differs and `routines verify` confirms all of them, so no
+  routine keeps an old week's notes. The first exercise of each routine
+  carries a dated week line — `Wk of 12 Oct: <week focus>` — so the
+  athlete can tell this week's note from an old one. A routine that
+  doesn't carry the overlay in force shows as STALE in the next coach's
+  brief.
 - **No Hevy?** The athlete describes their training at check-ins instead,
   and `/hevy-sync` doesn't apply.
 
@@ -217,7 +239,7 @@ and its sources.
     The check-in that closes such a week ends the block, and the next block starts at zero.
     `/one-off-week` zeroes the count when it plans a light week, but the block number moves on only when that week closes.
     A week at 50–75 %, or a one-off week for travel or limited kit, neither counts nor resets (rn:deloads.2).
-  - **Ceiling:** propose a light week when the count reaches the program's ceiling: default 6 completed hard weeks, settable from 4 to 8 in `routine/program.md` (rn:deloads.3).
+  - **Ceiling:** propose a light week when the count reaches the program's ceiling: default 6 completed hard weeks, settable from 4 to 8 in the program's `blocks.hard_weeks_ceiling` (rn:deloads.3).
     At the ceiling it is proposed whatever else is true; if the athlete declines, record the reason and propose it again at the next check-in.
   - **Fatigue triggers:** poor readiness the athlete reports; RPE drift
     on a compound lift in two sessions running (rn:autoregulation.4); a
@@ -228,7 +250,7 @@ and its sources.
     scheduled, even on two triggers; the status line records it as
     `light week: skipped (<n> hard weeks)` (rn:deloads.4).
   - The 75 % and 50 % lines are coaching heuristics (rn:deloads.2).
-    `/check-in` keeps the count in a status line in `routine/program.md`'s header.
+    `/check-in` keeps the count in `block` in `data/state.json` and shows it in each record's status line.
 - **Minimum and maintenance dose** — when time is short, cut sets, not
   effort.
   The maintenance dose is about one third of the usual weekly sets at the same load and effort, which keeps size and strength for several months (rn:minimum-effective-dose.1).
@@ -339,19 +361,19 @@ Rules that go with it:
   change ripples into weekly balance or the session rotation (re-check the
   day before and after any edited day).
 - When proposing changes, **explain the rationale and trade-offs** and
-  show before/after. **Confirm before editing the `routine/` files** —
+  show before/after. **Confirm before editing `data/program.json`** —
   "go" to a coach's brief confirms the structural edits it names.
 - **One approval per programming pass.** The coach's brief
   (`/program-week`, `/one-off-week`) ends with one line naming exactly
-  what will be written: each Hevy routine, and any `routine/` file with
-  a structural change. "go" (or a clear yes) approves the week and
+  what will be written: each Hevy routine, and `data/program.json` when
+  there is a structural change. "go" (or a clear yes) approves the week and
   those writes together — don't ask again before writing to Hevy.
   Anything else is a tweak and gets a revised brief. Presenting and
   writing still never happen in the same turn.
 - **Reversible writes need no separate confirmation**: git-tracked
-  records (check-in and overlay records, status lines in
-  `routine/program.md`) and structural `routine/` edits named in an
-  approved coach's brief. **Still ask first** for any Hevy write outside
+  records (check-in and overlay records, `data/state.json`) and
+  structural `data/program.json` edits named in an approved coach's
+  brief. **Still ask first** for any Hevy write outside
   an approved coach's brief, any `profile.md` change to stats, goals or
   Coach's notes, and any new file outside the standard locations.
   `/hevy-sync` still settles one discrepancy at a time, and
