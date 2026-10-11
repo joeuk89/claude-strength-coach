@@ -201,6 +201,9 @@ Template notes are refreshed in the template repo, never in an instance.
 | `python3 -m coach research validate` | Validate every note; exit 1 if any is invalid |
 | `python3 -m coach research render [id] [--dry-run]` | Rewrite the rendered region of one note, or of every note |
 
+`--area` uses the `applies_to` values listed above. An unknown value exits 2
+and names the valid areas; a valid area with no notes returns an empty list.
+
 ## Handing note writing to a subagent
 
 Give the subagent the question, the note kind and id, this doc's path, and

@@ -153,6 +153,20 @@ class StatusCommandTest(InstanceCase):
         _, envelope, _ = self.coach("research", "status", "--expired")
         self.assertEqual(envelope["data"]["notes"], [])
 
+    def test_unknown_area_is_a_usage_error_naming_all_known_areas(self):
+        code, envelope, _ = self.coach("research", "status", "--area", "bogus")
+        self.assertEqual(code, 2)
+        self.assertEqual(envelope["error"]["code"], "usage")
+        schema = jsonio.load_schema("research_note")
+        for area in schema["properties"]["applies_to"]["items"]["enum"]:
+            self.assertIn(area, envelope["error"]["message"])
+
+    def test_known_area_without_notes_is_an_honest_empty_result(self):
+        code, envelope, _ = self.coach("research", "status", "--area", "sleep")
+        self.assertEqual(code, 0, envelope)
+        self.assertEqual(envelope["data"]["notes"], [])
+        self.assertNotIn("sleep", envelope["data"]["areas"])
+
     def test_invalid_note_exits_1(self):
         self.edit(DOSE, "\nn = 2\n", "\nn = 1\n")
         code, envelope, _ = self.coach("research", "status")

@@ -1,4 +1,4 @@
-from coach import research
+from coach import jsonio, research
 from coach.commands import arg, command
 from coach.errors import ValidationError
 
@@ -35,7 +35,8 @@ def _load(ctx):
     "research status",
     help="List research notes with their review status, local supersessions and area status",
     args=(
-        arg("--area", help="only notes covering this area"),
+        arg("--area", choices=jsonio.load_schema("research_note")["properties"]["applies_to"]["items"]["enum"],
+            help="only notes covering this area"),
         arg("--kind", choices=KINDS, help="only notes of this kind"),
         arg("--expired", action="store_true", help="only expired notes"),
     ),

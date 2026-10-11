@@ -23,6 +23,8 @@ PUSH = f"python3 -m coach routines push --overlay {WEEKLY}"
 SETTINGS = REPO_ROOT / ".claude" / "settings.json"
 HOOK_COMMAND = 'cd "$CLAUDE_PROJECT_DIR" && python3 -m coach gate pretooluse'
 GIT_WRITES_ALLOWED = {"pages publish"}
+PROMPT_ONLY = {"plugins test", "hevy record-fixtures"}
+READ_LOOP = 'for c in "overlay list" "state show"; do python3 -m coach $c; done'
 SUBSTITUTED_PUSHES = (
     f'out="$({PUSH})"',
     f'echo "$({PUSH})"',
@@ -107,11 +109,23 @@ class PushDecisionTest(GateCase):
             decision = output(self.decide(PUSH))
         self.assertEqual(decision["permissionDecision"], "ask")
         self.assertIn("summary unavailable", decision["permissionDecisionReason"])
+        self.assertIn("writes to Hevy", decision["permissionDecisionReason"])
+        self.assertNotIn("effects cannot be determined", decision["permissionDecisionReason"])
+
+    def test_a_failure_before_the_dry_run_remains_a_known_write(self):
+        with mock.patch("coach.gate.Context", side_effect=RuntimeError("boom")):
+            decision = output(self.decide(PUSH))
+        self.assertEqual(decision["permissionDecision"], "ask")
+        self.assertIn("summary unavailable", decision["permissionDecisionReason"])
+        self.assertIn("writes to Hevy", decision["permissionDecisionReason"])
+        self.assertNotIn("effects cannot be determined", decision["permissionDecisionReason"])
 
     def test_a_push_that_cannot_be_dry_run_asks(self):
         decision = output(self.decide("python3 -m coach routines push --overlay 2099-01-05-weekly"))
         self.assertEqual(decision["permissionDecision"], "ask")
         self.assertIn("summary unavailable", decision["permissionDecisionReason"])
+        self.assertIn("writes to Hevy", decision["permissionDecisionReason"])
+        self.assertNotIn("effects cannot be determined", decision["permissionDecisionReason"])
 
     def test_the_root_follows_cd_and_root_options(self):
         for command in (f"cd instance && {PUSH}",
@@ -207,6 +221,41 @@ class CommandShapeTest(GateCase):
         decision = self.assert_decision(f"{PUSH} 'unclosed")
         self.assertEqual(decision["permissionDecision"], "ask")
 
+    def test_unknown_effects_keep_protection_with_hevy_on_and_off(self):
+        config = self.root / "config.toml"
+        original = config.read_text(encoding="utf-8")
+        for enabled in (True, False):
+            config.write_text(original.replace("[hevy]\nenabled = true",
+                                               f"[hevy]\nenabled = {str(enabled).lower()}"), encoding="utf-8")
+            for mode, expected in (("default", "ask"), ("bypassPermissions", "deny")):
+                with self.subTest(enabled=enabled, mode=mode):
+                    for command in ("python3 -m coach overlay list", "python3 -m coach state show"):
+                        self.assertIsNone(self.decide(command, mode=mode))
+                    for command in (READ_LOOP, "python3 -m coach $UNKNOWN"):
+                        decision = output(self.decide(command, mode=mode))
+                        self.assertEqual(decision["permissionDecision"], expected)
+                        reason = decision["permissionDecisionReason"]
+                        self.assertIn("effects cannot be determined", reason)
+                        self.assertIn("individual direct commands", reason)
+                        for direct in ("python3 -m coach overlay list", "python3 -m coach state show"):
+                            self.assertIn(direct, reason)
+                        self.assertNotIn("writes to Hevy", reason)
+                    for command in (PUSH, "curl -X PUT https://api.hevyapp.com/v1/routines/z"):
+                        decision = output(self.decide(command, mode=mode))
+                        self.assertIn(decision["permissionDecision"], ("ask", "deny"))
+                        self.assertNotIn("effects cannot be determined", decision["permissionDecisionReason"])
+                        if mode == "bypassPermissions":
+                            self.assertEqual(decision["permissionDecision"], "deny")
+                    self.assertEqual(self.fake.writes, [])
+
+    def test_mixed_unknown_and_known_write_descriptions_remain_distinct(self):
+        command = READ_LOOP + "; curl -X PUT https://api.hevyapp.com/v1/routines/z"
+        for mode in ("default", "bypassPermissions"):
+            reason = output(self.decide(command, mode=mode))["permissionDecisionReason"]
+            self.assertIn("effects cannot be determined", reason)
+            self.assertIn("writes to", reason)
+            self.assertNotIn("could not read writes to Hevy", reason)
+
     def test_other_tools_and_malformed_input(self):
         self.assertIsNone(self.decide(PUSH, tool="Read"))
         decision = gate.decide({"tool_name": "Bash", "tool_input": "not a dict"}, env=ENV)
@@ -237,9 +286,28 @@ class PretooluseCommandTest(GateCase):
         self.assertIn("summary unavailable", output(printed)["permissionDecisionReason"])
 
     def test_unreadable_hook_input_asks_and_exits_0(self):
-        code, printed, _ = self.run_gate("{not json")
+        for payload in ("{not json", "null", "[]", "{}", '{"tool_name":"Bash"}'):
+            with self.subTest(payload=payload):
+                code, printed, _ = self.run_gate(payload)
+                self.assertEqual(code, 0)
+                decision = output(printed)
+                self.assertEqual(decision["permissionDecision"], "ask")
+                self.assertIn("effects cannot be determined", decision["permissionDecisionReason"])
+                self.assertNotIn("writes to Hevy", decision["permissionDecisionReason"])
+
+    def test_malformed_input_and_scan_failure_respect_bypass_mode(self):
+        payload = hook_input(READ_LOOP, self.root, mode="bypassPermissions")
+        for malformed in ({**payload, "tool_input": []}, {**payload, "cwd": ["invalid"]},
+                          {"permission_mode": "bypassPermissions"}):
+            code, printed, _ = self.run_gate(malformed)
+            self.assertEqual(code, 0)
+            self.assertEqual(output(printed)["permissionDecision"], "deny")
+            self.assertNotIn("writes to Hevy", output(printed)["permissionDecisionReason"])
+        with mock.patch("coach.gate._Scanner.writes", side_effect=RuntimeError("boom")):
+            code, printed, _ = self.run_gate(payload)
         self.assertEqual(code, 0)
-        self.assertEqual(output(printed)["permissionDecision"], "ask")
+        self.assertEqual(output(printed)["permissionDecision"], "deny")
+        self.assertIn("effects cannot be determined", output(printed)["permissionDecisionReason"])
 
 
 class SubprocessTest(unittest.TestCase):
@@ -326,10 +394,11 @@ class SettingsTest(unittest.TestCase):
             self.assertFalse(any(rule_matches(rule, command) for rule in bash_rules()), command)
 
     def test_every_allowlisted_coach_command_exists_and_never_writes_to_hevy(self):
-        coach_rules = [rule for rule in bash_rules() if rule[0].startswith("python3 -m coach")]
+        coach_rules = bash_rules()
         self.assertTrue(coach_rules)
         for text, is_prefix in coach_rules:
             with self.subTest(rule=text):
+                self.assertTrue(text.startswith("python3 -m coach "))
                 self.assertTrue(is_prefix)
                 name = text[len("python3 -m coach "):]
                 self.assertIn(name, self.registered)
@@ -338,9 +407,33 @@ class SettingsTest(unittest.TestCase):
                 if name not in GIT_WRITES_ALLOWED:
                     self.assertFalse(metadata["git_write"])
 
+    def assert_permission_coverage(self, registered):
+        expected = {
+            f"Bash(python3 -m coach {cmd.name}:*)" for cmd in registered
+            if not cmd.hevy_write and (not cmd.git_write or cmd.name in GIT_WRITES_ALLOWED)
+            and cmd.envelope and cmd.name not in PROMPT_ONLY
+        }
+        actual = {rule for rule in allow_rules() if rule.startswith("Bash(python3 -m coach")}
+        self.assertEqual(expected, actual)
+
+    def test_every_eligible_registered_command_has_an_exact_allow_rule(self):
+        self.assert_permission_coverage(commands.discover())
+
+    def test_coverage_detects_a_new_eligible_command_without_a_rule(self):
+        for writes in (False, True):
+            with self.subTest(writes=writes):
+                new = commands.Command("fixture added", lambda args, ctx: None, "Fixture", writes=writes)
+                with self.assertRaisesRegex(AssertionError, "fixture added"):
+                    self.assert_permission_coverage([*commands.discover(), new])
+
+    def test_metadata_excludes_new_git_writes_and_hooks(self):
+        new = [commands.Command("fixture publish", None, "Fixture", git_write=True),
+               commands.Command("fixture hook", None, "Fixture", envelope=False)]
+        self.assert_permission_coverage([*commands.discover(), *new])
+
     def test_commands_that_stay_behind_a_prompt(self):
         names = {text[len("python3 -m coach "):] for text, _ in bash_rules() if text.startswith("python3 -m coach")}
-        for name in ("routines push", "routines retire", "routines create", "migrate run",
+        for name in ("routines push", "routines retire", "routines create",
                      "hevy record-fixtures", "plugins test", "gate pretooluse"):
             self.assertNotIn(name, names)
         for text, _ in bash_rules():

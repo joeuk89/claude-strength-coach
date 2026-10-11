@@ -5,8 +5,8 @@ writes to Hevy (`hevy_write` metadata) gets a dry run: the permission prompt
 shows its summary, and a push the dry run refuses is denied with the reason.
 A raw HTTP write to the Hevy API prompts with a warning. In
 bypass-permissions mode all of these are denied, because nobody would see a
-prompt. Every other command gets no opinion (None), so the normal
-permission rules decide.
+prompt. Unreadable effects ask in normal mode and are denied in bypass mode.
+Other commands get no opinion (None), so the normal permission rules decide.
 """
 
 import argparse
@@ -45,8 +45,8 @@ _HEREDOC_PLACEHOLDER = "__coach_gate_doc_"
 _HEREDOC_OPERATOR = re.compile(r"(?<!<)<<(-?)[ \t]*(['\"]?)\\?([A-Za-z0-9_.-]+)\2")
 _QUOTED_DELIMITER = re.compile(r"<<-?[ \t]*['\"\\]([^\s'\"]+)")
 
-_UNAVAILABLE = ("Approval gate: summary unavailable ({}). This command writes to Hevy; allow it only if the "
-                "athlete approved this exact write.")
+_WRITE_UNAVAILABLE = ("Approval gate: summary unavailable ({}). This command writes to Hevy; allow it only if the "
+                     "athlete approved this exact write.")
 
 
 def decide(hook_input, env=None):
@@ -55,11 +55,23 @@ def decide(hook_input, env=None):
     try:
         return _decide(hook_input, env)
     except Exception as exc:
-        return _response(ASK, _UNAVAILABLE.format(f"the gate failed: {type(exc).__name__}: {exc}"))
+        mode = hook_input.get("permission_mode") if isinstance(hook_input, dict) else None
+        return _response(DENY if mode == BYPASS_MODE else ASK,
+                         _unknown_reason(f"the gate failed: {type(exc).__name__}: {exc}", mode))
 
 
 def unreadable_input(error):
-    return _response(ASK, _UNAVAILABLE.format(f"the hook input could not be read: {error}"))
+    return _response(ASK, _unknown_reason(f"the hook input could not be read: {error}"))
+
+
+def _unknown_reason(why, mode=None):
+    reason = (f"Approval gate: effects cannot be determined ({why}). "
+              "Use individual direct commands, such as python3 -m coach overlay list and "
+              "python3 -m coach state show, instead of a loop or shell variable when possible. "
+              "Allow only after reviewing the intended effects.")
+    if mode == BYPASS_MODE:
+        reason += " Bypass-permissions mode cannot ask for approval; run with normal permissions."
+    return reason
 
 
 def _response(decision, reason):
@@ -70,7 +82,10 @@ def _response(decision, reason):
 def _decide(hook_input, env):
     if not isinstance(hook_input, dict):
         raise ValueError("the hook input is not a JSON object")
-    if hook_input.get("tool_name") != "Bash":
+    tool_name = hook_input.get("tool_name")
+    if not isinstance(tool_name, str) or not tool_name:
+        raise ValueError("tool_name is missing")
+    if tool_name != "Bash":
         return None
     tool_input = hook_input.get("tool_input")
     if not isinstance(tool_input, dict) or not isinstance(tool_input.get("command"), str):
@@ -80,10 +95,15 @@ def _decide(hook_input, env):
     if not found:
         return None
     if hook_input.get("permission_mode") == BYPASS_MODE:
-        what = "; ".join(item.label for item in found)
-        return _response(DENY, f"Approval gate: {what} writes to Hevy, which needs the athlete's approval at a "
+        reasons = []
+        for item in found:
+            if isinstance(item, _Unreadable):
+                reasons.append(_unknown_reason(item.why, BYPASS_MODE))
+            else:
+                reasons.append(f"Approval gate: {item.label} writes to Hevy, which needs the athlete's approval at a "
                                "permission prompt, and bypass-permissions mode shows none. Run it in a session "
                                "with normal permissions.")
+        return _response(DENY, "\n\n".join(reasons))
     reviews = [item.review() for item in found]
     denied = [text for decision, text in reviews if decision == DENY]
     if denied:
@@ -97,23 +117,23 @@ class _CoachWrite:
         self.label = f"python3 -m coach {cmd.name}"
 
     def review(self):
-        ctx = Context(self.root, self.env, io.StringIO())
-        args = argparse.Namespace(**vars(self.args))
-        args.dry_run = True
         try:
+            ctx = Context(self.root, self.env, io.StringIO())
+            args = argparse.Namespace(**vars(self.args))
+            args.dry_run = True
             report = self.cmd.func(args, ctx)
         except RefusedError as exc:
             reasons = [d["message"] for d in exc.details] if len(exc.details) > 1 else []
             lines = [f"Approval gate: {exc.message} The dry run of {self.cmd.name} refuses it, so the gate blocked it."]
             return DENY, "\n".join(lines + [f"- {reason}" for reason in reasons])
         except CoachError as exc:
-            return ASK, _UNAVAILABLE.format(f"the dry run failed: {exc.message.rstrip('.')}")
+            return ASK, _WRITE_UNAVAILABLE.format(f"the dry run failed: {exc.message.rstrip('.')}")
         except Exception as exc:
-            return ASK, _UNAVAILABLE.format(f"the dry run failed: {type(exc).__name__}: {exc}")
+            return ASK, _WRITE_UNAVAILABLE.format(f"the dry run failed: {type(exc).__name__}: {exc}")
         try:
             text = routines.summary(report)
         except Exception as exc:
-            return ASK, _UNAVAILABLE.format(f"{type(exc).__name__}: {exc}")
+            return ASK, _WRITE_UNAVAILABLE.format(f"{type(exc).__name__}: {exc}")
         lines = [f"Approval gate: {self.label} writes to Hevy. Dry run:", text]
         lines += [f"Warning: {warning}" for warning in ctx.warnings]
         lines.append("Allow only if the athlete approved exactly these changes.")
@@ -137,7 +157,7 @@ class _Unreadable:
         self.why = why
 
     def review(self):
-        return ASK, _UNAVAILABLE.format(f"the gate could not read the command: {self.why}")
+        return ASK, _unknown_reason(f"the gate could not read the command: {self.why}")
 
 
 class _Scanner:
