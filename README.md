@@ -62,8 +62,8 @@ in plain words. The commands are for the bigger moves.
 
 ### Getting set up
 - **`/setup`** — first-run onboarding: apps, profile, goals, first
-  program. Re-runnable — it's also how you add an integration (like
-  Notion) or refresh your profile later.
+  program. Re-runnable — it's also how you add an integration or
+  refresh your profile later.
 
 ### Your training
 - **`/new-program`** — build your program (import from Hevy or design from
@@ -90,18 +90,13 @@ in plain words. The commands are for the bigger moves.
   the ones you're bored of.
 - **`/meal-plan`** — turn your targets into meals and snacks for the week
   around what's already covered (meal kit, canteen, eating out), with a
-  shopping list for exactly what's needed — minus what you already have.
-- **`/pantry`** — keep track of what's in the house so food gets used,
-  not wasted: tell the coach what you bought, used up, or binned, or let
-  it estimate what's left and correct it.
+  shopping list for exactly what's needed — minus anything you name to
+  use up.
 
-### System & extras
+### System
 - **`/framework-sync`** — update your copy to the latest framework
   (skills, docs); your personal files are never touched (see "Updating
   your copy" below).
-- **`/notion-sync`** — optionally mirror your check-ins, meal plans, and
-  recipes to Notion, to read on your phone. Files here stay the source of
-  truth.
 
 ## Ground rules the coach follows
 
