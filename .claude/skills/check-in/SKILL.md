@@ -300,8 +300,9 @@ concrete: did the athlete hit the prescribed load × reps @ RPE?
   ratio); `cardio reconcile --week <the week>` for planned against
   logged when the cardio tier is `review` or `program`; and `cardio
   flags --week <the week>` (`cap_breach`, `run_volume_spike`,
-  `quality_stack`, `sleep_debt`, `status_active`, `niggle_link`). Name
-  each flag in the Coach's read.
+  `quality_stack`, `sleep_debt`, `status_active`, `niggle_link`, and
+  `collision` from the program's interference rules). Name each flag in
+  the Coach's read.
 - Notable sets: PRs, rep-range top-outs due a load increase, anything way
   off prescription.
 - RPE drift: check only **compound lifts** (multi-joint squat, hinge,

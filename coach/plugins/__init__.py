@@ -139,6 +139,20 @@ def scan_source(source, filename="<plugin>"):
     return sorted(found)
 
 
+def framework_code_uses(source):
+    """[(line, problem)] for each framework flag code an instance plugin passes to a call (it emits custom_ ones)."""
+    framework = {code for code in flags.registry() if not code.startswith(INSTANCE_PREFIX)}
+    found = []
+    for node in ast.walk(ast.parse(source, feature_version=(3, 11))):
+        if not isinstance(node, ast.Call):
+            continue
+        for value in [*node.args, *(k.value for k in node.keywords)]:
+            if isinstance(value, ast.Constant) and value.value in framework:
+                found.append((node.lineno, f"emits the framework flag code {value.value}; an instance plugin emits "
+                                           f"only its own {INSTANCE_PREFIX} codes"))
+    return found
+
+
 def _framework_plugins(kind):
     package = importlib.import_module(f"{__name__}.{kind.package}")
     found = []
@@ -188,8 +202,11 @@ def _instance_plugins(root, kind, framework_names):
         if not test.is_file():
             plugin.problems.append(f"no test file {paths.PLUGIN_TESTS_DIR.as_posix()}/test_{name}.py; every instance "
                                    "plugin ships one")
-        scanned = scan_source(path.read_text(encoding="utf-8"), str(path))
+        source = path.read_text(encoding="utf-8")
+        scanned = scan_source(source, str(path))
         plugin.problems += [f"line {line}: {problem}" for line, problem in scanned]
+        if kind.kind == "interference" and not scanned:
+            plugin.problems += [f"line {line}: {problem}" for line, problem in framework_code_uses(source)]
         if not scanned:
             plugin.module = _import_instance(plugin)
         found.append(plugin)
@@ -292,7 +309,7 @@ class Registry:
     plugins: list
 
     def get(self, kind, name):
-        """The valid plugin of a kind ("scheme", "schedule", "transform") with this name, or None."""
+        """The valid plugin of a kind (scheme, schedule, transform, interference) with this name, or None."""
         return next((p for p in self.plugins if p.kind == kind and p.name == name and p.valid), None)
 
     def find(self, name):
@@ -340,8 +357,8 @@ def state_errors(plugin, data):
 
 
 def program_problems(doc, registry):
-    """(JSONPath, message) for every scheme, schedule rule and deload rule the registry lacks or whose params fail,
-    and every slot whose load mode its scheme's LOAD_MODES leaves out."""
+    """(JSONPath, message) for every scheme, schedule rule, deload rule and interference rule the registry lacks or
+    whose params fail, and every slot whose load mode its scheme's LOAD_MODES leaves out."""
     found = []
 
     def check(kind, name, params, path):
@@ -373,4 +390,11 @@ def program_problems(doc, registry):
             found.extend((f"$.schedule.params{path[1:]}", message) for path, message in hook(merged, doc))
     deload = doc["blocks"]["deload_rule"]
     check("transform", deload["name"], deload["params"], "$.blocks.deload_rule")
+    seen = set()
+    for index, rule in enumerate(doc.get("interference", [])):
+        path = f"$.interference[{index}]"
+        if rule["name"] in seen:
+            found.append((f"{path}.name", f"interference rule {rule['name']} is listed twice"))
+        seen.add(rule["name"])
+        check("interference", rule["name"], rule["params"], path)
     return found

@@ -200,6 +200,78 @@ class SchedulePlan:
     flags: tuple = field(default_factory=tuple)
 
 
+LIFT_KINDS = ("lifting", "external")
+
+
+@dataclass(frozen=True)
+class InterferenceContext:
+    """One interference rule's view of a span (C51).
+
+    `bouts` are C49 bouts sorted by date then start, plus the quality
+    activities of the days just before the span. `heavy_lower` holds the
+    refs of lifting bouts that are heavy lower-body work under this rule's
+    params. `titles` maps a bout's ref to a name for messages. Timestamps
+    are in the athlete's timezone.
+    """
+
+    mode: str
+    span: object
+    params: dict
+    bouts: tuple
+    heavy_lower: frozenset
+    titles: dict = field(default_factory=dict)
+
+
+def is_lift(bout):
+    """True for a lifting workout or session and for a coach-led session."""
+    return bout.kind in LIFT_KINDS
+
+
+def quality_activities(bouts):
+    return [b for b in bouts if b.quality and not is_lift(b)]
+
+
+def timed(bout):
+    return bout.start is not None and bout_end(bout) is not None
+
+
+def bout_end(bout):
+    """When the bout ended: its end, else its start plus its minutes, else None."""
+    if bout.end is not None:
+        return bout.end
+    if bout.start is not None and bout.minutes is not None:
+        return bout.start + timedelta(minutes=bout.minutes)
+    return None
+
+
+def hours_between(earlier, later):
+    """Hours from one moment to a later one (negative when `later` comes first)."""
+    return (later - earlier).total_seconds() / 3600
+
+
+def hours_text(hours):
+    return f"{number(round(hours, 1))} h"
+
+
+def bout_text(ctx, bout):
+    """A bout for a message: its title, kind when it is an activity, date and start time when known."""
+    title = ctx.titles.get(bout.ref) or bout.session_id or bout.kind
+    planned = "planned " if bout.source == "planned" else ""
+    if is_lift(bout):
+        what = f"{planned}{title}"
+    else:
+        what = f"{planned}{bout.kind} \"{title}\"" if title != bout.kind else f"{planned}{bout.kind}"
+    when = bout.date.isoformat()
+    if bout.start is not None:
+        when += f" {bout.start.strftime('%H:%M')}"
+    return f"{what} ({when})"
+
+
+def session_flag(code, message, session_id, severity=None):
+    """A C10 flag about one session (no exercise), such as an interference rule's."""
+    return _flags.make(code, severity, session_id=session_id, message=message)
+
+
 def expand(groups):
     """One SetSpec per set of the program's set groups, in order."""
     found = []

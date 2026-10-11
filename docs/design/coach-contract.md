@@ -86,6 +86,7 @@ coach/                       # framework: synced to instances
   activity/store.py          # ActivityStore: resolved activities, planned, wellness     (R-42a)
   activity/adapters/<name>.py  # one module per activity source                          (R-42a, R-42b, R-42d)
   cardio.py                  # weekly load, bouts, reconcile, cardio flags               (R-43)
+  interference.py            # program rules, heavy lower, lead-in days, emitted-code check (R-44a)
   statusdays.py              # status days                                               (R-43)
   weekflags/<name>.py        # week-level flag providers: cardio (R-43), interference (R-44a)
 config.example.toml          # framework: every key, commented                           (R-10, then each item adds its tables)
@@ -1292,7 +1293,7 @@ Unless stated, each is a copy of `valid/` plus what is listed.
 | `activity-bad-record/` | R-42a | not a copy of `valid/`: the valid config and an `activities.jsonl` whose line 2 has an unknown field `heart_zone` |
 | `activity-wellness-misplaced/` | R-42a | not a copy of `valid/`: the valid config (`wellness_in_git` left false) and the wellness file at `data/activity/wellness.jsonl` |
 | `research-bad/` | R-32a | not a copy of `valid/`: the valid config; `fixture-dose` with a hand-edited claims table; `fixture-broken` with two claims numbered 1; `fixture-old` expired 2026-10-01 (area `sleep`); `reference/fixture-guide.md` citing a missing claim |
-| `interference/` | R-44a | a planned quality run on 2026-10-11 and Session A (squat at RPE 7) on 2026-10-12 |
+| `interference/` | R-44a | `[cardio] tier = "review"` and the planned quality run `manual:2026-10-11-run-1` "Tempo" (40 min) on 2026-10-11, the day before Session A (squat 3×5 at RPE 7) on 2026-10-12 |
 | `nutrition-bad-readings/` | R-33a | the valid config; a readings series with 2026-10-04 twice, the second with no weight and no protein |
 | `nutrition-override/` | R-33a | the valid config plus `[nutrition.override]` 2026-10-01 to 2026-10-22, renewal 1; no readings |
 | `meals-template-overlap/` | R-33c | not a copy of `valid/`: the valid config plus a fourth standing row filling Monday dinner |
@@ -1436,7 +1437,8 @@ version bump (below).
   "blocks": {"hard_weeks_ceiling": 6, "deload_rule": {"name": "standard", "params": {}}},
   "missed_day_rules": [
     {"id": "miss-a", "session_id": "session-a", "condition": "...", "action": "..."}
-  ]
+  ],
+  "interference": [{"name": "same_day", "params": {"min_gap_hours": 6, "lift_first": true}}]
 }
 ```
 
@@ -1606,7 +1608,8 @@ skip when there is no `data/program.json` (`state_schema`: no
 **Schema versions.** R-17a ships program and state v1. R-14b takes state
 to v2 (`temporary_routines` entries). R-23a took program to v2 and state
 to v3 (C23). R-30a took program to v3 (`dose_targets`, C40). R-22 took
-program to v4 and overlay (and its draft) to v3 (C37). Every later
+program to v4 and overlay (and its draft) to v3 (C37). R-44a took
+program to v5 (`interference`, C51). Every later
 bump takes the next free version when it merges and adds one step to the
 R-17a migration chain, so the chain stays linear.
 Program bumps: R-22 (executable `missed_day_rules`, C37), R-30b (`priority`, `minimum_week`, C40), R-44a
@@ -5445,6 +5448,51 @@ class InterferenceContext:
   appear in `propose week` and `cardio flags` without edits to either.
 - `interference list` shows the program's rules and params;
   `interference check` runs them alone for a span.
+
+**Built with R-44a** (details the text above leaves open):
+
+- `InterferenceContext` also carries `titles` (`{ref: name}`: the session
+  title, workout title, Activity name or planned title) for messages.
+  Rules call the pure helpers in `coach.plugins.base`: `is_lift` (kind
+  `lifting` or `external`), `quality_activities`, `timed`, `bout_end`
+  (`end`, else `start` plus `minutes`), `hours_between`, `hours_text`,
+  `bout_text` and `session_flag(code, message, session_id, severity)`.
+- `bouts` also holds the quality activities of the days just before the
+  span (`ceil(max hours / 24)` days, at least 1; logged ones to today and
+  unmatched plans from today on, as `cardio flags` reads them), so a
+  session on the span's first day is judged against the day before.
+  Timestamps are in `[athlete] timezone`.
+- A pair is judged on timestamps when both bouts have times, and at day
+  level otherwise (a planned bout, a coach-led annotation), with the
+  proposal-mode severities. At day level `quality_before_heavy_lower`
+  looks 1 to `ceil(hours / 24)` days back. On timestamps it judges any
+  quality activity ending under `hours` before the session starts, the
+  same date included, so a quality run before a heavy squat session on
+  one day raises both rules.
+- Heavy lower reads a rep range by its start (the fewest reps asked). A
+  rule without `heavy_rpe` or `heavy_max_reps` gets 7 and 6.
+- `program validate` checks each rule's params against its plugin and
+  fails a rule listed twice, at `$.interference[i]`. `program
+  import-hevy` drafts list the two framework rules with their defaults
+  (`coach.interference.default_rules()`).
+- A framework rule that emits a code other than `collision`, or an
+  instance rule a code outside its `FLAGS`, raises `PluginError` (exit
+  9). `plugins validate` also fails an instance interference rule that
+  passes a framework flag code to a call.
+- `coach.interference.flags(root, config, span, mode, bouts, today,
+  overlay=None)` is the one entry point; the provider and `interference
+  check` call it. `interference list` returns `{rules, available}`:
+  `rules` is the program's rules with params merged, `source`, `summary`
+  and `cites` (null with no valid program), `available` every valid
+  interference plugin with its defaults. `interference check` reads the
+  bouts `cardio flags` reads and returns `{span, today, rules, flags}`.
+  Those bouts hold lifting only once it is logged, so for an upcoming
+  week it judges planned activities against logged lifting alone;
+  `propose week` judges the week's planned sessions.
+- Messages start with the rule name, e.g. `quality_before_heavy_lower:
+  planned run "Tempo" (2026-10-11) is the day before planned Session A
+  (2026-10-12), a heavy squat or hinge session. Keep quality activities
+  at least 24 h before heavy lower-body lifting.`
 
 **Conditioning sessions** (R-44b). R-44b's program bump lets a session of
 `kind: conditioning` carry `"scheme": {"name": "emom_density", "params":

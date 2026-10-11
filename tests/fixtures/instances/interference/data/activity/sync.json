@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "sources": {
+    "hevy_conditioning": {
+      "last_sync_at": "2026-10-11T12:00:00Z",
+      "state": {
+        "seen_workout_ids": [
+          "00000000-0000-4000-8000-0000000000c1"
+        ]
+      }
+    }
+  }
+}
