@@ -16,6 +16,10 @@ class Context:
         self._stderr = stderr
 
     @property
+    def stderr(self):
+        return self._stderr
+
+    @property
     def config(self):
         """The validated config; raises ConfigError (exit 5) when it is missing or invalid."""
         if not hasattr(self, "_config"):
