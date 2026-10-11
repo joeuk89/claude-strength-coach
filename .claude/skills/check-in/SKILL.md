@@ -1,6 +1,6 @@
 ---
 name: check-in
-description: Use when the athlete wants a training check-in or progress review — weekly by default, with a deeper review on deload weeks or when one is overdue. Triggers include "/check-in", "check in", "weekly check-in", "progress review", "how's my training going", "let's review my progress".
+description: Use when the athlete wants a training check-in or progress review — weekly by default, with a deeper review when one is overdue, a light week is being proposed, or adherence has dropped. Triggers include "/check-in", "check in", "weekly check-in", "progress review", "how's my training going", "let's review my progress".
 ---
 
 # Training check-in
@@ -21,22 +21,44 @@ newest **deep** one, if the newest is weekly).
 
 Run a **deep** check-in when any of these is true, otherwise run **weekly**:
 
-- This week or next is the penciled **deload week** in
-  `routine/program.md` — deloads are the natural block boundary.
 - **6+ weeks** since the last deep check-in. Records without a tier marker
   count as deep; the first check-in ever runs deep.
+- **A light week is being proposed** (step 4: the hard-week count
+  reached the ceiling, or two fatigue triggers fired).
+- **The adherence trigger fires** (step 4: under 70 %).
 - The athlete asks for one.
+
+The coming week being a deload is not a trigger on its own. Judge the
+light-week and adherence triggers from the log before sending the Sunday
+message; if the reply changes the picture (a second fatigue trigger, a
+coach-led session that didn't happen), switch to deep and say so.
 
 The Sunday message's first line names the tier and why; the athlete can
 override. Mark the tier in the record's title line.
 
+**One-time conversion.** If `routine/program.md`'s header still carries a
+scheduled deload date from the old calendar cadence and no block status
+line (step 6), estimate the hard-week count from the check-in history
+since the last deload. State the estimate for confirmation after the
+Sunday message's last field, numbered on; step 7 writes the status line
+in place of the dated one.
+
 ## 2. Pull the data
 
 The window runs from the last check-in to today (excluding workouts the
-last record already covered) — normally ~1 week, but handle longer lapses
-the same way, just say more about less. **Deep tier:** for the trend
-analysis, extend the lookback to the last deep check-in (~6 weeks) — one
-week can't show a trend.
+last record already covered) — normally ~1 week. **Deep tier:** for the
+trend analysis, extend the lookback to the last deep check-in (~6 weeks)
+— one week can't show a trend. **Adherence and the hard-week count** need
+more history: read the check-in records and logs back as far as step 4
+needs.
+
+**Gap check.** Count the days since the last lifting workout of any
+kind — solo, or coach-led as the log or the reply shows it. Over 10 days
+means the coming week is a **return week** under the return rule in
+`CLAUDE.md` "Coaching principles": say so in the Sunday message's first
+line ("… — 16 days since your last workout, so next week is a return
+week"). An `ill` miss tag or reported illness in the gap brings in that
+rule's illness conditions too. Program-week applies the rule.
 
 **With Hevy** (key in `.env`): API details in `reference/hevy-api.md`.
 Page through `GET /v1/workouts` (`pageSize=10`, newest first) past the
@@ -211,6 +233,46 @@ concrete: did the athlete hit the prescribed load × reps @ RPE?
 - Weekly balance: does the program's balance picture still match what's
   actually being trained?
 
+**Both tiers — the hard-week count.** Class each week the window closes
+by the rules in `CLAUDE.md` "Coaching principles" → Fatigue management:
+a completed hard week adds one, a reset week sets the count to zero,
+anything else leaves it. Then check this week's four fatigue triggers:
+readiness from the reply and the workout notes, compound RPE drift from
+the drift check above (two sessions running), a niggle the Niggles field
+says was aggravated under load, and poor sleep from the Sleep field. The
+same rules say when a light week is proposed, watched or skipped.
+
+**Both tiers — adherence.** Adherence = sessions trained ÷ sessions
+planned over the **trailing four ordinary weeks**:
+
+- Judge each week against the overlay in force that week. Coach-led
+  sessions count, as the replies confirmed them; optional sessions are
+  left out; a shortened session counts as trained.
+- An **ordinary week** is any week except a deload or other light week,
+  a one-off week (illness, travel, limited kit), or a week inside a
+  layoff of 11+ days. Skip those and reach further back, at most 12
+  weeks. Fewer than four ordinary weeks in that span → no trigger yet.
+
+Adherence thresholds are coaching heuristics, not research cut-offs:
+
+- **Under 80 %:** propose no new recurring session — no new session or
+  weekly slot, conditioning and optional sessions included — and push
+  back if the athlete asks for one. Exercise swaps within a session are
+  not affected. An athlete override is recorded with the adherence
+  decision line (step 6), naming the session it adds.
+- **Under 70 % — the adherence trigger.** The check-in must present a
+  smaller schedule in its decisions:
+  - a Day / Session table sized to the average sessions actually trained
+    per week over the four weeks, rounded up, minimum two;
+  - a before/after table of weekly hard sets per muscle, kept equal;
+  - each session within the time limits in `profile.md` and about 11
+    fractional hard sets per muscle (an indirect set counts as half);
+  - anything trimmed, named.
+
+  The athlete adopts, declines with a reason, or defers to a date.
+  Record it with the adherence decision line (step 6), which also sets
+  when the proposal comes back.
+
 ## 5. Weight & nutrition check (every check-in)
 
 **If the athlete uses MacroFactor** (per `profile.md`): take the reply's
@@ -251,6 +313,7 @@ Create `check-ins/YYYY-MM-DD.md`. Weekly template:
 # Check-in — YYYY-MM-DD (weekly)
 
 **Window:** <start> → <end> · **Sessions:** n of ~m planned · **Missed:** <day> <session> (<tag>), … or none
+Block <n> · <count> of <ceiling> hard weeks · triggers <k> of 4 (<names>) · light week: <state>
 
 ## Headline
 1–2 sentences: the state of the week in plain words.
@@ -267,6 +330,7 @@ reply didn't answer reads "not supplied".
 
 ## Decisions
 What changed and why (or "stay the course"). Anything deferred.
+Adherence trigger: <n> % over 4 weeks: adopted | declined: <reason> | deferred to <date>
 
 ## The week ahead — <dates>
 | Day | Session |
@@ -278,11 +342,30 @@ followed directly by its `**Written to Hevy:**` line. The section
 always ends with one line: the focus of the week.
 ```
 
+**The block status line** is the second header line, copied from
+`routine/program.md`'s header after this check-in updates it (step 7).
+`<names>` lists the fatigue triggers that fired this week (none → `triggers
+0 of 4`). `<state>` is one of: `not due`, `watch`, `skipped (<n> hard
+weeks)`, `proposed for wk of <D Mon> (<type>, <reason>)`, `agreed:
+<type>, wk of <D Mon>`, or `declined (<reason>), proposed again next
+check-in`.
+
+**The adherence decision line** goes in Decisions only when the
+adherence trigger was presented or an under-80 % override was agreed, in
+that fixed shape, e.g. `Adherence trigger: 58 % over 4 weeks: deferred to
+2026-11-02`. An override adds the session after the outcome: `Adherence
+trigger: 76 % over 4 weeks: adopted (override: adds Sat conditioning)`.
+A **declined** proposal isn't presented again until four ordinary weeks
+have passed since the decision; a **deferred** one is presented again at
+the first check-in on or after its date; an **adopted** one goes to
+`/new-program`'s redesign path and isn't presented again for four
+ordinary weeks.
+
 Deep records use the same skeleton titled `(deep)`, with **Training**
 expanded to the full analysis (e1RM trends per lift, drift, balance,
-intensity honesty) and a **Block planning** section: deload timing,
-whether the goals/phase plan in `profile.md` is stale (if so, prompt
-`/goals`), and what the next block should emphasize. When body
+intensity honesty) and a **Block planning** section: the light-week
+outlook from the hard-week count, whether the goals/phase plan in
+`profile.md` is stale (if so, prompt `/goals`), and what the next block should emphasize. When body
 composition applies (step 3), Block planning ends with one line that
 says when the next reading is due — the next check-in reads it:
 
@@ -323,6 +406,18 @@ check-in the due one.
   no added load on an aggravated pattern.
 - If the program tracks a current position in a rotation, update it in
   `routine/program.md`.
+- **Update the block status line** in `routine/program.md`'s header —
+  one line in the record's format (step 6), holding the hard-week count
+  and trigger status — then copy it into the record's header. On the
+  one-time conversion (step 1), the status line replaces the dated
+  deload line.
+- **A light week proposed** at the ceiling or on two triggers: present
+  it with its reason. Agreed → invoke the **one-off-week** skill in
+  deload mode (below). Declined → record the reason in the status line;
+  at the ceiling, propose it again next check-in.
+- **Adherence trigger adopted** → hand off to `/new-program`'s redesign
+  path with the agreed smaller schedule. Under 80 % adherence (step 4),
+  propose no new recurring session, here or in program-week.
 - On a normal (non-deload) week, once decisions are agreed, invoke the
   **program-week** skill — it computes per-exercise targets for the
   coming week, writes them to Hevy, and fills this record's "The week
@@ -334,7 +429,7 @@ check-in the due one.
   again before writing. Structural routine changes agreed today ride
   along in its write step; `/hevy-sync` stays for reconciliation outside
   the pass.
-- On a deload-week check-in, invoke the **one-off-week** skill (deload
-  mode) to build the deload week itself — its schedule and sessions
-  fill this record's "The week ahead" section, and it handles the Hevy
-  writes.
+- When a light week is agreed, invoke the **one-off-week** skill
+  (deload mode) to build it — its schedule and sessions fill this
+  record's "The week ahead" section, it handles the Hevy writes, and it
+  resets the hard-week count.
