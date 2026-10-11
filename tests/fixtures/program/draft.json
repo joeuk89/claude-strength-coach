@@ -1,0 +1,205 @@
+{
+  "schema_version": 1,
+  "source": "hevy_import",
+  "created_at": "2026-10-11T18:00:00Z",
+  "program": {
+    "schema_version": 2,
+    "name": "Program (imported from Hevy)",
+    "sessions": [
+      {
+        "id": "session-a",
+        "title": "Session A",
+        "kind": "lifting",
+        "tier": "core",
+        "status": "active",
+        "location": null,
+        "focus": null,
+        "exercises": [
+          {
+            "exercise_id": "bb_back_squat",
+            "load_mode": "total",
+            "sets": [
+              {
+                "count": 1,
+                "type": "warmup",
+                "reps": 5
+              },
+              {
+                "count": 3,
+                "type": "normal",
+                "reps": 5
+              }
+            ],
+            "rest_seconds": 180,
+            "superset_id": null,
+            "cues": "brace · knees out",
+            "constraints": [],
+            "scheme": {
+              "name": "hold",
+              "params": {}
+            },
+            "start_load": 100
+          },
+          {
+            "exercise_id": "db_bench_press",
+            "load_mode": "per_hand_x2",
+            "sets": [
+              {
+                "count": 1,
+                "type": "warmup",
+                "reps": 10
+              },
+              {
+                "count": 3,
+                "type": "normal",
+                "rep_range": {
+                  "start": 8,
+                  "end": 10
+                }
+              }
+            ],
+            "rest_seconds": 120,
+            "superset_id": null,
+            "cues": "elbows tucked · feet planted",
+            "constraints": [],
+            "scheme": {
+              "name": "hold",
+              "params": {}
+            },
+            "start_load": 25
+          }
+        ]
+      },
+      {
+        "id": "session-b",
+        "title": "Session B",
+        "kind": "lifting",
+        "tier": "core",
+        "status": "active",
+        "location": null,
+        "focus": null,
+        "exercises": [
+          {
+            "exercise_id": "db_single_arm_row",
+            "load_mode": "single_implement",
+            "sets": [
+              {
+                "count": 3,
+                "type": "normal",
+                "reps": 10
+              }
+            ],
+            "rest_seconds": 90,
+            "superset_id": null,
+            "cues": "pull to the hip",
+            "constraints": [],
+            "scheme": {
+              "name": "hold",
+              "params": {}
+            },
+            "start_load": 30
+          },
+          {
+            "exercise_id": "pull_up",
+            "load_mode": "bodyweight",
+            "sets": [
+              {
+                "count": 3,
+                "type": "normal",
+                "reps": 8
+              }
+            ],
+            "rest_seconds": 120,
+            "superset_id": null,
+            "cues": "full hang at the bottom",
+            "constraints": [],
+            "scheme": {
+              "name": "hold",
+              "params": {}
+            },
+            "start_load": 0
+          }
+        ]
+      }
+    ],
+    "external_sessions": [],
+    "schedule": {
+      "rule": "fixed_weekdays",
+      "params": {
+        "days": {
+          "mon": "session-a",
+          "thu": "session-b"
+        }
+      }
+    },
+    "blocks": {
+      "hard_weeks_ceiling": 6,
+      "deload_rule": {
+        "name": "standard",
+        "params": {}
+      }
+    },
+    "missed_day_rules": []
+  },
+  "position": null,
+  "hevy_routines": {
+    "00000000-0000-4000-8000-000000000001": "session-a",
+    "00000000-0000-4000-8000-000000000002": "session-b"
+  },
+  "hevy_folder": 1,
+  "report": [
+    {
+      "kind": "cues_from_notes",
+      "session_id": "session-a",
+      "exercise_id": "bb_back_squat",
+      "message": "Cues from the Hevy note: brace · knees out"
+    },
+    {
+      "kind": "converted_load",
+      "session_id": "session-a",
+      "exercise_id": "bb_back_squat",
+      "message": "Hevy 100 → 100"
+    },
+    {
+      "kind": "cues_from_notes",
+      "session_id": "session-a",
+      "exercise_id": "db_bench_press",
+      "message": "Cues from the Hevy note: elbows tucked · feet planted"
+    },
+    {
+      "kind": "converted_load",
+      "session_id": "session-a",
+      "exercise_id": "db_bench_press",
+      "message": "Hevy 50 → 25/hand"
+    },
+    {
+      "kind": "cues_from_notes",
+      "session_id": "session-b",
+      "exercise_id": "db_single_arm_row",
+      "message": "Cues from the Hevy note: pull to the hip"
+    },
+    {
+      "kind": "converted_load",
+      "session_id": "session-b",
+      "exercise_id": "db_single_arm_row",
+      "message": "Hevy 30 → 30"
+    },
+    {
+      "kind": "cues_from_notes",
+      "session_id": "session-b",
+      "exercise_id": "pull_up",
+      "message": "Cues from the Hevy note: full hang at the bottom"
+    },
+    {
+      "kind": "schedule_missing",
+      "session_id": null,
+      "exercise_id": null,
+      "message": "Ask the athlete which days each session falls on and fill schedule.params; program adopt refuses an empty schedule."
+    }
+  ],
+  "detected": {
+    "percentage_based": false,
+    "evidence": [],
+    "suggested_schemes": []
+  }
+}

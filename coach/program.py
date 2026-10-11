@@ -6,6 +6,8 @@
 
 import copy
 import json
+import os
+import tempfile
 from pathlib import Path
 
 from coach import config as config_module
@@ -276,11 +278,53 @@ def render_all(root):
         raise ValidationError(f"{paths.PROGRAM} is not valid ({len(errors)} problem(s)); "
                               "run python3 -m coach program validate",
                               details=[error.to_json() for error in errors])
-    unit = config.athlete.units
+    return render_doc(doc, library, config.athlete.units)
+
+
+def render_doc(doc, library, unit):
+    """{relative path: text} for a valid, normalised program document."""
     pages = {PROGRAM_PAGE: render_program_page(doc)}
     for session in doc["sessions"]:
         pages[page_path(session["id"])] = render_session_page(session, library, unit)
     return pages
+
+
+def sync_pages(root, pages, dry_run):
+    """Write `pages` into routine/ and delete generated pages the program no longer has.
+
+    Returns written, removed, unchanged and not_generated paths (pages in
+    routine/ that no render made); with dry_run, written and removed are
+    what a real run would write and remove, and nothing changes on disk.
+    """
+    existing = routine_pages(root)
+    changed = sorted(path for path, text in pages.items() if existing.get(path) != text)
+    stale = sorted(path for path, text in existing.items() if path not in pages and is_generated(text))
+    result = {
+        "written": changed,
+        "removed": stale,
+        "unchanged": sorted(path for path in pages if path not in changed),
+        "not_generated": sorted(path for path in existing if path not in pages and path not in stale),
+    }
+    if dry_run:
+        return result
+    for path in changed:
+        _write_text(Path(root) / path, pages[path])
+    for path in stale:
+        (Path(root) / path).unlink()
+    return result
+
+
+def _write_text(path, text):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temp = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as handle:
+            handle.write(text)
+        os.replace(temp, path)
+    except BaseException:
+        if os.path.exists(temp):
+            os.unlink(temp)
+        raise
 
 
 def _cell(value):

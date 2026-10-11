@@ -1,24 +1,9 @@
-import os
-import tempfile
 from pathlib import Path
 
-from coach import paths, program
-from coach.commands import command
+from coach import jsonio, paths, program, program_drafts
+from coach.commands import arg, command
 from coach.errors import ValidationError
 from coach.library import Library
-
-
-def _write_text(path, text):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, temp = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8", newline="") as handle:
-            handle.write(text)
-        os.replace(temp, path)
-    except BaseException:
-        if os.path.exists(temp):
-            os.unlink(temp)
-        raise
 
 
 @command("program show", help="Show data/program.json, with absent optional keys filled")
@@ -42,22 +27,55 @@ def validate(args, ctx):
          writes=True)
 def render(args, ctx):
     pages = program.render_all(ctx.root)
-    existing = program.routine_pages(ctx.root)
-    changed = sorted(path for path, text in pages.items() if existing.get(path) != text)
-    unchanged = sorted(path for path in pages if path not in changed)
-    stale = sorted(path for path, text in existing.items() if path not in pages and program.is_generated(text))
-    not_generated = sorted(path for path, text in existing.items() if path not in pages and path not in stale)
-    for path in not_generated:
+    result = program.sync_pages(ctx.root, pages, args.dry_run)
+    for path in result["not_generated"]:
         ctx.warn(f"{path} was not rendered from {paths.PROGRAM}; routine_render_fresh fails until it is moved "
                  "out of routine/")
-    data = {"pages": sorted(pages), "written": [], "unchanged": unchanged, "removed": [],
-            "not_generated": not_generated}
+    data = {"pages": sorted(pages), "written": [], "unchanged": result["unchanged"], "removed": [],
+            "not_generated": result["not_generated"]}
     if args.dry_run:
-        data.update(would_write=changed, would_remove=stale)
+        data.update(would_write=result["written"], would_remove=result["removed"])
         return data
-    for path in changed:
-        _write_text(Path(ctx.root) / path, pages[path])
-    for path in stale:
-        (Path(ctx.root) / path).unlink()
-    data.update(written=changed, removed=stale)
+    data.update(written=result["written"], removed=result["removed"])
     return data
+
+
+@command(
+    "program import-hevy",
+    help="Turn the cached Hevy routines into a program draft (default .coach/drafts/program.json); "
+         "every exercise needs a confirmed load mode",
+    args=(
+        arg("--routine", action="append", metavar="ID", help="import only this routine; repeat for several"),
+        arg("--folder", type=int, metavar="ID", help="import only the routines in this Hevy folder"),
+        arg("--out", metavar="FILE", help="where to write the draft"),
+    ),
+    writes=True,
+)
+def import_hevy(args, ctx):
+    draft = program_drafts.import_hevy(ctx.root, args.routine, args.folder, now=ctx.now())
+    out = Path(args.out) if args.out else Path(ctx.root) / program_drafts.DEFAULT_OUT
+    jsonio.write_doc(out, draft, args.dry_run)
+    shown = program_drafts.DEFAULT_OUT.as_posix() if not args.out else args.out
+    return {"draft": draft, "path": shown, "written": not args.dry_run,
+            "problems": program_drafts.draft_problems(draft, ctx.root)}
+
+
+@command(
+    "program adopt",
+    help="Validate a program draft and make it the program: archive the old one (--replace), write program and "
+         "state, render routine/, git add; never commits",
+    args=(
+        arg("--input", required=True, metavar="FILE", help="the program draft"),
+        arg("--replace", action="store_true", help="archive the existing program and replace it"),
+        arg("--position", metavar="P", help="the rotation position to start at; default: the draft's, else the "
+                                            "schedule rule's first"),
+    ),
+    writes=True,
+)
+def adopt(args, ctx):
+    draft = program_drafts.read_draft(args.input)
+    result = program_drafts.adopt(ctx.root, draft, replace=args.replace, position=args.position,
+                                  dry_run=args.dry_run, today=ctx.today())
+    for warning in result.pop("warnings"):
+        ctx.warn(warning)
+    return result
