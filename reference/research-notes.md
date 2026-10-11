@@ -122,11 +122,15 @@ This note does not replace assessment by a qualified professional.
 
 ## Writing a note
 
-1. **Find the evidence.** Rank sources the way `CLAUDE.md` does:
+1. **Find the evidence.** Rank sources by evidence quality:
    peer-reviewed research and meta-analyses first, then established
    evidence-based educators and professional bodies, then general
-   content. Prefer recent sources. Be sceptical of influencer marketing,
-   anecdote and bro-science.
+   content. Reputable evidence-based outlets include Stronger By Science
+   and the MASS Research Review, Renaissance Periodization, Barbell
+   Medicine, the published research of scientists like Brad Schoenfeld,
+   and NSCA and ACSM position stands. Prefer recent sources: best
+   practice shifts as research accrues. Be sceptical of influencer
+   marketing, anecdote and bro-science.
 2. **Write the claims.**
    - One sentence per claim.
    - Numbers in a claim's text are the numbers the code and the skills

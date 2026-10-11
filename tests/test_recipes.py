@@ -10,6 +10,7 @@ from coach.config_tables.nutrition import bank_defaults
 from coach.config import parse
 from coach.errors import ConfigError
 from tests.support import FIXTURES, INSTANCES, MINIMAL_CONFIG, REPO_ROOT, VALID
+from tests.support.skills import skill_text
 
 MENU = VALID / "nutrition" / "menu"
 YAML_MENU = INSTANCES / "yaml-cards" / "nutrition" / "menu"
@@ -464,7 +465,6 @@ class ConvertTest(RoundTripMixin, unittest.TestCase):
 
 class ReferenceDocTest(unittest.TestCase):
     DOC = REPO_ROOT / "reference" / "recipe-cards.md"
-    SKILL = REPO_ROOT / ".claude" / "skills" / "recipes" / "SKILL.md"
 
     def test_example_card_is_valid_and_fresh(self):
         text = self.DOC.read_text(encoding="utf-8")
@@ -474,9 +474,10 @@ class ReferenceDocTest(unittest.TestCase):
         self.assertEqual(recipes.rendered_text(card), example)
 
     def test_no_hand_kept_mirrors(self):
-        for path in (self.DOC, self.SKILL):
-            text = path.read_text(encoding="utf-8").lower()
-            with self.subTest(path=path.name):
+        texts = {"recipe-cards.md": self.DOC.read_text(encoding="utf-8"), "recipes skill": skill_text("recipes")}
+        for name, text in texts.items():
+            text = text.lower()
+            with self.subTest(path=name):
                 self.assertNotIn("same-write", text)
                 self.assertNotIn("stats block", text)
 

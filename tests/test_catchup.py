@@ -6,6 +6,7 @@ import unittest
 from coach import checkin, jsonio, validity
 from tests.support import FIXTURES, INSTANCES, REPO_ROOT
 from tests.support.history import HistoryCase, read_json, write_json
+from tests.support.skills import skill_text
 
 GAP = INSTANCES / "gap"
 CHECKIN = INSTANCES / "checkin"
@@ -308,8 +309,7 @@ class RegistrationTest(unittest.TestCase):
 
 class CheckInSkillTest(unittest.TestCase):
     def setUp(self):
-        self.text = " ".join((REPO_ROOT / ".claude" / "skills" / "check-in" / "SKILL.md").read_text(
-            encoding="utf-8").split())
+        self.text = " ".join(skill_text("check-in").split())
 
     def test_catch_up_path(self):
         for words in ("catch_up", "python3 -m coach checkin tag-gap", "lines_digest", "propose finalize",

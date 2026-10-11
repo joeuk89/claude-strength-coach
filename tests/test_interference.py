@@ -9,6 +9,7 @@ from pathlib import Path
 
 from coach import jsonio, migrate, plugins, research
 from tests.support import INSTANCES, REPO_ROOT, VALID, run_cli
+from tests.support.skills import skill_text
 
 INTERFERENCE = INSTANCES / "interference"
 CARDIO = INSTANCES / "cardio"
@@ -111,7 +112,7 @@ class KindTest(unittest.TestCase):
 
 class SkillTest(unittest.TestCase):
     def read(self, name):
-        return (REPO_ROOT / ".claude" / "skills" / name / "SKILL.md").read_text(encoding="utf-8")
+        return skill_text(name)
 
     def test_program_week_settles_collision_and_names_the_list_command(self):
         text = self.read("program-week")
@@ -122,9 +123,9 @@ class SkillTest(unittest.TestCase):
         self.assertIn("`collision` from the program's interference rules", self.read("check-in"))
 
     def test_new_program_sets_the_rules_in_a_designed_draft(self):
-        text = self.read("new-program")
+        text = " ".join(self.read("new-program").split())
         self.assertIn("The program's `interference`", text)
-        self.assertIn("python3 -m coach interference\n   list", text)
+        self.assertIn("python3 -m coach interference list", text)
 
 
 class MigrationTest(Case):

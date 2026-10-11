@@ -10,6 +10,7 @@ from pathlib import Path
 
 from coach import nutrition, research
 from tests.support import FIXTURES, INSTANCES, REPO_ROOT, VALID, run_cli, run_module
+from tests.support.skills import skill_text
 
 NOW = {"COACH_NOW": "2026-10-11T18:00:00Z"}
 READINGS = Path("data") / "nutrition" / "readings.json"
@@ -399,10 +400,8 @@ class NoCalorieModelTest(unittest.TestCase):
 
 
 class SkillWiringTest(unittest.TestCase):
-    SKILLS = REPO_ROOT / ".claude" / "skills"
-
     def test_check_in_runs_the_commands_and_handles_every_flag(self):
-        text = (self.SKILLS / "check-in" / "SKILL.md").read_text(encoding="utf-8")
+        text = skill_text("check-in")
         for needle in ("6. **Food**", "nutrition record", "nutrition status", "only when a standing weekly template",
                        "protein_floor_raise", "override_expired", "override_renewed_twice", "app_protein_mismatch",
                        "logging_incomplete", "no_recent_reading"):
@@ -410,13 +409,13 @@ class SkillWiringTest(unittest.TestCase):
         self.assertNotIn("**Meal plan**", text)
 
     def test_goals_writes_the_numbers_to_config(self):
-        text = (self.SKILLS / "goals" / "SKILL.md").read_text(encoding="utf-8")
+        text = skill_text("goals")
         for needle in ("[nutrition.protein]", "[[nutrition.anchors]]", "[nutrition.override]", "config validate",
                        "What stays prose"):
             self.assertIn(needle, text)
 
     def test_goals_uses_the_who_body_fat_line_and_a_relative_bulk_rate(self):
-        text = (self.SKILLS / "goals" / "SKILL.md").read_text(encoding="utf-8")
+        text = skill_text("goals")
         flat = " ".join(text.split())
         self.assertIn("~25 % for men or ~35 % for women", flat)
         self.assertIn("~25 %/~35 % body-fat lines", flat)

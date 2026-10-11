@@ -7,6 +7,7 @@ from coach import dates, flags, jsonio, missed, overlay, program, structure
 from coach.library import Library
 from tests.support import INSTANCES, REPO_ROOT
 from tests.support.history import HistoryCase, read_json, write_json
+from tests.support.skills import skill_text
 
 WEEKLY = "2026-10-12-weekly"
 SQUAT = "bb_back_squat"
@@ -543,12 +544,11 @@ class RegistrationTest(PriorityCase):
             self.assertIn(f"Bash(python3 -m coach {name}:*)", allowed)
 
     def test_the_check_in_skill_runs_structure_priority(self):
-        text = (REPO_ROOT / ".claude" / "skills" / "check-in" / "SKILL.md").read_text(encoding="utf-8")
+        text = skill_text("check-in")
         self.assertIn("python3 -m coach structure priority", text)
         self.assertIn("priority_exposures_missed", text)
 
-    def test_the_one_off_week_skill_offers_the_minimum_week(self):
-        text = " ".join((REPO_ROOT / ".claude" / "skills" / "one-off-week" / "SKILL.md").read_text(
-            encoding="utf-8").split())
+    def test_program_week_offers_the_minimum_week(self):
+        text = " ".join(skill_text("program-week").split())
         self.assertIn("python3 -m coach structure minimum", text)
         self.assertIn("--plan", text)

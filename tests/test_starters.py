@@ -10,6 +10,7 @@ from pathlib import Path
 from coach import jsonio, program, research, render, routines, starters, units, validity
 from coach.library import Library
 from tests.support import INSTANCES, REPO_ROOT, run_cli
+from tests.support.skills import flat, step_text
 
 EMPTY = INSTANCES / "empty"
 NOW = "2026-10-11T18:00:00Z"
@@ -437,9 +438,7 @@ class WiringTest(unittest.TestCase):
         self.assertIn("**Starter**:", (REPO_ROOT / "CONTEXT.md").read_text(encoding="utf-8"))
 
     def test_new_program_offers_the_starter_path_before_adopting(self):
-        text = " ".join((REPO_ROOT / ".claude" / "skills" / "new-program" / "SKILL.md")
-                        .read_text(encoding="utf-8").split())
-        path = text[text.index("## Path C"):text.index("## Close out")]
+        path = flat(step_text("new-program", "starter.md"))
         order = [path.index(name) for name in ("python3 -m coach starters list", "python3 -m coach starters draft",
                                                "python3 -m coach program adopt")]
         self.assertEqual(order, sorted(order))

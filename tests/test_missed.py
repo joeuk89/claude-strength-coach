@@ -9,6 +9,7 @@ from coach.library import Library
 from tests.support import INSTANCES, REPO_ROOT
 from tests.support.activity import write_hevy_cache
 from tests.support.history import SYNTHETIC, HistoryCase, read_json, write_json
+from tests.support.skills import skill_text
 
 NOW = "2026-10-15T08:00:00Z"
 WEEKLY = "2026-10-12-weekly"
@@ -508,13 +509,13 @@ class RegistrationTest(MissedCase):
 
 class ProgramWeekSkillTest(MissedCase):
     def test_the_mid_week_step_runs_the_missed_commands_and_only_writes_after_go(self):
-        text = (REPO_ROOT / ".claude" / "skills" / "program-week" / "SKILL.md").read_text(encoding="utf-8")
+        text = skill_text("program-week")
         step = " ".join(re.search(r"\*\*Mid-week\?\*\*(.*?)\n\n", text, re.DOTALL).group(1).split())
         order = ["missed list", "missed plan", '"go"', "missed apply", "overlay approve", "routines push"]
         positions = [step.index(word) for word in order]
         self.assertEqual(positions, sorted(positions), step)
         self.assertIn("`missed_rule_unmatched`", step)
-        self.assertIn("step 2's mid-week reprogram", step)
+        self.assertIn("compute.md's proposal with `--kind midweek`", step)
         self.assertNotIn("missed apply", step[:step.index('"go"')])
         self.assertIn("for Hevy users, `python3 -m coach routines push", step)
         self.assertIn("`recorded: true`", step)

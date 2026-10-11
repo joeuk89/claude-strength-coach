@@ -11,6 +11,7 @@ from coach import flags, library
 from coach.activity import records
 from tests.support import FIXTURES, INSTANCES, REPO_ROOT, run_cli
 from tests.support.history import HistoryCase, read_json, write_json
+from tests.support.skills import skill_text, step_text
 from tests.test_checkin import CheckinCase
 from tests.test_propose import ProposeCase, codes, coaching, find_line, working
 
@@ -409,11 +410,11 @@ class StatusTest(HistoryCase):
 
 class SkillTest(unittest.TestCase):
     def read(self, skill):
-        return " ".join((REPO_ROOT / ".claude" / "skills" / skill / "SKILL.md").read_text(encoding="utf-8").split())
+        return " ".join(skill_text(skill).split())
 
     def test_check_in_maintains_niggles_and_follow_ups_with_the_commands(self):
         text = self.read("check-in")
-        act = text[text.index("## 7. Act on it"):]
+        act = " ".join(step_text("check-in", "act.md").split())
         self.assertIn("python3 -m coach niggles update", act)
         self.assertIn("python3 -m coach niggles add", act)
         self.assertNotIn("### Niggle log", act)

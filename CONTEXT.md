@@ -254,6 +254,12 @@ athlete confirmed for each exercise, and exercises they avoid). Exercises
 in a program, an overlay or a Hevy routine are named by library id.
 _Avoid_: exercise database, exercise list, catalogue (only the builtin part)
 
+**Programming pass**:
+One run of `/program-week` in one mode (normal, midweek, light, minimum,
+constrained or reshuffle): it builds one overlay for a span of days and
+ends in one approval, the athlete's "go" to the coach's brief.
+_Avoid_: programming session (a session is a training day), weekly update
+
 **Coach's brief**:
 The narrative presentation of a proposed training week, given to the
 athlete for approval before anything is written: week focus, what's

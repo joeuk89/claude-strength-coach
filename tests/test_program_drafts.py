@@ -16,6 +16,7 @@ from coach.hevy.cache import HevyCache
 from coach.validate import validate
 from tests.support import FIXTURES, INSTANCES, REPO_ROOT, VALID, run_cli
 from tests.support.fake_hevy import FakeHevy
+from tests.support.skills import flat, skill_text, step_text
 
 SYNTHETIC = FIXTURES / "hevy" / "synthetic"
 PUSHED = FIXTURES / "hevy" / "pushed"
@@ -688,8 +689,7 @@ class AllowlistTest(unittest.TestCase):
 
 class NewProgramSkillTest(unittest.TestCase):
     def setUp(self):
-        self.text = " ".join((REPO_ROOT / ".claude" / "skills" / "new-program" / "SKILL.md")
-                             .read_text(encoding="utf-8").split())
+        self.text = " ".join(skill_text("new-program").split())
 
     def test_it_names_the_commands(self):
         for name in ("python3 -m coach program import-hevy", "python3 -m coach program adopt",
@@ -698,13 +698,13 @@ class NewProgramSkillTest(unittest.TestCase):
             self.assertTrue(name in self.text, name)
 
     def test_the_import_path_runs_its_commands_in_order(self):
-        path = self.text[self.text.index("## Path A"):self.text.index("## Path B")]
+        path = flat(step_text("new-program", "import.md"))
         order = [path.index(name) for name in ("library seed", "library confirm", "program import-hevy",
                                                "one table", "program adopt")]
         self.assertEqual(order, sorted(order))
 
     def test_a_designed_draft_spells_out_detected_and_keeps_routines_on_a_redesign(self):
-        path = self.text[self.text.index("## Path B"):self.text.index("## Close out")]
+        path = flat(step_text("new-program", "design.md"))
         self.assertIn('`{"percentage_based": false, "evidence": [], "suggested_schemes": []}`', path)
         self.assertIn("python3 -m coach state show", path)
 

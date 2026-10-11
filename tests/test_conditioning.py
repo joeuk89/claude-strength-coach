@@ -12,6 +12,7 @@ from coach.plugins.conditioning import circuit_rounds, emom_density
 from tests.support import FIXTURES, INSTANCES, REPO_ROOT
 from tests.support.activity import write_hevy_cache
 from tests.support.history import HistoryCase
+from tests.support.skills import skill_text
 
 SWING = base.ExerciseInfo(id="kb_swing", name="Kettlebell Swing", pattern="hinge", muscles={"glutes": "primary"},
                           equipment="kettlebell", load_mode="single_implement", increment=4, is_compound=True)
@@ -181,7 +182,7 @@ class DecayTest(unittest.TestCase):
 
 class WiringTest(unittest.TestCase):
     def test_program_week_restores_a_dropped_session_with_the_command(self):
-        text = (REPO_ROOT / ".claude" / "skills" / "program-week" / "SKILL.md").read_text(encoding="utf-8")
+        text = skill_text("program-week")
         self.assertIn("`conditioning_dropped`", text)
         self.assertIn("python3 -m coach propose restore", text)
 

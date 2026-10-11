@@ -13,30 +13,25 @@ arithmetic (day totals, flags, the pool, the shopping list), and the
 athlete says "go".
 
 **Division of labour:** `/goals` owns the strategy and its numbers
-(`[nutrition]`; `python3 -m coach nutrition status` returns them). This
-skill owns the standing template (`[nutrition.template]`). The nutrition app, if the athlete uses one, owns the
-calorie target; without one, `kcal_target` does. `/recipes` owns the
-recipe bank. This skill picks food from the bank to those numbers and
-never computes a calorie target. If the targets look wrong, send the
-athlete to `/goals`; if the bank needs work, `/recipes`.
+(`[nutrition]`; `python3 -m coach nutrition status` returns them), and
+`/recipes` owns the recipe bank. This skill owns the standing template
+(`[nutrition.template]`). The nutrition app, if the athlete uses one,
+owns the calorie target; without one, `kcal_target` does. This skill
+picks food from the bank to those numbers and never computes a calorie
+target. Targets look wrong → `/goals`; the bank needs work → `/recipes`.
 
 Requires nutrition to be set up: if `nutrition status` says `enabled:
 false`, run `/setup` or `/goals` first. If `meals template` exits 5 for
 want of `[nutrition.template]`, run **Set up the standing template**
-below once before planning.
+below once before planning. If `nutrition/menu/` doesn't exist, invoke
+the `/recipes` skill now for its interview and seeding flow, then come
+back: never plan from an empty bank.
 
-## The files
-
-- **`nutrition/menu/`**: the recipe bank, owned by `/recipes`.
-- **`data/nutrition/plans/<id>.json`**: the plan, written by `meals
-  build`; the id is the first day of the window.
-- **`nutrition/plans/<id>.md`**: the rendered plan, written by `meals
-  render`. Never hand-edited: change the draft and build again.
-- **`.coach/drafts/meal-plan-<id>.json`**: your draft (gitignored).
-
-**No bank?** If `nutrition/menu/` doesn't exist, invoke the `/recipes`
-skill now: run its interview and seeding flow, then come back here and
-continue. Never plan from an empty bank.
+**The files:** the plan is `data/nutrition/plans/<id>.json` (written by
+`meals build`; the id is the window's first day), rendered to
+`nutrition/plans/<id>.md` by `meals render` — never hand-edited: change
+the draft and build again. Your draft is
+`.coach/drafts/meal-plan-<id>.json` (gitignored).
 
 ## Set up the standing template (first run only)
 
@@ -67,9 +62,8 @@ recipes render` first if `check --only recipe_index_fresh` fails).
 
 ## 2. Take the one exceptions line
 
-If the check-in already asked the food-exceptions question (`/check-in`,
-Food field c), use that answer. Otherwise ask it once, as the only
-question before the plan:
+If `/check-in`'s Food field already asked about next week's food, use
+that answer. Otherwise ask once, as the only question before the plan:
 
 > Anything different about food next week? Who cooks which nights,
 > office-day changes, meals out, anything in the house to use up?
@@ -79,57 +73,18 @@ Everything else in this skill is yours to decide; anything you assume
 (an estimate for a meal out, a pick for an open slot) is stated in the
 presentation, where the athlete can correct it in their reply.
 
-## 3. Draft
+## 3. Draft, dry run, fix the flags
 
 Write `.coach/drafts/meal-plan-<window start>.json` in the C34 draft
-shape (`docs/design/coach-contract.md`):
+shape: the span, the exceptions the athlete named, a pick for every open
+and pool slot, the items to use up, and notes. Then run `python3 -m
+coach meals build --input .coach/drafts/meal-plan-<id>.json --dry-run`:
+it writes nothing and returns the plan (`data.plan`) and its rendered
+page (`data.rendered`). Fix the draft and re-run until no `block` flag
+remains. Read [draft.md](draft.md) for each draft field, how to pick,
+and what to do with each flag.
 
-- **`span`**: the window, `{"start", "end"}`; default the week the
-  template showed.
-- **`exceptions`**: one per change the athlete named. A slot change is
-  `{"date", "slot", "entry", "note"}` and replaces everything the
-  template puts in that slot that day, anchors included; an office-day
-  change is `{"date", "office": true|false}`. An entry is
-  `{"recipe", "variations", "covered_by", "lock"}`, or
-  `{"cover", "kcal", "protein_g"}` for a meal someone else decides (your
-  estimate, stated in the presentation), or `{"skip": true}`.
-- **`assignments`**: a pick for every open slot and every pool slot,
-  from active cards. An assignment adds to its slot, so a protein
-  top-up on a low-protein covered night is an assignment beside the
-  cover. Use `lock` with a reason for a day-locked entry (a post-run
-  lunch that must be quick). A meal-kit box meal is a recipe with
-  `covered_by` set to the provider: counted, not shopped. A box meal
-  with no card is a cover entry with the box's numbers.
-- **`use_up`**: each item the athlete named, `{"item", "qty", "unit"}`
-  with the item spelt as the cards spell it. Plan those items into
-  meals early in the window.
-- **`notes`**: batch-cook days, timing cues.
-
-How to pick: protein first (the anchors cover part of the floor; spread
-the rest over the day's meals), then calories toward the target, then
-variety and what the athlete likes to eat. A card with `servings` above
-1 fills that many slots from one batch; schedule the cook day in
-`notes`. Variations stack only when they change different ingredients.
-
-## 4. Dry run and fix the flags
-
-Run `python3 -m coach meals build --input .coach/drafts/meal-plan-<id>.json
---dry-run`. It writes nothing and returns the plan (`data.plan`) and its
-rendered page (`data.rendered`). Fix the draft and re-run until no
-`block` flag remains:
-
-| Flag | Severity | What to do |
-| --- | --- | --- |
-| `recipe_unknown`, `variation_unknown` | block | Correct the slug or variation name, or pick another card. |
-| `variation_conflict` | block | Keep one of the two variations. |
-| `slot_open` | warn | Add an assignment; leave it open only on purpose (say so). |
-| `protein_below_floor` | warn | Add a top-up or swap a meal; present any that remain. |
-| `kcal_off_target` | warn | Adjust portions or picks; present any that remain, with the reason. |
-| `recipe_benched` | warn | Pick an active card, unless the athlete asked for it. |
-| `use_up_unmatched`, `units_mixed` | warn | Match the item's spelling and unit to the card's. |
-| `no_target` | warn | Say the days are checked against protein only; `/goals` or the next reading fixes it. |
-
-## 5. Present
+## 4. Present
 
 Show, in one message:
 
@@ -149,7 +104,7 @@ Show, in one message:
 Presenting and writing never happen in the same turn. A tweak in the
 reply means a revised draft, a new dry run and a new presentation.
 
-## 6. On "go"
+## 5. On "go"
 
 1. `python3 -m coach meals build --input .coach/drafts/meal-plan-<id>.json`
 2. `python3 -m coach meals approve <id>`

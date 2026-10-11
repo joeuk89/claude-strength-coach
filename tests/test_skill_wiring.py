@@ -7,11 +7,10 @@ from pathlib import Path
 
 from coach.commands import discover
 from tests.support import REPO_ROOT, run_module
-
-SKILLS = REPO_ROOT / ".claude" / "skills"
-WIRED = ("check-in", "hevy-sync", "new-program", "one-off-week", "program-week", "setup")
+from tests.support.skills import all_skills, flat, skill_text
+WIRED = ("check-in", "hevy-sync", "new-program", "program-week", "setup")
 PROGRAM_CHANGERS = ("check-in", "hevy-sync", "new-program", "program-week")
-PROGRAMMING_PASSES = ("one-off-week", "program-week")
+PROGRAMMING_PASSES = ("program-week",)
 APPROVAL_SENTENCE = 'Reply "go" to train this'
 WAIT = "stop and wait for the athlete's reply"
 PASS_ORDER = ("overlay build", "overlay validate", "overlay render", "routines diff", APPROVAL_SENTENCE,
@@ -19,18 +18,6 @@ PASS_ORDER = ("overlay build", "overlay validate", "overlay render", "routines d
 
 FULL_COMMAND = re.compile(r"python3\s+-m\s+coach\s+(?:--root\s+\S+\s+)?([a-z][a-z0-9-]*)(?:\s+([a-z][a-z0-9-]*))?")
 CODE_SPAN = re.compile(r"`([^`\n]+)`")
-
-
-def skill_text(name):
-    return (SKILLS / name / "SKILL.md").read_text(encoding="utf-8")
-
-
-def all_skills():
-    return {path.parent.name: path.read_text(encoding="utf-8") for path in sorted(SKILLS.glob("*/SKILL.md"))}
-
-
-def flat(text):
-    return " ".join(text.split())
 
 
 class NoHandBuiltHevyCallsTest(unittest.TestCase):
@@ -135,7 +122,7 @@ class ProgramChangesGoThroughTheDataTest(unittest.TestCase):
 class ProgramWeekSkillTest(unittest.TestCase):
     def test_program_week_close_out_renders_then_publishes_after_a_verified_push(self):
         text = skill_text("program-week")
-        start = text.index("## 7. Close out")
+        start = text.index("## Close out")
         close_out, rest = " ".join(text[start:].split()), text[:start]
         verify = close_out.index("routines verify")
         render = close_out.index("python3 -m coach pages render")

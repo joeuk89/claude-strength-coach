@@ -17,6 +17,7 @@ import coach.commands
 from coach import checkin, flags, validity
 from tests.support import INSTANCES, REPO_ROOT
 from tests.support.history import R_A, R_B, W, HistoryCase, read_json, write_json
+from tests.support.skills import skill_text, step_text
 
 CHECKIN = INSTANCES / "checkin"
 TAGS = "time / sleep / ill / family / skipped / other"
@@ -616,20 +617,16 @@ class RegistrationTest(unittest.TestCase):
 
 class CheckInSkillTest(unittest.TestCase):
     def setUp(self):
-        self.text = " ".join((REPO_ROOT / ".claude" / "skills" / "check-in" / "SKILL.md").read_text(
-            encoding="utf-8").split())
-
-    def section(self, start, end):
-        return self.text[self.text.index(start):self.text.index(end)]
+        self.text = " ".join(skill_text("check-in").split())
 
     def test_sunday_message_comes_from_prepare(self):
-        step = self.section("## 3. Send the Sunday message", "## 4.")
+        step = " ".join(step_text("check-in", "sunday-message.md").split())
         self.assertIn("python3 -m coach checkin prepare", step)
         self.assertIn("data.text", step)
         self.assertIn("python3 -m coach history annotate --input", step)
 
     def test_record_comes_from_the_skeleton(self):
-        step = self.section("## 6. Write the record", "## 7.")
+        step = " ".join(step_text("check-in", "record.md").split())
         self.assertIn("python3 -m coach checkin skeleton", step)
 
     def test_deep_tier_reads_misses(self):

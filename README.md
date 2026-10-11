@@ -75,10 +75,10 @@ in plain words. The commands are for the bigger moves.
 - **`/program-week`** — the weekly programming pass `/check-in` runs for
   you: this week's loads, rep targets, RPE, and notes set per exercise in
   Hevy (or recorded in the check-in without it). Run it directly to
-  reprogram mid-week ("I missed Tuesday", "today felt easy").
-- **`/one-off-week`** — a week that breaks the pattern: a deload, or a
-  disrupted one (travel, illness, limited kit). Concrete sessions for the
-  blip; your program stays untouched.
+  reprogram mid-week ("I missed Tuesday", "today felt easy"), or for a
+  week that breaks the pattern: a deload, or a disrupted one (travel,
+  illness, limited kit). Concrete sessions for the blip; your program
+  stays untouched.
 - **`/hevy-sync`** — reconcile `routine/` with your Hevy app after editing
   routines in either place, one difference at a time. (Hevy users.)
 

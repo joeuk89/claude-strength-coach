@@ -2518,8 +2518,8 @@ id follows C10. `data.lines_digest` (R-21b) is the C7 canonical hash of
   overlay, decisions and pending scheme state.
 
 A hand edit of the draft is allowed; finalize catches unexplained
-changes. One-off weeks (travel, limited kit) stay coach-built through
-`overlay build` until R-26 merges the skills.
+changes. One-off weeks for travel or limited kit (`program-week`'s
+constrained mode) stay coach-built through `overlay build`.
 
 **Built with R-23a** (details the steps above leave open):
 
@@ -2528,7 +2528,7 @@ changes. One-off weeks (travel, limited kit) stay coach-built through
   active session exits 1.
 - `--kind deload` writes overlay kind `deload` whose sessions keep their
   program session ids, are `temporary: true` (so R-14b gives them
-  temporary routines, as `/one-off-week` expects) and are titled
+  temporary routines, as `program-week`'s light mode expects) and are titled
   `Deload — <session title>`. `--transform NAME` applies that transform
   to any kind; a deload with none uses the program's `deload_rule`.
 - The `--plan FILE` shape is `schedule plan`'s output:
@@ -6009,7 +6009,7 @@ athlete's instance, a real key, a live session or a purchase):
 | R-32a (#26) | R-10 | Research notes and commands (C28). Parallel with Phase 1. |
 | R-32b1 (#44), R-32b2 (#45), R-32b3 (#46) | R-32a; b2 also R-02, b3 also R-06 | Seed notes. Parallel with each other. |
 | R-32c (#47) | R-32b1, R-32b2, R-32b3, R-02, R-06 | Coaching principles rewritten against the notes. Before R-26. |
-| R-26 (#22) | R-26a, R-20, R-21a, R-21b, R-22, R-23a, R-24, R-25, R-32c; R-27 either order | needs-info. Skill merge and `CLAUDE.md` shrink; last in Phase 2. |
+| R-26 (#22) | R-26a, R-20, R-21a, R-21b, R-22, R-23a, R-24, R-25, R-32c; R-27 either order | Skill merge and `CLAUDE.md` shrink; last in Phase 2. `program-week` absorbs the one-off week as modes (normal, midweek, light, minimum, constrained, reshuffle); each skill is a `SKILL.md` of at most 120 body lines plus step files of at most 150. |
 | R-30a (#24) | R-17a, R-20, R-23a | Dose targets and structure accounting (C40, C41). |
 | R-30b (#48) | R-30a, R-22 | Priority lifts and the minimum week (C40). |
 | R-31 (#25) | R-17a, R-23a, R-27, R-30a | Block ledger and light weeks (C42, C43); state bump. Not parallel with R-30b. |

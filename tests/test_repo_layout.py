@@ -5,6 +5,7 @@ import subprocess
 import unittest
 
 from tests.support import REPO_ROOT
+from tests.support.skills import skill_text
 
 # Paths the template never tracks, so /framework-sync can never write them.
 # An item that adds an instance namespace adds it here.
@@ -85,12 +86,12 @@ class TemplateGitTest(unittest.TestCase):
 
 class FrameworkSyncTest(unittest.TestCase):
     def test_skill_excludes_tests(self):
-        text = (REPO_ROOT / ".claude" / "skills" / "framework-sync" / "SKILL.md").read_text(encoding="utf-8")
+        text = skill_text("framework-sync")
         self.assertIn("`tests/**`", text)
         self.assertIn("`docs/**`", text)
 
     def test_skill_excludes_the_readme(self):
-        text = (REPO_ROOT / ".claude" / "skills" / "framework-sync" / "SKILL.md").read_text(encoding="utf-8")
+        text = skill_text("framework-sync")
         framework_set = text[text.index("**The framework set:**"):text.index("**The marker:**")]
         self.assertIn("`README.md`", framework_set)
 

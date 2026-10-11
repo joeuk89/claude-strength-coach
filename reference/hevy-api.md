@@ -114,7 +114,7 @@ Cues: narrow grip · elbows tucked · feet planted
 ```
 
 - **Week line** — on the **first exercise of every routine a
-  programming pass writes** (`/program-week`, `/one-off-week`), and only
+  programming pass writes** (`/program-week`, in any mode), and only
   there: `Wk of <span start as D Mon>: <week focus>`, about 80
   characters at most. The focus is the coach's brief's week focus,
   shortened. Hevy drops routine-level notes on PUT, so this is the only

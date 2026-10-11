@@ -12,6 +12,7 @@ from coach import flags, overlay, research, units, validity
 from tests.support import INSTANCES, REPO_ROOT, VALID, run_cli
 from tests.support.history import (R_A, W, HistoryCase, hevy_exercise, hevy_set, hevy_workout, read_json,
                                    write_json)
+from tests.support.skills import skill_text, step_text
 
 OVERLAY = "data/overlays/2026-10-12-weekly.json"
 NOW = {"COACH_NOW": "2026-10-11T18:00:00Z"}
@@ -642,9 +643,8 @@ class MigrationTest(unittest.TestCase):
 
 class ProgramWeekSkillTest(unittest.TestCase):
     def test_names_prescription_check_in_the_build_step_before_the_brief(self):
-        text = " ".join((REPO_ROOT / ".claude" / "skills" / "program-week" / "SKILL.md").read_text(
-            encoding="utf-8").split())
-        build = text[text.index("## 3. Build the overlay"):text.index("## 4. Present the coach's brief")]
+        text = " ".join(skill_text("program-week").split())
+        build = " ".join(step_text("program-week", "build.md").split())
         self.assertIn("python3 -m coach prescription check --overlay <id> --write", build)
         self.assertEqual(text.count("prescription check"), build.count("prescription check"))
         for code in R24_CODES:
