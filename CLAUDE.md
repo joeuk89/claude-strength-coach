@@ -141,8 +141,8 @@ anything. Rules that always apply:
   changed or not**, so no routine keeps an old week's notes. The first
   exercise of each routine written carries a dated week line —
   `Wk of 12 Oct: <week focus>` — so the athlete can tell this week's
-  note from an old one. Routines the last pass didn't write show as
-  STALE in the next coach's brief.
+  note from an old one. A routine the newest pass for its session
+  didn't write shows as STALE in the next coach's brief.
 - **No Hevy?** The athlete describes their training at check-ins instead,
   and `/hevy-sync` doesn't apply.
 

@@ -152,11 +152,13 @@ athlete trains the temp sessions from it.
   **Written to Hevy:** 2026-10-19T18:05:00Z · Deload Mon — Lower, Deload Wed — Upper
   ```
 
-  The last line records when this pass wrote to Hevy (ISO 8601 UTC) and
-  which routines it wrote; leave it out when nothing went to Hevy.
+  The `**Written to Hevy:**` line goes directly after the prescriptions
+  and records when this pass wrote to Hevy (ISO 8601 UTC) and which
+  routines it wrote; leave it out when nothing went to Hevy.
 
   If `/check-in` invoked this skill, put the same content in the new
-  check-in's "The week ahead" section instead of an addendum.
+  check-in's "The week ahead" section instead of an addendum; check-in's
+  week-focus line follows it and ends the section.
 - Update the one-off pointer in `routine/program.md`'s header — same
   style as any one-off note: what's different, where the full shape
   lives, when normal layout resumes. The next `/check-in` judges the

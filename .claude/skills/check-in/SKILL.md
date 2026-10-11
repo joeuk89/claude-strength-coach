@@ -47,11 +47,15 @@ them in the analysis and let them shape the decisions. `GET
 /v1/body_measurements` is a fallback weight source only.
 
 **STALE check (Hevy).** GET the mapped routines for the coming week's
-sessions. **The last pass** is the newest `**Written to Hevy:**` line
-in `check-ins/` that names any of them. Each routine whose `updated_at`
-is before it was not written by that pass, so it still holds older
-notes: list it as **STALE** with its last-written date (its
-`updated_at`). On a normal week the list appears in program-week's
+sessions and judge each against its own baseline: the newest overlay
+in `check-ins/` with a table for its session. A routine is **STALE**
+when that overlay's `**Written to Hevy:**` line doesn't name it, or
+names it with a timestamp after the routine's `updated_at`: that pass
+didn't write it, so it still holds older notes. A mid-week reprogram's
+line names only the days it rewrote, so it never makes the other
+routines STALE. List each STALE routine with its last-written date
+(its `updated_at`). No `**Written to Hevy:**` line in `check-ins/` yet
+→ skip the check. On a normal week the list appears in program-week's
 coach's brief, which reuses these routines for its in-app edit check;
 the pass rewrites every routine in the span either way. Skip the check
 when the coming week is a deload or other one-off week —
@@ -176,8 +180,8 @@ What changed and why (or "stay the course"). Anything deferred.
 | Mon | ... |
 One-off changes called out. On normal weeks `/program-week` expands
 this section with the per-exercise prescription tables — the overlay —
-and its `**Written to Hevy:**` line. End with one line: the focus of
-the week.
+followed directly by its `**Written to Hevy:**` line. The section
+always ends with one line: the focus of the week.
 ```
 
 Deep records use the same skeleton titled `(deep)`, with **Training**

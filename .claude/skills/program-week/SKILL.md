@@ -49,18 +49,22 @@ then reprogram only the remaining days.
 
 **Hevy freshness (Hevy users).** When `/check-in` invoked this skill,
 reuse the routines its data pull fetched; otherwise GET every mapped
-routine in the span. **The last pass** is the newest `**Written to
-Hevy:**` line in `check-ins/` that names any of them (none yet → skip
-both checks).
+routine in the span. Judge each routine against its own baseline,
+never one shared "last pass": a mid-week reprogram writes only the
+remaining days, so its line names only those routines. No `**Written
+to Hevy:**` line anywhere in `check-ins/` yet → skip both checks.
 
-- **STALE** — a routine whose `updated_at` is before the last pass was
-  not written by it, so the athlete would train from old notes. List
-  each in the coach's brief as STALE with its last-written date (its
-  `updated_at`).
-- **Edited in the app** — compare each routine structurally with what
-  the last pass wrote (its session in `routine/` with that pass's
-  overlay applied): exercises, their order, set counts, rep ranges,
-  rest. Any difference is an in-app edit made since the last pass.
+- **STALE** — find the newest overlay in `check-ins/` with a table for
+  the routine's session. The routine is STALE when that overlay's
+  `**Written to Hevy:**` line doesn't name it, or names it with a
+  timestamp after the routine's `updated_at`: that pass didn't write
+  it, so the athlete would train from old notes. List each in the
+  coach's brief as STALE with its last-written date (its `updated_at`).
+- **Edited in the app** — find the newest record whose `**Written to
+  Hevy:**` line names the routine, and compare the routine structurally
+  with what that pass wrote (its session in `routine/` with that
+  record's overlay applied): exercises, their order, set counts, rep
+  ranges, rest. Any difference is an in-app edit made since that pass.
   **Load-only edits are overwritten without comment** — the log already
   holds what was lifted, and this week's loads come from the log.
   **Structural edits** go in the coach's brief as keep-or-replace
@@ -194,10 +198,12 @@ noting the program start date and structure, then "The week ahead"
 holding the overlay. The first `/check-in` judges adherence against
 it.
 
-Whichever record holds the overlay, end it with one line stating when
-this pass wrote to Hevy (the timestamp from step 4, ISO 8601 UTC) and
-which routines it wrote — the next pass's STALE check reads it. No
-Hevy writes → leave the line out.
+Whichever record holds the overlay, put one line directly after the
+overlay tables stating when this pass wrote to Hevy (the timestamp
+from step 4, ISO 8601 UTC) and which routines it wrote — the next
+pass's STALE and in-app edit checks read it. In a check-in's "The week
+ahead" section, the week-focus line follows it and ends the section.
+No Hevy writes → leave the line out.
 
 ```markdown
 ## Week reprogrammed — YYYY-MM-DD
