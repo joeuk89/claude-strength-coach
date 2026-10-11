@@ -172,16 +172,28 @@ class ExampleTest(unittest.TestCase):
         config.parse_file(EXAMPLE)
 
     def test_example_has_every_key(self):
-        raw = tomllib.loads(EXAMPLE.read_text(encoding="utf-8"))
+        text = EXAMPLE.read_text(encoding="utf-8")
+        raw = tomllib.loads(text)
         tables = config.registered_tables()
         for name in ("athlete", "hevy", "equipment"):
+            body = re.search(rf"^\[{name}\]\n(.*?)(?=^#? ?\[|\Z)", text, re.M | re.S).group(1)
+            commented = set(re.findall(r"^# ([a-z_]+) = ", body, re.M))
             for key in tables[name].keys:
                 with self.subTest(table=name, key=key):
-                    self.assertIn(key, raw[name])
+                    self.assertTrue(key in raw[name] or key in commented, f"{key} missing from [{name}]")
         for key in ("experience", "available_days", "session_minutes"):
             self.assertIn(key, raw["athlete"])
         for key in ("available", "dumbbells"):
             self.assertIn(key, raw["equipment"])
+
+    def test_example_switched_to_lb_stops_on_kg_equipment_numbers(self):
+        text = EXAMPLE.read_text(encoding="utf-8").replace('units = "kg"', 'units = "lb"', 1)
+        exc = config_error(text)
+        messages = " ".join(d["message"] for d in exc.details)
+        for key in ("dumbbell_increment", "dumbbell_max", "barbell_increment", "bar_weight", "plates",
+                    "machine_increment", "cable_increment"):
+            with self.subTest(key=key):
+                self.assertIn(key, messages)
 
     def test_commented_location_example_validates(self):
         text = EXAMPLE.read_text(encoding="utf-8")

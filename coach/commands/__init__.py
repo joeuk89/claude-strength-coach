@@ -81,7 +81,6 @@ def command(name, *, help, args=(), writes=False, hevy_write=False, network=Fals
 
 
 def discover():
-    """Every command declared in this package, sorted by name."""
     found = {}
     for module_info in pkgutil.iter_modules(__path__):
         module = importlib.import_module(f"{__name__}.{module_info.name}")

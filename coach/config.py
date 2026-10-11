@@ -107,7 +107,6 @@ def _sectioned(value):
 
 
 def registered_tables():
-    """Every config table, by name, from the modules in coach/config_tables/."""
     from coach import config_tables
 
     found = {}
@@ -272,7 +271,6 @@ class _Validator:
 
 
 def parse(raw, path):
-    """Validate a parsed TOML document; return a Config or raise ConfigError."""
     path = Path(path)
     validator = _Validator(path)
     tables = registered_tables()
@@ -334,7 +332,6 @@ def parse_file(path):
 
 
 def load(root):
-    """Load and validate `<root>/config.toml`."""
     path = Path(root) / paths.CONFIG
     if not path.is_file():
         raise ConfigError(f"No config.toml in {root}: copy {paths.CONFIG_EXAMPLE} to {paths.CONFIG} and edit it.")

@@ -8,6 +8,7 @@ schema_version = 1
 
 [athlete]
 units = "kg"                  # "kg" | "lb": the units for every load. Required.
+                              # With "lb", set every [equipment] weight below in lb.
 bodyweight_units = "kg"       # "kg" | "lb"; default: the same as units
 week_starts = "monday"        # "monday" | "sunday"
 timezone = ""                 # IANA name such as "Europe/London"; "" = this computer's local time
@@ -20,19 +21,19 @@ enabled = true                # false if the athlete doesn't log in Hevy
 cache_max_age_hours = 24      # `coach check` warns when the Hevy cache is older than this
 
 # The main place the athlete trains. Every weight is in [athlete] units.
-# With units = "kg", any key left out takes the value shown here. With
-# units = "lb", the increments, dumbbell_max, bar_weight and plates have no
-# default and must be set.
+# The weights below are commented out. With units = "kg", each one left
+# commented takes the kg value shown. With units = "lb", they have no
+# default: uncomment and set every one in lb, or validation stops.
 [equipment]
 available = []                # equipment the athlete has; [] = assume every piece (not checked)
 dumbbells = []                # per-hand dumbbell weights available; [] = not checked
-dumbbell_increment = 2.0      # smallest per-hand dumbbell jump
-dumbbell_max = 40.0           # heaviest per-hand dumbbell; prescriptions are capped here
-barbell_increment = 2.5       # smallest jump in total bar load
-bar_weight = 20.0
-plates = [25, 20, 15, 10, 5, 2.5, 1.25]  # plate sizes you have in pairs, one per side; any number of each
-machine_increment = 5.0
-cable_increment = 2.5
+# dumbbell_increment = 2.0    # smallest per-hand dumbbell jump
+# dumbbell_max = 40.0         # heaviest per-hand dumbbell; prescriptions are capped here
+# barbell_increment = 2.5     # smallest jump in total bar load
+# bar_weight = 20.0
+# plates = [25, 20, 15, 10, 5, 2.5, 1.25]  # plate sizes you have in pairs, one per side; any number of each
+# machine_increment = 5.0
+# cable_increment = 2.5
 
 # Other places the athlete trains, one table each. The name uses lowercase
 # letters, digits and hyphens. Any [equipment] key may appear; at that place

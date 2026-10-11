@@ -40,8 +40,6 @@ def run_module(argv, cwd=REPO_ROOT, env=None):
 
 
 class TempInstance:
-    """A throwaway instance root holding a config.toml with the given text."""
-
     def __init__(self, config_text=None):
         self._tmp = tempfile.TemporaryDirectory()
         self.root = Path(self._tmp.name)

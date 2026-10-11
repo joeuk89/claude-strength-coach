@@ -22,7 +22,6 @@ def current_version(schema):
 
 
 def read_doc(path, schema_name):
-    """Read a JSON document, gate its schema_version, and validate it."""
     path = Path(path)
     schema = load_schema(schema_name)
     try:
