@@ -15,6 +15,7 @@ from coach import config, flags
 from coach.config_tables import coaching
 from tests.support import INSTANCES, MINIMAL_CONFIG, REPO_ROOT, run_cli
 from tests.support.history import read_json, write_json
+from tests.support.skills import skill_text
 from tests.test_block import BlockCase
 from tests.test_checkin import CheckinCase
 from tests.test_pages import PagesCase, section
@@ -32,7 +33,7 @@ def run_mode(root):
 
 
 def skill(name):
-    return " ".join((REPO_ROOT / ".claude" / "skills" / name / "SKILL.md").read_text(encoding="utf-8").split())
+    return " ".join(skill_text(name).split())
 
 
 class ConfigTest(unittest.TestCase):

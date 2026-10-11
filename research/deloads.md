@@ -216,8 +216,8 @@ than calendar weeks still gets one every six weeks.
   proposes a light week by claims 3 to 5, counting a session as trained
   by claim 11. The definitions live once in
   `CLAUDE.md` "Coaching principles" → Fatigue management.
-- `/one-off-week` builds a deload from the program's deload policy, or
-  from claim 9 when the program has none.
+- `/program-week`'s light mode builds a deload from the program's deload
+  policy, or from claim 9 when the program has none.
 - Claim 10 is the lighter option when the triggers are readiness and sleep
   rather than RPE drift or a niggle: the loads stay, so strength is kept,
   and the reduced sets and RPE ceiling let recovery catch up.

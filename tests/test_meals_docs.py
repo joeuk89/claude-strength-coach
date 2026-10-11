@@ -5,10 +5,11 @@ import re
 import unittest
 
 from tests.support import REPO_ROOT
+from tests.support.skills import skill_text
 
 
 class SkillWiringTest(unittest.TestCase):
-    TEXT = (REPO_ROOT / ".claude" / "skills" / "meal-plan" / "SKILL.md").read_text(encoding="utf-8")
+    TEXT = skill_text("meal-plan")
 
     def test_skill_uses_the_commands(self):
         for needle in ("meals template", "nutrition status", "meals build", "--dry-run", "meals approve",

@@ -1,0 +1,82 @@
+# Write, then close out
+
+**Only start this after the athlete has replied "go" (or a clear yes)
+to the brief.** If no brief with a write line has been presented and
+approved this session, go back to the brief. Write exactly what the
+write line named, nothing more.
+
+1. **Structural changes first** (normal and midweek only): edit
+   `data/program.json` as the write line named (an execution change like
+   grip width edits that exercise's `cues`), then run `python3 -m coach
+   program validate` and `python3 -m coach program render`. Re-check the
+   day before and after each edited session and the program's weekly
+   balance.
+2. `python3 -m coach overlay approve <id>` stamps the athlete's
+   approval. It exits 3 on an unresolved `block` flag: tell the athlete
+   why, settle it, and present the brief again.
+3. **An ended one-off week.** If `state show` has a `one_off` whose span
+   ended before today, run `python3 -m coach routines retire --overlay
+   <its overlay_id>`, which retitles its temporary routines `(unused)`
+   so step 4 can reuse them. Then set `one_off` to null in
+   `data/state.json` and run `python3 -m coach state show` to check it.
+4. **Hevy users.** If `routines diff` named sessions with no routine,
+   run `python3 -m coach routines create --overlay <id>` first. It gives
+   each program session a routine in the program folder, and each
+   temporary session one in the "One-off weeks" folder: it reuses a
+   spare temporary routine before it creates one, creates the folder
+   when there is none, and records every id in `data/state.json`. The
+   API has no delete, so reuse is the cleanup. Then run `python3 -m
+   coach routines push --overlay <id>`: the permission prompt shows what
+   it will write, which is what the athlete approved. It writes
+   **every** routine in the span that differs from the overlay, notes
+   included (the week line, Target, Focus and Cues all come from the
+   overlay), and logs a verification for each routine already right. A
+   push that **exits 3** was refused by a guard: report its reason to
+   the athlete and never retry it by hand. A routine edited in the app
+   since the diff is the usual one: run `python3 -m coach routines diff
+   --overlay <id> --refresh`, settle the edit with the athlete, and push
+   again. Exit 1 means a routine didn't read back as written; report
+   it. Only when a command keeps failing and the athlete agrees, use
+   `reference/hevy-api.md` → "Manual fallback".
+5. `python3 -m coach routines verify --overlay <id>`: the close-out
+   quotes its result for each routine.
+6. **A one-off week** (light, constrained or reshuffle mode): set
+   `one_off` in `data/state.json` to `{"overlay_id": "<id>", "span":
+   {"start": "<start>", "end": "<end>"}}`. The next `/check-in` judges
+   the span against this overlay, and the first pass after the span ends
+   retires its routines and clears `one_off` (step 3). A light week
+   leaves `block` alone: unless `state show` already has the light week
+   agreed (`/check-in` records it), record it with `python3 -m coach
+   block decide --outcome adopted` (add `--type` and `--reason` when
+   nobody proposed it). The check-in that closes the week (`block
+   close`) ends the block and starts the next at zero, by the rules in
+   `CLAUDE.md` "Coaching principles" → Fatigue management. Then run
+   `python3 -m coach state show`, which refuses an invalid state.
+
+**No Hevy:** skip `routines retire` in step 3 (an ended one-off week
+still gets `one_off` set to null) and steps 4 and 5, and run `python3 -m
+coach sheets render`.
+
+## Close out
+
+**Publish the week.** Hevy users: only once `routines verify` reports
+every routine verified; a routine left unverified means no publish, and
+the recap says why. No Hevy: once `sheets render` has written the
+sheets. Run `python3 -m coach pages render`, then `python3 -m coach
+pages publish --overlay <id>`: it commits exactly the brief
+(`this-week.md`), the dashboard (`README.md`), `progress.md`, the overlay
+and the newest check-in record, and pushes them so the athlete's phone
+shows the week. If `pages render` exits 3 because `README.md` is still
+the template's copy, ask once whether the dashboard may replace it, then
+run `python3 -m coach pages render --replace-readme`. A publish that
+exits 3 (overlay not approved, another file already staged) is reported,
+never worked around; exit 4 means the push failed and the commit is
+kept: tell the athlete to push by hand.
+
+Recap in plain words: what changed this week and why, what was written
+to Hevy (quote `routines verify`: each routine verified, or not and
+why, plus, on a hold-steady week, any routine that was STALE before
+it), and the one thing to focus on. A one-off week says when the normal
+program resumes; when recovery drove it, say the next check-in wants to
+hear how the week went. If a structural change landed, note it for the
+next check-in's Decisions section.

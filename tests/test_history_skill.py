@@ -3,23 +3,16 @@
 import re
 import unittest
 
-from tests.support import REPO_ROOT
-
-SKILL = REPO_ROOT / ".claude" / "skills" / "check-in" / "SKILL.md"
-
-
-def section(text, start, end):
-    return text[text.index(start):text.index(end)]
+from tests.support.skills import flat, skill_text, step_text
 
 
 class CheckInSkillTest(unittest.TestCase):
     def setUp(self):
-        self.text = SKILL.read_text(encoding="utf-8")
+        self.text = skill_text("check-in")
 
     def test_names_each_command_in_its_step(self):
-        flat = " ".join(self.text.split())
-        pull = section(flat, "## 2. Pull the data", "## 3.")
-        analyse = section(flat, "## 4. Analyze", "## 5.")
+        pull = flat(step_text("check-in", "pull.md"))
+        analyse = flat(step_text("check-in", "analyze.md"))
         self.assertIn("python3 -m coach history sync", pull)
         for command in ("stats e1rm", "stats adherence", "stats audit", "history annotate"):
             with self.subTest(command=command):

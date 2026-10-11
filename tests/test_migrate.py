@@ -11,6 +11,7 @@ from unittest import mock
 
 from coach import jsonio, migrate, overlay
 from tests.support import REPO_ROOT, VALID, run_cli
+from tests.support.skills import skill_text
 from tests.test_cli import EnvelopeMixin
 from tests.test_program import Instance
 
@@ -269,7 +270,7 @@ class MigrateCommandTest(EnvelopeMixin, unittest.TestCase):
 
 class FrameworkSyncSkillTest(unittest.TestCase):
     def test_skill_runs_the_migration_and_stages(self):
-        text = (REPO_ROOT / ".claude" / "skills" / "framework-sync" / "SKILL.md").read_text(encoding="utf-8")
+        text = skill_text("framework-sync")
         self.assertIn("python3 -m coach migrate run --dry-run", text)
         self.assertIn("python3 -m coach migrate run", text)
         self.assertIn("stages", text)

@@ -13,6 +13,7 @@ from coach.plugins.schemes import double_progression
 from coach.validate import validate as validate_schema
 from tests.support import INSTANCES, REPO_ROOT
 from tests.support.history import W, HistoryCase, read_json, write_json
+from tests.support.skills import flat, skill_files, step_text
 from tests.test_plugins import PLUGIN_TEST, fixed_load_plugin
 
 NOW = "2026-10-11T18:00:00Z"
@@ -708,24 +709,21 @@ class EvidenceTest(ProposeCase):
 
 
 class SkillWiringTest(unittest.TestCase):
-    def sections(self, skill):
-        text = (REPO_ROOT / ".claude" / "skills" / skill / "SKILL.md").read_text(encoding="utf-8")
-        parts = re.split(r"(?m)^(?=## )", text)
-        return {part.splitlines()[0]: " ".join(part.split()) for part in parts if part.startswith("## ")}
+    def compute_and_other_steps(self):
+        compute = flat(step_text("program-week", "compute.md"))
+        steps = [path for path in skill_files("program-week")[1:] if path.name != "compute.md"]
+        return compute, flat(" ".join(path.read_text(encoding="utf-8") for path in steps))
 
     def test_program_week_computes_with_propose(self):
-        sections = self.sections("program-week")
-        compute = sections["## 2. Compute the week — per session, per exercise"]
+        compute, others = self.compute_and_other_steps()
         for command in ("propose week", "propose override", "propose resolve", "propose finalize"):
             with self.subTest(command=command):
                 self.assertIn(f"python3 -m coach {command}", compute)
-        others = " ".join(text for title, text in sections.items() if not title.startswith("## 2."))
         self.assertNotIn("propose ", others)
 
-    def test_one_off_week_deloads_with_propose(self):
-        sections = self.sections("one-off-week")
-        self.assertIn("python3 -m coach propose week --kind deload", sections["## 2. Design the week"])
-        others = " ".join(text for title, text in sections.items() if not title.startswith("## 2."))
+    def test_program_week_light_mode_deloads_with_propose(self):
+        compute, others = self.compute_and_other_steps()
+        self.assertIn("python3 -m coach propose week --kind deload", compute)
         self.assertNotIn("propose ", others)
 
 

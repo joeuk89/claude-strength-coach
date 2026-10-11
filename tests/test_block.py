@@ -13,6 +13,7 @@ from coach import block, flags, jsonio, program, structure
 from coach.validate import validate
 from tests.support import INSTANCES, REPO_ROOT, VALID, run_cli
 from tests.support.history import read_json, write_json
+from tests.support.skills import skill_text
 
 BLOCK = INSTANCES / "block"
 NOW = "2026-10-11T18:00:00Z"
@@ -750,7 +751,7 @@ class RenderTest(BlockCase):
                 self.assertNotIn("pencil", path.read_text(encoding="utf-8").lower())
 
     def test_the_check_in_skill_names_the_block_commands(self):
-        text = " ".join((REPO_ROOT / ".claude" / "skills" / "check-in" / "SKILL.md").read_text(encoding="utf-8").split())
+        text = " ".join(skill_text("check-in").split())
         for command in ("block close", "block decide", "block status"):
             self.assertIn(f"python3 -m coach {command}", text)
 

@@ -7,6 +7,7 @@ import unittest
 
 from coach import checkin, research
 from tests.support import REPO_ROOT
+from tests.support.skills import skill_text, step_text
 
 DISCLAIMER = "This note does not replace assessment by a qualified professional."
 INLINE_CITATION_MARKERS = ("et al.", "doi.org/", "ncbi.nlm.nih.gov")
@@ -103,7 +104,7 @@ class HeuristicLabelsTest(unittest.TestCase):
         self.assertIn("42 days", claim.text)
         check_in = text_of_bullet(flat(_read("CLAUDE.md").splitlines()), "**`/check-in`**")
         self.assertIn("rn:deloads.12", check_in)
-        self.assertIn("rn:deloads.12", _read(".claude/skills/check-in/SKILL.md"))
+        self.assertIn("rn:deloads.12", skill_text("check-in"))
         self.assertEqual(checkin.DEEP_AFTER_DAYS, 42)
         self.assertIn("`DEEP_AFTER_DAYS` after the last one, a coaching heuristic (rn:deloads.12)",
                       flat(checkin.__doc__.splitlines()))
@@ -138,7 +139,7 @@ class HeuristicLabelsTest(unittest.TestCase):
                     self.assertEqual(self.claim(ref).basis, "heuristic")
 
     def test_standard_deload_cites_its_claim_as_a_heuristic(self):
-        text = flat(_read(".claude/skills/one-off-week/SKILL.md").splitlines())
+        text = flat(step_text("program-week", "compute.md").splitlines())
         sentence = next(s for s in text.split(". ") if "(rn:deloads.9)" in s)
         self.assertIn("RPE 6", sentence)
         self.assertIn("coaching heuristic", sentence)
@@ -185,12 +186,12 @@ class SkillsPointAtTheProcedureTest(unittest.TestCase):
     def test_goals_and_new_program_use_the_research_procedure(self):
         for skill in ("goals", "new-program"):
             with self.subTest(skill=skill):
-                text = flat(_read(f".claude/skills/{skill}/SKILL.md").splitlines())
+                text = flat(skill_text(skill).splitlines())
                 self.assertTrue('"Researching current best practice"' in text, skill)
                 self.assertNotIn("cite sources", text)
 
     def test_deep_check_in_lists_expired_areas(self):
-        text = flat(_read(".claude/skills/check-in/SKILL.md").splitlines())
+        text = flat(skill_text("check-in").splitlines())
         deep_tier = text.split("**Deep tier** — all of the above, plus:", 1)[1].split("**Both tiers", 1)[0]
         self.assertIn("python3 -m coach research status", deep_tier)
         self.assertIn("expired", deep_tier)

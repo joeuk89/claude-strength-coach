@@ -15,20 +15,15 @@ change is `migrate run`, which upgrades schema versions in step 6.
 `docs/**` (the template's own development history), `tests/**` (the
 template's own test suite and fixtures), `README.md` (the template's
 front page; here `README.md` is the dashboard `pages render` writes) and
-`.gitkeep` placeholders. There is no separate manifest — the template repo is the
-manifest. Personal files (`profile.md`, `routine/`, `check-ins/`,
-`nutrition/`, athlete-specific docs in `reference/`, `.env`) are not
-tracked in the template, so the sync cannot touch them.
+`.gitkeep` placeholders. The template repo is the manifest. Personal
+files (`profile.md`, `routine/`, `check-ins/`, `nutrition/`,
+athlete-specific docs in `reference/`, `.env`) are not tracked in the
+template, so the sync cannot touch them.
 
 **The marker:** `.claude/framework-sync.json` records the template
-commit this workspace last synced to:
-
-```json
-{ "template_commit": "<full sha>", "synced_at": "YYYY-MM-DD" }
-```
-
-It is committed in this workspace. The template repo itself never
-contains one.
+commit this workspace last synced to, as
+`{ "template_commit": "<full sha>", "synced_at": "YYYY-MM-DD" }`. It is
+committed in this workspace; the template repo never contains one.
 
 ## 1. Preconditions
 
@@ -40,11 +35,7 @@ changes.
 ## 2. Fetch the template
 
 - Use the existing `template` remote if there is one; otherwise add it:
-
-  ```bash
-  git remote add template https://github.com/joeuk89/claude-strength-coach.git
-  ```
-
+  `git remote add template https://github.com/joeuk89/claude-strength-coach.git`.
 - `git fetch template`. If the fetch fails (offline, repo moved), say so
   plainly and stop — nothing has changed locally.
 
@@ -55,22 +46,25 @@ Read the marker. Confirm its sha is known to the fetched history
 
 **Marker valid:** `git diff --name-status <marker sha> template/main`,
 filtered to the framework set. `A`/`M` entries (and rename targets) are
-copies; `D` entries (and rename sources) are deletions. Empty after
-filtering → tell the user they're already up to date and stop.
+copies; `D` entries (and rename sources) are deletions — a skill the
+template removed or merged goes this way. Empty after filtering → tell
+the user they're already up to date and stop.
 
 **No marker, or its sha is unknown to the fetched history:** full copy —
 every framework-set file in `template/main`
 (`git ls-tree -r --name-only template/main`, minus the exclusions) that
-differs from the working copy, plus any that don't exist locally. Note
-to the user that deletions can't be detected on this run.
+differs from the working copy, plus any that don't exist locally.
+Deleted files can't be detected on this run, with one exception: a
+folder in `.claude/skills/` that `template/main` lacks is a skill the
+template removed or merged, unless the user wrote it. List those and
+offer to `git rm` them with the batch in step 4.
 
 ## 4. Drift check — warn before overwriting
 
 Framework files are meant to be edited in the template, never locally —
-but it happens. Before writing anything, find local edits: for each file
-about to be overwritten or deleted, `git diff <marker sha> -- <path>` —
-non-empty output means the working copy drifted from what the last sync
-delivered.
+but it happens. Before writing anything, for each file about to be
+overwritten or deleted, run `git diff <marker sha> -- <path>`: non-empty
+output means the working copy drifted from what the last sync delivered.
 
 - Drifted files: list them, say plainly that their local edits will be
   **overwritten** (recoverable from git history), and get **one
@@ -112,13 +106,13 @@ files (`data/**/*.json`). Bring them up to it before committing:
     on a first run, `Baseline sync at <short sha>` instead.
 - Offer to push to `origin`; never push unasked.
 
-(If the user's own standing instructions require human review before
+If the user's own standing instructions require human review before
 commits, stage and show the diff instead of committing — user rules
-win over this skill.)
+win over this skill.
 
 ## 8. Close out
 
-- Summarize what came in, in plain words ("check-in skill updated, new
-  deload skill added") — not just filenames.
+- Summarize what came in, in plain words ("check-in skill updated, an
+  old skill removed") — not just filenames.
 - If this skill's own file was among the updates, say so: the new
   instructions take effect from the **next** run, not this one.

@@ -10,18 +10,14 @@ from pathlib import Path
 from coach.commands import discover
 from tests.support import FIXTURES, REPO_ROOT, run_cli, run_module
 from tests.support.config_edit import apply
+from tests.support.skills import skill_text, step_text
 
 EXAMPLE = REPO_ROOT / "config.example.toml"
 TRANSCRIPT = FIXTURES / "onboarding" / "starter-path.json"
-SKILLS = REPO_ROOT / ".claude" / "skills"
 
 
 def flat(text):
     return " ".join(text.split())
-
-
-def skill_text(name):
-    return (SKILLS / name / "SKILL.md").read_text(encoding="utf-8")
 
 
 def sections(text):
@@ -262,7 +258,9 @@ class SetupSkillTest(unittest.TestCase):
         self.assertEqual(re.findall(r"(?i)notion|pantry", self.text), [])
 
     def test_the_profile_skeleton_has_five_sections_and_no_nutrition(self):
-        body = section(self.text, "## 4.")
+        self.assertIn("reference/record-formats.md", flat(step_text("setup", "profile-facts.md")))
+        formats = (REPO_ROOT / "reference" / "record-formats.md").read_text(encoding="utf-8")
+        body = formats.split("## profile.md: the first version", 1)[1].split("## profile.md: Nutrition", 1)[0]
         skeleton = re.search(r"```markdown\n(.*?)```", body, re.S).group(1)
         headings = re.findall(r"(?m)^## (.*)$", skeleton)
         self.assertEqual(headings, ["Goal", "Training week", "Equipment", "Injuries / limitations",
@@ -272,7 +270,7 @@ class SetupSkillTest(unittest.TestCase):
 class NewProgramOfferTest(unittest.TestCase):
     def test_new_program_opens_with_the_three_paths_and_a_recommendation(self):
         text = flat(skill_text("new-program"))
-        offer = text[text.index("## 1. Offer the three paths"):text.index("## Path A")]
+        offer = text[text.index("## 1. Offer the three paths"):text.index("## 2.")]
         for needle in ("Path A", "Path B", "Path C", "one message", "recommend"):
             with self.subTest(needle=needle):
                 self.assertIn(needle, offer)
