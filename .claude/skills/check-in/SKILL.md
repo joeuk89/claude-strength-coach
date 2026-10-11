@@ -121,8 +121,11 @@ fields, always in this order:
 6. **Nutrition** — MacroFactor users: trend weight · expenditure ·
    targets (kcal / protein) · last 7 days' average (kcal / protein). A
    dashboard screenshot is accepted. Without MacroFactor: this week's
-   morning weigh-ins, and roughly how eating went. Nutrition setup still
-   TBD in `profile.md`: one morning scale weight.
+   morning weigh-ins, and roughly how eating went (with your average
+   daily protein if you track it). Then, for both: days
+   logged (of 7) · anchors most days (y/n). Leave out days logged for an
+   athlete who doesn't track food, and anchors when none are on file.
+   Nutrition setup still TBD in `profile.md`: one morning scale weight.
 7. **Meal plan** — what stuck, what got swapped?
 8. **Next week** — anything different: travel, schedule, kit, illness?
 
@@ -147,7 +150,8 @@ Check-in for <window> (<weekly|deep> — <reason>).
 4. Sleep. One line: average hours a night (from your watch or phone if it tracks sleep), and how it felt.
 5. Niggles. Anything new? Left knee (watching): quiet or still there?
 6. Nutrition. MacroFactor: trend weight · expenditure · targets (kcal/protein) · 7-day average (kcal/protein). A screenshot works.
-   No MacroFactor: this week's morning weigh-ins, and roughly how eating went.
+   No MacroFactor: this week's morning weigh-ins, and roughly how eating went (with your average daily protein if you track it).
+   Both: days logged (of 7) · anchors most days (y/n).
 7. Meal plan: what stuck, what got swapped?
 8. Next week. Anything different: travel, schedule, kit, illness?
 ```
@@ -278,22 +282,75 @@ Adherence thresholds are coaching heuristics, not research cut-offs:
 
 ## 5. Weight & nutrition check (every check-in)
 
+**The framework rule:** for an athlete using a nutrition app, this
+check-in gets **complete logging** into the app and reads the app's
+numbers out. It **never states its own calorie target or calorie band**
+and never runs a parallel calorie model. Fewer than 7 days logged → ask
+for every day to be logged, with an estimate of the day or the missed
+meal on a day they couldn't track and no half-logged days
+(MacroFactor's guidance, in `/goals`). Record the days logged either
+way.
+
 **If the athlete uses MacroFactor** (per `profile.md`): take the reply's
 Nutrition field — **trend weight**, **expenditure**, the **kcal/protein
-targets**, and the **last 7 days' average** (adherence to those
-targets). Then compare:
+targets**, the **last 7 days' average**, and **days logged**. Then
+compare:
 
 - Trend weight vs. the **target trend rate** in `profile.md` (Nutrition &
   goals). One odd week is noise; a **2–3-week trend** off target is a
   flag. MacroFactor auto-adjusts targets weekly — usually the right
-  response is "let it work and keep logging", not manual overrides.
+  response is "let it work and keep logging", not a manual override.
+- The app's protein target vs. the **protein floor** on file. They
+  should be the same number unless an active override covers protein;
+  if not, say so and have the athlete set the app to the floor.
 - If the **phase itself** looks wrong (trend says cut while the plan says
   bulk, a phase trigger arrived, or the goal has changed) — point the
   athlete at `/goals` rather than tweaking numbers here.
 
 **Without MacroFactor:** take the morning weigh-ins and the eating read
 from the Nutrition field; compare the weight trend across recent
-check-ins against the target trend rate in `profile.md`.
+check-ins against the target trend rate in `profile.md`. When a
+**2–3-week trend** misses the target rate, propose moving the calorie
+target on file by ~100–150 kcal/day in the direction the trend needs.
+With the athlete's yes, update it and its reason in Nutrition & goals.
+Never re-derive it from an equation; a fresh estimate comes only from
+`/goals` with a new phase.
+
+**Both — protein habit progression.** Read the weekly average protein
+against the **floor** in `profile.md`: the app's 7-day average, or,
+without MacroFactor, the average daily protein from the Nutrition field.
+No figure (the athlete doesn't track protein) → skip the progression
+this week.
+
+- Average at or over the floor at **two consecutive check-ins** since
+  the floor last changed → propose raising the floor by ~10–15 g,
+  **capped at the target**. With the athlete's yes, update the floor and
+  its date in `profile.md`; MacroFactor users set the app's protein to
+  the new floor the same day.
+- Under the floor → the floor stays. Missing it never lowers it; only
+  `/goals` lowers it.
+- **Anchors:** note the "anchors most days" answer. A "no" two weeks
+  running is a cue to revisit the anchors in `/goals`, not to lower the
+  floor.
+
+**Both — nutrition override.** If `profile.md` has an **Active
+override**, check its expiry date. On or after it, the override
+**expires**: clear the block, tell the athlete they're back on the app's
+numbers (or, without an app, the calorie target on file), and record it.
+Its exit condition firing earlier ends it the same way. Renewal is not
+done here: it needs `/goals` with a fresh reason. An active override at
+**renewal 2** (a second consecutive renewal) is **flagged** in the record
+at every check-in while it stands, as a sign the plan itself needs
+changing.
+
+**Sleep gate.** Once the athlete has a sleep source (a watch or phone
+that tracks sleep), take the trailing 14-day average: the tracker's own
+figure, or the mean of this and the last check-in's tracked Sleep
+fields. During a **deficit**, re-check the gate: under ~7 h fails it and
+sends the athlete to `/goals` to move to recomp at maintenance. A gate
+recorded as `pending measurement` gets its first measurement the same
+way: under ~7 h confirms recomp; at or over it, offer `/goals` to
+reconsider the deficit. Update the gate status in `profile.md`.
 
 If `profile.md` shows nutrition setup still TBD, just record the scale
 weight and prompt `/goals` to get set up.
@@ -326,6 +383,8 @@ Adherence, notable sets, anything off-plan worth naming.
 
 ## Weight & nutrition
 Weight (trend or scale) · targets · adherence. Trend vs. target rate — on track?
+Protein: <7-day avg> g vs floor <g> (<n> of 2 toward a raise | raised to <g> | under) · days logged <n>/7 · anchors most days: y/n
+Override: none | active, expires <date> | expired <date> | renewal flagged · Sleep gate: <status> (deficit only)
 
 ## Athlete's read
 Sleep, runs, niggles, next week — their words, summarized. A field the

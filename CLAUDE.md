@@ -97,7 +97,8 @@ anything. Rules that always apply:
   offers it for a new program's opening week; run it standalone to
   reprogram mid-week.
 - **`/goals`** — set or revise the training/physique goals, phase
-  (bulk/cut/maintain), and nutrition strategy.
+  (bulk/cut/maintain), and nutrition strategy: protein floor, target
+  and stretch, protein anchors, and any nutrition override.
 - **`/meal-plan`** — plan meals and snacks for a window (default: the week
   ahead) around whatever's already covered (meal kit, eating out), to the
   targets on file, and build the shopping list.
@@ -154,14 +155,26 @@ anything. Rules that always apply:
 
 - If the athlete uses **MacroFactor**, it is the nutrition engine: they log
   food and weight there; it estimates TDEE and auto-adjusts their daily
-  calorie/macro targets weekly. Never build a competing calorie calculator
-  here. It has **no API** — the athlete reads its numbers (trend weight,
-  TDEE, targets) off the dashboard at each check-in.
+  calorie/macro targets weekly. It has **no API** — the athlete reads its
+  numbers (trend weight, TDEE, targets) off the dashboard at each
+  check-in.
+- **The framework rule:** for an athlete using a nutrition app, this repo
+  gets **complete logging** into the app and reads the app's numbers
+  out. Complete logging means every day logged; on a day the athlete
+  couldn't track, they log an estimate of the day or the missed meal,
+  and never leave a day half-logged (MacroFactor's own guidance). The
+  repo **never states its own calorie target or calorie band** for an
+  app user and never runs a parallel calorie model. Any
+  departure from the app's numbers is a dated **nutrition override** in
+  `profile.md`, with an exit condition, that expires within 21 days.
 - This repo owns the **strategy**: phase (bulk/cut/maintain), goal weight,
-  target trend rate, protein floor — recorded in `profile.md` under
-  "Nutrition & goals" and revised via **`/goals`**.
-- **No MacroFactor?** Check-ins track scale weight against the goal, and
-  `/goals` states plain calorie/protein targets for manual tracking.
+  target trend rate, the protein floor, target and stretch, and the
+  standing protein anchors — recorded in `profile.md` under "Nutrition &
+  goals" and revised via **`/goals`**. Protein is coached through the
+  anchors and a floor that rises as the habit sticks, not a daily plan.
+- **No MacroFactor?** Check-ins track scale weight against the goal.
+  `/goals` gives one transparent starting calorie estimate per phase;
+  after that, calories move only from the weight trend.
 - **`/meal-plan`** turns the targets into actual meals and a shopping
   list — planning *to* the numbers, never recomputing them. The recipe
   bank (managed by `/recipes`) and the plans live in `nutrition/`.
@@ -245,9 +258,14 @@ anything. Rules that always apply:
   included), and push back when the athlete asks for one; exercise swaps
   within a session are fine.
   Both thresholds are coaching heuristics, not research cut-offs.
-- **Recovery** — sleep, protein (~1.6–2.2 g/kg bodyweight), calories, and
-  stress gate progress as much as the program; flag when they're the real
-  bottleneck.
+- **Recovery** — sleep, protein, calories, and stress gate progress as
+  much as the program; flag when they're the real bottleneck. Protein is
+  set per kg of a **reference mass** — bodyweight, goal weight when body
+  fat is high, or fat-free mass when a credible body-fat reading exists —
+  as a floor, a target (1.6 g/kg; ~2.0 of fat-free mass) and a stretch
+  (2.2 g/kg); the rules are in `/goals`. Sleep gates deficits: a trailing
+  14-day sleep average under ~7 h means recomp at maintenance instead of
+  a cut.
 - **Autoregulation** — bake RPE/RIR targets and sensible exercise swaps
   into the routine so the athlete can scale to daily readiness.
 - **Technique is non-negotiable** — never select or progress an exercise

@@ -84,9 +84,13 @@ in plain words. The commands are for the bigger moves.
 
 ### Goals & nutrition strategy
 - **`/goals`** — set or revise the big picture: bulk / cut / maintain,
-  target weight, trend rate, protein. Run it when goals change or a phase
-  decision is due ("should I bulk or cut?"). Ends with a recorded plan —
-  and exact MacroFactor setup, if you use it.
+  target weight, trend rate, and protein as a floor, target and stretch
+  from the right reference mass, plus 2–3 standing protein anchors you
+  eat every day. A short-sleep check decides whether a cut goes ahead or
+  becomes a recomp. Run it when goals change, a phase decision is due
+  ("should I bulk or cut?"), or you want to eat to a number other than
+  your app's for a while (a dated override, 3 weeks at most). Ends with
+  a recorded plan — and exact MacroFactor setup, if you use it.
 
 ### Food & meals
 - **`/recipes`** — build and manage your recipe bank: add from a link or
