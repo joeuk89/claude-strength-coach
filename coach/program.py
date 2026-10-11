@@ -24,6 +24,8 @@ RENDER_COMMAND = "program render"
 PROGRAM_PAGE = paths.ROUTINE_PROGRAM_PAGE.as_posix()
 
 _SESSION_DEFAULTS = {"location": None}
+_FLOOR_DEFAULTS = {"sets": 2, "rpe": None}
+MINIMUM_WEEK_STATUS = "standby"
 _TIMED_MODES = ("duration", "distance")
 _WORKING_TYPES = ("normal", "dropset", "failure")
 _SET_LABELS = {"warmup": "warm-up", "dropset": "drop set", "failure": "to failure"}
@@ -50,9 +52,20 @@ def read_json(path):
 
 
 def normalised(doc):
-    """A copy of a schema-valid program with absent optional keys filled (session `location` null, `dose_targets` {})."""
+    """A copy of a schema-valid program with absent optional keys filled.
+
+    Session `location` null, `dose_targets` {}, `priority` [] with each KPI's
+    `target` and `by` null and each floor 2 sets at the prescribed RPE, and
+    `minimum_week` null.
+    """
     doc = copy.deepcopy(doc)
     doc.setdefault("dose_targets", {})
+    doc.setdefault("priority", [])
+    doc.setdefault("minimum_week", None)
+    for lift in doc["priority"]:
+        lift["kpi"].setdefault("target", None)
+        lift["kpi"].setdefault("by", None)
+        lift["floor"] = dict(_FLOOR_DEFAULTS, **lift.get("floor", {}))
     for session in doc["sessions"]:
         for key, default in _SESSION_DEFAULTS.items():
             session.setdefault(key, default)
@@ -180,6 +193,47 @@ def _structure(doc):
         if rule["session_id"] not in session_ids:
             errors.append(Error(f"{path}.session_id", f"no program session {rule['session_id']}"))
         errors += _rule_shape_errors(rule, path)
+    errors += _priority_errors(doc)
+    errors += _minimum_week_errors(doc)
+    return errors
+
+
+def _priority_errors(doc):
+    held = {line["exercise_id"] for session in doc["sessions"] for line in session["exercises"]}
+    laddered = {line["exercise_id"] for session in doc["sessions"] for line in session["exercises"]
+                if line["scheme"]["name"] == "assistance_ladder"}
+    errors, seen = [], set()
+    for index, lift in enumerate(doc["priority"]):
+        path = f"$.priority[{index}]"
+        exercise_id = lift["exercise_id"]
+        if exercise_id in seen:
+            errors.append(Error(f"{path}.exercise_id", f"{exercise_id} is a priority lift twice"))
+        seen.add(exercise_id)
+        if exercise_id not in held:
+            errors.append(Error(f"{path}.exercise_id",
+                                f"no session holds {exercise_id}, so it cannot be a priority lift"))
+        elif lift["kpi"]["kind"] == "rung" and exercise_id not in laddered:
+            errors.append(Error(f"{path}.kpi.kind", f"a rung KPI needs an assistance_ladder slot; no session ladders "
+                                                  f"{exercise_id}"))
+    return errors
+
+
+def _minimum_week_errors(doc):
+    minimum = doc["minimum_week"]
+    if minimum is None:
+        return []
+    status = {session["id"]: session["status"] for session in doc["sessions"]}
+    errors, seen = [], set()
+    for index, session_id in enumerate(minimum["sessions"]):
+        path = f"$.minimum_week.sessions[{index}]"
+        if session_id in seen:
+            errors.append(Error(path, f"{session_id} is listed twice"))
+        seen.add(session_id)
+        if session_id not in status:
+            errors.append(Error(path, f"no program session {session_id}"))
+        elif status[session_id] != MINIMUM_WEEK_STATUS:
+            errors.append(Error(path, f"{session_id} is {status[session_id]}; a minimum-week session is "
+                                      f"{MINIMUM_WEEK_STATUS}"))
     return errors
 
 
@@ -486,6 +540,7 @@ def render_program_page(doc, library=None, status_line=None):
     if status_line:
         lines += ["", f"Status: {status_line}"]
 
+    lines += _priority_lines(doc, library)
     lines += ["", "## If a day is missed", ""]
     if doc["missed_day_rules"]:
         from coach import missed
@@ -495,6 +550,34 @@ def render_program_page(doc, library=None, status_line=None):
     else:
         lines.append("No rules yet.")
     return "\n".join(lines) + "\n"
+
+
+_KPI_WORDS = {"e1rm": "e1RM", "top_load": "top load", "top_reps": "top reps", "rung": "ladder rung"}
+
+
+def _priority_lines(doc, library):
+    """The priority lifts and the minimum week, only when the program has them, so older pages stay as they were."""
+    lines = []
+    if doc["priority"]:
+        lines += ["", "## Priority lifts", ""]
+        for lift in doc["priority"]:
+            entry = library.get(lift["exercise_id"]) if library else None
+            name = entry["name"] if entry else lift["exercise_id"]
+            kpi = lift["kpi"]
+            words = f"KPI {_KPI_WORDS[kpi['kind']]}"
+            if kpi["target"] is not None:
+                words += f", target {_number(kpi['target'])}"
+                if kpi["by"]:
+                    words += f" by {kpi['by']}"
+            floor = lift["floor"]
+            rpe = f"RPE {_number(floor['rpe'])} at most" if floor["rpe"] is not None else "the prescribed RPE"
+            lines.append(f"- {name}: {words}; floor {floor['sets']} working sets at {rpe}")
+    minimum = doc["minimum_week"]
+    if minimum:
+        lines += ["", "## Minimum week", "",
+                  f"Sessions: {', '.join(f'`{session_id}`' for session_id in minimum['sessions'])}. "
+                  f"Schedule rule: {_named(minimum['schedule']['rule'], minimum['schedule']['params'])}."]
+    return lines
 
 
 def routine_pages(root):

@@ -381,13 +381,16 @@ def program_problems(doc, registry):
             if modes is not None and exercise["load_mode"] not in modes:
                 found.append((f"{path}.name", f"{scheme['name']} programs only {', '.join(modes)} lines; this slot "
                                               f"is {exercise['load_mode']}"))
-    schedule = doc["schedule"]
-    plugin = check("schedule", schedule["rule"], schedule["params"], "$.schedule")
-    if plugin is not None and not any(p.startswith("$.schedule.params") for p, _ in found):
-        hook = getattr(plugin.module, "problems", None)
-        if hook is not None:
-            merged, _ = merged_params(plugin, schedule["params"])
-            found.extend((f"$.schedule.params{path[1:]}", message) for path, message in hook(merged, doc))
+    schedules = [(doc["schedule"], "$.schedule")]
+    if doc.get("minimum_week"):
+        schedules.append((doc["minimum_week"]["schedule"], "$.minimum_week.schedule"))
+    for schedule, at in schedules:
+        plugin = check("schedule", schedule["rule"], schedule["params"], at)
+        if plugin is not None and not any(p.startswith(f"{at}.params") for p, _ in found):
+            hook = getattr(plugin.module, "problems", None)
+            if hook is not None:
+                merged, _ = merged_params(plugin, schedule["params"])
+                found.extend((f"{at}.params{path[1:]}", message) for path, message in hook(merged, doc))
     deload = doc["blocks"]["deload_rule"]
     check("transform", deload["name"], deload["params"], "$.blocks.deload_rule")
     seen = set()

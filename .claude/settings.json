@@ -79,6 +79,8 @@
       "Bash(python3 -m coach structure adherence:*)",
       "Bash(python3 -m coach structure balance:*)",
       "Bash(python3 -m coach structure decide:*)",
+      "Bash(python3 -m coach structure priority:*)",
+      "Bash(python3 -m coach structure minimum:*)",
       "Bash(python3 -m coach block status:*)",
       "Bash(python3 -m coach block close:*)",
       "Bash(python3 -m coach block decide:*)",

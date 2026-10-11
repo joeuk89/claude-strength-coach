@@ -5,7 +5,7 @@
   "required": ["kind", "span", "focus", "sessions"],
   "additionalProperties": false,
   "properties": {
-    "schema_version": {"const": 3},
+    "schema_version": {"const": 4},
     "id": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}-[a-z0-9-]+$"},
     "kind": {"enum": ["weekly", "midweek", "deload", "one_off"]},
     "created_at": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"},
@@ -88,7 +88,7 @@
       "required": ["rule_id", "from_session_id", "from_date", "scope"],
       "additionalProperties": false,
       "properties": {
-        "rule_id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+        "rule_id": {"type": "string", "pattern": "^([a-z0-9-]+|priority:[a-z0-9_]+(\\+[a-z0-9_]+)*)$"},
         "from_session_id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
         "from_date": {"$ref": "#/$defs/date"},
         "scope": {"const": "one_week"}

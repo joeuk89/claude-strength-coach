@@ -12,7 +12,8 @@ from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
 from coach import config as config_module
-from coach import dates, decisions, flags, history, overlay, plugins, program, state, stats, validity
+from coach import dates, decisions, flags, history, jsonio, overlay, paths, plugins, program, state, stats, validity
+from coach.config_tables.sessions import cap_minutes
 from coach.errors import ValidationError
 from coach.library import Library
 from coach.plugins import base
@@ -26,6 +27,11 @@ REACH_WEEKS = 12
 UNDERSHOOT_WEEKS = 3
 OVERRIDE_DAYS = 28
 LAYOFF_AFTER_DAYS = validity.RETURN_BANDS[0].upper
+FLOOR_PREFIX = "priority:"
+PRIORITY_DAYS = 28
+MINIMUM_MAX_SESSIONS = 2
+MINIMUM_SHARE = 1 / 3
+VARIANTS = ("minimum",)
 RULES = ("restructure", "add_session")
 OUTCOMES = ("adopted", "declined", "deferred")
 
@@ -162,14 +168,15 @@ class _Instance:
         return found is None or found["kind"] == "lifting"
 
 
-def _schedule(inst, program_doc, span, rotation=None):
-    """(date, session id) the program's schedule rule plans in a span: active sessions only."""
-    rule = program_doc["schedule"]["rule"]
+def _schedule(inst, program_doc, span, rotation=None, schedule=None, allowed=None):
+    """(date, session id) a schedule rule plans in a span: the program's rule over its active sessions by default."""
+    schedule = schedule or program_doc["schedule"]
+    rule = schedule["rule"]
     plugin = plugins.load(inst.root).get("schedule", rule)
     if plugin is None:
         raise ValidationError(f"The schedule rule {rule} is not a known schedule plugin; run python3 -m coach "
                               "program validate")
-    params, errors = plugins.merged_params(plugin, program_doc["schedule"]["params"])
+    params, errors = plugins.merged_params(plugin, schedule["params"])
     if errors:
         raise ValidationError(f"The {rule} schedule params are not valid; run python3 -m coach program validate")
     if rotation is None:
@@ -179,8 +186,9 @@ def _schedule(inst, program_doc, span, rotation=None):
         rotation=dict(rotation), sessions=tuple(program_doc["sessions"]),
         external_sessions=tuple(program_doc["external_sessions"]),
     )
-    active = {s["id"] for s in program_doc["sessions"] if s["status"] == "active"}
-    return sorted((day, sid) for day, sid in plugin.module.plan(ctx).sessions if span.contains(day) and sid in active)
+    if allowed is None:
+        allowed = {s["id"] for s in program_doc["sessions"] if s["status"] == "active"}
+    return sorted((day, sid) for day, sid in plugin.module.plan(ctx).sessions if span.contains(day) and sid in allowed)
 
 
 def _program_session(session, day):
@@ -191,7 +199,8 @@ def _program_session(session, day):
         for group in line["sets"]:
             single = {key: value for key, value in group.items() if key != "count"}
             sets += [dict(single, load=None) for _ in range(group["count"])]
-        exercises.append({"exercise_id": line["exercise_id"], "load_mode": line["load_mode"], "sets": sets})
+        exercises.append({"exercise_id": line["exercise_id"], "load_mode": line["load_mode"], "sets": sets,
+                          "rest_seconds": line["rest_seconds"]})
     return {"session_id": session["id"], "date": day.isoformat(), "title": session["title"], "hevy_routine_id": None,
             "temporary": False, "location": session.get("location"), "exercises": exercises}
 
@@ -522,14 +531,15 @@ def adherence(root, until=None, *, today=None, now=None):
     return _adherence(inst, _as_date(until) or inst.today)[0]
 
 
-def _cycle(inst, program_doc, reference):
-    """[(position, [(date, session id)])] for each position of the schedule rule, planned in the reference week."""
-    rule = program_doc["schedule"]["rule"]
+def _cycle(inst, program_doc, reference, schedule=None, allowed=None):
+    """[(position, [(date, session id)])] for each position of a schedule rule, planned in the reference week."""
+    schedule = schedule or program_doc["schedule"]
+    rule = schedule["rule"]
     plugin = plugins.load(inst.root).get("schedule", rule)
     if plugin is None:
         raise ValidationError(f"The schedule rule {rule} is not a known schedule plugin; run python3 -m coach "
                               "program validate")
-    params, _ = plugins.merged_params(plugin, program_doc["schedule"]["params"])
+    params, _ = plugins.merged_params(plugin, schedule["params"])
     positions = tuple(plugin.module.positions(params)) or (None,)
     found = []
     for position in positions:
@@ -537,7 +547,7 @@ def _cycle(inst, program_doc, reference):
         if position is not None:
             rotation = {"position": position, "confirmed": True, "confirmed_at": None,
                         "week": reference.start.isoformat()}
-        found.append((position, _schedule(inst, program_doc, reference, rotation)))
+        found.append((position, _schedule(inst, program_doc, reference, rotation, schedule, allowed)))
     return found
 
 
@@ -606,10 +616,19 @@ def _balance(inst, program_doc, candidate):
     return result
 
 
-def balance(root, program=None, *, today=None, now=None):
-    """Static weekly balance on core sessions plus coach-led estimates; with `program`, a candidate is checked too."""
+def balance(root, program=None, variant=None, *, today=None, now=None):
+    """Static weekly balance on core sessions plus coach-led estimates; with `program`, a candidate is checked too.
+
+    With `variant` "minimum", the program's minimum week is checked instead (C40); the report's `passed` says
+    whether it holds and `reasons` why not.
+    """
+    if variant is not None and variant not in VARIANTS:
+        raise ValidationError(f"variant must be one of {', '.join(VARIANTS)}")
     inst = _Instance.load(root, today, now)
-    return _balance(inst, program if program is not None else inst.program, program is not None)
+    doc = program if program is not None else inst.program
+    if variant == "minimum":
+        return _minimum_balance(inst, doc)
+    return _balance(inst, doc, program is not None)
 
 
 def decision_line(pct, weeks, rule, outcome, reason, revisit_on):
@@ -674,3 +693,317 @@ def decide(root, rule, outcome, reason=None, revisit_on=None, *, today=None, now
     line = decision_line(report["pct"], len(report["weeks"]), rule, outcome, reason, revisit_text)
     return {"decision": decision, "line": line,
             "adherence": {k: report[k] for k in ("pct", "planned", "trained", "weeks")}, "written": not dry_run}
+
+
+def floor_rule_id(exercise_ids):
+    return FLOOR_PREFIX + "+".join(exercise_ids)
+
+
+def _carried(doc, session_id, day, program_doc):
+    """Exercise ids a session planned on `day` carries: its lines in the overlay, else its program lines."""
+    if doc is not None:
+        found = next((s for s in doc["sessions"] if s["session_id"] == session_id and s["date"] == day.isoformat()),
+                     None)
+        if found is not None:
+            return {line["exercise_id"] for line in found["exercises"]}
+    session = next((s for s in program_doc["sessions"] if s["id"] == session_id), None)
+    return {line["exercise_id"] for line in session["exercises"]} if session else set()
+
+
+def priority_floor(root, missed_session_id, date, doc=None, program_doc=None):
+    """The synthetic C37 fold rule carrying each priority lift's floor dose out of a missed session, or None.
+
+    One rule covers every priority lift the session carried; `doc` is the overlay in force (looked up when not
+    given). Loads and reps come from that overlay's lines when `coach.missed.apply_rule` folds them.
+    """
+    root = Path(root)
+    day = _as_date(date)
+    program_doc = program.normalised(program_doc) if program_doc is not None else program.load(root)
+    if doc is None:
+        picked = overlay.in_force(root, day)
+        doc = picked[0] if picked else None
+    carried = _carried(doc, missed_session_id, day, program_doc)
+    lifts = [lift for lift in program_doc["priority"] if lift["exercise_id"] in carried]
+    if not lifts:
+        return None
+    return {"id": floor_rule_id([lift["exercise_id"] for lift in lifts]), "session_id": missed_session_id,
+            "text": None, "when": {},
+            "action": {"kind": "fold", "into": "next", "exercises": [
+                {"exercise_id": lift["exercise_id"], "sets": lift["floor"]["sets"], "rpe": lift["floor"]["rpe"]}
+                for lift in lifts]}}
+
+
+def _name(inst, exercise_id):
+    entry = inst.library.get(exercise_id)
+    return entry["name"] if entry else exercise_id
+
+
+def _usable_sets(exposure):
+    return [s for s in exposure["sets"] if not s.get("discounted") and not s.get("convention_unknown")]
+
+
+def _top_load(exposure):
+    loads = [history.coaching_number(s["load"]) for s in _usable_sets(exposure)]
+    loads = [load for load in loads if load is not None]
+    return max(loads) if loads else None
+
+
+def _top_reps(exposure):
+    reps = [s["reps"] for s in _usable_sets(exposure) if s.get("reps") is not None]
+    return max(reps) if reps else None
+
+
+def _kpi_series(inst, lift, since, until):
+    """[(date, value)] oldest first, and the KPI's value now as {value, date, ...} or None."""
+    exercise_id, kind = lift["exercise_id"], lift["kpi"]["kind"]
+    if kind == "e1rm":
+        found = stats.e1rm_series(inst.root, exercise_id, since=since, now=inst.now)
+        points = [p for p in found["series"].get(exercise_id, []) if p["date"] <= until.isoformat()]
+        best = max(points, key=lambda p: (p["e1rm"], p["date"])) if points else None
+        return [(p["date"], p["e1rm"]) for p in points], ({"value": best["e1rm"], "date": best["date"]}
+                                                          if best else None)
+    if kind in ("top_load", "top_reps"):
+        measure = _top_load if kind == "top_load" else _top_reps
+        exposures = sorted((e for e in history.all_exposures(inst.root, now=inst.now)
+                            if e["exercise_id"] == exercise_id and since.isoformat() <= e["date"] <= until.isoformat()
+                            and not e["excluded"] and not e["suspect"]),
+                           key=lambda e: (e["date"], e["workout_id"]))
+        series = [(e["date"], _round(v)) for e in exposures if (v := measure(e)) is not None]
+        return series, ({"value": series[-1][1], "date": series[-1][0]} if series else None)
+    return [], _rung_now(inst, exercise_id)
+
+
+def _rung_now(inst, exercise_id):
+    for session in inst.program["sessions"]:
+        line = next((e for e in session["exercises"] if e["exercise_id"] == exercise_id
+                     and e["scheme"]["name"] == "assistance_ladder"), None)
+        if line is None:
+            continue
+        entry = ((inst.state or {}).get("scheme_state") or {}).get(f"{session['id']}/{exercise_id}") or {}
+        data = entry.get("data") or {}
+        if "rung" not in data:
+            return None
+        rungs = line["scheme"]["params"].get("rungs", [])
+        name = rungs[data["rung"]]["name"] if data["rung"] < len(rungs) else None
+        return {"value": data["rung"], "name": name, "date": data.get("through"), "session_id": session["id"]}
+    return None
+
+
+def _kpi(inst, lift, since, until):
+    kpi = lift["kpi"]
+    series, now_value = _kpi_series(inst, lift, since, until)
+    trend = None
+    if len(series) > 1:
+        trend = {"from": {"date": series[0][0], "value": series[0][1]},
+                 "to": {"date": series[-1][0], "value": series[-1][1]},
+                 "delta": _round(series[-1][1] - series[0][1])}
+    met = None
+    if kpi["target"] is not None and now_value is not None:
+        modes = {line["load_mode"] for session in inst.program["sessions"] for line in session["exercises"]
+                 if line["exercise_id"] == lift["exercise_id"]}
+        lower_is_better = kpi["kind"] == "top_load" and "assisted" in modes
+        met = now_value["value"] <= kpi["target"] if lower_is_better else now_value["value"] >= kpi["target"]
+    return {"kind": kpi["kind"], "target": kpi["target"], "by": kpi["by"], "now": now_value, "trend": trend,
+            "met": met}
+
+
+def _weeks_between(inst, since, until):
+    span, last, found = inst.week(since), inst.week(until), []
+    while span.start <= last.start:
+        found.append(span)
+        span = inst.week(span.end + timedelta(days=1))
+    return found
+
+
+def _lifted(session, exercise_id):
+    return any(line["exercise_id"] == exercise_id and not line.get("fold") for line in session["exercises"])
+
+
+def _replacements(sessions_by_key, span, exercise_id, missed_key):
+    """Keys of sessions in the week that make up a missed exposure: a fold of the lift from it, or the moved session."""
+    day, session_id = missed_key
+    found = []
+    for (other_day, other_id), session in sessions_by_key.items():
+        if not span.contains(dates.parse_date(other_day)):
+            continue
+        folded = any(line["exercise_id"] == exercise_id and (line.get("fold") or {}).get("from_date") == day
+                     and line["fold"]["from_session_id"] == session_id for line in session["exercises"])
+        moved = other_id == session_id and session.get("moved_from") == day and _lifted(session, exercise_id)
+        if folded or moved:
+            found.append((other_day, other_id))
+    return found
+
+
+def _priority_weeks(inst, lifts, since, until):
+    """{exercise id: [week rows]} and the priority_exposures_missed flags over the weeks from `since` to `until`."""
+    spans = _weeks_between(inst, since, until)
+    pairs = [pair for span in spans for pair in _planned_pairs(inst, span)]
+    window = dates.Span(spans[0].start, spans[-1].end)
+    matched = stats.adherence_of(inst.root, pairs, window, today=inst.today, now=inst.now)
+    status = {(r["date"], r["session_id"]): r["status"] for r in matched["sessions"]}
+    sessions_by_key = {(s["date"], s["session_id"]): s for _, s in pairs}
+    trained_on = {}
+    for workout in inst.workouts():
+        if workout["conditioning"]:
+            continue
+        for exercise in workout["exercises"]:
+            if any(s["type"] in history.WORKING_SET_TYPES for s in exercise["sets"]):
+                trained_on.setdefault(exercise["exercise_id"], []).append(dates.parse_date(workout["date"]))
+    found, raised = {}, []
+    for lift in lifts:
+        exercise_id = lift["exercise_id"]
+        rows = []
+        for span in spans:
+            keys = sorted(key for key, session in sessions_by_key.items()
+                          if span.contains(dates.parse_date(key[0])) and inst.tier(key[1]) == "core"
+                          and not session.get("moved_from") and _lifted(session, exercise_id))
+            missed = [key for key in keys if status.get(key) == "missed" and key[0] < inst.today.isoformat()]
+            replaced = pending = 0
+            unreplaced = []
+            for key in missed:
+                made_up = [status.get(other) for other in _replacements(sessions_by_key, span, exercise_id, key)]
+                if "trained" in made_up:
+                    replaced += 1
+                elif "upcoming" in made_up:
+                    pending += 1
+                else:
+                    unreplaced.append(key)
+            rows.append({"week": span.start.isoformat(), "label": span.label(), "planned": len(keys),
+                         "trained": sum(1 for day in trained_on.get(exercise_id, []) if span.contains(day)),
+                         "missed": len(missed), "replaced": replaced, "pending": pending,
+                         "unreplaced": len(unreplaced)})
+            if unreplaced:
+                days = ", ".join(f"{session_id} on {day}" for day, session_id in unreplaced)
+                raised.append(flags.make(
+                    "priority_exposures_missed", session_id=unreplaced[0][1], exercise_id=exercise_id,
+                    message=f"{_name(inst, exercise_id)}: planned exposure missed in {span.label()} ({days}) and no "
+                            f"floor dose of {lift['floor']['sets']} sets replaced it"))
+        found[exercise_id] = rows
+    return found, raised
+
+
+def priority(root, since=None, *, today=None, now=None):
+    """Each priority lift's KPI now and its trend since `since`, its exposures per week against plan, and the flags.
+
+    `since` defaults to four weeks before today.
+    """
+    inst = _Instance.load(root, today, now)
+    since = _as_date(since) or inst.today - timedelta(days=PRIORITY_DAYS)
+    until = inst.today
+    if since > until:
+        raise ValidationError(f"--since {since} is after today ({until})")
+    lifts = inst.program["priority"]
+    weeks, raised = _priority_weeks(inst, lifts, since, until) if lifts else ({}, [])
+    rows = []
+    for lift in lifts:
+        exercise_id = lift["exercise_id"]
+        rows.append({"exercise_id": exercise_id, "name": _name(inst, exercise_id),
+                     "sessions": [s["id"] for s in inst.program["sessions"]
+                                  if any(e["exercise_id"] == exercise_id for e in s["exercises"])],
+                     "kpi": _kpi(inst, lift, since, until), "floor": lift["floor"], "weeks": weeks[exercise_id]})
+    return {"since": since.isoformat(), "until": until.isoformat(), "lifts": rows, "flags": raised}
+
+
+def _minimum_week(program_doc):
+    minimum = program_doc.get("minimum_week")
+    if not minimum:
+        raise ValidationError(f"The program has no minimum_week; add one to {paths.PROGRAM} and run python3 -m coach "
+                              "program validate")
+    return minimum
+
+
+def _hard_sets(line):
+    return sum(s.get("count", 1) for s in line["sets"] if _is_hard(s))
+
+
+def _minimum_position(inst, program_doc, position, planned, target):
+    """One position's sessions, dose against a third of each target, priority floors, and its reasons."""
+    prefix = f"{position}: " if position else ""
+    reasons = []
+    if len(planned) > MINIMUM_MAX_SESSIONS:
+        reasons.append(f"{prefix}the schedule plans {len(planned)} sessions in the week; a minimum week has at most "
+                       f"{MINIMUM_MAX_SESSIONS}")
+    rows, dose, carried = [], {}, {}
+    for day, session_id in planned:
+        session = inst.program_session(session_id, program_doc)
+        minutes = validity.estimate_minutes(inst.root, _program_session(session, day))
+        cap = cap_minutes(inst.config, session_id)
+        within = cap is None or minutes <= cap
+        rows.append({"date": day.isoformat(), "session_id": session_id, "minutes": minutes, "cap_minutes": cap,
+                     "within_cap": within})
+        if not within:
+            reasons.append(f"{prefix}{session_id}: estimated {minutes} min, over its {cap} min cap")
+        if session["kind"] == "lifting":
+            _add(dose, session_dose(inst.library, session))
+        for line in session["exercises"]:
+            sets = _hard_sets(line)
+            if sets > carried.get(line["exercise_id"], (0, None))[0]:
+                carried[line["exercise_id"]] = (sets, session_id)
+    floors = []
+    for lift in program_doc["priority"]:
+        sets, session_id = carried.get(lift["exercise_id"], (0, None))
+        needed = lift["floor"]["sets"]
+        floors.append({"exercise_id": lift["exercise_id"], "floor_sets": needed, "sets": sets,
+                       "session_id": session_id, "met": sets >= needed})
+        if sets < needed:
+            held = f" ({session_id} has {sets})" if sets else ""
+            reasons.append(f"{prefix}no session carries the priority floor of {needed} working sets of "
+                           f"{_name(inst, lift['exercise_id'])}{held}")
+    muscles = {}
+    for muscle in sorted(target):
+        third = target[muscle] * MINIMUM_SHARE
+        planned_sets = dose.get(muscle, 0.0)
+        met = planned_sets >= third - 1e-9
+        muscles[muscle] = {"target": target[muscle], "third": _round(third), "planned": _round(planned_sets),
+                           "met": met}
+        if not met:
+            reasons.append(f"{prefix}{muscle}: {_round(planned_sets)} fractional sets planned, below a third of its "
+                           f"target of {_round(target[muscle])} ({_round(third)})")
+    return {"position": position, "sessions": rows, "muscles": muscles, "priority": floors}, reasons
+
+
+def _minimum_balance(inst, program_doc):
+    minimum = _minimum_week(program_doc)
+    reference = inst.week(inst.today + timedelta(days=1))
+    target = targets(program_doc, inst.library)
+    reasons = []
+    if len(minimum["sessions"]) > MINIMUM_MAX_SESSIONS:
+        reasons.append(f"it lists {len(minimum['sessions'])} sessions; a minimum week has at most "
+                       f"{MINIMUM_MAX_SESSIONS}")
+    positions = []
+    for position, planned in _cycle(inst, program_doc, reference, minimum["schedule"], set(minimum["sessions"])):
+        row, found = _minimum_position(inst, program_doc, position, planned, target)
+        positions.append(row)
+        reasons += [reason for reason in found if reason not in reasons]
+    return {"variant": "minimum", "reference_week": reference.label(), "sessions": list(minimum["sessions"]),
+            "schedule": minimum["schedule"], "positions": positions, "targets": target, "passed": not reasons,
+            "reasons": reasons, "flags": []}
+
+
+def minimum_plan_path(week_start):
+    return paths.PLANS_DIR / f"{_as_date(week_start).isoformat()}-minimum.json"
+
+
+def minimum(root, week_start, *, write=False, dry_run=False, today=None, now=None):
+    """The minimum week's plan for one week: a C23 SchedulePlan for `propose week --plan`, written with `write`.
+
+    The report carries the minimum-week balance (`passed`, `reasons`) so a failing minimum week is visible before use.
+    """
+    inst = _Instance.load(root, today, now)
+    minimum_week = _minimum_week(inst.program)
+    span = inst.week(_as_date(week_start.start if isinstance(week_start, dates.Span) else week_start))
+    planned = _schedule(inst, inst.program, span, schedule=minimum_week["schedule"],
+                        allowed=set(minimum_week["sessions"]))
+    if not planned:
+        raise ValidationError(f"The minimum week's schedule plans no session in {span.label()}")
+    plan_doc = {"variant": "minimum", "rule": minimum_week["schedule"]["rule"], "week": span.label(),
+                "span": span.to_json(),
+                "sessions": [{"date": day.isoformat(), "session_id": session_id,
+                              "title": inst.program_session(session_id)["title"]} for day, session_id in planned],
+                "rotation": None, "flags": []}
+    path = minimum_plan_path(span.start)
+    if write:
+        jsonio.write_doc(inst.root / path, plan_doc, dry_run)
+    report = _minimum_balance(inst, inst.program)
+    return {"week": span.label(), "span": span.to_json(), "plan": plan_doc, "path": path.as_posix(),
+            "written": write and not dry_run, "balance": {"passed": report["passed"], "reasons": report["reasons"]}}

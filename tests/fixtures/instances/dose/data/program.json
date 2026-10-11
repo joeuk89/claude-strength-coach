@@ -1,5 +1,5 @@
 {
-  "schema_version": 5,
+  "schema_version": 6,
   "name": "Two-session fixture program",
   "sessions": [
     {
@@ -143,5 +143,7 @@
   "interference": [
     {"name": "same_day", "params": {"min_gap_hours": 6, "lift_first": true}},
     {"name": "quality_before_heavy_lower", "params": {"hours": 24, "heavy_rpe": 7, "heavy_max_reps": 6}}
-  ]
+  ],
+  "priority": [],
+  "minimum_week": null
 }

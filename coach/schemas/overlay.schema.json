@@ -4,7 +4,7 @@
   "required": ["schema_version", "id", "kind", "created_at", "span", "supersedes", "focus", "flags", "approval", "sessions"],
   "additionalProperties": false,
   "properties": {
-    "schema_version": {"const": 3},
+    "schema_version": {"const": 4},
     "id": {"$ref": "#/$defs/overlay_id"},
     "kind": {"enum": ["weekly", "midweek", "deload", "one_off"]},
     "created_at": {"$ref": "#/$defs/timestamp"},
@@ -100,7 +100,7 @@
       "required": ["rule_id", "from_session_id", "from_date", "scope"],
       "additionalProperties": false,
       "properties": {
-        "rule_id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+        "rule_id": {"type": "string", "pattern": "^([a-z0-9-]+|priority:[a-z0-9_]+(\\+[a-z0-9_]+)*)$"},
         "from_session_id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
         "from_date": {"$ref": "#/$defs/date"},
         "scope": {"const": "one_week"}
