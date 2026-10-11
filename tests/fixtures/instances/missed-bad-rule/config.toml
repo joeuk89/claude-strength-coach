@@ -1,0 +1,81 @@
+schema_version = 1
+
+[athlete]
+units = "kg"
+bodyweight_units = "kg"
+week_starts = "monday"
+timezone = "UTC"
+experience = "intermediate"
+available_days = []
+session_minutes = 60
+
+[hevy]
+enabled = true
+cache_max_age_hours = 24
+
+[equipment]
+available = []
+dumbbells = []
+dumbbell_increment = 2.0
+dumbbell_max = 40.0
+barbell_increment = 2.5
+bar_weight = 20.0
+plates = [25, 20, 15, 10, 5, 2.5, 1.25]
+machine_increment = 5.0
+cable_increment = 2.5
+
+[equipment.locations.home]
+available = ["dumbbell", "bench", "band", "bodyweight"]
+dumbbells = [5, 10, 15, 20]
+dumbbell_max = 20.0
+
+[caps]
+
+[activity]
+enabled = true
+
+[nutrition]
+enabled = true
+app = "macrofactor"
+phase = "recomp"
+target_rate_per_week = 0.0
+
+[nutrition.protein]
+reference_basis = "bodyweight"
+reference_mass = 80.0
+floor_g = 110
+target_g = 128
+stretch_g = 176
+floor_since = 2026-09-28
+floor_step_g = 10
+
+[[nutrition.anchors]]
+name = "Whey shake"
+slot = "snack"
+days = ["daily"]
+kcal = 150
+protein_g = 30
+
+[nutrition.template]
+slots = ["breakfast", "lunch", "dinner", "snack"]
+office_days = ["tue", "thu"]
+staples = ["eggs", "rolled oats", "olive oil"]
+kcal_tolerance_pct = 15
+shopping_issue = false
+
+[[nutrition.template.standing]]
+days = ["daily"]
+slot = "breakfast"
+recipe = "overnight-oats"
+
+[[nutrition.template.standing]]
+days = ["office"]
+slot = "lunch"
+pool = ["chicken-rice-bowl"]
+
+[[nutrition.template.standing]]
+days = ["mon", "tue", "wed", "thu"]
+slot = "dinner"
+cover = "family"
+kcal = 900
+protein_g = 40

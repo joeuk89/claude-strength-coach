@@ -214,7 +214,8 @@ class RenderTest(PagesCase):
                         for n in range(5)]
         self.write_overlay(doc)
         self.edit_json("data/program.json", lambda p: p.update(missed_day_rules=[
-            {"id": f"miss-{n}", "session_id": "session-a", "condition": f"miss {n}", "action": "move it"}
+            {"id": f"miss-{n}", "session_id": "session-a", "text": f"miss {n} → move it", "when": {},
+             "action": {"kind": "manual"}}
             for n in range(25)]))
         text = self.brief()
         self.assertLessEqual(len(text.splitlines()), 60, text)
@@ -231,7 +232,8 @@ class RenderTest(PagesCase):
                            for n in range(12)]
         self.write_overlay(doc)
         self.edit_json("data/program.json", lambda p: p.update(missed_day_rules=[
-            {"id": f"miss-{n}", "session_id": "session-a", "condition": f"miss {n}", "action": "move it"}
+            {"id": f"miss-{n}", "session_id": "session-a", "text": f"miss {n} → move it", "when": {},
+             "action": {"kind": "manual"}}
             for n in range(45)]))
         text = self.brief()
         self.assertLessEqual(len(text.splitlines()), 60, text)
@@ -264,9 +266,10 @@ class RenderTest(PagesCase):
         self.assertEqual([r["status"] for r in results], ["fail"])
         self.assertIn("61 lines", results[0]["message"])
 
-    def test_missed_day_rules_print_condition_and_action(self):
+    def test_missed_day_rules_print_their_own_text(self):
         self.edit_json("data/program.json", lambda p: p.update(missed_day_rules=[
-            {"id": "miss-a", "session_id": "session-a", "condition": "Session A missed", "action": "train it Tue"}]))
+            {"id": "miss-a", "session_id": "session-a", "text": "Session A missed → train it Tue", "when": {},
+             "action": {"kind": "manual"}}]))
         self.assertEqual(section(self.brief(), "If you miss a day"), ["- Session A missed → train it Tue"])
 
     def test_dry_run_writes_nothing_and_show_prints_the_page(self):
@@ -570,7 +573,14 @@ class PagePartsTest(PagesCase):
             watch = section(self.brief(), "Watch")
         self.assertEqual(watch, ["- urgent", "- a warn flag", "- default priority"])
 
-    def test_a_part_replaces_the_missed_day_text(self):
+    def test_the_missed_part_replaces_the_missed_day_text(self):
+        self.edit_json("data/program.json", lambda p: p.update(missed_day_rules=[
+            {"id": "miss-a", "session_id": "session-a", "text": None, "when": {}, "action": {"kind": "skip"}}]))
+        text = self.brief()
+        self.assertEqual(section(text, "If you miss a day"),
+                         ["- Miss Session A: skip it; the rest of the week stays as planned."])
+
+    def test_a_second_part_replacing_the_missed_day_text_is_an_error(self):
         self.part("missed", """
             from coach.page_parts import Item
             SLOTS = ("brief.if_you_miss",)
@@ -578,8 +588,8 @@ class PagePartsTest(PagesCase):
                 return {"brief.if_you_miss": [Item("Miss Session A: train it Saturday.")]}
         """)
         with self.paths():
-            text = self.brief()
-        self.assertEqual(section(text, "If you miss a day"), ["- Miss Session A: train it Saturday."])
+            envelope = self.render("--only", "brief", expect=1)
+        self.assertIn("both replace slot 'brief.if_you_miss'", envelope["error"]["message"])
 
     def test_append_slots_land_in_their_places(self):
         self.part("extras", """

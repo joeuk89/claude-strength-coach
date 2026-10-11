@@ -215,14 +215,18 @@ class Run:
         return max(points) if points else None
 
     def last_prescription(self, session_id, exercise_id):
-        """This slot's line in the newest approved overlay that has it, loads as coaching numbers."""
+        """This slot's line in the newest approved overlay that has it, loads as coaching numbers.
+
+        Lines a missed-day rule folded in (`fold`, C37) last one week, so they never stand for the slot.
+        """
         approved = sorted((doc for doc in self.overlays if overlay.is_approved(doc)),
                           key=lambda d: (d["created_at"], d["id"]), reverse=True)
         for doc in approved:
             sessions = sorted((s for s in doc["sessions"] if s["session_id"] == session_id),
                               key=lambda s: s["date"], reverse=True)
             for session in sessions:
-                line = next((e for e in session["exercises"] if e["exercise_id"] == exercise_id), None)
+                line = next((e for e in session["exercises"]
+                             if e["exercise_id"] == exercise_id and not e.get("fold")), None)
                 if line is not None:
                     return {"overlay_id": doc["id"], "session_id": session_id, "date": session["date"],
                             "exercise_id": exercise_id, "load_mode": line["load_mode"],
