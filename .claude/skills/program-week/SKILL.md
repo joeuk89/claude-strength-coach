@@ -31,8 +31,17 @@ current working weights (`GET /v1/workouts`, newest first — API in
 weights). Read each logged workout's `description` and per-exercise
 `notes` too — the athlete's own account of how the sets felt ("target
 too high, did back-off sets", "wiped out after yesterday's run") should
-temper the next week's loads as much as the numbers do. If the program
-rotates, confirm which week is next — never assume.
+temper the next week's loads as much as the numbers do.
+
+**Rotation position.** If the program rotates, infer which week is next
+and state it for confirmation — never ask it as its own question, and
+never assume it silently. Sources, in order: the coach-led session's log,
+the current-position line in `routine/program.md`, the newest check-in.
+When `/check-in` invoked this skill, its Sunday message already stated
+the position and the reply confirmed or corrected it — use that.
+Standalone, state it in the brief's week focus ("Week B, going by
+Tuesday's PT log — say if not"). If the sources disagree, state the
+first one and name the disagreement.
 
 **Brand-new program?** An empty `check-ins/` is normal — there's no
 overlay or decisions to read. With no logged workouts yet, working
@@ -59,7 +68,8 @@ to Hevy:**` line anywhere in `check-ins/` yet → skip both checks.
   `**Written to Hevy:**` line doesn't name it, or names it with a
   timestamp after the routine's `updated_at`: that pass didn't write
   it, so the athlete would train from old notes. List each in the
-  coach's brief as STALE with its last-written date (its `updated_at`).
+  coach's brief (on a hold-steady week, its close-out) as STALE with its
+  last-written date (its `updated_at`).
 - **Edited in the app** — find the newest record whose `**Written to
   Hevy:**` line names the routine, and compare the routine structurally
   with what that pass wrote (its session in `routine/` with that
@@ -142,6 +152,35 @@ first, tables second.
    or, with no structural change either,
    `Reply "go" to train this. Nothing goes to Hevy (no Hevy).`
 
+**Hold-steady week: the short brief.** Only a pass invoked by
+`/check-in` at the **weekly tier**, on a week that is **not a deload**,
+can hold steady — never a deep check-in, a deload week, or a standalone
+run. It is a
+hold-steady week when all five hold:
+
+1. no structural change (a structural in-app edit to settle counts as
+   one);
+2. no new or worsening niggle;
+3. no goals/phase flag from the check-in;
+4. nothing different next week (the Sunday message's Next week field);
+5. every prescription change is the progression scheme applied as
+   written.
+
+On a hold-steady week the check-in summary and the coach's brief
+collapse into one message, in this order:
+
+- **three sentences** — how the week went, leading with a win; what
+  changes, or "nothing changes", and why; the focus;
+- the offer: "say 'tables' to see the full week" — per-session tables
+  are offered, not shown, but still go into the recorded overlay and
+  the Hevy `Target:` lines;
+- the write line above, unchanged;
+- "Reply go, or tell me what to change."
+
+A STALE routine doesn't break hold-steady: the write line already
+rewrites it, so name it in the close-out instead. "tables" shows the
+tables and the write line again — it approves nothing.
+
 Then **stop and wait for the athlete's reply. Never present and write
 in the same turn** — the brief is a proposal, not a notification, and
 that holds even on a hold-steady week. **"go" (or a clear yes) approves
@@ -219,5 +258,6 @@ No Hevy writes → leave the line out.
 
 Recap in plain words: what changed this week and why, what was written
 to Hevy (and any routine the freshness check found not updated by this
-pass), and the one thing to focus on. If a structural change landed,
+pass, plus, on a hold-steady week, any routine that was STALE before
+it), and the one thing to focus on. If a structural change landed,
 note it for the next check-in's Decisions section.

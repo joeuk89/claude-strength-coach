@@ -1110,7 +1110,7 @@ local start date (`[athlete] timezone`):
 | `confirm` | closes a `convention_slip` candidate as genuine | coach, R-21a |
 | `miss` | a planned session not trained; `tag` in `time`, `sleep`, `ill`, `family`, `skipped`, `other` (R-01). No tag recorded means `untagged` | R-21a, R-21b, R-22 |
 | `external` | a coach-led session from `program.external_sessions` happened (`done` true) or not, with a one-line note of its content | R-21a; R-30a reads |
-| `trained_unlogged` | a planned session was trained but not logged (`date`, `session_id`, `note`). Adherence counts it `trained` with `unlogged: true`; its exercises are `unknown`; it adds no dose and no e1RM point | R-21a (from the Sunday message), coach |
+| `trained_unlogged` | a planned session was trained but not logged (`date`, `session_id`, `note`). Adherence counts it `trained` with `unlogged: true`; its exercises are `unknown`; it adds no dose and no e1RM point | R-21a (from the reply to the Sunday message), coach |
 
 - Ids are `a-NNNN`, never reused. Annotations are appended; a wrong one is
   withdrawn by a later annotation of the same kind with `"withdraws": "a-0003"`.
@@ -2403,7 +2403,7 @@ with no ask). Builtin fields:
 | `sleep` | R-01 wording |
 | `niggles` | asks for anything new |
 | `nutrition`, `meal_plan` | R-01 wording (R-06's two additions included) |
-| `next_week` | R-01 wording |
+| `next_week` | R-01 wording; states `state.rotation` for confirmation when there is no `coach_led` field |
 
 **Card parts** (`coach/checkin_parts/<topic>.py`), the way later items
 change the card without editing R-21a's modules:
@@ -2820,7 +2820,8 @@ uninstall and log steps for a human, and states what the run never does:
 write to Hevy, commit, push, or start Claude.
 
 The `check-in` skill reads the athlete's comment on an open `coach-nudge`
-issue as the Sunday message and closes the issue after the record (R-45).
+issue as the reply to the Sunday message and closes the issue after the
+record (R-45).
 
 ## C40. Dose targets, priority lifts and the minimum week (R-30a, R-30b; R-31, R-41b read)
 
