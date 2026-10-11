@@ -1,0 +1,40 @@
+{
+  "title": "One upsert line in the wellness file (contract C29, C30); a device record covers the day the athlete woke",
+  "type": "object",
+  "required": ["schema_version", "op", "id", "source", "recorded_at", "span", "content_hash"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": 1},
+    "op": {"const": "upsert"},
+    "id": {"type": "string", "pattern": "^[a-z_]+:[A-Za-z0-9._:-]+$"},
+    "source": {"type": "string", "pattern": "^[a-z_]+$"},
+    "recorded_at": {"$ref": "#/$defs/timestamp"},
+    "span": {
+      "type": "object",
+      "required": ["start", "end"],
+      "additionalProperties": false,
+      "properties": {"start": {"$ref": "#/$defs/date"}, "end": {"$ref": "#/$defs/date"}}
+    },
+    "sleep": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "asleep_hours": {"type": ["number", "null"], "minimum": 0, "maximum": 24},
+        "in_bed_hours": {"type": ["number", "null"], "minimum": 0, "maximum": 24},
+        "start": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"},
+        "end": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"}
+      }
+    },
+    "resting_hr_bpm": {"type": ["number", "null"], "minimum": 0},
+    "hrv_ms": {"type": ["number", "null"], "minimum": 0},
+    "steps": {"type": ["integer", "null"], "minimum": 0},
+    "body_mass_kg": {"type": ["number", "null"], "minimum": 0},
+    "body_fat_pct": {"type": ["number", "null"], "minimum": 0, "maximum": 100},
+    "device": {"type": ["string", "null"]},
+    "content_hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  },
+  "$defs": {
+    "timestamp": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"},
+    "date": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"}
+  }
+}

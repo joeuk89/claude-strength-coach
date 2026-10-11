@@ -131,6 +131,20 @@ One logged bout of non-lifting training (a run, a ride, a conditioning
 session) from any activity source.
 _Avoid_: workout (reserved for logged lifting), cardio session
 
+**Wellness day**:
+One calendar day of the athlete's health readings (sleep, resting heart
+rate, steps, body mass), resolved across activity sources. Sleep belongs
+to the day the athlete woke. A record entered by hand may cover a span,
+such as a week's average sleep, and fills only the days no daily reading
+covers.
+_Avoid_: readiness (nothing computes a readiness score), health day
+
+**Planned activity**:
+A dated, planned bout of non-lifting training from a run plan, the coach
+or the athlete. Its record says whether it is intervals, tempo,
+threshold, hills or a race.
+_Avoid_: planned session (a session is a program template), planned run
+
 **Research note**:
 A dated, cited answer to one coaching question, with a confidence and a
 review-by date (`review_by`), that the coach consults before deciding in

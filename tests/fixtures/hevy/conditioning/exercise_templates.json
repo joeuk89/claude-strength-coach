@@ -1,0 +1,107 @@
+{
+  "x-synthetic": true,
+  "exercise_templates": [
+    {
+      "id": "F0000001",
+      "title": "Squat (Barbell)",
+      "type": "weight_reps",
+      "primary_muscle_group": "quadriceps",
+      "secondary_muscle_groups": [
+        "glutes",
+        "hamstrings"
+      ],
+      "equipment": "barbell",
+      "is_custom": false,
+      "thumbnail_url": null
+    },
+    {
+      "id": "F0000002",
+      "title": "Bench Press (Dumbbell)",
+      "type": "weight_reps",
+      "primary_muscle_group": "chest",
+      "secondary_muscle_groups": [
+        "triceps",
+        "shoulders"
+      ],
+      "equipment": "dumbbell",
+      "is_custom": false,
+      "thumbnail_url": null
+    },
+    {
+      "id": "F0000003",
+      "title": "Single Arm Row (Dumbbell)",
+      "type": "weight_reps",
+      "primary_muscle_group": "upper_back",
+      "secondary_muscle_groups": [
+        "lats",
+        "biceps"
+      ],
+      "equipment": "dumbbell",
+      "is_custom": false,
+      "thumbnail_url": null
+    },
+    {
+      "id": "F0000004",
+      "title": "Pull Up",
+      "type": "bodyweight_reps",
+      "primary_muscle_group": "lats",
+      "secondary_muscle_groups": [
+        "biceps",
+        "upper_back"
+      ],
+      "equipment": "none",
+      "is_custom": false,
+      "thumbnail_url": null
+    },
+    {
+      "id": "F00000A1",
+      "title": "Rowing Machine",
+      "type": "distance_duration",
+      "primary_muscle_group": "cardio",
+      "secondary_muscle_groups": [],
+      "equipment": "machine",
+      "is_custom": false,
+      "thumbnail_url": null
+    },
+    {
+      "id": "F00000A2",
+      "title": "Burpee",
+      "type": "bodyweight_reps",
+      "primary_muscle_group": "full_body",
+      "secondary_muscle_groups": [],
+      "equipment": "none",
+      "is_custom": false,
+      "thumbnail_url": null
+    },
+    {
+      "id": "F00000A3",
+      "title": "Kettlebell Swing",
+      "type": "weight_reps",
+      "primary_muscle_group": "glutes",
+      "secondary_muscle_groups": [],
+      "equipment": "kettlebell",
+      "is_custom": false,
+      "thumbnail_url": null
+    },
+    {
+      "id": "F00000A4",
+      "title": "Treadmill",
+      "type": "distance_duration",
+      "primary_muscle_group": "cardio",
+      "secondary_muscle_groups": [],
+      "equipment": "machine",
+      "is_custom": false,
+      "thumbnail_url": null
+    },
+    {
+      "id": "C00000A1",
+      "title": "Bike Erg Sprints",
+      "type": "duration",
+      "primary_muscle_group": "cardio",
+      "secondary_muscle_groups": [],
+      "equipment": "machine",
+      "is_custom": true,
+      "thumbnail_url": null
+    }
+  ]
+}

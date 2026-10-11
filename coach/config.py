@@ -2,7 +2,8 @@
 
 Tables are declared with `Key` and `Table` in modules under
 `coach/config_tables/`, discovered at load time, so an item that adds a
-table adds a module and edits nothing here. Validation is strict: an
+table adds a module and edits nothing here. A module may also export
+RULES, checks that span keys or tables, run once every table is valid. Validation is strict: an
 unknown table or key is an error that names the file and the key.
 """
 
@@ -106,17 +107,26 @@ def _sectioned(value):
     return value
 
 
-def registered_tables():
+def _table_modules():
     from coach import config_tables
 
-    found = {}
     for module_info in sorted(pkgutil.iter_modules(config_tables.__path__), key=lambda m: m.name):
-        module = importlib.import_module(f"coach.config_tables.{module_info.name}")
+        yield importlib.import_module(f"coach.config_tables.{module_info.name}")
+
+
+def registered_tables():
+    found = {}
+    for module in _table_modules():
         for name, table in getattr(module, "TABLES", {}).items():
             if name in found:
                 raise RuntimeError(f"config table [{name}] is declared twice")
             found[name] = table
     return found
+
+
+def registered_rules():
+    """Rules that span keys or tables: each takes the validated config, returns [(key path, message)]."""
+    return [rule for module in _table_modules() for rule in getattr(module, "RULES", [])]
 
 
 _TYPE_NAMES = {
@@ -311,6 +321,12 @@ def parse(raw, path):
         if value is not None and not isinstance(value, dict):
             continue
         data[name] = validator.table(name, value or {}, spec)
+
+    if not validator.problems:
+        sectioned = Section({name: _sectioned(value) for name, value in data.items()})
+        for rule in registered_rules():
+            for where, message in rule(sectioned):
+                validator.problem(where, message)
 
     if validator.problems:
         details = [{"path": where, "message": f"{path}: {message}"} for where, message in validator.problems]

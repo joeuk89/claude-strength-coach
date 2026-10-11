@@ -1,0 +1,35 @@
+schema_version = 1
+
+[athlete]
+units = "kg"
+bodyweight_units = "kg"
+week_starts = "monday"
+timezone = "UTC"
+experience = "intermediate"
+available_days = []
+session_minutes = 60
+
+[hevy]
+enabled = true
+cache_max_age_hours = 24
+
+[equipment]
+available = []
+dumbbells = []
+dumbbell_increment = 2.0
+dumbbell_max = 40.0
+barbell_increment = 2.5
+bar_weight = 20.0
+plates = [25, 20, 15, 10, 5, 2.5, 1.25]
+machine_increment = 5.0
+cable_increment = 2.5
+
+[equipment.locations.home]
+available = ["dumbbell", "bench", "band", "bodyweight"]
+dumbbells = [5, 10, 15, 20]
+dumbbell_max = 20.0
+
+[caps]
+
+[activity]
+enabled = true

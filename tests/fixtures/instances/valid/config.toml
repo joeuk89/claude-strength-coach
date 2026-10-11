@@ -30,3 +30,6 @@ dumbbells = [5, 10, 15, 20]
 dumbbell_max = 20.0
 
 [caps]
+
+[activity]
+enabled = true

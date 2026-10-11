@@ -1,0 +1,29 @@
+{
+  "title": "One upsert line in data/activity/planned.jsonl: a planned activity (contract C29, C30)",
+  "type": "object",
+  "required": ["schema_version", "op", "id", "source", "recorded_at", "date", "kind", "title", "quality",
+               "content_hash"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": 1},
+    "op": {"const": "upsert"},
+    "id": {"type": "string", "pattern": "^[a-z_]+:[A-Za-z0-9._:-]+$"},
+    "source": {"type": "string", "pattern": "^[a-z_]+$"},
+    "recorded_at": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"},
+    "date": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+    "kind": {"enum": ["run", "ride", "swim", "row", "walk", "hike", "conditioning", "sport", "mobility", "other"]},
+    "title": {"type": "string", "pattern": "\\S"},
+    "quality": {"type": "boolean"},
+    "target": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "distance_meters": {"type": ["number", "null"], "minimum": 0},
+        "duration_seconds": {"type": ["integer", "null"], "minimum": 0},
+        "description": {"type": ["string", "null"]}
+      }
+    },
+    "notes": {"type": ["string", "null"]},
+    "content_hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}
