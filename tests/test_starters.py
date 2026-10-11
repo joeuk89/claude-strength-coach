@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from coach import program, research, render, routines, starters, units, validity
+from coach import jsonio, program, research, render, routines, starters, units, validity
 from coach.library import Library
 from tests.support import INSTANCES, REPO_ROOT, run_cli
 
@@ -150,7 +150,8 @@ class StarterFilesTest(Case):
             session["status"] = "active"
         (Path(tmp.name) / "full-body-3.json").write_text(json.dumps(doc), encoding="utf-8")
         loaded = starters.load("full-body-3", tmp.name)
-        self.assertEqual(loaded["program"]["schema_version"], 6)
+        current = jsonio.current_version(jsonio.load_schema(program.SCHEMA))
+        self.assertEqual(loaded["program"]["schema_version"], current)
         self.assertEqual((loaded["program"]["priority"], loaded["program"]["minimum_week"]), ([], None))
 
     def test_an_unknown_starter_names_the_known_ones(self):
@@ -334,6 +335,23 @@ class DraftTest(Case):
         self.assertEqual({lift["exercise_id"] for lift in draft["program"]["priority"]},
                          {"db_bench_press", "goblet_squat", "db_romanian_deadlift"})
         self.ok(root, "program", "adopt", "--input", str(root / ".coach/drafts/program.json"), "--dry-run")
+
+    def test_start_loads_take_the_swapped_ids_a_dry_run_lists_as_priority(self):
+        root = instance(self)
+        path = root / "config.toml"
+        path.write_text(path.read_text(encoding="utf-8").replace('available = []',
+                                                                  'available = ["dumbbell", "bodyweight"]'),
+                        encoding="utf-8")
+        preview = self.ok(root, "starters", "draft", "upper-lower-4", "--dry-run")
+        self.assertFalse(preview["written"])
+        self.assertFalse((root / ".coach/drafts/program.json").exists())
+        priority = [lift["exercise_id"] for lift in preview["draft"]["program"]["priority"]]
+        self.assertIn("db_bench_press", priority)
+        error = self.fails(root, "starters", "draft", "upper-lower-4", "--start-load", "bb_bench_press=60")
+        self.assertIn("db_bench_press", error["message"])
+        draft = self.draft(root, "upper-lower-4", "--start-load", "db_bench_press=20")
+        loads = {line["start_load"] for _, line in lines(draft["program"]) if line["exercise_id"] == "db_bench_press"}
+        self.assertEqual(loads, {20})
 
     def test_a_barbell_starter_refuses_a_kit_without_a_barbell(self):
         root = instance(self)

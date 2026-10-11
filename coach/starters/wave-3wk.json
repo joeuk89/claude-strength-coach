@@ -32,7 +32,7 @@
     "rn:minimum-effective-dose.4"
   ],
   "program": {
-    "schema_version": 6,
+    "schema_version": 7,
     "name": "3-week wave (5/3/1-style)",
     "sessions": [
       {
@@ -161,7 +161,8 @@
             },
             "start_load": null
           }
-        ]
+        ],
+        "scheme": null
       },
       {
         "id": "deadlift-day",
@@ -265,7 +266,8 @@
             },
             "start_load": null
           }
-        ]
+        ],
+        "scheme": null
       },
       {
         "id": "bench-day",
@@ -417,7 +419,8 @@
             },
             "start_load": null
           }
-        ]
+        ],
+        "scheme": null
       },
       {
         "id": "squat-day",
@@ -569,7 +572,8 @@
             },
             "start_load": null
           }
-        ]
+        ],
+        "scheme": null
       },
       {
         "id": "min-a",
@@ -718,7 +722,8 @@
             },
             "start_load": null
           }
-        ]
+        ],
+        "scheme": null
       },
       {
         "id": "min-b",
@@ -939,7 +944,8 @@
             },
             "start_load": null
           }
-        ]
+        ],
+        "scheme": null
       }
     ],
     "external_sessions": [],

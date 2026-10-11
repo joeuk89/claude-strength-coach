@@ -32,7 +32,7 @@
     "rn:minimum-effective-dose.4"
   ],
   "program": {
-    "schema_version": 6,
+    "schema_version": 7,
     "name": "Upper/lower, 4 days",
     "sessions": [
       {
@@ -212,7 +212,8 @@
             },
             "start_load": null
           }
-        ]
+        ],
+        "scheme": null
       },
       {
         "id": "lower-a",
@@ -343,7 +344,8 @@
             },
             "start_load": null
           }
-        ]
+        ],
+        "scheme": null
       },
       {
         "id": "upper-b",
@@ -570,7 +572,8 @@
             },
             "start_load": null
           }
-        ]
+        ],
+        "scheme": null
       },
       {
         "id": "lower-b",
@@ -701,7 +704,8 @@
             },
             "start_load": null
           }
-        ]
+        ],
+        "scheme": null
       },
       {
         "id": "min-a",
@@ -880,7 +884,8 @@
             },
             "start_load": null
           }
-        ]
+        ],
+        "scheme": null
       },
       {
         "id": "min-b",
@@ -1083,7 +1088,8 @@
             },
             "start_load": null
           }
-        ]
+        ],
+        "scheme": null
       }
     ],
     "external_sessions": [],
