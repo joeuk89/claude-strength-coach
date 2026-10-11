@@ -82,6 +82,7 @@ coach/                       # framework: synced to instances
   meals.py                   # meal plans, shopping list                                 (R-33c)
   log.py, sheets.py          # manual log and session sheets                             (R-40c)
   starters.py                # starter programs                                          (R-41b)
+  onboarding.py              # `config suggest` values and notes                         (R-40a)
   starters/<id>.json         # framework starter programs                                (R-41b)
   activity/store.py          # ActivityStore: resolved activities, planned, wellness     (R-42a)
   activity/adapters/<name>.py  # one module per activity source                          (R-42a, R-42b, R-42d)
@@ -4951,6 +4952,26 @@ values:
 | `dumbbell_max` | commercial 50, home asked | commercial 120, home asked |
 | `machine_increment` | 5 | 10 |
 | `cable_increment` | 2.5 | 5 |
+
+**Built with R-40a** (details the text above leaves open):
+
+- `--gym` defaults to `commercial`. `coach.onboarding.suggest(unit,
+  gym)` holds the table; the command lives in
+  `coach/commands/config_suggest.py`.
+- `data` holds `unit`, `gym`, `values` and `notes`. `values` is
+  `{"athlete": {"units", "bodyweight_units"}, "equipment": {...}}`, the
+  equipment keys as in the table above; a home gym leaves
+  `dumbbell_max` out, so an lb home config fails validation until the
+  athlete's answer is written. `notes` is `[{key, message}]`, `key` a
+  dotted config path such as `equipment.dumbbell_max`.
+- `/setup` writes Hevy free as `[hevy] enabled = false`. It writes
+  `[nutrition]` only as `enabled = false`, when the athlete declines
+  nutrition coaching. On a yes it writes nothing and `/goals` sets the
+  table after week one is approved, because `enabled = true` without
+  R-33a's required keys fails validation. On "later" it writes nothing.
+- The profile skeleton's sections are Goal, Training week, Equipment,
+  Injuries / limitations and Coach's notes. The last-but-one keeps the
+  heading `niggles import` reads (C27).
 
 ## C45. Program drafts, adoption, import and starters (R-41a, R-41b; R-40a, R-40c read)
 
