@@ -20,6 +20,24 @@ migration onto `data/program.json` first, and stop. When a command
 fails, tell the athlete what its exit code means, as `CLAUDE.md` "The
 coach scripts" sets out.
 
+## 1. Offer the three paths
+
+Unless the athlete has already picked one ("import my routines", a
+redesign), offer the three paths in one message and recommend one from
+`profile.md` and `config.toml`, saying why in a line:
+
+- **Path A — Import:** they already run a program in Hevy (or on paper)
+  and want to keep it.
+- **Path B — Design:** the week or goal needs a program built for it,
+  such as coach-led sessions to plan around, a sport, or unusual kit or
+  limits; and every redesign.
+- **Path C — Starter:** no program of their own, and a week a starter
+  fits. `python3 -m coach starters list --days <n>` names the one that
+  suits `[athlete] experience` as `recommended_id`.
+
+Every path ends in a program draft and `program adopt`, as the output
+contract below sets out.
+
 ## Output contract (every path)
 
 - `data/program.json` (schema `coach/schemas/program.schema.json`) —

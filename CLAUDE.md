@@ -100,8 +100,10 @@ anything. Rules that always apply:
 
 ## The commands
 
-- **`/setup`** — first-run onboarding: integrations, profile, goals,
-  program. Re-runnable; picks up where it left off.
+- **`/setup`** — first-run onboarding: three settings questions, six
+  profile questions, a program (a starter, a Hevy import or a design)
+  and an approved first week; nutrition only when the athlete wants it.
+  Re-runnable; picks up where it left off.
 - **`/new-program`** — create the training program (import from Hevy or
   design from scratch), or redesign it at a block boundary.
 - **`/check-in`** — weekly progress review: one Sunday message,

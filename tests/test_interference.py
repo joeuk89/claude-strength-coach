@@ -172,6 +172,13 @@ class ProposalTest(Case):
         self.planned("2026-10-15", "Easy 6 km", quality=False)
         self.assertEqual(self.collisions(self.proposal()["overlay"]["flags"]), before)
 
+    def test_an_empty_timezone_means_local_time(self):
+        path = self.root / "config.toml"
+        text = path.read_text(encoding="utf-8")
+        self.assertIn('timezone = "UTC"', text)
+        path.write_text(text.replace('timezone = "UTC"', 'timezone = ""'), encoding="utf-8")
+        self.assertEqual(len(self.collisions(self.proposal()["overlay"]["flags"])), 1)
+
     def test_an_empty_list_turns_every_rule_off(self):
         self.set_rules([])
         self.assertEqual(self.collisions(self.proposal()["overlay"]["flags"]), [])

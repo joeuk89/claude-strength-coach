@@ -1,0 +1,87 @@
+{
+  "about": "A synthetic new athlete taken through /setup to an approved week one on the starter path. Each reply lists the config.toml values the coach writes from it and the coach commands it runs before its next message. Hevy calls (hevy status, hevy pull, routines create) are named in coach_also but not run here: there is no key.",
+  "now": "2026-10-11T18:00:00Z",
+  "week": "2026-W42",
+  "suggest": {"unit": "kg", "gym": "commercial"},
+  "replies": [
+    {
+      "asked": "Config: Hevy (Pro, free or none), units, and nutrition coaching (yes, no or later), in one message.",
+      "athlete": "Hevy Pro, kg, and no nutrition coaching for now.",
+      "config": {
+        "hevy": {"enabled": true},
+        "nutrition": {"enabled": false}
+      },
+      "commands": [["config", "validate"]],
+      "coach_also": "config suggest --unit kg; copy config.example.toml to config.toml; apply the suggested values; send the Hevy key steps."
+    },
+    {
+      "asked": "Create .env from .env.example and paste the Hevy API key.",
+      "athlete": "Done, the key is in .env.",
+      "config": {},
+      "commands": [],
+      "coach_also": "hevy status (key present), hevy pull (key works); then profile questions 1 to 3."
+    },
+    {
+      "asked": "Profile questions 1 to 3: name; goal; training experience and any working weights you know.",
+      "athlete": "Riley. Get stronger and build some muscle. About six months of lifting on and off; squat 60 kg for 5, bench 45 kg for 5.",
+      "config": {
+        "athlete": {"experience": "beginner"}
+      },
+      "commands": [["config", "validate"]],
+      "coach_also": "profile questions 4 to 6."
+    },
+    {
+      "asked": "Profile questions 4 to 6: your training week; equipment, per place you train; injuries and limitations.",
+      "athlete": "Mon, Wed and Fri, about 75 minutes each, no PT or classes, and two easy runs a week. A commercial gym with everything, dumbbells up to 50; at home, dumbbells 5 to 22.5 in 2.5 steps and a band. My lower back has flared on deadlifts from the floor for years, so I won't do those.",
+      "config": {
+        "athlete": {"available_days": ["mon", "wed", "fri"], "session_minutes": 75},
+        "equipment": {"available": ["barbell", "dumbbell", "machine", "cable", "plate", "bodyweight"]},
+        "equipment.locations.home": {
+          "available": ["dumbbell", "band", "bodyweight"],
+          "dumbbells": [5, 7.5, 10, 12.5, 15, 17.5, 20, 22.5],
+          "dumbbell_increment": 2.5,
+          "dumbbell_max": 22.5
+        },
+        "activity": {"enabled": true}
+      },
+      "commands": [
+        ["config", "validate"],
+        ["niggles", "add", "--area", "lower back", "--status", "chronic", "--pattern", "hinge",
+         "--constraint", "rpe_cap=7", "--constrain-while", "chronic",
+         "--notes", "Long-standing; flares on deadlifts from the floor."],
+        ["library", "set-avoid", "bb_deadlift", "--reason", "Lower back flares on deadlifts from the floor."],
+        ["starters", "list", "--days", "3"]
+      ],
+      "coach_also": "write profile.md; offer the three program paths with the starter recommended."
+    },
+    {
+      "asked": "Three paths: a starter (recommended: full-body-3), an import from Hevy, or a design conversation.",
+      "athlete": "The starter sounds right.",
+      "config": {},
+      "commands": [
+        ["starters", "draft", "full-body-3", "--dry-run"],
+        ["starters", "draft", "full-body-3", "--start-load", "bb_back_squat=60", "--start-load", "bb_bench_press=45"],
+        ["program", "adopt", "--input", "{root}/.coach/drafts/program.json", "--dry-run"]
+      ],
+      "coach_also": "show the draft's report and the load-mode table once; ask to adopt."
+    },
+    {
+      "asked": "The draft, its report and the load-mode table: adopt it?",
+      "athlete": "Looks good. Adopt it; the load modes are right.",
+      "config": {},
+      "commands": [
+        ["program", "adopt", "--input", "{root}/.coach/drafts/program.json"],
+        "confirm load modes",
+        ["propose", "week", "--week", "{week}"]
+      ],
+      "coach_also": "/program-week: build, validate and render the overlay, diff the routines, present the coach's brief and wait."
+    },
+    {
+      "asked": "The coach's brief for week one. Reply \"go\" to train this.",
+      "athlete": "go",
+      "config": {},
+      "commands": [],
+      "coach_also": "overlay approve, then routines create behind the approval gate; close out."
+    }
+  ]
+}

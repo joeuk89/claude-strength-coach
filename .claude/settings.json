@@ -10,6 +10,7 @@
       "Bash(python3 -m coach dates span:*)",
       "Bash(python3 -m coach config show:*)",
       "Bash(python3 -m coach config validate:*)",
+      "Bash(python3 -m coach config suggest:*)",
       "Bash(python3 -m coach version:*)",
       "Bash(python3 -m coach library list:*)",
       "Bash(python3 -m coach library show:*)",
