@@ -752,8 +752,9 @@ def propose_week(root, config, today, now, span, kind="weekly", transform_name=N
         session = run.sessions[session_id]
         if ctx_extra["illness"] and day == first_day:
             all_flags.append(flags.make("return_after_illness", session_id=session_id, message=(
-                f"{ctx_extra['illness']} falls in the gap before this first session back: confirm 48 hours "
-                f"symptom-free; every set is capped at RPE {validity.ILLNESS_RPE_CAP}")))
+                f"{ctx_extra['illness']} falls in the gap before this first session back: confirm "
+                f"{validity.SYMPTOM_FREE_HOURS} hours symptom-free; every set is capped at RPE "
+                f"{validity.ILLNESS_RPE_CAP}")))
         lines = []
         for exercise in session["exercises"]:
             result = propose_line(run, session, day, exercise, ctx_extra)
@@ -790,10 +791,12 @@ def propose_week(root, config, today, now, span, kind="weekly", transform_name=N
             _write_state(root, settled_state, run.program)
         _write_proposal(root, doc["id"], draft, draft, meta)
     draft_path, proposed_path, _ = proposal_paths(root, doc["id"])
+    lines = lines_of(doc, config.athlete.units)
     return {
         "id": doc["id"], "kind": kind, "span": span.to_json(), "draft": _relative(root, draft_path),
-        "proposed": _relative(root, proposed_path), "overlay": doc, "lines": lines_of(doc, config.athlete.units),
-        "settled": settled, "rotation": found.rotation, "written": not dry_run,
+        "proposed": _relative(root, proposed_path), "overlay": doc, "lines": lines,
+        "lines_digest": jsonio.canonical_hash(lines), "settled": settled, "rotation": found.rotation,
+        "written": not dry_run,
     }
 
 
@@ -898,8 +901,9 @@ def resolve(root, proposal_id, index, resolution, dry_run):
 def show(root, config, proposal_id, now):
     draft, proposed, meta = load_proposal(root, proposal_id)
     doc = overlay.build(draft, config, root=root, now=now)
-    return {"id": proposal_id, "kind": meta["kind"], "span": meta["span"], "overlay": doc,
-            "lines": lines_of(doc, config.athlete.units), "unexplained": unexplained_changes(draft, proposed),
+    lines = lines_of(doc, config.athlete.units)
+    return {"id": proposal_id, "kind": meta["kind"], "span": meta["span"], "overlay": doc, "lines": lines,
+            "lines_digest": jsonio.canonical_hash(lines), "unexplained": unexplained_changes(draft, proposed),
             "unresolved_blocks": overlay.unresolved_blocks(doc)}
 
 
