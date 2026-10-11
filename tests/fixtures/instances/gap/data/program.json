@@ -1,0 +1,140 @@
+{
+  "schema_version": 4,
+  "name": "Two-session fixture program",
+  "sessions": [
+    {
+      "id": "session-a",
+      "title": "Session A",
+      "kind": "lifting",
+      "tier": "core",
+      "status": "active",
+      "location": null,
+      "focus": null,
+      "exercises": [
+        {
+          "exercise_id": "bb_back_squat",
+          "load_mode": "total",
+          "sets": [
+            {
+              "count": 3,
+              "type": "normal",
+              "reps": 5,
+              "rpe": 7
+            }
+          ],
+          "rest_seconds": 180,
+          "superset_id": null,
+          "cues": "brace · knees out",
+          "constraints": [],
+          "scheme": {
+            "name": "double_progression",
+            "params": {}
+          },
+          "start_load": 100
+        },
+        {
+          "exercise_id": "db_bench_press",
+          "load_mode": "per_hand_x2",
+          "sets": [
+            {
+              "count": 3,
+              "type": "normal",
+              "rep_range": {
+                "start": 8,
+                "end": 10
+              },
+              "rpe": 8
+            }
+          ],
+          "rest_seconds": 120,
+          "superset_id": null,
+          "cues": "elbows tucked · feet planted",
+          "constraints": [],
+          "scheme": {
+            "name": "double_progression",
+            "params": {}
+          },
+          "start_load": 25
+        }
+      ]
+    },
+    {
+      "id": "session-b",
+      "title": "Session B",
+      "kind": "lifting",
+      "tier": "core",
+      "status": "active",
+      "location": null,
+      "focus": null,
+      "exercises": [
+        {
+          "exercise_id": "db_single_arm_row",
+          "load_mode": "single_implement",
+          "sets": [
+            {
+              "count": 3,
+              "type": "normal",
+              "reps": 10,
+              "rpe": 8
+            }
+          ],
+          "rest_seconds": 90,
+          "superset_id": null,
+          "cues": "pull to the hip",
+          "constraints": [],
+          "scheme": {
+            "name": "double_progression",
+            "params": {}
+          },
+          "start_load": 30
+        },
+        {
+          "exercise_id": "pull_up",
+          "load_mode": "bodyweight",
+          "sets": [
+            {
+              "count": 3,
+              "type": "normal",
+              "reps": 8,
+              "rpe": 8
+            }
+          ],
+          "rest_seconds": 120,
+          "superset_id": null,
+          "cues": "full hang at the bottom",
+          "constraints": [],
+          "scheme": {
+            "name": "linear",
+            "params": {}
+          },
+          "start_load": 0
+        }
+      ]
+    }
+  ],
+  "external_sessions": [
+    {
+      "id": "pt-tue",
+      "title": "PT",
+      "weekday": "tue",
+      "estimated_sets": {}
+    }
+  ],
+  "schedule": {
+    "rule": "fixed_weekdays",
+    "params": {
+      "days": {
+        "mon": "session-a",
+        "thu": "session-b"
+      }
+    }
+  },
+  "blocks": {
+    "hard_weeks_ceiling": 6,
+    "deload_rule": {
+      "name": "standard",
+      "params": {}
+    }
+  },
+  "missed_day_rules": []
+}

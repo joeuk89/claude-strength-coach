@@ -1,4 +1,4 @@
-from coach import checkin, dates
+from coach import checkin, checkin_catchup, dates, history
 from coach.commands import arg, command
 from coach.errors import UsageError
 
@@ -20,10 +20,9 @@ def _date(text, flag):
 )
 def prepare(args, ctx):
     card = checkin.prepare(ctx.root, ctx.today(), _date(args.until, "--until"), args.tier, ctx.now())
-    days = card["days_since_last"]
-    if args.tier is None and days is not None and days > checkin.CATCH_UP_AFTER_DAYS:
-        ctx.warn(f"catch_up_pending: {days} days since the last check-in, over {checkin.CATCH_UP_AFTER_DAYS}; "
-                 "catch-up mode is not built yet, so the card runs weekly")
+    problem = (card["catch_up"] or {}).get("return_week_problem")
+    if problem:
+        ctx.warn(f"no return week on the catch-up card: {problem}")
     if card["unsynced"]:
         ctx.warn(f"{card['unsynced']} workout(s) in the window are not in data/history yet; the card reads them "
                  "from the Hevy cache. Run python3 -m coach history sync before writing the record")
@@ -71,4 +70,30 @@ def skeleton(args, ctx):
                  f"{checkin.REGION_KIND} region leaves them out; run python3 -m coach history sync, then "
                  f"checkin skeleton --date {day} --refresh")
     report["unsynced"] = len(unsynced)
+    return report
+
+
+@command(
+    "checkin tag-gap",
+    help="Tag every untagged missed core session since the last check-in with one miss tag",
+    args=(arg("--tag", required=True, choices=history.MISS_TAGS, help="the miss tag for the whole gap"),),
+    writes=True,
+)
+def tag_gap(args, ctx):
+    return checkin.tag_gap(ctx.root, ctx.today(), args.tag, ctx.now(), args.dry_run)
+
+
+@command(
+    "checkin return-brief",
+    help="The return template of the coach's brief for the week back, from a proposal or a one-off overlay",
+    args=(arg("--proposal", metavar="ID", help="proposal id from propose week (illness, layoff)"),
+          arg("--overlay", metavar="ID", help="a coach-built one-off overlay (travel, no kit)"),
+          arg("--reason", required=True, choices=checkin_catchup.REASONS, help="what caused the gap")),
+)
+def return_brief(args, ctx):
+    if (args.proposal is None) == (args.overlay is None):
+        raise UsageError("give --proposal ID or --overlay ID")
+    report = checkin_catchup.return_brief(ctx.root, ctx.config, ctx.now(), args.proposal, args.overlay, args.reason)
+    for warning in report["warnings"]:
+        ctx.warn(warning)
     return report

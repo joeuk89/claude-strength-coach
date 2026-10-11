@@ -18,7 +18,8 @@ from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
-from coach import checkin_parts, dates, flags, history, overlay, paths, program, render, routines, state, stats, units
+from coach import checkin_catchup, checkin_parts, dates, flags, history, overlay, paths, program, render, routines
+from coach import state, stats, units
 from coach import config as config_module
 from coach.config_tables.sessions import cap_minutes
 from coach.errors import ValidationError
@@ -32,6 +33,8 @@ WORD_CEILINGS = {"weekly": 600, "deep": 1000, "catch-up": 600}    # heuristics, 
 CARD_VERSION = 1
 TIERS = ("weekly", "deep", "catch-up")
 CARD_TIERS = ("weekly", "deep")
+CATCH_UP = "catch_up"
+TIER_OF_MODE = {CATCH_UP: "catch-up"}
 REGION_KIND = "week-review"
 FIELD_ORDER = ("sessions", "coach_led", "runs", "sleep", "niggles", "nutrition", "meal_plan", "next_week")
 HEVY_EDITS = "hevy_edits"
@@ -166,6 +169,29 @@ def deep_reasons(found, day):
     return []
 
 
+def deferred_reason(found):
+    """"deferred from catch-up <date>" when the newest records are catch-ups and a deep review was due at one."""
+    for index in range(len(found) - 1, -1, -1):
+        record = found[index]
+        if record.tier != "catch-up":
+            return None
+        if deep_reasons(found[:index], record.date):
+            return f"deferred from catch-up {record.date.isoformat()}"
+    return None
+
+
+def mode_for(found, day):
+    """(mode, deep reasons) for a check-in on `day` after the records `found`: catch-up after a long gap, which
+    never runs deep, else deep when one is due or a catch-up deferred one, else weekly."""
+    reasons = deep_reasons(found, day)
+    deferred = deferred_reason(found)
+    if deferred:
+        reasons = [deferred] + reasons
+    if found and (day - found[-1].date).days > CATCH_UP_AFTER_DAYS:
+        return CATCH_UP, reasons
+    return ("deep" if reasons else "weekly"), reasons
+
+
 def due(root, today):
     """When the next check-in falls due and which mode it runs in."""
     today = _as_date(today)
@@ -175,8 +201,7 @@ def due(root, today):
     last = found[-1]
     days = (today - last.date).days
     due_date = last.date + timedelta(days=_cadence(root))
-    reasons = deep_reasons(found, today)
-    mode = "catch_up" if days > CATCH_UP_AFTER_DAYS else "deep" if reasons else "weekly"
+    mode, reasons = mode_for(found, today)
     return Due(last, days, due_date, max(0, (today - due_date).days), mode, reasons)
 
 
@@ -529,18 +554,26 @@ def misses(root, since, until, now=None, include_unsynced=True):
             "by_session": dict(sorted(by_session.items())), "sessions_missed": sum(by_session.values())}
 
 
-def _build(root, today, until=None, tier=None, now=None, live=True, parts=True):
+def _catch_up_reasons(found, end, deep):
+    gap = [f"{(end - found[-1].date).days} days since the last check-in, over {CATCH_UP_AFTER_DAYS}"] if found else []
+    return gap + ([f"deep review deferred ({'; '.join(deep)})"] if deep else [])
+
+
+def _build(root, today, until=None, tier=None, now=None, live=True, parts=True, with_return=None):
     inst = _Instance.load(root)
     end = _as_date(until) or _as_date(today)
     found = [r for r in records(inst.root) if r.date < end]
     window = _window(inst, found, end)
-    reasons = deep_reasons(found, end)
+    mode, reasons = mode_for(found, end)
     if tier == "weekly":
         mode, reasons = "weekly", []
     elif tier == "deep":
         mode, reasons = "deep", reasons or ["asked for"]
-    else:
-        mode = "deep" if reasons else "weekly"
+    elif tier == CATCH_UP:
+        mode = CATCH_UP
+    deferred = mode == CATCH_UP and bool(reasons)
+    if mode == CATCH_UP:
+        reasons = _catch_up_reasons(found, end, reasons)
 
     adherence = stats.adherence(inst.root, span=(window.start, window.end), include_unsynced=live, today=end, now=now)
     workouts = {w["workout_id"]: w for w in history.workouts(inst.root, include_unsynced=live, now=now)}
@@ -551,7 +584,7 @@ def _build(root, today, until=None, tier=None, now=None, live=True, parts=True):
               + hevy_flags)
     card = {
         "schema_version": CARD_VERSION, "date": end.isoformat(), "window": window.to_json(), "mode": mode,
-        "tier_reasons": reasons, "deep_deferred": False,
+        "tier_reasons": reasons, "deep_deferred": deferred,
         "days_since_last": (end - found[-1].date).days if found else None,
         "unsynced": sum(1 for w in workouts.values() if w["unsynced"] and window.contains(dates.parse_date(w["date"]))),
         "sessions": sessions, "exercises": _exercises(inst, kept, workouts), "e1rm": _e1rm(inst, window, live, now),
@@ -578,9 +611,18 @@ def _build(root, today, until=None, tier=None, now=None, live=True, parts=True):
             card["flags"] += list(contribution.flags)
             card["nudge_lines"] += list(contribution.nudge_lines)
             part_reasons += list(contribution.tier_reasons)
-        if part_reasons and tier != "weekly":
+        if part_reasons and tier != "weekly" and mode == CATCH_UP:
+            card["deep_deferred"] = True
+            card["tier_reasons"] = reasons + [f"deep review deferred ({'; '.join(part_reasons)})"]
+        elif part_reasons and tier != "weekly":
             card["tier_reasons"] = reasons + part_reasons
             card["mode"] = "deep"
+
+    if card["mode"] == CATCH_UP:
+        proposing = live if with_return is None else with_return
+        card["catch_up"] = checkin_catchup.build(inst, card, window, end, _as_date(today), now, proposing,
+                                                 list(workouts.values()))
+        return card
 
     if card["mode"] == "deep":
         deep = [r for r in found if r.tier == "deep"]
@@ -605,6 +647,12 @@ def prepare(root, today, until=None, tier=None, now=None):
     if tier is not None and tier not in CARD_TIERS:
         raise ValueError(f"tier must be one of {', '.join(CARD_TIERS)}")
     return _build(root, today, until, tier, now)
+
+
+def tag_gap(root, today, tag, now=None, dry_run=False):
+    """Tag every untagged missed core session in the window since the last record with one miss tag (C36)."""
+    card = _build(root, today, tier=CATCH_UP, now=now, parts=False, with_return=False)
+    return checkin_catchup.tag_gap(root, card, tag, now, dry_run)
 
 
 def _minutes_text(row):
@@ -648,13 +696,6 @@ def _sessions_field(inst, card):
     return checkin_parts.Field(prefill=" ".join(lines), ask=ask)
 
 
-def _rotation_text(inst):
-    rotation = (inst.state or {}).get("rotation") or {}
-    if not rotation.get("position"):
-        return None
-    return f"Rotation: next week is {rotation['position']}; correct me if not."
-
-
 def _coach_led_field(inst, card):
     external = card["sessions"]["external"]
     if not external:
@@ -672,7 +713,7 @@ def _coach_led_field(inst, card):
             if logged:
                 stated.append(f"{when}: logged as {logged['title']}.")
             asked.append(f"What did {when} cover?")
-    rotation = _rotation_text(inst)
+    rotation = checkin_catchup.rotation_text(inst, _as_date(card["date"]))
     if rotation:
         stated.append(rotation)
     return checkin_parts.Field(prefill=" ".join(stated) or None, ask=" ".join(asked) or None)
@@ -698,7 +739,7 @@ def _hevy_edits_field(card):
 
 
 def _builtin_fields(inst, card, runs):
-    rotation = None if card["sessions"]["external"] else _rotation_text(inst)
+    rotation = None if card["sessions"]["external"] else checkin_catchup.rotation_text(inst, _as_date(card["date"]))
     return {
         "sessions": _sessions_field(inst, card),
         "coach_led": _coach_led_field(inst, card),
@@ -745,6 +786,8 @@ def _field_lines(field):
 
 def card_text(card):
     """The Sunday message: the week as the log shows it, then the numbered fields."""
+    if card["mode"] == CATCH_UP:
+        return "\n".join(checkin_catchup.text_lines(card, _first_line(card))) + "\n"
     lines = [_first_line(card)]
     results = {}
     for row in card["exercises"]:
@@ -782,7 +825,8 @@ def card_text(card):
 
 
 def _review_card(root, day, tier):
-    return _build(root, day, tier="deep" if tier == "deep" else "weekly", live=False, parts=False)
+    card_tier = {"deep": "deep", "catch-up": CATCH_UP}.get(tier, "weekly")
+    return _build(root, day, tier=card_tier, live=False, parts=False)
 
 
 def _missed_line(card):
@@ -801,6 +845,9 @@ def _status_text(row):
 
 
 def _region(card, record_date):
+    if card["mode"] == CATCH_UP:
+        lines = [render.begin_marker(REGION_KIND, record_date)] + checkin_catchup.region_lines(card)
+        return "\n".join(lines + [render.end_marker(REGION_KIND, record_date)])
     sessions = card["sessions"]
     window = card["window"]
     header = (f"**Window:** {window['start']} → {window['end']} · **Sessions:** {sessions['trained_core']} of "
@@ -940,7 +987,8 @@ def skeleton(root, record_date, tier=None, overlay_id=None, refresh=False, dry_r
         if path.exists():
             raise ValidationError(f"{rel.as_posix()} already exists; re-render its regions with --refresh")
         if tier is None:
-            tier = _build(root, day, now=now, live=False)["mode"]
+            mode = _build(root, day, now=now, live=False)["mode"]
+            tier = TIER_OF_MODE.get(mode, mode)
         review = _region(_review_card(root, day, tier), day.isoformat())
         text = skeleton_text(day, tier, review, overlay_region if overlay_id is not None else None)
         rendered.append(f"{REGION_KIND} {day.isoformat()}")

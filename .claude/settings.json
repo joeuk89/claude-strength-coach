@@ -63,6 +63,8 @@
       "Bash(python3 -m coach missed plan:*)",
       "Bash(python3 -m coach missed rules:*)",
       "Bash(python3 -m coach missed apply:*)",
+      "Bash(python3 -m coach checkin tag-gap:*)",
+      "Bash(python3 -m coach checkin return-brief:*)",
       "Bash(python3 -m coach pages show:*)",
       "Bash(python3 -m coach pages render:*)",
       "Bash(python3 -m coach pages publish:*)",
