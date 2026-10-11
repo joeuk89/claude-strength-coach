@@ -1,0 +1,34 @@
+{
+  "title": "The one JSON object every coach command prints on stdout (contract C3)",
+  "type": "object",
+  "required": ["schema_version", "ok", "command", "warnings"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": 1},
+    "ok": {"type": "boolean"},
+    "command": {"type": ["string", "null"]},
+    "data": {"type": "object"},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "error": {
+      "type": "object",
+      "required": ["code", "message"],
+      "additionalProperties": false,
+      "properties": {
+        "code": {"enum": ["validation", "usage", "refused", "network", "config", "internal"]},
+        "message": {"type": "string"},
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "message"],
+            "additionalProperties": false,
+            "properties": {
+              "path": {"type": ["string", "null"]},
+              "message": {"type": "string"}
+            }
+          }
+        }
+      }
+    }
+  }
+}
