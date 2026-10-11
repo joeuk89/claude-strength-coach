@@ -22,7 +22,9 @@ CITES = ("rn:progression-training-age.2",)
 def _hit_top(source, prescribed, tops):
     """`tops` come from the program, not `prescribed`: this scheme's own overlay lines ask for fixed reps below them."""
     logged = [s for s in source.sets if s.working]
-    if not prescribed or not tops or len(logged) < len(prescribed):
+    if not prescribed:
+        return False, "historical prescription unknown"
+    if not tops or len(logged) < len(prescribed):
         return False, "fewer working sets than prescribed"
     for index, (wanted, got) in enumerate(zip(prescribed, logged)):
         if (got.reps or 0) < (tops[min(index, len(tops) - 1)] or 0):
@@ -42,7 +44,7 @@ def propose(ctx):
         return base.Proposal(sets=base.with_load(sets, load), rationale=f"Double progression: {reason}",
                              derived_from=None, state={})
 
-    prescribed = base.working(source.prescribed) or base.working(sets)
+    prescribed = base.working(source.prescribed)
     working = base.working(sets)
     bottom = working[0].target_reps if working else None
     top = working[0].top_reps if working else None

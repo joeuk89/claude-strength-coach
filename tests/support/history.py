@@ -5,8 +5,10 @@ import json
 import shutil
 import tempfile
 import unittest
+from datetime import timedelta
 from pathlib import Path
 
+from coach import dates, overlay
 from tests.support import FIXTURES, VALID, run_cli
 from tests.support.activity import write_hevy_cache
 
@@ -96,4 +98,34 @@ class HistoryCase(unittest.TestCase):
         path = self.root / relative
         doc = read_json(path)
         change(doc)
+        write_json(path, doc)
+
+
+def prescribe_fixture_history(root):
+    """Give progression fixtures dated prescriptions and explicit session identities."""
+    template_path = root / "data/overlays/2026-10-12-weekly.json"
+    template = read_json(template_path if template_path.is_file() else VALID / "data/overlays/2026-10-12-weekly.json")
+    history_files = list((root / "data/history").glob("????-??.json"))
+    workouts = [w for path in history_files for w in read_json(path)["workouts"]]
+    days = {w["date"] for w in workouts} | {"2026-09-28", "2026-10-05"}
+    by_day = {}
+    for day in sorted(days):
+        span = dates.week_span(dates.parse_date(day), "monday")
+        historical = copy.deepcopy(template)
+        historical.pop("approval", None)
+        historical.update(id=f"{span.start}-weekly", span=span.to_json(),
+                          created_at=f"{span.start - timedelta(days=1)}T18:00:00Z")
+        for session in historical["sessions"]:
+            offset = 0 if session["session_id"] == "session-a" else 3
+            session["date"] = (span.start + timedelta(days=offset)).isoformat()
+        historical = overlay.approve(historical, dates.parse_timestamp(historical["created_at"]))
+        write_json(root / "data/overlays" / f"{historical['id']}.json", historical)
+        by_day[day] = historical["id"]
+    for path in history_files:
+        doc = read_json(path)
+        for workout in doc["workouts"]:
+            session_id = {R_A: "session-a", R_B: "session-b"}.get(workout.get("routine_id"))
+            if session_id:
+                workout["session_id"] = session_id
+                workout["overlay_id"] = by_day[workout["date"]]
         write_json(path, doc)

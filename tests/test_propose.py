@@ -12,7 +12,7 @@ from coach import dates, jsonio, overlay, units
 from coach.plugins.schemes import double_progression
 from coach.validate import validate as validate_schema
 from tests.support import INSTANCES, REPO_ROOT
-from tests.support.history import W, HistoryCase, read_json, write_json
+from tests.support.history import W, HistoryCase, prescribe_fixture_history, read_json, write_json
 from tests.support.skills import flat, skill_files, step_text
 from tests.test_plugins import PLUGIN_TEST, fixed_load_plugin
 
@@ -61,6 +61,7 @@ class ProposeCase(HistoryCase):
 
     def setUp(self):
         super().setUp()
+        prescribe_fixture_history(self.root)
         if self.synced:
             self.cache(edit=self.workouts)
             self.sync()

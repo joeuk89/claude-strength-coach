@@ -92,7 +92,8 @@ class MaintenanceTest(unittest.TestCase):
 class AssistedReturnAndDeloadTest(unittest.TestCase):
     """More assistance is a lighter lift, so return bands and deloads keep the assistance and cut sets instead."""
 
-    SOURCE = exposure(date(2026, 9, 14), [(20, 5, 7)] * 3, exercise=PULL_UP)
+    SOURCE = replace(exposure(date(2026, 9, 14), [(20, 5, 7)] * 3, exercise=PULL_UP),
+                     prescribed=base.expand(THREE_FIVES))
 
     def assisted(self, name, days_off=0, week_kind="weekly", sets=THREE_FIVES):
         return context(name, exposures=(self.SOURCE,), exercise=PULL_UP, sets=sets, start_load=20,
@@ -238,6 +239,7 @@ class AssistanceLadderTest(unittest.TestCase):
     SETS = ({"count": 3, "type": "normal", "reps": 8, "rpe": 8},)
 
     def ladder(self, state, exposures=(), days_off=0):
+        exposures = tuple(replace(e, prescribed=base.expand(self.SETS)) for e in exposures)
         return context("assistance_ladder", self.PARAMS, state=state, exposures=exposures, exercise=PULL_UP,
                        sets=self.SETS, start_load=None, days_off=days_off)
 

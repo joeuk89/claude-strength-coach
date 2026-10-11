@@ -61,7 +61,7 @@ def _hit(exposure, targets):
     """True when every target set was logged at its target reps (the top of a range) at or under its RPE."""
     wanted = base.working(targets)
     logged = [s for s in exposure.sets if s.working]
-    if len(logged) < len(wanted):
+    if not wanted or len(logged) < len(wanted):
         return False
     for target, got in zip(wanted, logged):
         if (got.reps or 0) < (target.top_reps or 0):
@@ -99,13 +99,15 @@ def propose(ctx):
         judged = base.usable_oldest_first(ctx.exposures, date.fromisoformat(through))
     newest = judged[-1] if judged else None
     start = rung
-    if newest is not None and _hit(newest, targets) and rung < len(rungs) - 1:
+    if newest is not None and _hit(newest, newest.prescribed) and rung < len(rungs) - 1:
         rung += 1
     state = {"rung": rung, "through": source.date.isoformat() if source else through}
     name = rungs[rung]["name"]
     if rung > start:
         reason = (f"every set reached its target reps at or under the target RPE on {newest.date.isoformat()}, so "
                   f"up from {rungs[start]['name']} to {name}")
+    elif newest is not None and not newest.prescribed:
+        reason = f"historical prescription unknown on {newest.date.isoformat()}, so {name} holds"
     elif judged and rung == len(rungs) - 1:
         reason = f"{name} is the top rung, so it holds"
     elif judged:

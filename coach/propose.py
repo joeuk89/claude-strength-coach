@@ -178,7 +178,9 @@ class Run:
         doc = self.by_id.get(overlay_id)
         prescribed = self._prescribed(doc, raw["session_id"], raw["exercise_id"], raw["date"])
         sets = tuple(base.LoggedSet(index=s["index"], type=s["type"], reps=s["reps"], rpe=s["rpe"],
-                                    load=history.coaching_number(s["load"]))
+                                    load=history.coaching_number(s["load"]),
+                                    duration_seconds=s.get("duration_seconds"),
+                                    distance_meters=s.get("distance_meters"))
                      for s in raw["sets"] if not s.get("discounted"))
         return base.Exposure(
             date=dates.parse_date(raw["date"]), workout_id=raw["workout_id"], session_id=raw["session_id"],
@@ -196,8 +198,7 @@ class Run:
                 if line is not None:
                     return tuple(base.SetSpec.from_dict(s, load=history.coaching_number(s.get("load")))
                                  for s in line["sets"] if overlay.is_working(s))
-        slot = self.slot(session_id, exercise_id)
-        return tuple(s for s in base.expand(slot["sets"]) if s.working) if slot else ()
+        return ()
 
     def slot(self, session_id, exercise_id):
         session = self.sessions.get(session_id)
@@ -205,8 +206,10 @@ class Run:
             return None
         return next((e for e in session["exercises"] if e["exercise_id"] == exercise_id), None)
 
-    def exposures_of(self, exercise_id, before):
-        return tuple(e for e in self.exposures() if e.exercise_id == exercise_id and e.date < before)
+    def exposures_of(self, exercise_id, before, session_id=None, load_mode=None):
+        return tuple(e for e in self.exposures() if e.exercise_id == exercise_id and e.date < before
+                     and (session_id is None or e.session_id == session_id)
+                     and (load_mode is None or e.load_mode == load_mode))
 
     def e1rm(self, exercise_id, day):
         if self._series is None:
@@ -375,23 +378,51 @@ def _scheme_state(plugin, stored, slot_key, scheme_name, line_flag):
     return dict(stored["data"]), []
 
 
-def _gain(older, newer):
-    if newer.top_load is None or older.top_load is None:
-        return False
-    if newer.top_load > older.top_load + 1e-9:
+def _hardest_load(sets, direction):
+    loads = [s.load for s in sets if s.working and s.load is not None]
+    return (max(loads) if direction > 0 else min(loads)) if loads else None
+
+
+def _gain(older, newer, direction=None):
+    """Progress over comparable work, or None when the logged metrics cannot be compared."""
+    if older.load_mode != newer.load_mode:
+        return None
+    before, after = base.working(older.sets), base.working(newer.sets)
+    if not before or len(before) != len(after):
+        return None
+    mode = newer.load_mode
+    direction = direction if direction is not None else (-1 if mode == "assisted" else 1)
+    metric = {"duration": "duration_seconds", "distance": "distance_meters"}.get(mode, "reps")
+    if any(getattr(s, metric) is None for s in (*before, *after)):
+        return None
+    if mode in units.LOADED_MODES:
+        if any(s.load is None for s in (*before, *after)):
+            return None
+        old_load, new_load = _hardest_load(before, direction), _hardest_load(after, direction)
+        if (new_load - old_load) * direction > 1e-9:
+            return True
+        if not _same(old_load, new_load):
+            return False
+        old_work = sum(getattr(s, metric) for s in before if _same(s.load, old_load))
+        new_work = sum(getattr(s, metric) for s in after if _same(s.load, new_load))
+    else:
+        old_work, new_work = (sum(getattr(s, metric) for s in sets) for sets in (before, after))
+    if new_work > old_work:
         return True
+    matched = all((a.load, a.reps, a.duration_seconds, a.distance_meters) ==
+                  (b.load, b.reps, b.duration_seconds, b.distance_meters) for a, b in zip(before, after))
+    effort_known = all(s.rpe is not None for s in (*before, *after))
+    return (matched and effort_known and all(b.rpe <= a.rpe for a, b in zip(before, after))
+            and any(b.rpe < a.rpe for a, b in zip(before, after)))
 
-    def reps_at_top(exposure):
-        return sum(s.reps or 0 for s in exposure.sets if s.working and _same(s.load, exposure.top_load))
-    return _same(newer.top_load, older.top_load) and reps_at_top(newer) > reps_at_top(older)
 
-
-def _stalled(exposures):
+def _stalled(exposures, direction=None):
     usable = [e for e in exposures if e.usable and e.week_kind != "deload"][:STALL_EXPOSURES]
     if len(usable) < STALL_EXPOSURES:
         return None
     newest, middle, oldest = usable
-    if _gain(oldest, middle) or _gain(middle, newest):
+    gains = (_gain(oldest, middle, direction), _gain(middle, newest, direction))
+    if any(gain is None or gain for gain in gains):
         return None
     return [e.date.isoformat() for e in reversed(usable)]
 
@@ -452,9 +483,7 @@ def propose_line(run, session, day, exercise, ctx_extra):
         return flags.make(code, severity, session_id=session_id, exercise_id=exercise_id, message=message)
 
     state, line_flags = _scheme_state(plugin, ctx_extra["states"].get(slot_key), slot_key, scheme_name, line_flag)
-    slot_sets = tuple(s for s in base.expand(exercise["sets"]) if s.working)
-    exposures = tuple(e if e.prescribed else replace(e, prescribed=slot_sets)
-                      for e in run.exposures_of(exercise_id, day))
+    exposures = run.exposures_of(exercise_id, day, session_id=session_id, load_mode=mode)
     active = constraints_module.active(run.root, session_id, exercise_id, day)
     days_off = validity.days_off(run.root, exercise_id, day) or 0
     info = _exercise_info(run, session, exercise)
@@ -756,16 +785,27 @@ def _core_flags(ctx, entry, exercise, sets, exposures, active, line_flag, mode):
     if mode in units.LOADED_MODES and any(s.working and s.load is None for s in sets):
         found.append(line_flag("no_data", f"{ctx.exercise.name}: no usable exposure and no start load, so the load "
                                           "is left for the coach to set"))
-    dates_stalled = _stalled(exposures)
-    if dates_stalled:
-        found.append(line_flag("stalled", f"{ctx.exercise.name}: no load or rep gain over the exposures of "
-                                          f"{', '.join(dates_stalled)} (a coaching heuristic)"))
+    source = base.baseline(exposures)
+    if source is not None and not source.prescribed and ctx.scheme in (
+            "double_progression", "linear", "assistance_ladder"):
+        found.append(line_flag("prescription_unknown", f"{ctx.exercise.name}: historical prescription unknown on "
+                                          f"{source.date.isoformat()}; no prescribed hit or miss inferred"))
+    direction = ctx.exercise.load_direction
+    before_load = _hardest_load(source.sets, direction) if source else None
+    after_load = _hardest_load(sets, direction)
+    advancing_load = (before_load is not None and after_load is not None
+                      and (after_load - before_load) * direction > 1e-9)
+    dates_stalled = _stalled(exposures, direction)
+    if dates_stalled and not advancing_load:
+        found.append(line_flag("stalled", f"{ctx.exercise.name}: no load, reps, duration, distance or matched-work "
+                                          f"effort gain over the three comparable exposures of "
+                                          f"{', '.join(dates_stalled)} (a coaching heuristic, not a diagnosis)"))
     newest = base.newest(exposures)
     if newest is not None:
         caps = [c["value"] for c in active if c["kind"] == "rpe_cap"]
         cap = min(caps) if caps else None
         if patterns.is_compound(entry) or cap is not None:
-            prescribed = newest.prescribed or tuple(s for s in base.expand(exercise["sets"]) if s.working)
+            prescribed = newest.prescribed
             if patterns.rpe_drift(newest.sets, prescribed, cap):
                 found.append(line_flag("rpe_drift", f"{ctx.exercise.name}: two or more working sets on "
                                                     f"{newest.date.isoformat()} were logged 1 or more RPE over target"))
