@@ -1270,7 +1270,7 @@ Unless stated, each is a copy of `valid/` plus what is listed.
 | `slip/` | R-20 | DB bench logged Hevy 45 on 2026-09-28 and Hevy 90 on 2026-10-05 at the same reps and RPE, and DB shoulder press (template `F0000005`, confirmed `per_hand_x2`) Hevy 30 then 60 on the same dates. Not a full copy: `valid/`'s config, program, state and overlay, the library plus DB shoulder press, and `data/history/2026-09.json` and `2026-10.json` resolved by `history sync`; no Hevy cache |
 | `history-bad-schema/`, `history-unresolved/`, `annotations-invalid/` | R-20 | not copies of `valid/`: `valid/`'s config and `slip/`'s `2026-10.json`, with one fault each: a set with an unknown key `weight`; workout 3's squat as an unmatched "Mystery Lift"; an annotation discounting a workout the history lacks |
 | `flag-unknown/` | R-20 | not a copy of `valid/`: its config and its overlay, unapproved, carrying a flag with the unregistered code `no_such_code` |
-| `checkin/` | R-21a | external session `pt-tue` (Tue) in the program; approved overlay `2026-10-05-weekly` (span 2026-10-05..2026-10-11: Session A 2026-10-05 squat 3×5 @ 97.5 RPE 7.5, DB bench 3×10 @ 22.5/hand (Hevy: 45) RPE 8; Session B 2026-10-08 row 3×10 @ 30 RPE 8, pull-up 3×8 BW; Session A 2026-10-10 as on 10-05); records `check-ins/2026-09-06.md` (deep) and `check-ins/2026-10-04.md` (weekly); `[sessions.cap_minutes] session-a = 45`; `writes.jsonl` verify lines for both routines at 2026-10-04T19:00:00Z; cached routine `...0002` with `updated_at` 2026-10-07T07:00:00Z and one extra exercise |
+| `checkin/` | R-21a | external session `pt-tue` (Tue) in the program; approved overlay `2026-10-05-weekly` (span 2026-10-05..2026-10-11: Session A 2026-10-05 squat 3×5 @ 97.5 RPE 7.5, DB bench 3×10 @ 22.5/hand (Hevy: 45) RPE 8; Session B 2026-10-08 row 3×10 @ 30 RPE 8, pull-up 3×8 BW; Session A 2026-10-10 as on 10-05); `valid/`'s two records replaced by `check-ins/2026-09-06.md` (deep) and `check-ins/2026-10-04.md` (weekly, holding its week-review region); `[sessions.cap_minutes] session-a = 45`; `writes.jsonl` verify lines for both routines, `2026-10-05-weekly` and its approval hash, at 2026-10-04T19:00:00Z; a Hevy cache holding the four C14 workouts and the two routines as that overlay writes them, `...0002` with `updated_at` 2026-10-07T07:00:00Z and one extra exercise (DB bench); `data/history/2026-09.json` and `2026-10.json` from `history sync`; `miss` annotations 2026-09-14 Session A `sleep`, 2026-09-17 Session B `sleep`, 2026-09-21 Session A `time` |
 | `gap/` | R-21b | same program as `checkin/`; record `check-ins/2026-09-13.md` (weekly); last workout 2026-09-14 (squat 3×5 @ 100), none after; no overlay after 2026-09-20 |
 | `missed/` | R-22 | program with rules `miss-b` (fold row, 2 sets, into Session A), `miss-a` (shift to sat, then thu); approved overlay `2026-10-12-weekly` re-dated: Session A 2026-10-12, Session B 2026-10-14, Session A 2026-10-17; workout for Session A on 2026-10-12 only |
 | `dose/` | R-30a | program with `pt-tue` estimated at `{"chest": 3, "lats": 3}`; weekly overlays for 2026-W36 to 2026-W41; workouts and `external` annotations giving the weeks below (planned = Session A, Session B, PT = 3) |
@@ -3370,8 +3370,17 @@ coach.checkin.records(root) -> list[Record]        # Record(date, tier, path), o
 coach.checkin.due(root, today) -> Due
 # Due(last: Record | None, days_since: int | None, due_date: date | None,
 #     overdue_days: int, mode: "first" | "weekly" | "deep" | "catch_up", tier_reasons: list[str])
+coach.checkin.prepare(root, today, until=None, tier=None, now=None) -> dict   # the card
+coach.checkin.card_text(card) -> str                                         # the Sunday message
+coach.checkin.misses(root, since, until, now=None) -> dict
+coach.checkin.render_week_review(root, record_date) -> str                   # C11
+coach.checkin.skeleton(root, date, tier=None, overlay_id=None, refresh=False, dry_run=False, now=None) -> dict
 CATCH_UP_AFTER_DAYS = 10    # R-02's first return band ends at 10 days
 ```
+
+The message renderer is `card_text`, not `render_card`: the C11 sweep
+takes any top-level `render_<kind>` as the renderer of that region kind,
+and `render_card` would capture R-33b's `card` regions.
 
 - **Window**: day after the last record's date to today (`--until` sets
   the end). No record: from the program's first overlay span start.
@@ -3385,8 +3394,10 @@ CATCH_UP_AFTER_DAYS = 10    # R-02's first return band ends at 10 days
 - `due_date` = last record date + `[checkin] cadence_days`.
 
 **Card document** (`checkin prepare` → `data.card`; `data.text` is the
-markdown from `coach.checkin.render_card(card)`). It reads history with
-`include_unsynced=True` (C17):
+markdown from `coach.checkin.card_text(card)`). It reads history with
+`include_unsynced=True` (C17). The last record is the newest one dated
+before the window end, so re-running `prepare` after writing today's
+record gives the same card:
 
 ```json
 {
@@ -3399,18 +3410,22 @@ markdown from `coach.checkin.render_card(card)`). It reads history with
     "planned_core": 3, "trained_core": 2, "optional_trained": 0,
     "rows": [{"date": "2026-10-05", "session_id": "session-a", "title": "Session A", "tier": "core",
               "status": "trained", "moved": false, "unlogged": false, "tag": null,
-              "workout_id": "…", "minutes": 58, "cap_minutes": 45}],
+              "workout_id": "…", "workout_date": "2026-10-05", "minutes": 58, "cap_minutes": 45}],
     "external": [{"date": "2026-10-06", "external_id": "pt-tue", "title": "PT", "done": null, "note": null}],
     "extra": []
   },
   "exercises": [{"date": "2026-10-05", "session_id": "session-a", "exercise_id": "bb_back_squat",
-                 "prescribed": "3×5 @ 97.5 @ RPE 7.5", "logged": "5, 5, 5 @ 97.5 @ RPE 7.5",
-                 "status": "hit", "rpe_delta": 0}],
-  "e1rm": [{"exercise_id": "bb_back_squat", "date": "2026-10-05", "e1rm": 121.88, "delta": 1.54, "method": "epley_rir"}],
-  "hevy": [{"routine_id": "…0002", "title": "Session B", "state": "edited_in_app",
-            "changes": [{"class": "structural", "path": "…", "before": null, "after": "…"}]}],
+                 "name": "Back Squat (Barbell)", "prescribed": "3×5 @ 97.5 @ RPE 7.5",
+                 "logged": "5, 5, 5 @ 97.5 @ RPE 7.5", "status": "hit", "rpe_delta": 0}],
+  "e1rm": [{"exercise_id": "bb_back_squat", "name": "Back Squat (Barbell)", "load_mode": "total",
+            "date": "2026-10-05", "e1rm": 121.88, "delta": 1.55, "method": "epley_rir"}],
+  "hevy": [{"routine_id": "…0002", "title": "Session B", "session_id": "session-b",
+            "overlay_id": "2026-10-05-weekly", "state": "edited_in_app",
+            "changes": [{"class": "structural", "path": "…", "before": null, "after": "…"}],
+            "summary": "Bench Press (Dumbbell) added"}],
   "flags": [],
-  "fields": [{"id": "sessions", "n": 1, "prefill": "…", "ask": "…"}],
+  "fields": [{"id": "sessions", "n": 1, "label": "Sessions", "prefill": "…", "ask": "…"}],
+  "facts": [], "nudge_lines": [],
   "misses": null,
   "catch_up": null
 }
@@ -3424,31 +3439,45 @@ markdown from `coach.checkin.render_card(card)`). It reads history with
 - `exercises`: one row per prescribed exercise of a trained session.
   `prescribed` and `logged` text use `units.format_load`; status and
   `rpe_delta` from C18.
-- `e1rm`: exercises with a C18 point in the window; `delta` = C18 `delta`.
-  Compounds first (`coach.patterns.is_compound` once R-23a exists; library
-  order before), at most eight rows.
+- `e1rm`: exercises with a C18 point in the window; `delta` = C18 `delta`
+  (latest minus previous rounded point, counting only points up to the
+  window end). Compounds first (`coach.patterns.COMPOUND_PATTERNS` once
+  R-23a exists; library order before), at most eight rows (a heuristic).
 - `hevy`: per routine of an active session (`state.hevy.routines`),
-  comparing the cache with the newest approved overlay holding that session
-  through R-14's `coach.routines.diff`, offline. `edited_in_app`: a
+  comparing the cache with the newest approved overlay whose span starts
+  on or before the window end and whose session carries that routine,
+  through R-14's `coach.routines.diff`, offline. (An approved overlay for
+  next week is the programming pass's to write; the card judges the
+  routines the athlete has been training from.) `state` is `current`,
+  `not_written`, `edited_in_app`, `loads_edited` or `not_cached`;
+  `summary` describes the listed changes in words. `edited_in_app`: a
   `structural` change and a cached `updated_at` after the routine's last
   C9 `verify` line; becomes a keep-or-replace question (R-03).
-  `not_written`: no `verify: true` line for this routine and that overlay;
-  raises `stale_routine`. Load-only edits are listed as a fact, not asked
-  (R-03 overwrites them). Skipped when `[hevy] enabled` is false.
+  `not_written`: no `verify: true` line for this routine, that overlay and
+  its approval hash; raises `stale_routine`. Load-only edits
+  (`loads_edited`) are listed as a fact, not asked (R-03 overwrites
+  them). Skipped when `[hevy] enabled` is false.
 - `flags`: C20 objects for the window: `convention_slip` (open audit
   candidates), `duration_over_cap`, `stale_routine`, plus part flags.
   Presented through `coach.flags.for_mode` (C44).
 - `misses` (deep tier only): `coach.checkin.misses(root, since=last deep
   record date, until=window end)` →
   `{"by_tag": {"time": 0, "sleep": 2, "ill": 0, "family": 0, "skipped": 0, "other": 0, "untagged": 1},
-    "by_session": {"session-a": 2}, "sessions_missed": 3}`. Counts `miss`
-  annotations and untagged missed planned sessions (C18).
+    "by_session": {"session-a": 2}, "sessions_missed": 3}`, plus `since`
+  and `until`. Counts each missed planned session (C18 adherence over the
+  span, by its tag or `untagged`) and each `miss` annotation in the span
+  that no planned session's overlay span could match, so a tagged miss is
+  counted once.
+- `facts` and `nudge_lines` collect the parts' contributions. Facts print
+  above the fields; nudge lines are for a short reminder (R-45) and never
+  print in the card.
 
 **Fields.** Ids and order are R-01's Sunday message: `sessions`,
 `coach_led`, `runs`, `sleep`, `niggles`, `nutrition`, `meal_plan`,
 `next_week`, then `hevy_edits` (only when a routine is `edited_in_app`).
-Each field is `{id, n, prefill, ask}`: `prefill` states what the data
-shows for confirmation, `ask` is the question. Fields that cannot apply are
+Each field is `{id, n, label, prefill, ask}`: `label` is the field's
+name in the message, `prefill` states what the data shows for
+confirmation, `ask` is the question. Fields that cannot apply are
 left out and the rest renumbered from 1 (no external sessions → no
 `coach_led`; no unlogged or missed sessions → `sessions` is a statement
 with no ask). Builtin fields:
@@ -3470,19 +3499,23 @@ change the card without editing R-21a's modules:
 FIELDS = ("nutrition", "meal_plan")    # field ids this part owns; may be empty
 def contribute(ctx: CardContext) -> Contribution | None
 # CardContext: root, today, window, mode, card (read-only so far)
+# Field(prefill=None, ask=None, label=None)
 # Contribution(fields: dict[str, Field | None] = {},   # None = omit that field
 #              facts: list[str] = [], flags: list[dict] = [],
 #              tier_reasons: list[str] = [], nudge_lines: list[str] = [])
 ```
 
 - Two parts owning the same field id is an error at discovery (exit 1,
-  both modules named). A part's `Field` replaces the builtin; returning
-  `None` for a contribution falls back to the builtin.
+  both modules named), and so is a part setting a field it does not own.
+  A part's `Field` replaces the builtin; returning `None` for a
+  contribution falls back to the builtin. A field id outside R-01's list
+  goes after `next_week`, before `hevy_edits`.
 - Parts are pure reads and run in a fixed order (module name).
 - R-21a ships one part itself, `nutrition`: when `coach.nutrition` exists
   and `nutrition status` says enabled, it replaces `nutrition` with
-  `data.questions` (pre-fills included), omits `meal_plan`, and passes the
-  food-exceptions question as a `nudge_lines` entry. When the module is
+  `data.questions` (pre-fills included), labelled `Food`, omits
+  `meal_plan`, and passes the food-exceptions question
+  (`coach.nutrition.QUESTION_NEXT_WEEK`) as a `nudge_lines` entry. When the module is
   absent or reports `{"enabled": false}`, it returns None and R-01's
   builtin fields stay. A soft dependency on R-33a: nothing is computed
   from nutrition data here.
@@ -3522,15 +3555,25 @@ as it was):
 ```
 
 - The week-review region is the card's data part, rendered as of the
-  record date (no questions). The overlay region is R-13's `overlay render`.
+  record date (no questions). It reads committed history only (no
+  `include_unsynced`), leaves out the Hevy routine list and card parts,
+  and takes its tier from the record's title, so a fresh render needs
+  nothing gitignored. The skeleton warns when the window holds workouts
+  not yet synced. The overlay region is R-13's `overlay render`.
+- `--refresh` re-renders the week-review region only on the newest
+  record (an older one is archive, C11), and every `overlay` region in
+  the file; with `--overlay ID` it adds the collapsed prescription when
+  the record has no region for it.
 - Coach's read, Decisions and Next week are prose the coach writes. R-01's
   `Missed:` line lives in the region; R-02's adherence decision line and
   block status line are prose in Decisions until R-30a and R-31 script
   them.
 - Deep records add `## Block planning` after Decisions, and `misses` in
   the region.
-- Check `checkin_record_words` (warn): prose outside rendered regions and
-  `<details>` over 600 words (weekly) or 1,000 (deep). Check
+- Check `checkin_record_words` (warn): prose outside the title, rendered
+  regions and `<details>` over 600 words (weekly, catch-up) or 1,000
+  (deep), heuristics. It reads records in the skeleton format (holding a
+  week-review region), so older hand-written records never warn. Check
   `checkin_records` (warn): a file in `check-ins/` named like a record
   whose first line does not parse.
 - Hevy sync details never go in the record: C9's `writes.jsonl` is the log.

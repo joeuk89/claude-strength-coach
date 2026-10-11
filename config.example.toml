@@ -54,6 +54,11 @@ dumbbells = []                # per-hand dumbbell weights available; [] = not ch
 # [sessions.cap_minutes]
 # session-a = 45
 
+# Check-ins fall due this many days after the last record in check-ins/
+# (python3 -m coach checkin due).
+[checkin]
+cadence_days = 7
+
 # Nutrition strategy, set by /goals with the athlete's approval. Left out,
 # or with enabled = false, nutrition is off: the check-in asks for one
 # morning weigh-in and /goals sets things up. Weights are in [athlete]
