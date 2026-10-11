@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "last_pull_started_at": "2026-10-11T12:00:00Z",
+  "last_pull_finished_at": "2026-10-11T12:00:00Z",
+  "last_full_pull_at": "2026-10-11T12:00:00Z",
+  "events_since": "2026-10-11T12:00:00Z",
+  "counts": {
+    "workouts": 4,
+    "routines": 2,
+    "routine_folders": 1,
+    "exercise_templates": 4,
+    "body_measurements": 2
+  }
+}
