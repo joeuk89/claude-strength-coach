@@ -77,8 +77,10 @@ equipment, training week, time per session, injuries, recovery, cardio).
 1. **Confirm the constraints** from the profile; ask only what's missing.
 2. **Propose 2–3 structure options** that fit the constraints, with
    trade-offs (e.g. for 4 days: upper/lower vs. full-body vs. PPL+1).
-   Recommend one and say why. Research current best practice where the
-   choice depends on evidence; cite sources.
+   Recommend one and say why. Where the choice depends on evidence,
+   follow `CLAUDE.md` "Researching current best practice": read the notes
+   for the area first, research and save a local note when none answers
+   it, and cite claim ids.
 3. **Draft the program:** `program.md` rules first (progression scheme —
    double progression is a sensible default; RPE targets; deload policy —
    a hard-week ceiling and the fatigue triggers from `CLAUDE.md`

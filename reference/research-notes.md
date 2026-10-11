@@ -72,8 +72,8 @@ updates = ["rn:<template-note-id>.<n>"]
 
 [[sources]]
 id = "smith-2024"
-citation = "Smith A, et al. Title of the paper. Journal. 2024;10:100-110."
-url = "https://doi.org/10.xxxx/xxxxx"
+citation = "Smith A, Jones B. Title of the paper. Journal. 2024;10:100-110."
+url = "https://<the paper's DOI link>"
 type = "systematic-review"
 year = 2024
 
