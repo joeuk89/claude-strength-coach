@@ -219,6 +219,15 @@ class SessionStartTest(unittest.TestCase):
 
 
 class PostToolUseTest(unittest.TestCase):
+    def test_equipment_profile_write_does_not_block(self):
+        root = copy_of(self, VALID)
+        profile = root / "profile.md"
+        profile.write_text("Home only: adjustable dumbbells, 2–20 kg per hand in 2 kg steps.\n"
+                           "dumbbells 5–40 kg per hand in 2.5 kg steps. Plates down to 1.25 kg\n"
+                           "cables and dumbbells to 30 kg.\n", encoding="utf-8")
+        code, response, _ = run_hook("posttooluse", root, edit_input(profile))
+        self.assertEqual((code, response), (0, None))
+
     def test_hand_edited_routine_page_blocks_naming_the_check(self):
         root = copy_of(self, STALE)
         code, response, _ = run_hook("posttooluse", root, edit_input(root / "routine" / "session-a.md"))

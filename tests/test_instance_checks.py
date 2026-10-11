@@ -376,6 +376,83 @@ class EnvUntrackedTest(unittest.TestCase):
 
 
 class BareHevyValuesTest(unittest.TestCase):
+    def test_equipment_and_other_exercises_are_not_dumbbell_prescriptions(self):
+        examples = (
+            "Home only: adjustable dumbbells, 2–20 kg per hand in 2 kg steps.",
+            "dumbbells 5–40 kg per hand in 2.5 kg steps. Plates down to 1.25 kg",
+            "cables and dumbbells to 30 kg.",
+            "Next block: the 20 kg dumbbell is the heaviest she has. Goal plan current: 1.9 kg to 73 kg.",
+            "dumbbell Romanian deadlift 20/hand × 10–12, leg curl 25 kg × 15, "
+            "assisted pull-up 6s at 50 kg assistance.",
+            "Dumbbells go up in 2.5 kg at the gym.",
+            "Lateral raise at 15 lb fell short: the 5 lb cable step is a third of the load.",
+            "Lateral raise on the cable machine: 10 kg.",
+            "dumbbells up to 30 kg per hand.",
+            "DB bench 20 kg per hand, leg curl 25 kg.",
+        )
+        for text in examples:
+            with self.subTest(text=text), TempCopy() as tmp:
+                config = (tmp.root / "config.toml").read_text()
+                tmp.write("config.toml", config.replace("enabled = true", "enabled = false", 1))
+                tmp.write("profile.md", text)
+                code, results, _ = check(tmp.root, "bare_hevy_values")
+                self.assertEqual(code, 0, failures(results, "bare_hevy_values"))
+
+    def test_explicit_dumbbell_loads_still_fail_in_separate_clauses(self):
+        with TempCopy() as tmp:
+            tmp.write("profile.md", "DB bench 20 kg, leg curl 25 kg; dumbbell RDL 30 kg.")
+            _, results, _ = check(tmp.root, "bare_hevy_values")
+            failed = failures(results, "bare_hevy_values")
+            self.assertEqual(len(failed), 2, failed)
+            self.assertIn("20 kg", failed[0]["message"])
+            self.assertIn("30 kg", failed[1]["message"])
+            self.assertTrue(all("'25 kg'" not in r["message"] for r in failed))
+
+    def test_a_comma_before_a_load_does_not_detach_it_from_the_exercise(self):
+        with TempCopy() as tmp:
+            tmp.write("profile.md", "DB bench, 20 kg")
+            code, results, _ = check(tmp.root, "bare_hevy_values")
+            self.assertEqual(code, 1, results)
+            self.assertIn("'20 kg'", failures(results, "bare_hevy_values")[0]["message"])
+
+    def test_confirmed_per_hand_goblet_load_fails_without_hevy_requirement(self):
+        with TempCopy() as tmp:
+            tmp.edit_json("data/exercises.json", lambda d: d["exercises"].update(
+                goblet_squat={"load_mode": "per_hand_x2"}))
+            config = (tmp.root / "config.toml").read_text()
+            tmp.write("config.toml", config.replace("enabled = true", "enabled = false", 1))
+            tmp.write("profile.md", "goblet squat 20 kg")
+            code, results, _ = check(tmp.root, "bare_hevy_values")
+            self.assertEqual(code, 1)
+            [failed] = failures(results, "bare_hevy_values")
+            self.assertIn("per-hand", failed["message"])
+            self.assertNotIn("Hevy", failed["message"])
+
+    def test_equipment_context_resolves_lateral_raise_variants(self):
+        for text, expected in (("dumbbell lateral raise 10 kg", 1),
+                               ("cable lateral raise 10 kg", 0),
+                               ("lateral raise (cable) 10 kg", 0),
+                               ("lateral raise 10 kg", 0)):
+            with self.subTest(text=text), TempCopy() as tmp:
+                tmp.write("profile.md", text)
+                code, results, _ = check(tmp.root, "bare_hevy_values")
+                self.assertEqual(code, expected, failures(results, "bare_hevy_values"))
+
+    def test_overlay_ignores_measurements_but_still_checks_its_load(self):
+        with TempCopy() as tmp:
+            tmp.edit_overlay(lambda doc: db_bench(doc).update(
+                target_note="bodyweight 73 kg; dumbbells up to 30 kg; move to 8 kg"))
+            _, results, _ = check(tmp.root, "bare_hevy_values")
+            [failed] = failures(results, "bare_hevy_values")
+            self.assertIn(": '8 kg' for db_bench_press", failed["message"])
+
+    def test_per_hand_only_passes_with_hevy_enabled(self):
+        with TempCopy() as tmp:
+            tmp.write("profile.md", "DB bench 20 kg per hand.")
+            tmp.edit_overlay(lambda doc: db_bench(doc).update(target_note="move to 20 kg per hand"))
+            code, results, _ = check(tmp.root, "bare_hevy_values")
+            self.assertEqual(code, 0, failures(results, "bare_hevy_values"))
+
     def test_two_number_form_passes(self):
         with TempCopy() as tmp:
             tmp.edit_overlay(lambda doc: db_bench(doc).update(target_note="go to 25/hand (Hevy: 50)"))
@@ -474,6 +551,12 @@ class LoadFigureTest(unittest.TestCase):
     def test_figures(self):
         cases = {
             "go to 50 kg": ["50 kg"],
+            "dumbbells go up in 2.5 kg": [],
+            "move dumbbells to 8 kg": ["8 kg"],
+            "dumbbells up to 30 kg; move to 8 kg": ["8 kg"],
+            "equipment has 2.5 kg steps; add 2.5 kg": ["2.5 kg"],
+            "bodyweight 73 kg; move to 8 kg": ["8 kg"],
+            "plates down to 1.25 kg": [],
             "go to 25/hand (Hevy: 50)": [],
             "22.5 → 25/hand": [],
             "45 → 50": ["45", "50"],

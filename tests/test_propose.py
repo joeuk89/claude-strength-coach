@@ -615,6 +615,35 @@ class OverrideTest(ProposeCase):
                               "bb_back_squat", *extra, expect=expect, env=env)
         return envelope["data"] if expect == 0 else envelope
 
+    def test_ambiguous_per_hand_reason_is_rejected_before_any_write(self):
+        for standing in ((), ("--standing",)):
+            with self.subTest(standing=standing):
+                before = self.snapshot()
+                result = self.coach("propose", "override", "--proposal", FIRST_ID, "--session", "session-a",
+                                    "--exercise", "db_bench_press", "--load", "8", "--reason", "move to 8 kg",
+                                    *standing, expect=1)
+                self.assertIn("per-hand", result["error"]["message"])
+                self.assertEqual(self.snapshot(), before)
+
+    def test_hevy_off_override_refusal_requests_only_per_hand_wording(self):
+        self.set_config("enabled = true", "enabled = false")
+        before = self.snapshot()
+        result = self.coach("propose", "override", "--proposal", FIRST_ID, "--session", "session-a",
+                            "--exercise", "db_bench_press", "--load", "8", "--reason", "move to 8 kg",
+                            "--standing", expect=1)
+        self.assertIn("per-hand", result["error"]["message"])
+        self.assertNotIn("Hevy", result["error"]["message"])
+        self.assertEqual(self.snapshot(), before)
+
+    def test_corrected_per_hand_reason_can_be_approved_and_checked(self):
+        self.coach("propose", "override", "--proposal", FIRST_ID, "--session", "session-a",
+                   "--exercise", "db_bench_press", "--load", "8", "--reason", "move to 8 kg per hand",
+                   "--standing")
+        self.coach("propose", "finalize", "--proposal", FIRST_ID)
+        self.coach("overlay", "approve", FIRST_ID)
+        result = self.coach("check", "--only", "bare_hevy_values")
+        self.assertTrue(all(r["status"] != "fail" for r in result["data"]["results"]))
+
     def test_a_standing_override_holds_until_its_end_date(self):
         data = self.override("--sets", "3x5@95 rpe7", "--reason", "knee", "--standing")
         draft = read_json(self.draft_path())
