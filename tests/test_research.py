@@ -291,6 +291,12 @@ class TemplateRepoTest(unittest.TestCase):
         self.assertTrue(all(c.scope == "framework" for c in citations if c.path.startswith("coach/")))
         self.assertEqual([n for n in notes if n.kind == "local"], [])
 
+    def test_every_shipped_note_is_valid_and_rendered(self):
+        notes, problems, _ = research.load_all(REPO_ROOT)
+        self.assertEqual([p.message for p in problems], [])
+        stale = [note.id for note in notes if research.region_in(note) != research.render_note(note)]
+        self.assertEqual(stale, [])
+
     def test_schema_uses_only_the_supported_subset(self):
         check_schema(jsonio.load_schema("research_note"))
 
