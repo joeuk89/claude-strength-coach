@@ -19,7 +19,7 @@ NOW = {"COACH_NOW": "2026-10-11T18:00:00Z"}
 LAYOFF = INSTANCES / "layoff"
 R24_CODES = {"stale_prescription": ("block",), "unearned_load": ("block",), "load_cap": ("block",),
              "load_unrepresentable": ("block",), "load_mode_mismatch": ("block",), "load_mode_unconfirmed": ("block",),
-             "rpe_infeasible": ("warn",), "session_over_cap": ("warn",)}
+             "rpe_infeasible": ("warn",), "session_over_cap": ("warn",), "load_geometry_unknown": ("warn",)}
 LOAD_CODES = ("stale_prescription", "unearned_load", "load_cap", "load_unrepresentable", "rpe_infeasible")
 
 
@@ -275,7 +275,7 @@ class CapsAndKitTest(ValidityCase):
         self.assertIn("load_cap", codes(self.found(), "db_bench_press"))
 
     def test_dumbbell_not_in_the_rack(self):
-        self.bench(24)
+        self.bench(17.5)
         self.assertEqual(codes(self.found(), "db_bench_press"), [])
         self.set_config("dumbbells = []", "dumbbells = [20, 22.5, 25]")
         self.assertEqual(codes(self.found(), "db_bench_press"), ["load_unrepresentable"])
@@ -300,9 +300,11 @@ class CapsAndKitTest(ValidityCase):
         self.bench(12.5)
         self.assertEqual(codes(self.found(), "db_bench_press"), [])
 
-    def test_an_empty_home_rack_is_not_checked(self):
+    def test_an_empty_home_rack_uses_the_declared_grid(self):
         self.set_config("dumbbells = [5, 10, 15, 20]", "dumbbells = []")
         self.at_home()
+        self.bench(12)
+        self.assertEqual(codes(self.found(), "db_bench_press"), ["load_unrepresentable"])
         self.bench(12.5)
         self.assertEqual(codes(self.found(), "db_bench_press"), [])
 

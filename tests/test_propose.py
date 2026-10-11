@@ -131,8 +131,8 @@ class ValidWeekTest(ProposeCase):
     def test_lines_quote_loads_through_units(self):
         data = self.propose("--dry-run")
         bench = next(row for row in data["lines"] if row["exercise_id"] == "db_bench_press")
-        self.assertEqual(bench["text"], "3×8–10 @ 24.5/hand (Hevy: 49) RPE 8")
-        self.assertEqual(bench["change"], "25/hand (Hevy: 50) → 24.5/hand (Hevy: 49)")
+        self.assertEqual(bench["text"], "3×8–10 @ 25/hand (Hevy: 50) RPE 8")
+        self.assertIsNone(bench["change"])
         self.assertEqual(set(bench), {"session_id", "date", "exercise_id", "text", "change", "rationale", "flags"})
 
     def test_overlay_sessions_copy_the_program_location(self):
@@ -173,6 +173,7 @@ class DoubleProgressionTest(ProposeCase):
     workouts = staticmethod(edit_sets(BENCH, lambda wid, i, s: s.update(weight_kg=48.0)))
 
     def test_top_of_the_range_adds_the_increment_and_keeps_the_program_range_and_rpe(self):
+        self.set_config("dumbbell_increment = 2.5", "dumbbell_increment = 2.0")
         line = find_line(self.propose("--dry-run")["overlay"], "db_bench_press")
         for set_ in working(line):
             self.assertIsNone(set_.get("reps"))
@@ -190,6 +191,7 @@ class DoubleProgressionShortTest(ProposeCase):
         edit_sets(BENCH, change)(found)
 
     def test_one_set_short_holds_the_load_at_the_program_range(self):
+        self.set_config("dumbbell_increment = 2.5", "dumbbell_increment = 2.0")
         line = find_line(self.propose("--dry-run")["overlay"], "db_bench_press")
         self.assertEqual({(s["rep_range"]["start"], s["rep_range"]["end"], s["rpe"], coaching(s["load"]))
                           for s in working(line)}, {(8, 10, 8, 24)})
@@ -202,6 +204,7 @@ class DoubleProgressionAfterOwnOverlayTest(ProposeCase):
 
     def setUp(self):
         super().setUp()
+        self.set_config("dumbbell_increment = 2.5", "dumbbell_increment = 2.0")
         weekly = read_json(self.root / "data" / "overlays" / "2026-10-12-weekly.json")
         weekly.pop("approval")
         weekly.update(id="2026-10-05-weekly", created_at="2026-10-04T18:00:00Z",
@@ -492,7 +495,7 @@ class CapsAndConstraintsTest(ProposeCase):
         self.set_config("[caps]", "[caps]\ndb_bench_press = 24")
         doc = self.propose("--dry-run")["overlay"]
         line = find_line(doc, "db_bench_press")
-        self.assertEqual({coaching(s["load"]) for s in working(line)}, {24})
+        self.assertEqual({coaching(s["load"]) for s in working(line)}, {22.5})
         self.assertIn("constraint_applied", codes(doc, "db_bench_press"))
         self.assertNotIn("load_cap", codes(doc))
 
@@ -581,7 +584,7 @@ class ConventionSlipTest(ProposeCase):
         bench = find_line(doc, "db_bench_press")
         self.assertEqual(bench["provenance"]["derived_from"], {"date": "2026-09-28", "workout_id": W[1]})
         self.assertIn("convention_slip", codes(doc, "db_bench_press"))
-        self.assertEqual({coaching(s["load"]) for s in working(bench)}, {24.5})
+        self.assertEqual({coaching(s["load"]) for s in working(bench)}, {24})
 
 
 class DeloadTest(ProposeCase):

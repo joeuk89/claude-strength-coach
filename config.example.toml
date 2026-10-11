@@ -38,11 +38,12 @@ apparatus = []                # benches, bars and supports confirmed here: "flat
                               # "pull_up_bar", "dip_station", "nordic_anchor", "box" (a sturdy box, step
                               # or chair; a bench serves as one). [] with available = [] assumes every
                               # piece; otherwise an unlisted one is missing
-dumbbells = []                # per-hand dumbbell weights available; [] = not checked
+dumbbells = []                # per-hand rack; [] = use the physical increment grid
 # dumbbell_increment = 2.0    # smallest per-hand dumbbell jump
 # dumbbell_max = 40.0         # heaviest per-hand dumbbell; prescriptions are capped here
 # barbell_increment = 2.5     # smallest jump in total bar load
 # bar_weight = 20.0
+# smith_base_weight = 15.0   # known effective unloaded Smith mass, in athlete units; never inferred
 # plates = [25, 20, 15, 10, 5, 2.5, 1.25]  # plate sizes you have in pairs, one per side; any number of each
 # machine_increment = 5.0
 # cable_increment = 2.5

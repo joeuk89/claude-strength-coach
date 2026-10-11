@@ -99,9 +99,10 @@ class Section(dict):
 class Config(Section):
     """The validated config: every known table, defaults filled in."""
 
-    def __init__(self, data, path):
+    def __init__(self, data, path, declared_equipment=None):
         super().__init__(data)
         self.path = Path(path)
+        self.declared_equipment = declared_equipment or {}
 
 
 def _sectioned(value):
@@ -361,7 +362,7 @@ def parse(raw, path, today=None):
         message = first if not more else f"{first} (and {more} more problem(s))"
         raise ConfigError(message, details=details)
 
-    return Config({name: _sectioned(value) for name, value in data.items()}, path)
+    return Config({name: _sectioned(value) for name, value in data.items()}, path, raw.get("equipment"))
 
 
 def parse_file(path, today=None):

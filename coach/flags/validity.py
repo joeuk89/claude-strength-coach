@@ -21,3 +21,6 @@ register("rpe_infeasible", owner="R-24", severities=("warn",),
          summary="RPE target more than 1 away from the RPE implied by load, reps and current e1RM.")
 register("session_over_cap", owner="R-24", severities=("warn",),
          summary="Estimated session duration above its cap.")
+
+register("load_geometry_unknown", owner="R-24", severities=("warn",),
+         summary="Physical load feasibility is unknown because the equipment base mass is not configured.")

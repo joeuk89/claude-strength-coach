@@ -20,7 +20,7 @@ from coach import constraints as constraints_module
 from coach import dates, decisions, flags, followups, history, jsonio, niggles, overlay, paths, patterns, plugins
 from coach import cardio, conditioning, external, program, research, weekflags
 from coach import state as state_module
-from coach import stats, units, validity
+from coach import loads, stats, units, validity
 from coach.checks.instance import cap_for
 from coach.errors import ConfigError, RefusedError, UsageError, ValidationError
 from coach.library import Library, e1rm_supported
@@ -145,22 +145,6 @@ def _metric_problem(exercise_id, mode, sets):
     if mode != "duration" and timed:
         return f"{exercise_id} is {mode}, not a duration line, so --sets takes reps, not seconds"
     return None
-
-
-def _on_grid(value, increment, direction, anchor):
-    """`value` rounded to a whole number of increments from `anchor`, in `direction`."""
-    if value >= anchor:
-        return units.json_number(round(anchor + units.round_to_increment(value - anchor, increment, direction), 6))
-    flipped = {"down": "up", "up": "down"}.get(direction, direction)
-    return units.json_number(round(anchor - units.round_to_increment(anchor - value, increment, flipped), 6))
-
-
-def _from_list(value, available, direction):
-    available = sorted(available)
-    if direction == "down":
-        lower = [w for w in available if w <= value + 1e-9]
-        return lower[-1] if lower else available[0]
-    return min(available, key=lambda w: (abs(w - value), -w))
 
 
 class Run:
@@ -556,8 +540,17 @@ def propose_line(run, session, day, exercise, ctx_extra):
         cap, cap_source = cap_for(run.config, exercise_id, mode, location) if mode in units.LOADED_MODES else (None, None)
     except ConfigError:
         cap, cap_source = None, None
-    references = _reference_loads(source, ctx, exercise)
-    rounding = (run, entry, exercise_id, location, mode, cap, references, source, info.load_direction)
+    ceilings = [c["value"] for c in active if c["kind"] == "load_cap"]
+    if cap is not None:
+        ceilings.append(cap)
+    floor = None
+    if newest is not None and newest.top_load is not None and any(c["kind"] == "no_added_load" for c in active):
+        if info.load_direction > 0:
+            ceilings.append(newest.top_load)
+        else:
+            floor = newest.top_load
+    rounding = (run, entry, exercise_id, location, mode, min(ceilings, default=None), floor, source,
+                info.load_direction, scheme_name == "assistance_ladder")
 
     def limited(sets, round_down):
         """Constraints, the illness cap, caps and rounding: what every load passes after its scheme."""
@@ -571,6 +564,9 @@ def propose_line(run, session, day, exercise, ctx_extra):
                 clipped.update(changed)
                 per_hand = "/hand" if mode in units.PER_HAND_MODES else ""
                 words.append(f"{cap_source} caps the load at {units.json_number(cap)}{per_hand}")
+        if scheme_name == "assistance_ladder" and clipped:
+            raise ValidationError(f"{slot_key}: an explicit ladder rung conflicts with a load cap or constraint; "
+                                  "edit the rung or equipment/constraint configuration before proposing")
         return _rounded(sets, clipped, round_down, rounding), words
 
     sets, constraint_words = limited(proposal.sets, proposal.round_down)
@@ -754,31 +750,16 @@ def _check_proposal(plugin, proposal):
         raise ValidationError(f"Scheme {plugin.name} gave no rationale")
 
 
-def _reference_loads(source, ctx, exercise):
-    """Loads already real for this slot: the derived-from load, the last approved loads, the start load."""
-    found = []
-    if source is not None and source.top_load is not None:
-        found.append(source.top_load)
-    if ctx.last_prescription:
-        found += [s.load for s in ctx.last_prescription["sets"] if s.load is not None]
-    if exercise["start_load"] is not None:
-        found.append(exercise["start_load"])
-    return found
-
-
 def _rounded(sets, clipped, round_down, rounding):
-    """Each load snapped to the kit: lighter below the derived-from load, nearest otherwise; never past a cap (C23).
+    """Each load snapped to the kit: toward less effort when lightened, nearest otherwise; never past a cap (C23).
 
     More assistance is a lighter lift, so assistance rounds up where other loads round down.
     """
-    run, entry, exercise_id, location, mode, cap, references, source, load_direction = rounding
+    run, entry, exercise_id, location, mode, cap, floor, source, load_direction, exact = rounding
     if mode not in units.LOADED_MODES:
         return tuple(replace(s, load=None) for s in sets)
     kit = run.kit(location)
-    dumbbells = kit.get("dumbbells") or []
-    by_list = entry.get("equipment") == "dumbbell" and mode in units.PER_HAND_MODES and bool(dumbbells)
-    increment = run.increment(exercise_id, location)
-    anchor = references[0] if references else 0
+    available = loads.AvailableLoads(entry.get("equipment"), mode, kit, run.increment(exercise_id, location))
     derived = source.top_load if source is not None else None
     found = []
     for index, s in enumerate(sets):
@@ -786,16 +767,16 @@ def _rounded(sets, clipped, round_down, rounding):
             found.append(s)
             continue
         value = max(0, s.load)
-        lighter = round_down or (derived is not None and value < derived - 1e-9) or index in clipped
+        lighter = round_down or (derived is not None and (value - derived) * load_direction < -1e-9) or index in clipped
         direction = ("down" if load_direction > 0 else "up") if lighter else "nearest"
-        if by_list:
-            value = _from_list(value, dumbbells, direction)
-            if cap is not None and value > cap + 1e-9:
-                value = _from_list(cap, dumbbells, "down")
-        elif index not in clipped and increment and not any(_same(value, r) for r in references):
-            value = _on_grid(value, increment, direction, anchor)
-            if cap is not None and value > cap + 1e-9:
-                value = _on_grid(cap, increment, "down", anchor)
+        if not exact:
+            selected = available.select(value, direction, cap)
+            if selected is not None and floor is not None and selected < floor and (cap is None or cap >= floor):
+                selected = available.select(floor, "up", cap)
+            if selected is None and cap is not None:
+                selected = available.select(cap, "down", cap)
+            if selected is not None:
+                value = selected
         found.append(replace(s, load=units.json_number(max(0, value))))
     return tuple(found)
 

@@ -13,7 +13,7 @@ from coach import config as config_module
 from coach import bodyweight as bodyweight_module
 from coach import capacity, dates, flags, history, overlay, program, state, units
 from coach.config_tables.sessions import cap_minutes
-from coach.errors import ConfigError
+from coach.hevy.cache import HevyCache
 from coach.library import Library, e1rm_supported
 
 MAX_REPS_TO_FAILURE = 12
@@ -271,19 +271,17 @@ def _half(increment):
 
 
 def load_increment(library, config, exercise_id, location):
-    """The load step for an exercise at a location: its library increment, else its equipment's, else 0."""
-    unit = config.athlete.units
-    step = library.increment(exercise_id, unit)
-    if step is not None:
-        return step
+    """The declared location step, then the library fallback, then the equipment default."""
     entry = library.get(exercise_id)
     key = _EQUIPMENT_INCREMENT.get(entry["equipment"]) if entry else None
-    if key is None:
-        return 0
-    try:
-        return config_module.equipment_for(config, location).get(key, 0)
-    except ConfigError:
-        return config_module.equipment_for(config).get(key, 0)
+    kit = config_module.equipment_for(config, location)
+    declared = dict(config.declared_equipment)
+    if location is not None:
+        declared.update(declared.get("locations", {}).get(location, {}))
+    if key in declared:
+        return kit[key]
+    step = library.increment(exercise_id, config.athlete.units)
+    return step if step is not None else kit.get(key, 0)
 
 
 def _target_reps(prescribed):
