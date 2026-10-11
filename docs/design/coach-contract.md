@@ -6111,8 +6111,9 @@ recovery habits, food preferences and the coach's notes. Setup confirms current
 experience independently of lifetime years and records that confirmation in
 notes. No automatic layoff-to-level conversion applies. `birth_year` is an
 optional positive integer no later than the validation clock's year; absent
-stays absent. Config loading accepts an optional `today` (date or timestamp) for deterministic
-validation; timestamps use the athlete timezone, and command contexts use their clock. `config show` adds `age`: null
+stays absent. Config loading accepts an optional `today` (date or timestamp) and checks the
+future-year rule only against it, never the wall date; timestamps use the athlete timezone. Command
+contexts pass their clock, and the starter, import and adoption paths reuse the command's config. `config show` adds `age`: null
 when unknown, otherwise `{years, approximate: true, as_of, note}`. Calendar-year
 subtraction is approximate, since actual age may be one less. Calculators
 keep their own validated age bounds and require actual age when necessary.

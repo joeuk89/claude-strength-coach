@@ -54,9 +54,9 @@ def show(args, ctx):
 def draft(args, ctx):
     days = starters.parse_days(args.days) if args.days is not None else None
     found, chosen = starters.draft(ctx.root, args.id, days, starters.parse_start_loads(args.start_load),
-                                   now=ctx.now())
+                                   now=ctx.now(), config=ctx.config)
     out = Path(args.out) if args.out else Path(ctx.root) / program_drafts.DEFAULT_OUT
     jsonio.write_doc(out, found, args.dry_run)
     shown = args.out if args.out else program_drafts.DEFAULT_OUT.as_posix()
     return {"draft": found, "days": chosen, "path": shown, "written": not args.dry_run,
-            "problems": program_drafts.draft_problems(found, ctx.root)}
+            "problems": program_drafts.draft_problems(found, ctx.root, config=ctx.config)}

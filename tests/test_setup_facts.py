@@ -41,6 +41,12 @@ class BirthYearTest(unittest.TestCase):
         self.assertEqual(self.config(2026).athlete.birth_year, 2026)
         self.assertEqual(self.config(1900).athlete.birth_year, 1900)
 
+    def test_future_year_check_needs_a_supplied_clock_never_the_wall_date(self):
+        self.assertEqual(self.config(2090, today=None).athlete.birth_year, 2090)
+        self.assertEqual(self.config(2090, today=date(2100, 1, 1)).athlete.birth_year, 2090)
+        with self.assertRaises(ConfigError):
+            self.config(2090, today="2030-10-11T18:00:00Z")
+
     def test_cli_uses_test_clock_for_validation_and_approximate_age(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "config.toml"
@@ -140,6 +146,21 @@ class LocalSetupTest(unittest.TestCase):
             self.assertEqual(profile.count(f"## {title}\n"), 1)
         self.assertIn("20 years", profile)
         self.assertIn("12 years off", profile)
+
+    def test_starter_and_adoption_paths_validate_birth_year_against_the_command_clock(self):
+        draft = self.root / "draft.json"
+        draft.write_text((FIXTURES / "program/draft.json").read_text())
+        starter = ("starters", "draft", "upper-lower-4", "--days", "mon,tue,thu,fri", "--dry-run")
+        adopt = ("program", "adopt", "--input", str(draft), "--dry-run")
+        cases = ((2090, "2100-10-11T18:00:00Z", 0), (2024, "2020-10-11T18:00:00Z", 5))
+        for birth_year, now, expected in cases:
+            self.path.write_text(apply(self.path.read_text(), {"athlete": {"birth_year": birth_year}}))
+            for args in (starter, adopt):
+                with self.subTest(birth_year=birth_year, now=now, command=args[:2]):
+                    code, out, stderr = run_cli(["--root", str(self.root), *args], env={"COACH_NOW": now})
+                    self.assertEqual(code, expected, (out, stderr))
+                    if expected:
+                        self.assertIn("after 2020", out["error"]["message"])
 
     def test_older_draft_requires_only_wrapper_upgrade_and_revalidation(self):
         draft = json.loads((FIXTURES / "program/draft.json").read_text())

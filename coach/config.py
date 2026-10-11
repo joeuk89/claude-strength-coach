@@ -337,14 +337,16 @@ def parse(raw, path, today=None):
             continue
         data[name] = validator.table(name, value or {}, spec)
 
-    if not validator.problems:
+    if not validator.problems and today is not None:
+        if isinstance(today, str):
+            today = dates.parse_timestamp(today)
         if isinstance(today, datetime):
             name = data["athlete"]["timezone"]
             today = today.astimezone(dates.zone(name) if name else None).date()
-        year = (today or date.today()).year
         birth_year = data["athlete"].get("birth_year")
-        if birth_year is not None and birth_year > year:
-            validator.problem("athlete.birth_year", f"[athlete] birth_year must not be in the future (after {year})")
+        if birth_year is not None and birth_year > today.year:
+            validator.problem("athlete.birth_year",
+                              f"[athlete] birth_year must not be in the future (after {today.year})")
 
     if not validator.problems:
         sectioned = Section({name: _sectioned(value) for name, value in data.items()})

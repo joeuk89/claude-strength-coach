@@ -60,7 +60,7 @@ def timestamp(now):
     return now.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def import_hevy(root, routine_ids=None, folder_id=None, now=None):
+def import_hevy(root, routine_ids=None, folder_id=None, now=None, config=None):
     """A program draft from the cached Hevy routines (all but retired ones, or those named, or one folder's).
 
     Raises ConfigError with no cached routines, and ValidationError for an
@@ -68,7 +68,7 @@ def import_hevy(root, routine_ids=None, folder_id=None, now=None):
     confirmed load mode.
     """
     root = Path(root)
-    config = config_module.load(root)
+    config = config if config is not None else config_module.load(root, today=now)
     library = Library.load(root)
     cache = HevyCache(root)
     if cache.read("routines") is None:
@@ -537,7 +537,7 @@ def _as_date(today):
     return dates.parse_date(today) if isinstance(today, str) else today
 
 
-def adopt(root, draft, replace=False, position=None, dry_run=False, today=None):
+def adopt(root, draft, replace=False, position=None, dry_run=False, today=None, config=None):
     """Validate a draft and make it the program: archive the old one, write program and state, render, stage.
 
     Raises ValidationError (exit 1) for an invalid draft or position,
@@ -548,7 +548,7 @@ def adopt(root, draft, replace=False, position=None, dry_run=False, today=None):
     """
     root = Path(root)
     today = _as_date(today)
-    config = config_module.load(root)
+    config = config if config is not None else config_module.load(root, today=today)
     library = Library.load(root)
     errors = _draft_errors(draft, config, library, root)
     if errors:
@@ -610,9 +610,9 @@ def adopt(root, draft, replace=False, position=None, dry_run=False, today=None):
     return result
 
 
-def draft_problems(draft, root):
+def draft_problems(draft, root, config=None):
     """The adopt-time problems of a draft's program other than its schedule, for the import's report."""
     root = Path(root)
-    config = config_module.load(root)
+    config = config if config is not None else config_module.load(root)
     errors = _draft_errors(draft, config, Library.load(root), root)
     return [e.to_json() for e in errors if not e.path.startswith("$.program.schedule")]

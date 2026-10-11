@@ -54,12 +54,13 @@ def render(args, ctx):
     writes=True,
 )
 def import_hevy(args, ctx):
-    draft = program_drafts.import_hevy(ctx.root, args.routine, args.folder, now=ctx.now())
+    draft = program_drafts.import_hevy(ctx.root, args.routine, args.folder, now=ctx.now(),
+                                       config=ctx.config)
     out = Path(args.out) if args.out else Path(ctx.root) / program_drafts.DEFAULT_OUT
     jsonio.write_doc(out, draft, args.dry_run)
     shown = program_drafts.DEFAULT_OUT.as_posix() if not args.out else args.out
     return {"draft": draft, "path": shown, "written": not args.dry_run,
-            "problems": program_drafts.draft_problems(draft, ctx.root)}
+            "problems": program_drafts.draft_problems(draft, ctx.root, config=ctx.config)}
 
 
 @command(
@@ -77,7 +78,7 @@ def import_hevy(args, ctx):
 def adopt(args, ctx):
     draft = program_drafts.read_draft(args.input)
     result = program_drafts.adopt(ctx.root, draft, replace=args.replace, position=args.position,
-                                  dry_run=args.dry_run, today=ctx.today())
+                                  dry_run=args.dry_run, today=ctx.today(), config=ctx.config)
     for warning in result.pop("warnings"):
         ctx.warn(warning)
     return result
