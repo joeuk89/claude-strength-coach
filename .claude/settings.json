@@ -28,7 +28,12 @@
       "Bash(python3 -m coach overlay render:*)",
       "Bash(python3 -m coach overlay approve:*)",
       "Bash(python3 -m coach routines diff:*)",
-      "Bash(python3 -m coach routines verify:*)"
+      "Bash(python3 -m coach routines verify:*)",
+      "Bash(python3 -m coach program show:*)",
+      "Bash(python3 -m coach program validate:*)",
+      "Bash(python3 -m coach program render:*)",
+      "Bash(python3 -m coach state show:*)",
+      "Bash(python3 -m coach migrate status:*)"
     ]
   },
   "hooks": {

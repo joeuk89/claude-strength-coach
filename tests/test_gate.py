@@ -141,6 +141,8 @@ class CommandShapeTest(GateCase):
             f"echo start\n{PUSH}",
             f"env COACH_NOW={NOW} {PUSH}",
             f"/usr/bin/python3.11 -m coach routines push --overlay {WEEKLY}",
+            f"python3 -X utf8 -I -m coach routines push --overlay {WEEKLY}",
+            f"python3 -mcoach routines push --overlay {WEEKLY}",
             f"{PUSH} --refresh",
         ):
             with self.subTest(command=command):

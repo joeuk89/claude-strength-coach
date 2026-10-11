@@ -28,6 +28,7 @@ ASK, DENY = "ask", "deny"
 _PUNCTUATION = "();<>|&\n"
 _SEPARATOR_CHARS = set(";|&()\n")
 _PYTHON = re.compile(r"^python(\d+(\.\d+)*)?$")
+_PYTHON_OPTIONS_WITH_VALUE = {"-X", "-W", "--check-hash-based-pycs"}
 _ASSIGNMENT = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$", re.S)
 _FD_BEFORE_REDIRECT = re.compile(r"(?<![\w-])\d+(?=[<>])")
 _SHELLS = {"sh", "bash", "zsh", "dash", "ksh"}
@@ -283,7 +284,9 @@ def _coach_argv(words):
                 if position + 1 < len(words) and words[position + 1] == "coach":
                     return words[position + 2:]
                 return None
-            position += 1
+            if option == "-c":
+                return None
+            position += 2 if option in _PYTHON_OPTIONS_WITH_VALUE else 1
         return None
     return None
 
