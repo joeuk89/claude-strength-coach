@@ -96,9 +96,11 @@ verify; the pass rewrites every routine in the span either way. Skip
 the check when the coming week is a deload or other one-off week —
 `/one-off-week` writes fresh temp routines for it.
 
-**Without Hevy:** there is no log to pre-fill, so the Sessions field of
-the Sunday message asks the athlete to describe the week — which sessions
-happened, notable sets, anything skipped or changed.
+**Without Hevy:** the workouts are in the manual log, one `log add` per
+workout the athlete reported. Log any they report now the same way
+(`CLAUDE.md` "Hevy" → "No Hevy?"), then run `python3 -m coach history
+sync` so `checkin prepare` pre-fills the Sunday message from them. Read
+each logged workout's `notes` as you would a Hevy description.
 
 **Coach-led sessions (PT, classes) are often logged worse than solo
 sessions** — the Coach-led field of the Sunday message confirms which

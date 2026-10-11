@@ -172,8 +172,14 @@ anything. Rules that always apply:
   athlete can tell this week's note from an old one. A routine that
   doesn't carry the overlay in force shows as STALE in the next coach's
   brief.
-- **No Hevy?** The athlete describes their training at check-ins instead,
-  and `/hevy-sync` doesn't apply.
+- **No Hevy?** (`[hevy] enabled = false`, which includes Hevy free.) The
+  athlete trains from the session sheets, `this-week-sheets.md`, written
+  by `sheets render`, and reports each workout in chat ("all as written,
+  bench last set 8"). Log it: `python3 -m coach log prefill --session
+  <id> --date <date>`, apply only the differences they name, write the
+  draft to `.coach/drafts/`, run `python3 -m coach log add --input
+  <file>` and show them its one-line summary. A correction is `log void
+  <id> --reason <text>` plus a new entry. `/hevy-sync` doesn't apply.
 
 ## Nutrition (MacroFactor)
 
