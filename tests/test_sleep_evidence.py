@@ -19,7 +19,10 @@ class SleepEvidenceTest(ActivityCase):
         return self.ok("wellness", "summary", "--from", start, "--to", end)
 
     def diary(self, hours, source="manual", count=14):
-        for day in self.span.days()[:count]:
+        self.diary_of([hours] * count, source)
+
+    def diary_of(self, nightly_hours, source):
+        for day, hours in zip(self.span.days(), nightly_hours):
             if source == "manual":
                 self.ok("wellness", "add", "--date", day.isoformat(), "--sleep-hours", str(hours))
             else:
@@ -57,7 +60,25 @@ class SleepEvidenceTest(ActivityCase):
 
     def test_display_rounding_does_not_pass_an_under_seven_hour_mean(self):
         self.ok("wellness", "add", "--from", "2026-09-28", "--to", "2026-10-11", "--sleep-hours", "6.999")
-        self.assertEqual(self.summary()["nutrition_gate"]["status"], "recomp")
+        data = self.summary()
+        self.assertEqual(data["nutrition_gate"]["status"], "recomp")
+        self.assertEqual(data["sleep"]["avg_asleep_hours"], 6.99)
+
+    def test_varied_diary_averaging_exactly_seven_hours_passes(self):
+        for source in ("manual", "apple_health"):
+            with self.subTest(source=source):
+                (self.root / LOCAL_WELLNESS).unlink(missing_ok=True)
+                self.diary_of([6.4] * 7 + [7.6] * 7, source)
+                data = self.summary()
+                self.assertTrue(data["sleep"]["complete"])
+                self.assertEqual(data["sleep"]["avg_asleep_hours"], 7.0)
+                self.assertEqual(data["nutrition_gate"]["status"], "passed")
+
+    def test_varied_diary_just_under_seven_hours_shows_under_seven_and_resolves_recomp(self):
+        self.diary_of([6.4] * 7 + [7.59] * 7, "manual")
+        data = self.summary()
+        self.assertEqual(data["sleep"]["avg_asleep_hours"], 6.99)
+        self.assertEqual(data["nutrition_gate"]["status"], "recomp")
 
     def test_two_complete_period_means_are_weighted_by_their_full_spans(self):
         self.ok("wellness", "add", "--from", "2026-09-28", "--to", "2026-10-01", "--sleep-hours", "6")

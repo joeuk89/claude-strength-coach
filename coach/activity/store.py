@@ -5,7 +5,9 @@ removes the record from every view. Dedup and precedence happen here, at
 read time, and never rewrite a file.
 """
 
+import math
 from datetime import timedelta
+from fractions import Fraction
 from pathlib import Path
 
 from coach import dates, jsonio, paths
@@ -29,6 +31,11 @@ def _has(field, value):
         return isinstance(value, dict) and (value.get("asleep_hours") is not None
                                             or value.get("in_bed_hours") is not None)
     return value is not None
+
+
+def _floor_hundredths(value):
+    # Rounding down keeps a shown 7.0 from hiding a mean just under a 7-hour threshold.
+    return math.floor(value * 100) / 100
 
 
 class ActivityStore:
@@ -154,7 +161,7 @@ class ActivityStore:
                 provenance, asleep_hours=day["sleep"]["asleep_hours"],
                 self_report=provenance["source"] == "manual", resolved_dates=[]))
             item["resolved_dates"].append(day["date"])
-        covered, weighted_hours, nightly_hours = [], 0, []
+        covered, weighted_hours, nightly_hours = [], Fraction(0), []
         for item in evidence.values():
             original = dates.Span(*(dates.parse_date(item["span"][key]) for key in ("start", "end")))
             original_dates = [day.isoformat() for day in original.days()]
@@ -162,11 +169,11 @@ class ActivityStore:
             item["included_in_average"] = item["resolved_dates"] == original_dates
             if item["included_in_average"]:
                 covered.extend(original_dates)
-                weighted_hours += item["asleep_hours"] * len(original_dates)
+                weighted_hours += Fraction(str(item["asleep_hours"])) * len(original_dates)
             if item["kind"] == "nightly":
                 nightly_hours.append(item["asleep_hours"])
         missing = sorted({day.isoformat() for day in span.days()} - set(covered))
-        return {"avg_asleep_hours": round(weighted_hours / len(covered), 2) if covered else None,
+        return {"avg_asleep_hours": _floor_hundredths(weighted_hours / len(covered)) if covered else None,
                 "nightly_avg_asleep_hours": (round(sum(nightly_hours) / len(nightly_hours), 2)
                                              if nightly_hours else None),
                 "nights": len(nightly_hours), "nights_in_span": len(span.days()),

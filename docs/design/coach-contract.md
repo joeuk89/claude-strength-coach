@@ -3105,15 +3105,18 @@ R-32 and is registered in `coach/flags/research.py`.
     "nights_in_span": int, "sources": [str], ...}`: `nights` counts actual
     nightly observations. `nightly_avg_asleep_hours` uses those only.
     The overall average weights whole, non-overlapping source periods
-    by their days; a clipped or partially superseded period is excluded,
+    by their days, summed exactly from the recorded decimal hours and
+    rounded down to 0.01 h, so a shown 7.0 is never under 7 h; a
+    clipped or partially superseded period is excluded,
     never used to infer its missing nights. `evidence` retains id, source,
     original span, kind (`nightly`/`period_mean`), hours, `self_report`,
     resolved dates and `included_in_average`. `covered_dates`,
     `missing_dates` and `complete` describe eligible average coverage.
     `wellness summary` returns actual `nights` separately and a read-only
     `nutrition_gate` for the trailing 14 dates ending today: complete
-    coverage under 7 h is `recomp`, otherwise `passed`; incomplete or
-    non-trailing coverage is `pending measurement`. Profile status and
+    coverage whose overall average is under 7 h is `recomp`, otherwise
+    `passed`; incomplete or non-trailing coverage is `pending
+    measurement`. Profile status and
     approved phase edits remain the coach's job. The gate is a
     low-confidence coaching heuristic (rn:sleep-dieting.3).
   - `records(kind, include_void=False)`: the last raw line per id, voided

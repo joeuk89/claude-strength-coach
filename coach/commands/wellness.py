@@ -36,9 +36,7 @@ def summary(args, ctx):
     elif not sleep["complete"]:
         gate["reason"] = "incomplete hours coverage; retain the missing dates and original source spans"
     else:
-        total_hours = sum(item["asleep_hours"] * len(item["resolved_dates"])
-                          for item in sleep["evidence"] if item["included_in_average"])
-        gate["status"] = "recomp" if total_hours < 7 * 14 else "passed"
+        gate["status"] = "recomp" if sleep["avg_asleep_hours"] < 7 else "passed"
         gate["reason"] = "maintenance" if gate["status"] == "recomp" else "offer goals review before a deficit"
     return {"span": span.to_json(), "sleep": sleep, "nights": nights, "nutrition_gate": gate}
 
