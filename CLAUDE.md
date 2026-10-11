@@ -125,7 +125,7 @@ and its sources.
     `/check-in` keeps the count in `block` in `data/state.json` and shows it in each record's status line.
 - **Minimum and maintenance dose** — when time is short, cut sets, not
   effort.
-  The maintenance dose is about one third of the usual weekly sets at the same load and effort, which keeps size and strength for several months (rn:minimum-effective-dose.1).
+  About one third of prior dose can maintain younger adults' size and strength at the same intensity; it is no maintenance guarantee (rn:minimum-effective-dose.1). The fractional-set minimum check is application policy relative to the ordinary week (rn:minimum-effective-dose.6).
   Lifters aged about 60 and over need more than that to keep muscle size (rn:minimum-effective-dose.2).
   One hard set per exercise of 6–12 reps at about 70–85 % of 1RM, done 2–3 times a week, still builds strength in trained lifters (rn:minimum-effective-dose.3).
   A priority lift keeps a floor of 2 hard sets at its prescribed load in a disrupted week (rn:minimum-effective-dose.4).

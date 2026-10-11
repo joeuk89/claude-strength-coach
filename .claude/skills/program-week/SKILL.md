@@ -58,8 +58,8 @@ it in the brief's first line:
 | normal | the coming program week | `weekly` | [compute.md](compute.md): `propose week`, settle each line, `propose finalize` |
 | midweek | a missed session, or a change partway through a trained week | `midweek` | [midweek.md](midweek.md): `missed plan`; no matching rule → compute.md with `--kind midweek` |
 | light | a deload, light or return week the check-in agreed, or a return after illness | `deload` | compute.md: the `command` that `block decide` printed, or `--kind deload` |
-| minimum | short on time at the usual kit, and the program has a `minimum_week` | `weekly` | compute.md: `structure balance --variant minimum`, `structure minimum`, then `--plan` |
-| constrained | travel or limited kit | `one_off` | [one-off.md](one-off.md): a coach-built draft through `overlay build` |
+| minimum | short on time at the usual kit, with a configured `minimum_week` | `weekly` | [short-week.md](short-week.md): configure and validate, then `structure minimum` and `--plan` |
+| constrained | travel, limited kit, or short on time without a valid minimum | `one_off` | [one-off.md](one-off.md): a coach-built draft through `overlay build` |
 | reshuffle | the same sessions on different days | `one_off` | one-off.md: the overlay in force, re-dated; `routines diff` is empty, so nothing goes to Hevy |
 
 A span can mix a reshuffle and a constrained week (two days moved, two

@@ -5,7 +5,7 @@
                "interference"],
   "additionalProperties": false,
   "properties": {
-    "schema_version": {"const": 7},
+    "schema_version": {"const": 8},
     "name": {"$ref": "#/$defs/text"},
     "sessions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/session"}},
     "external_sessions": {"type": "array", "items": {"$ref": "#/$defs/external_session"}},
@@ -45,6 +45,7 @@
       "additionalProperties": false,
       "properties": {
         "sessions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/session_id"}},
+        "external_sessions": {"type": "array", "items": {"$ref": "#/$defs/session_id"}},
         "schedule": {
           "type": "object",
           "required": ["rule", "params"],

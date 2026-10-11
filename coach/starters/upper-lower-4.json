@@ -1021,7 +1021,7 @@
             "load_mode": "total",
             "sets": [
               {
-                "count": 2,
+                "count": 3,
                 "type": "normal",
                 "rep_range": {
                   "start": 10,
