@@ -645,10 +645,5 @@ def _signed(value):
 
 
 def splice(text, label, region):
-    """`text` with the cardio region for `label` replaced, or appended at the end when absent."""
-    for found_id, start, end in render.find_regions(text, REGION_KIND):
-        if found_id == label:
-            return text[:start] + region + text[end:]
-    if text and not text.endswith("\n"):
-        text += "\n"
-    return text + ("\n" if text else "") + region + "\n"
+    """Replace the cardio snapshot, or add it to the retrospective section."""
+    return render.splice_region(text, REGION_KIND, label, region, heading="## Week in review")

@@ -439,6 +439,8 @@ class CardPartsTest(CheckinCase):
         """)
         with self.paths():
             card = self.card()
+            explicit = self.card("--tier", "deep")
+        self.assertEqual(explicit["tier_reasons"], ["two fatigue triggers"])
         self.assertEqual(card["mode"], "deep")
         self.assertIn("two fatigue triggers", card["tier_reasons"])
         self.assertIn("from a part", [f["message"] for f in card["flags"]])
@@ -469,7 +471,7 @@ class SkeletonTest(CheckinCase):
         text = self.record()
         self.assertTrue(text.startswith("# Check-in — 2026-10-11 (weekly)\n"))
         self.assertIn("<!-- coach:begin week-review 2026-10-11 -->", text)
-        for heading in ("## Week in review", "## Coach's read", "## Decisions", "## Next week"):
+        for heading in ("## Week in review", "## Coach's read", "## Decisions", "## The week ahead"):
             self.assertIn(f"\n{heading}\n", text)
         self.assertNotIn("## Block planning", text)
         details = text[text.index("<details>"):text.index("</details>")]

@@ -2,14 +2,15 @@
 
 Run `python3 -m coach history sync`, then `python3 -m coach checkin
 skeleton --date <today>`. It writes `check-ins/<today>.md`, titled with
-the card's tier (`--tier` overrides), holding:
+the card's tier (pass `--tier deep` when the block preview required
+deep), holding:
 
 - **Week in review:** a rendered region: the window, sessions n of m
   core, the `Missed:` line with each miss's tag, the sessions, results
   and e1RM tables, and the flags; on a deep record, the misses since the
   last deep check-in. It reads synced history only, so the command warns
   when a workout in the window is not synced yet.
-- **Coach's read**, **Decisions** and **Next week**: empty, for your
+- **Coach's read**, **Decisions** and **The week ahead**: empty, for your
   prose. Deep records add **Block planning** after Decisions.
 
 Exit 1 means the record exists. Never edit inside a rendered region:
@@ -17,12 +18,12 @@ correct the data (`history annotate`), then run `checkin skeleton --date
 <today> --refresh`, which re-renders the regions and leaves every other
 byte as it was. Once the week's overlay is approved (act.md), run it
 with `--refresh --overlay <id>` to put the prescription in a collapsed
-appendix; it also collapses a region `overlay render --into` already
-wrote.
+appendix in **The week ahead**; it also collapses a region that
+`overlay render --into` already wrote.
 
 Add the cardio block with `python3 -m coach cardio render --week <the
-week> --into check-ins/<today>.md`: the week's numbers, the reconcile
-and the cardio flags. It is a snapshot, which no check re-renders, so
+week> --into check-ins/<today>.md`: in **Week in review**, the week's
+numbers, the reconcile and the cardio flags. It is a snapshot, which no check re-renders, so
 run it again only when the week's data changes before the record is
 committed.
 
@@ -37,7 +38,7 @@ in `reference/record-formats.md`.
 - **Decisions:** first the block status line, then what changed and why
   (or "stay the course"), anything deferred, and the adherence decision
   line when it applies.
-- **Next week:** a Day / Session table, one-off changes called out, and
+- **The week ahead:** a Day / Session table, one-off changes called out, and
   one closing line: the focus of the week.
 
 Keep the prose outside the regions under 600 words (1,000 on a deep

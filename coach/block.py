@@ -400,7 +400,7 @@ def status_line(root):
 def _deep_tier(inst, block_state):
     """(reasons, last deep date) by the check-in's own deep rules, counting a `--deep` close as a deep record."""
     from coach import checkin
-    found = [r for r in checkin.records(inst.root) if r.date <= inst.today]
+    found = [r for r in checkin.reviews(inst.root) if r.date <= inst.today]
     if block_state["last_deep_review"]:
         found = sorted(found + [checkin.Record(dates.parse_date(block_state["last_deep_review"]), "deep",
                                                paths.STATE)], key=lambda r: r.date)
@@ -434,10 +434,10 @@ def deep_review(inst, block_state):
     return {"due": bool(reasons), "reasons": reasons, "last_deep_review": last.isoformat() if last else None}
 
 
-_DEEP_WORDS = {"first_close": "no deep check-in on record", "six_weeks": "six weeks since the last deep check-in",
-               "catch_up_deferred": "a catch-up check-in deferred the deep review",
-               "light_week_proposed": "a light week is being proposed",
-               "restructure_required": "the adherence trigger fired"}
+DEEP_REASON_WORDS = {"first_close": "no deep check-in on record", "six_weeks": "six weeks since the last deep check-in",
+                     "catch_up_deferred": "a catch-up check-in deferred the deep review",
+                     "light_week_proposed": "a light week is being proposed",
+                     "restructure_required": "the adherence trigger fired"}
 
 
 def _flags(block_state, entry, deep, words=None):
@@ -463,7 +463,7 @@ def _flags(block_state, entry, deep, words=None):
         found.append(flags.make("fatigue_watch", message=f"One fatigue trigger: {text}; watch it next week"))
     if deep["due"]:
         found.append(flags.make("deep_review_due", message=(
-            "Run this check-in deep: " + "; ".join(_DEEP_WORDS[r] for r in deep["reasons"]))))
+            "Run this check-in deep: " + "; ".join(DEEP_REASON_WORDS[r] for r in deep["reasons"]))))
     return found
 
 

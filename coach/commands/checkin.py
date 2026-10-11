@@ -1,4 +1,4 @@
-from coach import checkin, checkin_catchup, dates, history
+from coach import block, checkin, checkin_catchup, dates, history
 from coach.commands import arg, command
 from coach.errors import UsageError
 
@@ -16,10 +16,13 @@ def _date(text, flag):
     "checkin prepare",
     help="The check-in card: the week from the log, then the numbered questions (data.text is the Sunday message)",
     args=(arg("--until", metavar="D", help="last day of the window (default today)"),
-          arg("--tier", choices=checkin.CARD_TIERS, help="run this tier whatever is due")),
+          arg("--tier", choices=checkin.CARD_TIERS, help="run this tier whatever is due"),
+          arg("--deep-reason", action="append", default=[], choices=tuple(block.DEEP_REASON_WORDS),
+              help="reason from block close deep_review.reasons; repeat for each reason")),
 )
 def prepare(args, ctx):
-    card = checkin.prepare(ctx.root, ctx.today(), _date(args.until, "--until"), args.tier, ctx.now())
+    card = checkin.prepare(ctx.root, ctx.today(), _date(args.until, "--until"), args.tier, ctx.now(),
+                           deep_review_reasons=args.deep_reason)
     problem = (card["catch_up"] or {}).get("return_week_problem")
     if problem:
         ctx.warn(f"no return week on the catch-up card: {problem}")
@@ -39,7 +42,7 @@ def misses(args, ctx):
     until = _date(args.until, "--until") or ctx.today()
     since = _date(args.since, "--since")
     if since is None:
-        found = [r for r in checkin.records(ctx.root) if r.date < until]
+        found = [r for r in checkin.reviews(ctx.root) if r.date < until]
         deep = [r for r in found if r.tier == "deep"]
         since = deep[-1].date if deep else (found[0].date if found else until)
     if since > until:

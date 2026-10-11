@@ -63,7 +63,12 @@ def overlay_render_fresh(ctx):
                 message = exc.message if isinstance(exc, ValidationError) else str(exc)
                 results.append(Result("fail", f"overlay {overlay_id} cannot be rendered: {message}", where))
                 continue
-            if text[start:end] != fresh:
+            body = text[start:end].split("-->", 1)[1].rsplit("<!--", 1)[0]
+            if not body.strip():
+                results.append(Result(
+                    "warn", f"the overlay {overlay_id} region is not rendered yet; "
+                    f"run python3 -m coach overlay render {overlay_id} --into {where}", where))
+            elif text[start:end] != fresh:
                 results.append(Result(
                     "fail",
                     f"the overlay {overlay_id} region was edited by hand or is out of date; "

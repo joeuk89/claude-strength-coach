@@ -17,10 +17,11 @@ prescription; e1RM changes; flags (`convention_slip`,
 (`edited_in_app` routines end the card with a keep-or-replace field,
 settled in program-week). The card picks the tier (`mode`, with
 `tier_reasons`: no record yet, or the last deep record 42 or more days
-old, rn:deloads.12). When step 1 picks deep for a reason the card can't
-see, run it with `--tier deep`; `--tier weekly` overrides a due deep
-review. Mode `catch_up` means more than 10 days since the last check-in:
-send the catch-up card instead ([catch-up.md](catch-up.md)).
+old, rn:deloads.12). When the block preview requires deep, pass `--tier
+deep` and one `--deep-reason <code>` for each `deep_review.reasons` code.
+Use `--tier deep` alone for an explicit request; `--tier weekly` overrides
+a due deep review. Mode `catch_up` means more than 10 days since the
+last check-in: send the catch-up card instead ([catch-up.md](catch-up.md)).
 
 The first line names the window and the tier with its reason. Then the
 fields, always in this order:

@@ -8,7 +8,11 @@ from coach.status import Section, provider
 def checkin_status(ctx):
     facts = pages.header_facts(ctx.root, ctx.now())["checkin"]
     if facts["last"] is None:
-        return Section("checkin", ["No check-in recorded yet; the first one is due."], facts, "attention")
+        due = facts["due_date"]
+        if due is None:
+            return Section("checkin", ["No check-in recorded yet; the first due date is unknown."], facts)
+        level = "attention" if due <= ctx.today().isoformat() else "info"
+        return Section("checkin", [f"No check-in recorded yet; the first is due {due} (deep)."], facts, level)
     since = facts["days_since"]
     ago = "today" if since == 0 else f"{since} day{'s' if since != 1 else ''} ago"
     runs = "catch-up" if facts["mode"] == "catch_up" else facts["tier"]
