@@ -504,6 +504,120 @@ program start loads):
   an explicit allowlist of `(path, source line)` pairs, empty at the start;
   extending it means editing the test, which shows in review.
 
+**Exercise library (R-11).** The catalogue `coach/catalogue/exercises.json`
+(schema `exercise_catalogue`) ships with the framework. The instance
+library `data/exercises.json` (schema `exercise_library`) belongs to the
+athlete and sync never touches it. `coach.library.Library.load(root)`
+merges them; with no instance file the catalogue stands alone.
+
+- Catalogue entry: `id`, `name`, `aliases[]`, `hevy_titles[]`,
+  `hevy_template_ids[]`, `muscles {primary[], secondary[]}`, `pattern`,
+  `equipment`, `load_mode_default`, `increment {kg, lb} | null`,
+  `substitutes[]`. Enums, agreed in triage:
+  - `pattern`: `squat`, `hinge`, `lunge`, `horizontal_push`,
+    `vertical_push`, `horizontal_pull`, `vertical_pull`, `elbow_flexion`,
+    `elbow_extension`, `shoulder_raise`, `knee_flexion`,
+    `knee_extension`, `hip_abduction`, `hip_adduction`, `calf_raise`,
+    `core`, `carry`, `conditioning`.
+  - Muscles: Hevy's muscle groups with `shoulders` split into
+    `front_delts`, `side_delts` and `rear_delts`: `abdominals`, the three
+    delts, `biceps`, `triceps`, `forearms`, `quadriceps`, `hamstrings`,
+    `calves`, `glutes`, `abductors`, `adductors`, `lats`, `upper_back`,
+    `traps`, `lower_back`, `chest`, `cardio`, `neck`, `full_body`,
+    `other`.
+  - `equipment`: `barbell`, `ez_bar`, `trap_bar`, `dumbbell`,
+    `kettlebell`, `machine`, `smith_machine`, `cable`, `plate`, `band`,
+    `suspension`, `bodyweight`, `cardio_machine`, `other`.
+- `increment` is the entry's progression step in each unit: per hand for
+  the per-hand modes, the total otherwise, null for `band`, `duration`
+  and `distance`. `Library.increment(id, unit)` returns null when the
+  entry has none; the caller then uses the equipment increment from
+  `equipment_for` (C54).
+- Instance file, keyed by library id:
+
+  ```json
+  {"schema_version": 1, "exercises": {
+    "db_bench_press": {"hevy_template_id": "F0000002", "load_mode": "per_hand_x2",
+                       "load_mode_proposed": "per_hand_x2", "confidence": "high", "avoid": null},
+    "custom_tyre_flip": {"name": "Tyre Flip", "muscles": {"primary": ["full_body"], "secondary": []},
+                         "pattern": "conditioning", "equipment": "other", "load_mode_default": "total",
+                         "hevy_template_id": "C0000001", "load_mode": null}}}
+  ```
+
+- **Merge rule.** An instance entry for a catalogue id overrides each
+  catalogue field it carries, whole: a list or object replaces the
+  catalogue's, it never merges into it. An id the catalogue lacks starts
+  `custom_` and must carry `name`, `muscles`, `pattern`, `equipment` and
+  `load_mode_default`; its other catalogue fields default to empty lists
+  and a null increment.
+- Instance-only fields, all optional and nullable: `hevy_template_id`
+  (the athlete's Hevy template, added to the merged
+  `hevy_template_ids`), `load_mode` (confirmed by the athlete),
+  `load_mode_proposed` and `confidence` (`high` | `low`, written by
+  `library seed`), and `avoid` (C54).
+- **Effective load mode** is the confirmed `load_mode` only.
+  `Library.effective_load_mode(id)` returns null until the athlete
+  confirms; `load_mode_default` and `load_mode_proposed` never stand in
+  for it.
+- **Match key.** Names are compared lower-cased, punctuation dropped,
+  `db`, `bb` and `kb` spelled out, words sorted, so "Bench Press
+  (Dumbbell)" and "dumbbell bench press" are the same name.
+- Validation exits 1 with a JSONPath per problem: the schema, then an
+  unknown id without `custom_`, a custom entry missing a required field,
+  a substitute that is not another library id, a name, alias or Hevy
+  title that already names another entry (by match key), and a Hevy
+  template id on two entries.
+- Readers: `get(id)` (the merged entry plus `source` `catalogue` |
+  `custom`, `overridden` and `effective_load_mode`),
+  `by_hevy_template_id(tid)`, `search(text)`, `effective_load_mode(id)`,
+  `increment(id, unit)`, `avoided(id)`.
+
+**Seeding** (`library seed [--dry-run]`). It reads the C8 cache's
+`routines.json` and `exercise_templates.json`; with no cached routines it
+exits 5 naming `hevy pull`. For each distinct `exercise_template_id`, in
+routine order, it finds a library entry by template id, then Hevy title,
+then alias or name (both by match key), and proposes a load mode from the
+first row that applies:
+
+| Rule | When | Proposed | Confidence |
+|---|---|---|---|
+| `hevy_type` | Hevy type `duration`, `distance_duration`, `bodyweight_assisted_reps`, `bodyweight_reps` or `reps_only` | `duration`, `distance`, `assisted`, `bodyweight`; `reps_only` gives `band` for band equipment, else `bodyweight` | high; low when a matched entry's default differs |
+| `alternating` | dumbbell or kettlebell, and the title says alternating | `single_implement` | high |
+| `one_arm` | dumbbell or kettlebell, and the title says single arm or one arm | `single_implement` | high |
+| `custom` | matched a custom entry | its `load_mode_default` | low |
+| `matched` | matched by template id or Hevy title | the entry's `load_mode_default` | high when it fits Hevy's equipment, else low |
+| `alias` | matched by alias or name only | the entry's `load_mode_default` | low |
+| `equipment` | no match | dumbbell `per_hand_x2`, kettlebell `single_implement`, band `band`, none or suspension `bodyweight`, anything else `total` | low |
+
+A mode fits Hevy's equipment when: dumbbell or kettlebell and a per-hand
+mode; barbell or plate and `total`; machine and `total` or `assisted`;
+none and `bodyweight`, `assisted`, `duration` or `distance`; band and
+`band`. Other and suspension fit any mode.
+
+- A matched entry gets `hevy_template_id` (or one more
+  `hevy_template_ids` item when it already has one), `load_mode_proposed`
+  and `confidence`. An entry with a confirmed `load_mode` keeps it.
+- No match makes a `custom_<slug of the title>` entry from the template:
+  name and Hevy title from its title; muscles from Hevy's groups
+  (`shoulders` becomes rear, side or front delts by the title); equipment
+  mapped (`none` to `bodyweight`, `resistance_band` to `band`, a cardio
+  machine to `cardio_machine`); pattern guessed from the primary muscle
+  group. `data.guessed` lists each one for the coach to check.
+- Output: `data.proposals[]` with `hevy_template_id`, `hevy_title`,
+  `routines`, `matched_id`, `matched_by` (`template_id` | `hevy_title` |
+  `alias` | `custom`), `load_mode_proposed`, `confidence`, `rule` and
+  `action` (`created` | `updated` | `unchanged` | `confirmed`).
+- Confidence tells the coach which proposals to put to the athlete; it
+  never confirms anything. `library confirm (IDS | --all)` copies
+  `load_mode_proposed` to `load_mode`; `library set-mode ID MODE` records
+  the athlete's answer directly, and an invalid mode exits 1 listing the
+  eight.
+- Checks: `library_valid` (catalogue and instance file validate; one
+  `fail` per problem, with its JSONPath) and `load_modes_confirmed`
+  (every exercise in the cached Hevy routines and in every overlay has a
+  confirmed load mode; a routine exercise whose template id no entry
+  holds fails naming `library seed`).
+
 ## C6. Instance file layout
 
 | Path | What | Git | Written by |
@@ -855,7 +969,7 @@ with the traceback on stderr; an empty list becomes one `pass` result.
 `--only` takes comma-separated ids and may repeat; an unknown id exits 2.
 R-10 registers `python_floor` and `config` in `coach/checks/environment.py`.
 
-The sections from C17 on name the checks their owners register. R-32a
+C5 (the exercise library, R-11) and the sections from C17 on name the checks their owners register. R-32a
 registers `research_notes`, `research_citations`, `research_render_fresh`
 and `research_expiry`.
 
@@ -906,6 +1020,9 @@ Unless stated, each is a copy of `valid/` plus what is listed.
 | `dose/` | R-30a | program with `pt-tue` estimated at `{"chest": 3, "lats": 3}`; weekly overlays for 2026-W36 to 2026-W41; workouts and `external` annotations giving the weeks below (planned = Session A, Session B, PT = 3) |
 | `block/` | R-31 | program with `hard_weeks_ceiling` 6 and `pt-tue`; a ledger with block `b-0001` started 2026-08-31 and no closed weeks; weekly overlays for 2026-W36 to W41; workouts matching each overlay (every core session at the prescribed sets and RPE) plus `external` done annotations. Closing W36 to W41 gives six hard weeks |
 | `nohevy/` | R-40c | the valid program and overlay; `[hevy] enabled = false`; no Hevy cache; `data/log/workouts.jsonl` holding the two Session A workouts of the logged-workouts table, logged by hand (squat 3×5 @ 95 RPE 7, DB bench 3×10 @ 22.5/hand RPE 8; the same on 2026-10-05 at 97.5) |
+| `library-seed/` | R-11 | not a copy of `valid/`: config, and a synthetic Hevy cache (C8) holding Session A and Session B with the four `valid/` exercises plus the custom template `C0000001` "Tyre Flip"; no instance library |
+| `library-unconfirmed/` | R-11 | not a copy of `valid/`: config, cached Session A, and an instance library where `db_bench_press` has a proposal but no confirmed load mode |
+| `library-invalid/` | R-11 | not a copy of `valid/`: config and an instance library with an unknown field on `db_bench_press` |
 | `empty/` | R-41a | `config.toml` and an instance library only: no program, no state. Not a copy of `valid/` |
 | `hevy-fresh/` | R-12 | `valid/`'s `config.toml` and a cache `meta.json` with the last pull at 2026-10-11T12:00:00Z (6 hours before `COACH_NOW`) |
 | `hevy-stale/` | R-12 | the same with the last pull at 2026-10-09T12:00:00Z (54 hours) |
@@ -2950,7 +3067,7 @@ record (R-45).
 an optional top-level object; migration adds `{}`:
 
 ```json
-"dose_targets": {"chest": 10, "lats": 10, "quads": 8, "calves": 6}
+"dose_targets": {"chest": 10, "lats": 10, "quadriceps": 8, "calves": 6}
 ```
 
 - Keys are R-11 muscle names; values are fractional hard sets per week,
@@ -3047,7 +3164,7 @@ coach.structure.ordinary_weeks(root, until, n=4, reach=12) -> list[str]
  ],
  "planned": 3, "trained": 2,
  "muscles": {"chest": {"target": 10, "planned": 6.0, "delivered": 6.0, "bonus": 0.0}},
- "by_session": {"session-a": {"quads": 3.0, "chest": 3.0}},
+ "by_session": {"session-a": {"quadriceps": 3.0, "chest": 3.0}},
  "flags": []}
 ```
 
