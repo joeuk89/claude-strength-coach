@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 import coach
-from coach import dates, jsonio, overlay, paths, recipes, render, research, units
+from coach import dates, jsonio, migrate, overlay, paths, recipes, render, research, units
 from coach.checks import Result, check
 from coach.config import equipment_for
 from coach.errors import ConfigError, ValidationError
@@ -31,6 +31,8 @@ PER_HAND_X2 = "per_hand_x2"
 SNAPSHOT_KINDS = ("cardio",)
 OVERLAY_TEXT_FIELDS = ("target_note", "change", "cues", "focus")
 TWO_NUMBER_EXAMPLE = "25/hand (Hevy: 50)"
+MIGRATE_RUN = "run python3 -m coach migrate run"
+REBUILD_HEVY_CACHE = "rebuild the cache with python3 -m coach hevy pull --full"
 
 
 def _rel(ctx, path):
@@ -75,7 +77,7 @@ _BAD_LIBRARY = Result("skip", "The exercise library is invalid; see library_vali
 
 
 def claimed_documents():
-    """{schema name: instance path globs} for every schema that names where its documents live."""
+    """{schema name: instance path globs} for the documents the migration runner does not own (C7)."""
     claimed = {}
     for path in sorted(jsonio.SCHEMA_DIR.glob("*.schema.json")):
         globs = json.loads(path.read_text(encoding="utf-8")).get(PATHS_KEY)
@@ -84,46 +86,60 @@ def claimed_documents():
     return claimed
 
 
-def _version_problem(where, found, current):
-    """The fail message for a document at schema_version `found`, or None when it is `current`."""
-    if isinstance(found, bool) or not isinstance(found, int):
-        return f"{where} has no integer schema_version"
-    if found > current:
-        return f"{where} has schema_version {found}, newer than this coach reads ({current}); run /framework-sync"
-    if found < current:
-        return (f"{where} has schema_version {found}, older than the current {current}; "
-                "run python3 -m coach migrate run")
-    return None
+def _newer(where, found, current):
+    return f"{where} has schema_version {found}, newer than this coach reads ({current}); run /framework-sync"
 
 
-def _schema_for_line(doc, names, schemas):
-    if len(names) == 1:
-        return names[0]
-    kind = doc.get("kind")
-    for name in names:
-        if schemas[name].get("properties", {}).get("kind", {}).get("const") == kind:
-            return name
-    return None
+def _older(where, found, current, rel):
+    fix = REBUILD_HEVY_CACHE if rel.startswith(f"{paths.HEVY_CACHE_DIR}/") else MIGRATE_RUN
+    return f"{where} has schema_version {found}, older than the current {current}; {fix}"
 
 
-@check(id="schema_versions", owner=OWNER)
-def schema_versions(ctx):
-    claimants = {}
-    schemas = {}
+def _registry_results(ctx):
+    """(fail results, paths checked) for the documents the migration runner owns (C16)."""
+    results, checked = [], set()
+    for row in migrate.status(ctx.root):
+        checked.add(row["path"])
+        where, found, current = row["path"], row["version"], row["target"]
+        if row["state"] == "unreadable":
+            results.append(Result("fail", f"{where} is not a JSON object with an integer schema_version", where))
+        elif row["state"] == "ahead":
+            results.append(Result("fail", _newer(where, found, current), where))
+        elif row["state"] == "behind":
+            results.append(Result("fail", _older(where, found, current, where), where))
+    return results, checked
+
+
+def _schema_for(doc, names, schemas):
+    """The claiming schema whose constant fields (other than schema_version) the line matches."""
+    def matches(name):
+        properties = schemas[name].get("properties", {})
+        return all(doc.get(key) == spec["const"] for key, spec in properties.items()
+                   if key != "schema_version" and isinstance(spec, dict) and "const" in spec)
+
+    fitting = [name for name in names if matches(name)]
+    return (fitting or names)[0]
+
+
+def _claimed_results(ctx, skip):
+    """(fail results, documents checked) for every file an `x-coach-paths` glob matches.
+
+    A JSONL line keeps the version it was written at (C29), so only a line
+    newer than this coach reads fails.
+    """
+    claimants, schemas = {}, {}
     for name, globs in claimed_documents().items():
         schemas[name] = jsonio.load_schema(name)
         for pattern in globs:
             for path in ctx.root.glob(pattern):
-                if path.is_file():
-                    claimants.setdefault(_rel(ctx, path), []).append(name)
-    if not claimants:
-        return [Result("skip", "No versioned JSON documents in this instance.")]
-
+                rel = _rel(ctx, path)
+                if path.is_file() and rel not in skip:
+                    claimants.setdefault(rel, []).append(name)
     results, checked = [], 0
     for rel in sorted(claimants):
-        names = claimants[rel]
         text = (ctx.root / rel).read_text(encoding="utf-8")
-        if rel.endswith(".jsonl"):
+        is_log = rel.endswith(".jsonl")
+        if is_log:
             entries = [(f"{rel} line {n}", line) for n, line in enumerate(text.splitlines(), 1) if line.strip()]
         else:
             entries = [(rel, text)]
@@ -133,19 +149,28 @@ def schema_versions(ctx):
             except json.JSONDecodeError as exc:
                 results.append(Result("fail", f"{where} is not valid JSON ({exc.msg})", rel))
                 continue
-            if not isinstance(doc, dict):
-                results.append(Result("fail", f"{where} is not a JSON object", rel))
-                continue
-            name = _schema_for_line(doc, names, schemas)
-            if name is None:
-                results.append(Result("fail", f"{where} has kind {doc.get('kind')!r}, which no schema for "
-                                              f"{rel} names", rel))
+            found = doc.get("schema_version") if isinstance(doc, dict) else None
+            if isinstance(found, bool) or not isinstance(found, int):
+                results.append(Result("fail", f"{where} has no integer schema_version", rel))
                 continue
             checked += 1
-            problem = _version_problem(where, doc.get("schema_version"), jsonio.current_version(schemas[name]))
-            if problem:
-                results.append(Result("fail", problem, rel))
-    return results or [Result("pass", f"{checked} document(s) are at their current schema version.")]
+            current = jsonio.current_version(schemas[_schema_for(doc, claimants[rel], schemas)])
+            if found > current:
+                results.append(Result("fail", _newer(where, found, current), rel))
+            elif found < current and not is_log:
+                results.append(Result("fail", _older(where, found, current, rel), rel))
+    return results, checked
+
+
+@check(id="schema_versions", owner=OWNER)
+def schema_versions(ctx):
+    results, registered = _registry_results(ctx)
+    claimed, count = _claimed_results(ctx, skip=registered)
+    total = len(registered) + count
+    if not total and not claimed:
+        return [Result("skip", "No versioned JSON documents in this instance.")]
+    return results + claimed or [Result("pass", f"{total} document(s) and log line(s) are at a version this coach "
+                                                "reads.")]
 
 
 @check(id="dangling_exercise_ids", owner=OWNER)

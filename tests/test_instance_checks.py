@@ -158,33 +158,56 @@ class SchemaVersionsTest(unittest.TestCase):
         self.assertIn("schema_version 0", row["message"])
         self.assertIn("run python3 -m coach migrate run", row["message"])
 
-    def test_jsonl_lines_are_checked_one_by_one(self):
+    def test_older_jsonl_lines_are_fine_and_newer_ones_fail(self):
         with TempCopy() as tmp:
-            good = {"schema_version": 1, "at": "2026-10-11T19:00:00Z", "kind": "verify", "routine_id": "r",
+            line = {"schema_version": 1, "at": "2026-10-11T19:00:00Z", "kind": "verify", "routine_id": "r",
                     "overlay_id": "2026-10-12-weekly", "overlay_hash": "sha256:00", "verified": True, "diff": []}
-            bad = dict(good, schema_version=0)
-            tmp.write("data/hevy/writes.jsonl", "\n".join(json.dumps(x) for x in (good, bad, good)) + "\n")
+            lines = (dict(line, schema_version=0), dict(line, schema_version=2), line)
+            tmp.write("data/hevy/writes.jsonl", "\n".join(json.dumps(x) for x in lines) + "\n")
             code, results, _ = check(tmp.root, "schema_versions")
         self.assertEqual(code, 1)
         [row] = failures(results, "schema_versions")
         self.assertIn("line 2", row["message"])
-        self.assertIn("migrate run", row["message"])
+        self.assertIn("/framework-sync", row["message"])
+
+    def test_lines_go_to_the_schema_whose_constants_match(self):
+        with TempCopy() as tmp:
+            void = {"schema_version": 3, "op": "void", "id": "manual:x", "source": "manual",
+                    "recorded_at": "2026-10-11T19:00:00Z", "reason": "typo", "by": "athlete"}
+            tmp.write("data/activity/planned.jsonl", json.dumps(void) + "\n")
+            _, results, _ = check(tmp.root, "schema_versions")
+        [row] = failures(results, "schema_versions")
+        self.assertEqual(row["path"], "data/activity/planned.jsonl")
+        self.assertIn("schema_version 3", row["message"])
+
+    def test_migrated_documents_come_from_the_migration_registry(self):
+        with TempCopy() as tmp:
+            tmp.edit_json("data/program.json", lambda doc: doc.update(schema_version=2))
+            _, results, _ = check(tmp.root, "schema_versions")
+        [row] = failures(results, "schema_versions")
+        self.assertEqual(row["path"], "data/program.json")
+        self.assertIn("/framework-sync", row["message"])
 
     def test_cache_files_and_missing_versions(self):
         with TempCopy(INSTANCES / "dangling-routine") as tmp:
-            tmp.edit_json(".coach/cache/hevy/meta.json", lambda doc: doc.update(schema_version=3))
+            tmp.edit_json(".coach/cache/hevy/meta.json", lambda doc: doc.update(schema_version=0))
             tmp.edit_json(".coach/cache/hevy/routines.json", lambda doc: doc.pop("schema_version"))
             code, results, _ = check(tmp.root, "schema_versions")
         self.assertEqual(code, 1)
         failed = {row["path"]: row["message"] for row in failures(results, "schema_versions")}
-        self.assertIn("/framework-sync", failed[".coach/cache/hevy/meta.json"])
+        self.assertIn("hevy pull --full", failed[".coach/cache/hevy/meta.json"])
         self.assertIn("no integer schema_version", failed[".coach/cache/hevy/routines.json"])
 
-    def test_every_instance_schema_names_its_paths(self):
+    def test_schemas_the_runner_does_not_own_name_their_paths(self):
+        from coach import migrate
+
         claimed = instance.claimed_documents()
-        for name in ("exercise_library", "overlay", "hevy_write_line", "hevy_verify_line", "hevy_retire_line",
-                     "hevy_cache_meta", "hevy_cache_file"):
+        for name in ("hevy_write_line", "hevy_verify_line", "hevy_retire_line", "hevy_cache_meta", "hevy_cache_file",
+                     "nutrition_readings", "activity_sync", "activity_record", "activity_void", "planned_record",
+                     "wellness_record"):
             self.assertIn(name, claimed)
+        for name in migrate.registry().documents:
+            self.assertNotIn(name, claimed, "the migration registry already says where it lives")
 
     def test_empty_instance_skips(self):
         with tempfile.TemporaryDirectory() as tmp:

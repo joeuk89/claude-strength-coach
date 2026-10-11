@@ -1,4 +1,8 @@
 {
+  "x-coach-paths": ["data/activity/activities.jsonl",
+                    "data/activity/planned.jsonl",
+                    "data/activity/wellness.jsonl",
+                    ".coach/activity/wellness.jsonl"],
   "title": "A void line in any activity-source file (contract C29): removes the record from every view, keeps its history",
   "type": "object",
   "required": ["schema_version", "op", "id", "source", "recorded_at", "reason", "by"],

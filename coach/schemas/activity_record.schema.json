@@ -1,4 +1,5 @@
 {
+  "x-coach-paths": ["data/activity/activities.jsonl"],
   "title": "One upsert line in data/activity/activities.jsonl (contract C29, C30)",
   "type": "object",
   "required": ["schema_version", "op", "id", "source", "recorded_at", "kind", "start", "local_date",
