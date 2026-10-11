@@ -374,8 +374,9 @@ what the write line named — nothing more.
    set `one_off` to null in `data/state.json` and run `python3 -m coach
    state show` to check it.
 
-**No Hevy?** `overlay approve` is the last write of the pass: skip
-steps 3–5 and run `python3 -m coach sheets render`, which writes
+**No Hevy?** `overlay approve` is the last write of the pass: skip the
+Hevy commands in steps 3–5 (an ended one-off week still gets `one_off`
+set to null) and run `python3 -m coach sheets render`, which writes
 `this-week-sheets.md`, the per-set sheets the athlete trains from. Never
 run `routines push`: with Hevy off it exits 5.
 
