@@ -47,7 +47,7 @@ coach/                       # framework: synced to instances
   routines.py                # diff, push, verify, retire; create                        (R-14, R-14b)
   gate.py                    # PreToolUse hook logic                                     (R-15)
   program.py, state.py, migrate.py, migrations/<doc>/{__init__,NNNN_<slug>}.py           (R-17a)
-                             # program.py also holds import_hevy and adopt               (R-41a)
+  program_drafts.py          # import_hevy and adopt; reads stats and routines, which import program.py (R-41a)
   history.py                 # resolve workouts, annotations, exposures                  (R-20)
   history_sources/<name>.py  # one module per history input: hevy (R-20), manual (R-40c)
   stats.py                   # e1RM, adherence, dose, durations, audit                   (R-20)
@@ -542,7 +542,8 @@ program start loads):
   carry it. It prints at most two decimals, rounding halves up, and strips
   trailing zeros (`22.5`, `1.25`, `25`). It raises on a null load; callers
   print what a null load means in their context (C12).
-- `format_load(load, show_hevy=True)` (R-40c). With `show_hevy` false,
+  `format_number(value)` (R-41a) prints a bare number the same way.
+- `format_load(load, show_hevy=True)` (R-40c; R-41a's import report uses it too). With `show_hevy` false,
   `per_hand_x2` prints `25/hand`, `single_implement` prints `25`, and
   `assisted` prints `BW-20 assist`. Renderers pass `config.hevy.enabled`;
   `units format --no-hevy` sets it false.
@@ -1281,7 +1282,7 @@ Unless stated, each is a copy of `valid/` plus what is listed.
 | `library-seed/` | R-11 | not a copy of `valid/`: config, and a synthetic Hevy cache (C8) holding Session A and Session B with the four `valid/` exercises plus the custom template `C0000001` "Tyre Flip"; no instance library |
 | `library-unconfirmed/` | R-11 | not a copy of `valid/`: config, cached Session A, and an instance library where `db_bench_press` has a proposal but no confirmed load mode |
 | `library-invalid/` | R-11 | not a copy of `valid/`: config and an instance library with an unknown field on `db_bench_press` |
-| `empty/` | R-41a | `config.toml` and an instance library only: no program, no state. Not a copy of `valid/` |
+| `empty/` | R-41a | `config.toml` (`valid/`'s without `[activity]` and `[nutrition]`) and `valid/`'s instance library with `db_bench_press` proposed but not confirmed: no program, no state. Not a copy of `valid/` |
 | `pages/`, `pages-stale/`, `pages-long-brief/` | R-25 | not copies of `valid/`: its config without `[activity]` and `[nutrition]`, library, program, state, overlay and record `check-ins/2026-10-11.md`; `data/history/2026-09.json` and `2026-10.json` from `history sync` of the C14 workouts plus Session A on 2026-10-12 (squat 3×5 @ 100 RPE 7, DB bench 3×10 @ Hevy 50 RPE 8); no Hevy cache; the three pages rendered at 2026-10-14T18:00:00Z. `pages-stale/` hand-edits the brief's focus; `pages-long-brief/` pads the brief to 61 lines |
 | `hevy-fresh/` | R-12 | `valid/`'s `config.toml` and a cache `meta.json` with the last pull at 2026-10-11T12:00:00Z (6 hours before `COACH_NOW`) |
 | `hevy-stale/` | R-12 | the same with the last pull at 2026-10-09T12:00:00Z (54 hours) |
@@ -1330,6 +1331,15 @@ Synthetic Hevy fixture set `tests/fixtures/hevy/wave/` (R-41a; its
 `routines.json`, layered over `synthetic/`, C15): four routines "W1
 Squat Day", "W2 Squat Day", "W3 Squat Day", "Bench Day", squat top loads
 85, 90, 95, with "TM 100" in a note.
+
+Synthetic Hevy fixture set `tests/fixtures/hevy/pushed/` (R-41a; its
+`routines.json`, layered over `synthetic/`): the two C14 routines as
+`routines push` of the valid overlay leaves them (`routines-pushed/`'s
+cache): squat 1 warm-up and 3×5 at 100, DB bench 1 warm-up and 3×8–10 at
+Hevy 50, row 3×10 at 30, pull-up 3×8, each with its C12 note. The
+program draft `tests/fixtures/program/draft.json` is `program
+import-hevy` of it on `valid/`, with the days `mon` Session A and `thu`
+Session B filled in.
 
 ## C15. Hevy fixtures and anonymisation (R-12)
 
@@ -4455,6 +4465,7 @@ writes `data/program.json` directly.
   "program": { "...": "a complete program.json document (C16 / C23 v2 or later)" },
   "position": null,
   "hevy_routines": {"00000000-0000-4000-8000-000000000001": "session-a"},
+  "hevy_folder": 1,
   "report": [
     {"kind": "converted_load", "session_id": "session-a", "exercise_id": "db_bench_press",
      "message": "Hevy 50 → 25/hand"},
@@ -4466,31 +4477,61 @@ writes `data/program.json` directly.
 ```
 
 - `source`: `starter:<id>`, `hevy_import`, `design`.
-- `report[].kind`: `converted_load`, `mixed_loads`, `cues_from_notes`,
-  `schedule_missing`, `swapped_exercise`, `no_substitute`,
-  `percentage_evidence`. The skill shows the report as one table.
-- `detected` is filled by import only; empty for other sources.
+- `hevy_folder` (R-41a): the Hevy folder id the imported routines share
+  (`--folder`, else the one folder they all sit in), or null. Adopt
+  writes it to `state.hevy.folders.program`; null keeps the old state's.
+- `report[]`: `{kind, session_id, exercise_id, message}`, the ids null
+  where they do not apply. `kind`: `converted_load`, `mixed_loads`,
+  `cues_from_notes`, `schedule_missing`, `swapped_exercise`,
+  `no_substitute`, `percentage_evidence`. The skill shows the report as
+  one table.
+- `detected` is filled by import only; for other sources it is
+  `{"percentage_based": false, "evidence": [], "suggested_schemes": []}`.
+  An evidence item is `{kind, exercise_id, message}` with `kind`
+  `keyword`, `week_titles` or `top_loads`.
 - Schema file `program_draft.schema.json`; the `program` member is
   validated with the program schema and the plugin `PARAMS` (C23).
+  Drafts are gitignored and never migrated (C7).
 
 `program adopt --input FILE [--replace] [--position P] [--dry-run]`:
 
 1. Validate the draft and its program (`program validate` rules, library
-   ids, `[caps]` for start loads). Exit 1 with JSONPaths on failure.
-2. With an existing program: exit 3 without `--replace`; with it, copy
-   both files to `data/archive/programs/<today>/`.
+   ids, `[caps]` for start loads, every `hevy_routines` session in the
+   program). Exit 1 with JSONPaths from the draft's root
+   (`$.program.sessions[0]...`) on failure. A schedule whose params name
+   no program session (the import's placeholder) fails at
+   `$.program.schedule.params`. A position the rule does not have, or a
+   position for a rule without one, exits 1.
+2. With an existing program: exit 3 without `--replace` (under
+   `--dry-run` too); with it, copy both files to
+   `data/archive/programs/<today>/` (`<today>-2`, `-3` when that exists).
 3. Write `data/program.json` and `data/state.json` (block started
-   today, zero hard weeks, rotation position from `--position` or the
-   schedule rule's first position, confirmed; scheme state kept only for
-   slots whose exercise and scheme are unchanged; `hevy.routines` from the
-   draft).
-4. Run `program render`. Stage the written files; never commit.
-5. Return `data.unconfirmed`: program exercises with no confirmed load
-   mode in the instance library. Adopt does not confirm on the athlete's
-   behalf; the skill runs `library confirm` or `library set-mode`.
+   today, zero hard weeks, deload not due; rotation position from
+   `--position`, else the draft's `position`, else the schedule rule's
+   first position, confirmed today for the week holding tomorrow, or
+   null with `confirmed_at` and `week` null for a rule without positions;
+   scheme state kept only for slots whose exercise and scheme are
+   unchanged; `hevy.routines` from the draft; `one_off`,
+   `folders.one_off` and `temporary_routines` carried over from the old
+   state).
+4. Render the pages (`program render`'s rules: changed pages written,
+   pages of dropped sessions removed). Stage the written, archived and
+   removed files; never commit. Outside a git work tree it writes and
+   warns.
+5. Return `data.unconfirmed` (`[{exercise_id, sessions}]`): program
+   exercises with no confirmed load mode in the instance library. Adopt
+   does not confirm on the athlete's behalf; the skill runs `library
+   confirm` or `library set-mode`. Also `data.avoided`
+   (`[{exercise_id, sessions, reason}]`, active sessions only, each with a
+   warning), `data.without_routine` (sessions no `hevy_routines` entry
+   names, empty when Hevy is off), `data.scheme_state` (`kept` and
+   `dropped` slot keys), `archived`, `written`, `removed`, `staged`;
+   under `--dry-run`, `would_archive`, `would_write` and `would_remove`.
 
-An avoided exercise (C54) is treated like missing equipment: substituted
-and reported.
+Adopt reports an avoided exercise (C54) the way it reports an
+unconfirmed load mode and leaves it in the program: swapping it is the
+coach's call, made with the athlete (amended in R-41a's triage).
+`starters draft` (R-41b) still substitutes and reports.
 
 `program import-hevy [--routine ID ...] [--folder ID] [--out FILE] [--dry-run]`
 reads the C8 cache and writes a draft (default
@@ -4505,23 +4546,39 @@ reads the C8 cache and writes a draft (default
   `kind: "conditioning"`.
 - Set groups come from consecutive routine sets with the same type and
   reps or rep range. Warm-up sets are kept.
-- Start load is the top working set's `weight_kg` through
-  `units.from_hevy_kg` with the confirmed load mode, then
-  `units.round_to_increment`; every conversion is a `converted_load` row.
+- Start load is the top working set's `weight_kg` (for an `assisted`
+  line, the least assistance) through `units.from_hevy_kg` with the
+  confirmed load mode; every conversion is
+  a `converted_load` row (`Hevy 50 → 25/hand`). The value is rounded
+  with `units.round_to_increment` to the exercise's increment
+  (`stats.load_increment`) only when it does not convert back to the
+  same `weight_kg` (a load set in the other unit), and the row says so
+  (`Hevy 44.09 → 45, rounded to the 5 lb step`): a load the athlete
+  actually set stays exactly as set. With no working load, a
+  `bodyweight` line starts at 0 and other loaded lines at null.
   Working sets with different loads keep the top load and get a
-  `mixed_loads` row.
+  `mixed_loads` row. An exercise repeated in a routine becomes one entry
+  whose set groups follow each other, with the first entry's rest and
+  superset; its start load and `mixed_loads` check cover the working
+  sets of every entry.
 - Cues come from the note's `Cues:` line when present; otherwise the note
   text with `Target:`, `Focus:` and `Wk of` lines removed
   (`cues_from_notes`).
 - Every imported exercise gets scheme `hold`. Schedule is a
-  `fixed_weekdays` placeholder with no days; adopt fails until the coach
-  fills it (`schedule_missing`).
+  `fixed_weekdays` placeholder, `{"days": {}}`; adopt fails until the
+  coach fills it (`schedule_missing`). Blocks default to a ceiling of 6
+  and the `standard` deload rule; there are no external sessions or
+  missed-day rules.
 - Percentage detection only reports (`detected`, `percentage_evidence`):
   `%`, "TM", "training max", "1RM", "5/3/1" or "531" in titles and notes;
   two or more routines whose titles differ only by a week marker (`W1`,
   `Week 2`, `Wk3`); the same exercise in three or more routines with three
-  or more distinct top loads. It suggests `wave_531` or `fixed_reps_rpe`
-  and never assigns a scheme.
+  or more distinct top loads. It suggests `wave_531` for week-marked
+  titles or "TM", "training max", "5/3/1" or "531", and
+  `fixed_reps_rpe` for `%` or "1RM", or for spread top loads without
+  week-marked titles. It never assigns a scheme.
+- Output: `draft`, `path`, `written`, and `problems`: what adopt would
+  reject in the draft other than its schedule, as JSONPaths.
 
 A program adopted with sessions that have no Hevy routine gets them from
 R-14b's `routines create`; adopt itself never calls Hevy.
@@ -5167,8 +5224,9 @@ in `starters draft`), R-40a, `config suggest`.
 text"}`. Commands: `library set-avoid ID --reason TEXT`, `library
 set-avoid ID --clear` (W, `--dry-run`), `library list --avoided`.
 
-- R-41b `starters draft` and R-41a `program adopt` treat an avoided
-  exercise like missing equipment: substitute and report.
+- R-41b `starters draft` treats an avoided exercise like missing
+  equipment: substitute and report. R-41a `program adopt` reports it
+  (`data.avoided`) and leaves it in the program (C45).
 - R-17a adds a warn check `avoided_in_program` when an active program slot
   uses one.
 - The proposal step never swaps exercises; swaps stay the coach's call.

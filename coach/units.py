@@ -30,6 +30,11 @@ def json_number(value):
     return value
 
 
+def format_number(value):
+    """A number as `format_load` prints one: at most two decimals, trailing zeros stripped."""
+    return _text(_number(value))
+
+
 def _factor(unit):
     if unit not in UNITS:
         raise ValueError(f"unknown unit {unit!r}; expected one of {', '.join(UNITS)}")

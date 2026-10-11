@@ -34,35 +34,53 @@ coach scripts" sets out.
   `external_sessions`, the light-week policy in `blocks` (a hard-week
   ceiling within the allowed range and a deload rule) and any
   missed-day rules.
-- `data/state.json` (schema `coach/schemas/state.schema.json`; its
-  `schema_version` is the schema's const) — the rotation position if
-  the program rotates, the block (`started`, `hard_weeks_completed` 0,
-  `deload` not due), `one_off` null, an empty `scheme_state`, and for
-  Hevy users `hevy.routines` mapping each routine id to its session.
-- After every write: `python3 -m coach program validate`, `python3 -m
-  coach state show` (it refuses an invalid state) and `python3 -m coach
-  program render`, which renders `routine/program.md` and one page per
-  session. Those pages are rendered — never edit them by hand.
+- **Every new program goes through a program draft.** Both paths end
+  with a draft at `.coach/drafts/program.json` (schema
+  `coach/schemas/program_draft.schema.json`: the complete program under
+  `program`, plus `source`, `hevy_routines` and a `report`). Show the
+  athlete the draft, then run `python3 -m coach program adopt --input
+  .coach/drafts/program.json --dry-run` and, once they agree, the same
+  without `--dry-run`. Adopt validates the draft (exit 1 names each
+  problem by JSONPath), writes `data/program.json` and
+  `data/state.json` (block started today, the rotation at `--position`
+  or the schedule rule's first position, `hevy.routines` from the
+  draft), renders `routine/program.md` and one page per session, and
+  stages the files without committing. Never write a new
+  `data/program.json` or `data/state.json` yourself.
+- Adopt's output lists what still needs the athlete:
+  - `unconfirmed` — exercises without a confirmed load mode: ask how
+    each is performed, then `python3 -m coach library set-mode <id>
+    <mode>` or `python3 -m coach library confirm <ids>`.
+  - `avoided` — exercises the athlete avoids, with the reason. Adopt
+    keeps them; propose a swap from `python3 -m coach library show <id>`
+    (its `substitutes`) and agree it with the athlete.
+  - `without_routine` — sessions with no Hevy routine yet (see Path B
+    step 5).
+- Later edits to `data/program.json` (a swap, a fix): edit it, then
+  `python3 -m coach program validate` and `python3 -m coach program
+  render`. The pages are rendered — never edit them by hand.
 - A weekly balance picture (muscle group × sessions, including any
   coach-led sessions), shown in the walk-through so check-ins can audit
   it.
 
-**Loads come from `coach` output; quote them.** A load read from Hevy
-is a Hevy value: `python3 -m coach units convert --mode <load mode>
---from-hevy-kg <value>` turns it into the athlete's number, and the
-rendered pages print both numbers for dumbbell work.
+**Loads come from `coach` output; quote them.** `program import-hevy`
+turns each Hevy value into the athlete's number with the confirmed load
+mode and reports every conversion; the rendered pages print both
+numbers for dumbbell work.
 
 Requires `profile.md` and `config.toml` — if missing, run `/setup`
 first.
 
-## Redesigns: archive first
+## Redesigns: adopt with `--replace`
 
-If `data/program.json` exists, this is a redesign. Before writing
-anything, copy the current `data/program.json` and `data/state.json` to
-`data/archive/programs/YYYY-MM-DD/` (with the athlete's approval) so
-history survives; `program render` removes pages for sessions the new
-program drops. Carry forward what the last block taught (check the
-latest deep check-in).
+If `data/program.json` exists, this is a redesign. `program adopt`
+refuses (exit 3) until you add `--replace`, with the athlete's
+approval: it then archives the current `data/program.json` and
+`data/state.json` under `data/archive/programs/<today>/`, keeps the
+progression state of every exercise whose session, exercise and scheme
+are unchanged, and removes the pages of sessions the new program drops.
+Carry forward what the last block taught (check the latest deep
+check-in).
 
 Under 80 % adherence (as `/check-in` step 4 defines it), the redesign
 adds no new recurring session — no new session or weekly slot,
@@ -74,9 +92,8 @@ trigger started builds the smaller schedule the check-in agreed.
 
 For athletes arriving with routines in Hevy (or on paper).
 
-1. **Fetch:** run `python3 -m coach hevy pull` and list the cached
-   routines (`.coach/cache/hevy/routines.json`) — or take the paper
-   plan.
+1. **Fetch:** run `python3 -m coach hevy pull` — or take the paper
+   plan, and write the draft as in Path B.
 2. **Interview:** which routines are active? How do they rotate across a
    week (or longer cycle)? Any coach-/PT-led sessions alongside them?
    Rest days? What progression rule do they follow, if any?
@@ -88,17 +105,29 @@ For athletes arriving with routines in Hevy (or on paper).
    implement) — and record the answers with `python3 -m coach library
    set-mode <id> <mode>`; confirm the rest with `python3 -m coach
    library confirm <ids>` (or `--all` once every one is right).
-4. **Write:** `data/program.json` with one session per active routine,
-   mirroring the athlete's *actual* structure (don't reshape it during
-   import), and `data/state.json` with `hevy.routines` mapping each
-   routine id to its session and `hevy.folders.program` set to the
-   routines' folder id. Start loads are each routine's working-set Hevy
-   values through `units convert` with the confirmed load mode; check
-   each dumbbell result against the athlete's actual dumbbells before
-   trusting it. Agree `cues` per exercise as you go — existing Hevy
-   exercise notes are the starting point. Then validate and render as
-   above.
-5. **Review with a coaching eye:** now assess it — weekly balance gaps,
+4. **Import:** run `python3 -m coach program import-hevy` (`--routine
+   <id>` for each active routine, or `--folder <id>`). It writes the
+   draft with one session per routine, mirroring the athlete's *actual*
+   structure (don't reshape it during import): set groups, rest,
+   supersets, a start load from each routine's top working set, cues
+   from the exercise notes, and `hevy_routines` mapping each routine to
+   its session. It exits 1 naming any exercise still without a
+   confirmed load mode; settle it as in step 3 and run it again.
+5. **Show the draft's report as one table** (kind, session, exercise,
+   message): every converted load (check each dumbbell number against
+   the athlete's actual dumbbells), working sets at mixed loads, cues
+   taken from notes, and the missing schedule. When
+   `detected.percentage_based` is true, show its evidence too.
+6. **Finish the draft with the athlete:** the schedule rule and its
+   days (adopt refuses an empty schedule), coach-led sessions, the
+   light-week policy, and a progression scheme per exercise. Import sets
+   every scheme to `hold`; a percentage-based program's
+   `suggested_schemes` are a starting point for that conversation, never
+   applied for you. Agree `cues` per exercise as you go.
+7. **Adopt:** run `python3 -m coach program adopt --input
+   .coach/drafts/program.json --dry-run`, then without `--dry-run`, as
+   the output contract sets out.
+8. **Review with a coaching eye:** now assess it — weekly balance gaps,
    missing progression scheme, junk volume, recovery clashes between
    adjacent days. **Propose improvements; don't force them.** Small fixes
    can land now (with approval); big ones can wait for a `/check-in` or a
@@ -128,13 +157,26 @@ and `config.toml` (units, equipment and its increments).
    sessions and cardio).
 4. **Walk the athlete through it** — the reasoning, not just the tables.
    Iterate until they'd actually train it. Confirm before writing files,
-   then write `data/program.json` and `data/state.json` and validate
-   and render them as above.
-5. **Hevy:** the program's routines are created by the opening week's
-   programming pass. `/program-week` names each new routine in its
-   write line, and after the athlete's "go" runs `routines create`,
-   which makes each routine in the program folder and records its id in
-   `data/state.json`.
+   then write the draft to `.coach/drafts/program.json` and adopt it as
+   the output contract sets out. The schema lists every key; set these
+   as follows:
+   - `source` `design`, `hevy_folder` null (adopt then keeps the
+     current program folder), `report` `[]`, and `detected`
+     `{"percentage_based": false, "evidence": [], "suggested_schemes": []}`.
+   - `hevy_routines` `{}` for a first program. For a redesign, adopt
+     builds `hevy.routines` only from the draft, so carry the mapping
+     over: take each `hevy.routines` entry from `python3 -m coach state
+     show` whose `session_id` the new program keeps, and write it as
+     `"<routine id>": "<session id>"`. Leave sessions that are new out;
+     step 5 gives them routines. A kept session left out gets a second
+     routine and its old one goes stale.
+5. **Hevy:** adopt lists the sessions without a routine in
+   `without_routine`; the opening week's programming pass creates them.
+   `/program-week` names each new routine in its write line, and after
+   the athlete's "go" runs `python3 -m coach routines create --overlay
+   <id>` behind the approval gate, which makes each routine in the
+   program folder and records its id in `data/state.json`. Without Hevy
+   (`[hevy] enabled = false`) skip this step.
 
 ## Close out
 
@@ -149,5 +191,5 @@ and `config.toml` (units, equipment and its increments).
 - Point at the rhythm: train it, log it, `/check-in` weekly — the first
   check-in after a new program pays extra attention to whether the
   starting loads and volume landed right.
-- Offer to commit the new `data/` files and rendered `routine/` pages
-  after the athlete approves.
+- Adopt staged the new `data/` files and rendered `routine/` pages;
+  offer to commit them after the athlete approves.

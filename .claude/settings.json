@@ -32,6 +32,8 @@
       "Bash(python3 -m coach program show:*)",
       "Bash(python3 -m coach program validate:*)",
       "Bash(python3 -m coach program render:*)",
+      "Bash(python3 -m coach program import-hevy:*)",
+      "Bash(python3 -m coach program adopt:*)",
       "Bash(python3 -m coach state show:*)",
       "Bash(python3 -m coach migrate status:*)",
       "Bash(python3 -m coach meals template:*)",

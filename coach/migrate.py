@@ -214,18 +214,18 @@ def _restore(root, backup, relatives):
         shutil.copy2(backup / relative, Path(root) / relative)
 
 
-def _stage(root, relatives):
-    """(staged paths, warning or None): `git add` the migrated files; never commits."""
+def stage(root, relatives, what="migrated files"):
+    """(staged paths, warning or None): `git add` the files, deletions included; never commits."""
     try:
         inside = subprocess.run(["git", "-C", str(root), "rev-parse", "--is-inside-work-tree"],
                                 capture_output=True, text=True)
     except FileNotFoundError:
-        return [], "git is not installed, so the migrated files are not staged; stage them by hand"
+        return [], f"git is not installed, so the {what} are not staged; stage them by hand"
     if inside.returncode != 0 or inside.stdout.strip() != "true":
-        return [], f"{root} is not a git repository, so the migrated files are not staged"
+        return [], f"{root} is not a git repository, so the {what} are not staged"
     added = subprocess.run(["git", "-C", str(root), "add", "--", *relatives], capture_output=True, text=True)
     if added.returncode != 0:
-        return [], f"git add failed ({added.stderr.strip()}); stage the migrated files by hand"
+        return [], f"git add failed ({added.stderr.strip()}); stage the {what} by hand"
     return list(relatives), None
 
 
@@ -277,7 +277,7 @@ def run(root, dry_run, now=None, reg=None):
         _restore(root, backup, relatives)
         raise
     report["written"] = True
-    report["staged"], warning = _stage(root, relatives)
+    report["staged"], warning = stage(root, relatives)
     if warning:
         report["warnings"].append(warning)
     return report
