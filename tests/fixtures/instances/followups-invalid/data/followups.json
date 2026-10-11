@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "items": [
+    {
+      "id": "f-0001",
+      "raised": "2026-10-11",
+      "source": "check-in 2026-10-11",
+      "text": "Synthetic: re-test the pull-up ladder.",
+      "review_at": "2026-11-08",
+      "status": "dropped",
+      "events": [
+        {"date": "2026-10-11", "action": "raised", "note": null},
+        {"date": "2026-11-08", "action": "dropped", "note": null}
+      ]
+    }
+  ]
+}

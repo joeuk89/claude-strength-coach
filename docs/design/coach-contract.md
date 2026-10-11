@@ -200,8 +200,8 @@ Phase 2 to 4 command inventory. No command here writes to Hevy.
 | `schedule plan --week W`, `decisions list`, `propose show ID` | R-23a | |
 | `schedule confirm --position P`, `propose week`, `propose override`, `propose resolve`, `propose finalize`, `decisions withdraw ID` | R-23a | W |
 | `propose restore --proposal ID --session S --reason TEXT` | R-44b | W |
-| `followups list`, `niggles list`, `niggles constraints` | R-27 | |
-| `followups add\|resolve\|drop\|defer\|render`, `niggles add\|update\|resolve\|import` | R-27 | W |
+| `followups list`, `followups render`, `niggles list`, `niggles constraints` | R-27 | |
+| `followups add\|resolve\|drop\|defer`, `niggles add\|update\|resolve\|import` | R-27 | W |
 | `checkin prepare [--until D] [--tier weekly\|deep]`, `checkin misses [--since D] [--until D]`, `checkin due` | R-21a | |
 | `checkin skeleton --date D [--tier T] [--overlay ID] [--refresh]` | R-21a | W |
 | `checkin return-brief (--proposal ID \| --overlay ID) --reason R` | R-21b | |
@@ -2524,7 +2524,16 @@ is the single function R-23a's pipeline, R-31's niggle trigger and R-43's
 - **Deep check-in must resolve each.** `followups render --deep --date D`
   prints the deep record's follow-up section and exits 1 while any item
   open before D has no event dated D. Each needs one of resolve, drop
-  (with reason), or defer/keep (with a new `review_at`).
+  (with reason), or defer/keep (with a new `review_at`). `render` only
+  prints (read-only); the coach puts its text in the record.
+- `coach.followups.due(doc, today)` and `coach.followups.render_deep(doc,
+  day)` take the loaded document first, as `active_constraints` does.
+- Commands (R-27): `followups add --text T --review-at D --source S
+  [--raised D]`, `followups resolve ID [--note]`, `followups drop ID
+  --reason T`, `followups defer ID --to D [--kept] [--note]`. Events are
+  dated today. `defer` records `kept` with `--kept` (reviewed, still
+  open) and `deferred` without it. A closed item takes no further
+  events.
 
 `data/niggles.json`:
 
@@ -2555,16 +2564,47 @@ is the single function R-23a's pipeline, R-31's niggle trigger and R-43's
   `["aggravated", "watching"]`).
 - `niggle_escalate` (warn) when the last three check-in entries in
   `history` are all `aggravated` or `watching`, or the status moved to
-  `aggravated` from a better one.
+  `aggravated` from a better one (the entry before it is `watching`,
+  `easing` or `resolved`). It is a week-level flag in `propose week` and
+  the R-21a card, and `niggles list` gives each row's `escalate` reason.
+- `history` holds one entry per check-in day: `niggles update ID
+  [--status S] [--note T] [--mention]` adds today's entry, or replaces
+  it when today already has one. `--mention` bumps `mentions` and
+  `last_noted` once a day. `niggles resolve ID` sets `resolved`. The
+  newest entry's status equals `status`.
+- Whether a row's constraints apply on a date reads its status on that
+  date: the newest `history` entry on or before it (none: not yet
+  noted). `coach.niggles.active_constraints(doc, entry, on_date)` returns
+  the matching constraints with `source` set to the niggle id; a row
+  matches a library entry by `applies_to.exercises` (its id) or
+  `applies_to.patterns` (its pattern). `niggles constraints [--session
+  S]` lists each program line a niggle constrains today.
+- `niggles add|update` set `applies_to` with `--pattern`, `--exercise`
+  and `--activity-kinds` (comma-separated; an empty value clears) and
+  constraints with `--constraint KIND[=VALUE]` (repeatable; `reason` is
+  the niggle's area; `update --clear-constraints` removes them). An
+  unknown pattern, exercise id, activity kind or constraint exits 1
+  naming the valid values. Check `niggles_schema` fails on the same.
 - R-31 reads `aggravated` as its "niggle under load" fatigue trigger.
-- `niggles import --from-profile [--dry-run]` parses the template's
-  `### Niggle log` table (`Area · First noted · Last noted · Mentions ·
-  Status · Notes`) into rows with no constraints, for the coach to add.
-  An "Injuries / limitations" line the coach marks as permanent maps to
-  `chronic`.
+- `niggles import --from-profile [--chronic I[,I...]] [--dry-run]`
+  parses the template's `### Niggle log` table (`Area · First noted ·
+  Last noted · Mentions · Status · Notes`) into rows with no
+  constraints, for the coach to add; each row's one history entry is
+  dated its Last noted. Its output also numbers every other line of the
+  "Injuries / limitations" section (`lines`, from 1); `--chronic` turns
+  those lines into `chronic` rows (area = the line, noted today, empty
+  `applies_to`), and unmarked lines are not imported. It refuses (exit
+  1) when `data/niggles.json` already has rows, and never edits
+  `profile.md`.
 - R-27 builds `activity_kinds` and `chronic` into niggles v1. If R-27 has
   merged without `activity_kinds`, R-43 adds it with a schema bump (an
   empty list on every row).
+- R-27 also ships the C36 card part `niggles` (the Niggles field names
+  each open row; due follow-ups as facts; `followup_due` and
+  `niggle_escalate` flags) and the C52 status providers `followups`
+  (order 55, due items) and `niggles` (order 56, aggravated and
+  escalating rows), both at `attention`. Checks: `followups_schema`,
+  `niggles_schema`. Both files are migration-runner documents (C16).
 
 ## C28. Research notes and claim ids (R-32a owns; R-32b, R-32c, R-23a, R-46 read)
 

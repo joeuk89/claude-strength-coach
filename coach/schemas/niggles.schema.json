@@ -1,0 +1,64 @@
+{
+  "title": "Niggles, data/niggles.json: aches worth watching, the movements they affect and the load limits they set (contract C26, C27)",
+  "description": "Rows are never deleted: recurrence is the signal. Patterns, exercise ids, activity kinds, constraint values and the history's order are cross-checked by coach.niggles.problems against the exercise library and the activity kinds.",
+  "type": "object",
+  "required": ["schema_version", "niggles"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": 1},
+    "niggles": {"type": "array", "items": {"$ref": "#/$defs/niggle"}}
+  },
+  "$defs": {
+    "date": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+    "text": {"type": "string", "pattern": "\\S"},
+    "status": {"enum": ["aggravated", "watching", "easing", "resolved", "chronic"]},
+    "niggle": {
+      "type": "object",
+      "required": ["id", "area", "first_noted", "last_noted", "mentions", "status", "notes", "applies_to",
+                   "constraints", "constrain_while", "history"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^n-\\d{4,}$"},
+        "area": {"$ref": "#/$defs/text"},
+        "first_noted": {"$ref": "#/$defs/date"},
+        "last_noted": {"$ref": "#/$defs/date"},
+        "mentions": {"type": "integer", "minimum": 1},
+        "status": {"$ref": "#/$defs/status"},
+        "notes": {"type": ["string", "null"], "pattern": "\\S"},
+        "applies_to": {
+          "type": "object",
+          "required": ["patterns", "exercises", "activity_kinds"],
+          "additionalProperties": false,
+          "properties": {
+            "patterns": {"type": "array", "items": {"type": "string", "pattern": "^[a-z_]+$"}},
+            "exercises": {"type": "array", "items": {"type": "string", "pattern": "^[a-z0-9_]+$"}},
+            "activity_kinds": {"type": "array", "items": {"type": "string", "pattern": "^[a-z_]+$"}}
+          }
+        },
+        "constraints": {"type": "array", "items": {"$ref": "#/$defs/constraint"}},
+        "constrain_while": {"type": "array", "items": {"$ref": "#/$defs/status"}},
+        "history": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/entry"}}
+      }
+    },
+    "constraint": {
+      "type": "object",
+      "required": ["kind", "value", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {"enum": ["rpe_cap", "no_added_load", "load_cap"]},
+        "value": {"type": ["number", "null"], "minimum": 0},
+        "reason": {"$ref": "#/$defs/text"}
+      }
+    },
+    "entry": {
+      "type": "object",
+      "required": ["date", "status", "note"],
+      "additionalProperties": false,
+      "properties": {
+        "date": {"$ref": "#/$defs/date"},
+        "status": {"$ref": "#/$defs/status"},
+        "note": {"type": ["string", "null"], "pattern": "\\S"}
+      }
+    }
+  }
+}

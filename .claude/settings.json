@@ -76,7 +76,19 @@
       "Bash(python3 -m coach log prefill:*)",
       "Bash(python3 -m coach log add:*)",
       "Bash(python3 -m coach log void:*)",
-      "Bash(python3 -m coach sheets render:*)"
+      "Bash(python3 -m coach sheets render:*)",
+      "Bash(python3 -m coach followups list:*)",
+      "Bash(python3 -m coach followups add:*)",
+      "Bash(python3 -m coach followups resolve:*)",
+      "Bash(python3 -m coach followups drop:*)",
+      "Bash(python3 -m coach followups defer:*)",
+      "Bash(python3 -m coach followups render:*)",
+      "Bash(python3 -m coach niggles list:*)",
+      "Bash(python3 -m coach niggles add:*)",
+      "Bash(python3 -m coach niggles update:*)",
+      "Bash(python3 -m coach niggles resolve:*)",
+      "Bash(python3 -m coach niggles import:*)",
+      "Bash(python3 -m coach niggles constraints:*)"
     ]
   },
   "hooks": {

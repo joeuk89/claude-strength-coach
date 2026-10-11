@@ -289,6 +289,19 @@ concrete: did the athlete hit the prescribed load × reps @ RPE?
   `Research: nothing expired`). For an expired area the coming block
   depends on, offer to refresh it as a local note (`CLAUDE.md`
   "Researching current best practice").
+- Follow-ups: run `python3 -m coach followups list --open` and settle
+  each item raised before today with the athlete — `python3 -m coach
+  followups resolve <id>`, `python3 -m coach followups drop <id>
+  --reason "<why>"`, or `python3 -m coach followups defer <id> --to
+  <date> --kept`. Then put the text of `python3 -m coach followups
+  render --deep --date <today>` in Block planning; exit 1 names each
+  item still without a disposition dated today. A question to come back
+  to, at any check-in, goes in with `python3 -m coach followups add
+  --text "<question>" --review-at <date> --source "check-in <date>"`.
+- Niggles: run `python3 -m coach niggles list --open`. Review each
+  open row's status with the athlete; list each `chronic` row in Block
+  planning without asking for a resolution — it is a lasting
+  limitation.
 
 **Both tiers — the hard-week count.** Class each week the window closes
 by the rules in `CLAUDE.md` "Coaching principles" → Fatigue management:
@@ -540,17 +553,25 @@ check-in the due one.
   they move (deep tier refreshes the whole file). Add or retire
   **Coach's notes** as patterns emerge or resolve — with the athlete's
   confirmation.
-- **Maintain the niggle log** in `profile.md` (Injuries / limitations →
-  a `### Niggle log` table: `Area · First noted · Last noted · Mentions
-  · Status · Notes`; statuses `watching` / `easing` / `resolved`;
-  create the subsection on its first entry). New complaint → new row;
-  repeat mention → bump Last noted and Mentions; confirmed gone →
-  `resolved`, but **keep the row** — recurrence is the signal this log
-  exists to catch. Escalate — recommend a qualified professional and
-  program around it meanwhile, never diagnose — when a niggle runs ~3
-  consecutive check-ins, worsens, or interferes with prescribed
-  training. Active niggles inform any routine change proposed today:
-  no added load on an aggravated pattern.
+- **Maintain the niggle log** in `data/niggles.json` with the `niggles`
+  commands; statuses `aggravated` / `watching` / `easing` / `resolved`,
+  and `chronic` for a lasting limitation. New complaint → `python3 -m
+  coach niggles add --area "<where>" --status <status> --pattern
+  <patterns> --note "<report>"` (`--exercise` and `--activity-kinds`
+  name anything else it affects); repeat mention → `python3 -m coach
+  niggles update <id> --mention --status <status> --note "<report>"`;
+  confirmed gone → `python3 -m coach niggles resolve <id>`, which
+  **keeps the row** — recurrence is the signal this log exists to
+  catch. Agree with the athlete the limit an active niggle sets and add
+  it with `--constraint` (`rpe_cap=7`, the recovery cap;
+  `no_added_load`; `load_cap=<n>`): `propose week` applies it to every
+  matching line while the status is `aggravated` or `watching` (always,
+  for `chronic`) and names the niggle in `constraint_applied`. Escalate
+  — recommend a qualified professional and program around it
+  meanwhile, never diagnose — when `python3 -m coach niggles list`
+  gives a row an `escalate` reason (three check-ins running, or worse
+  to `aggravated`), or when a niggle interferes with prescribed
+  training.
 - **Update `data/state.json`:** the confirmed `rotation` (`position`,
   `confirmed`, `confirmed_at`) if the program rotates, and `block` —
   `hard_weeks_completed` as step 4 counted it; when this check-in closes

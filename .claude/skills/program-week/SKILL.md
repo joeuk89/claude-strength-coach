@@ -167,8 +167,13 @@ formula applied blindly is not coaching.
    scheme stops proposing it away. A per-exercise **focus** drawn from
    check-in findings ("slow the eccentric") may be written into the
    draft line, with an `override` reason saying why; any line changed
-   without a reason is refused. Active niggles constrain everything: no
-   added load on an aggravated pattern.
+   without a reason is refused. Niggle limits are already in the
+   proposal: `propose week` applies each active niggle's constraints to
+   every matching line and names the niggle in `constraint_applied`;
+   `python3 -m coach niggles constraints` lists them. A `niggle_escalate`
+   flag means recommend a qualified professional and keep programming
+   around it, never diagnose; a `followup_due` flag names a follow-up to
+   raise with the athlete.
 4. **Keep a flag** you and the athlete decide to accept with `python3 -m
    coach propose resolve --proposal <id> --flag <index> --resolution
    "<why>"`.

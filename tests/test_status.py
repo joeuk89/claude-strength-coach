@@ -274,9 +274,12 @@ class ProviderRegistryTest(unittest.TestCase):
 
     def test_discovery_finds_the_shipped_providers(self):
         found = {item.id: item for item in status.discover()}
-        self.assertEqual(set(found), {"instance", "checks", "hevy", "overlay", "program", "checkin", "proposal"})
-        self.assertEqual({item.id for item in found.values() if item.owner != "R-26b"}, {"proposal"})
+        self.assertEqual(set(found), {"instance", "checks", "hevy", "overlay", "program", "checkin", "proposal",
+                                      "followups", "niggles"})
+        self.assertEqual({item.id for item in found.values() if item.owner != "R-26b"},
+                         {"proposal", "followups", "niggles"})
         self.assertEqual(found["proposal"].owner, "R-23a")
+        self.assertEqual((found["followups"].owner, found["niggles"].owner), ("R-27", "R-27"))
 
     def test_section_rules(self):
         with self.assertRaises(ValueError):
