@@ -1,0 +1,287 @@
+{
+  "x-synthetic": true,
+  "data": {
+    "metrics": [
+      {
+        "name": "sleep_analysis",
+        "units": "hr",
+        "data": [
+          {
+            "date": "2026-09-21",
+            "totalSleep": 7.1,
+            "asleep": 0,
+            "core": 3.91,
+            "deep": 1.06,
+            "rem": 2.13,
+            "sleepStart": "2026-09-20 23:10:00 +0100",
+            "sleepEnd": "2026-09-21 06:40:00 +0100",
+            "inBed": 7.6,
+            "inBedStart": "2026-09-20 22:55:00 +0100",
+            "inBedEnd": "2026-09-21 06:50:00 +0100",
+            "source": "Sample Person's Watch|Sample Person's Phone"
+          },
+          {
+            "date": "2026-09-22",
+            "totalSleep": 6.4,
+            "asleep": 0,
+            "core": 3.52,
+            "deep": 0.96,
+            "rem": 1.92,
+            "sleepStart": "2026-09-21 23:10:00 +0100",
+            "sleepEnd": "2026-09-22 06:40:00 +0100",
+            "inBed": 6.9,
+            "inBedStart": "2026-09-21 22:55:00 +0100",
+            "inBedEnd": "2026-09-22 06:50:00 +0100",
+            "source": "Sample Person's Watch|Sample Person's Phone"
+          },
+          {
+            "date": "2026-09-23",
+            "totalSleep": 7.8,
+            "asleep": 0,
+            "core": 4.29,
+            "deep": 1.17,
+            "rem": 2.34,
+            "sleepStart": "2026-09-22 23:10:00 +0100",
+            "sleepEnd": "2026-09-23 06:40:00 +0100",
+            "inBed": 8.3,
+            "inBedStart": "2026-09-22 22:55:00 +0100",
+            "inBedEnd": "2026-09-23 06:50:00 +0100",
+            "source": "Sample Person's Watch|Sample Person's Phone"
+          },
+          {
+            "date": "2026-09-24",
+            "totalSleep": 6.9,
+            "asleep": 0,
+            "core": 3.8,
+            "deep": 1.03,
+            "rem": 2.07,
+            "sleepStart": "2026-09-23 23:10:00 +0100",
+            "sleepEnd": "2026-09-24 06:40:00 +0100",
+            "inBed": 7.4,
+            "inBedStart": "2026-09-23 22:55:00 +0100",
+            "inBedEnd": "2026-09-24 06:50:00 +0100",
+            "source": "Sample Person's Watch|Sample Person's Phone"
+          },
+          {
+            "date": "2026-09-25",
+            "totalSleep": 7.3,
+            "asleep": 0,
+            "core": 4.02,
+            "deep": 1.09,
+            "rem": 2.19,
+            "sleepStart": "2026-09-24 23:10:00 +0100",
+            "sleepEnd": "2026-09-25 06:40:00 +0100",
+            "inBed": 7.8,
+            "inBedStart": "2026-09-24 22:55:00 +0100",
+            "inBedEnd": "2026-09-25 06:50:00 +0100",
+            "source": "Sample Person's Watch|Sample Person's Phone"
+          },
+          {
+            "date": "2026-09-26",
+            "totalSleep": 8.2,
+            "asleep": 0,
+            "core": 4.51,
+            "deep": 1.23,
+            "rem": 2.46,
+            "sleepStart": "2026-09-25 23:10:00 +0100",
+            "sleepEnd": "2026-09-26 06:40:00 +0100",
+            "inBed": 8.7,
+            "inBedStart": "2026-09-25 22:55:00 +0100",
+            "inBedEnd": "2026-09-26 06:50:00 +0100",
+            "source": "Sample Person's Watch|Sample Person's Phone"
+          },
+          {
+            "date": "2026-09-27",
+            "totalSleep": 6.6,
+            "asleep": 0,
+            "core": 3.63,
+            "deep": 0.99,
+            "rem": 1.98,
+            "sleepStart": "2026-09-26 23:10:00 +0100",
+            "sleepEnd": "2026-09-27 06:40:00 +0100",
+            "inBed": 7.1,
+            "inBedStart": "2026-09-26 22:55:00 +0100",
+            "inBedEnd": "2026-09-27 06:50:00 +0100",
+            "source": "Sample Person's Watch|Sample Person's Phone"
+          }
+        ]
+      },
+      {
+        "name": "resting_heart_rate",
+        "units": "bpm",
+        "data": [
+          {
+            "date": "2026-09-21 00:00:00 +0100",
+            "qty": 54,
+            "source": "Sample Person's Watch|Sample Person's Phone"
+          },
+          {
+            "date": "2026-09-22 00:00:00 +0100",
+            "qty": 55,
+            "source": "Sample Person's Watch|Sample Person's Phone"
+          },
+          {
+            "date": "2026-09-23 00:00:00 +0100",
+            "qty": 53,
+            "source": "Sample Person's Watch|Sample Person's Phone"
+          },
+          {
+            "date": "2026-09-24 00:00:00 +0100",
+            "qty": 56,
+            "source": "Sample Person's Watch|Sample Person's Phone"
+          },
+          {
+            "date": "2026-09-25 00:00:00 +0100",
+            "qty": 54,
+            "source": "Sample Person's Watch|Sample Person's Phone"
+          },
+          {
+            "date": "2026-09-26 00:00:00 +0100",
+            "qty": 52,
+            "source": "Sample Person's Watch|Sample Person's Phone"
+          },
+          {
+            "date": "2026-09-27 00:00:00 +0100",
+            "qty": 55,
+            "source": "Sample Person's Watch|Sample Person's Phone"
+          }
+        ]
+      },
+      {
+        "name": "step_count",
+        "units": "count",
+        "data": [
+          {
+            "date": "2026-09-21 00:00:00 +0100",
+            "qty": 8120,
+            "source": "Sample Person's Watch|Sample Person's Phone"
+          },
+          {
+            "date": "2026-09-22 00:00:00 +0100",
+            "qty": 10410,
+            "source": "Sample Person's Watch|Sample Person's Phone"
+          },
+          {
+            "date": "2026-09-23 00:00:00 +0100",
+            "qty": 7300,
+            "source": "Sample Person's Watch|Sample Person's Phone"
+          },
+          {
+            "date": "2026-09-24 00:00:00 +0100",
+            "qty": 12050,
+            "source": "Sample Person's Watch|Sample Person's Phone"
+          },
+          {
+            "date": "2026-09-25 00:00:00 +0100",
+            "qty": 9020,
+            "source": "Sample Person's Watch|Sample Person's Phone"
+          },
+          {
+            "date": "2026-09-26 00:00:00 +0100",
+            "qty": 15200,
+            "source": "Sample Person's Watch|Sample Person's Phone"
+          },
+          {
+            "date": "2026-09-27 00:00:00 +0100",
+            "qty": 6400,
+            "source": "Sample Person's Watch|Sample Person's Phone"
+          }
+        ]
+      },
+      {
+        "name": "weight_&_body_mass",
+        "units": "lb",
+        "data": [
+          {
+            "date": "2026-09-21 07:00:00 +0100",
+            "qty": 176.4,
+            "source": "Sample Person's Watch|Sample Person's Phone"
+          },
+          {
+            "date": "2026-09-24 07:00:00 +0100",
+            "qty": 175.8,
+            "source": "Sample Person's Watch|Sample Person's Phone"
+          },
+          {
+            "date": "2026-09-27 07:00:00 +0100",
+            "qty": 175.2,
+            "source": "Sample Person's Watch|Sample Person's Phone"
+          }
+        ]
+      }
+    ],
+    "workouts": [
+      {
+        "id": "5A1C0003-0000-4000-8000-000000000001",
+        "name": "Outdoor Run",
+        "start": "2026-09-23 07:00:00 +0100",
+        "end": "2026-09-23 07:32:00 +0100",
+        "duration": 1920,
+        "location": "Outdoor",
+        "isIndoor": false,
+        "source": "Sample Person's Watch",
+        "distance": {
+          "qty": 5.0,
+          "units": "km"
+        },
+        "heartRate": {
+          "min": {
+            "qty": 118,
+            "units": "bpm"
+          },
+          "avg": {
+            "qty": 148,
+            "units": "bpm"
+          },
+          "max": {
+            "qty": 171,
+            "units": "bpm"
+          }
+        },
+        "heartRateData": [
+          {
+            "date": "2026-09-23 07:01:00 +0100",
+            "Min": 120,
+            "Avg": 131,
+            "Max": 140,
+            "units": "bpm",
+            "source": "Sample Person's Watch"
+          }
+        ],
+        "route": [
+          {
+            "latitude": 51.5,
+            "longitude": -0.12,
+            "altitude": 20.5,
+            "timestamp": "2026-09-23 07:00:05 +0100",
+            "speed": 2.9
+          }
+        ],
+        "metadata": {
+          "weather": "Sample Town, light rain"
+        }
+      },
+      {
+        "id": "5A1C0003-0000-4000-8000-000000000002",
+        "name": "High Intensity Interval Training",
+        "start": "2026-09-25 18:00:00 +0100",
+        "end": "2026-09-25 18:20:00 +0100",
+        "duration": 1200,
+        "source": "Hevy",
+        "activeEnergyBurned": {
+          "qty": 190,
+          "units": "kcal"
+        }
+      }
+    ],
+    "stateOfMind": [
+      {
+        "id": "5A1C0003-0000-4000-8000-0000000000F1",
+        "start": "2026-09-23 09:00:00 +0100",
+        "labels": [
+          "calm"
+        ]
+      }
+    ]
+  }
+}

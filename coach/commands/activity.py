@@ -1,8 +1,8 @@
 """`activity` commands: logged cardio from every activity source (contract C29 to C31)."""
 
-from coach.activity import actions, records, sync
+from coach.activity import actions, adapters, records, sync
 from coach.commands import arg, command
-from coach.errors import ValidationError
+from coach.errors import UsageError, ValidationError
 
 SPAN_ARGS = (
     arg("--from", dest="start", metavar="DATE", help="first day (default: the start of this week)"),
@@ -40,6 +40,29 @@ def status(args, ctx):
 def sync_sources(args, ctx):
     store = actions.store_for(ctx)
     return {"sources": sync.run(ctx, store, only=args.source, dry_run=args.dry_run), "dry_run": args.dry_run}
+
+
+@command("activity import", help="Read one export file from a source, such as a 90-day manual export, "
+                                 "and append what changed",
+         args=(arg("--source", required=True, metavar="NAME"), arg("--file", required=True, metavar="PATH")),
+         writes=True)
+def import_file(args, ctx):
+    store = actions.store_for(ctx)
+    return {**sync.import_file(ctx, store, args.source, args.file, dry_run=args.dry_run), "dry_run": args.dry_run}
+
+
+@command("activity anonymise", help="Turn a real export into a committable test fixture: dates shifted by whole weeks, "
+                                    "ids and device names replaced, values perturbed",
+         args=(arg("--source", required=True, metavar="NAME"), arg("--file", required=True, metavar="PATH"),
+               arg("--out", required=True, metavar="DIR", help="folder the fixture is written to")),
+         writes=True)
+def anonymise(args, ctx):
+    actions.store_for(ctx)
+    module = adapters.discover().get(args.source)
+    if module is None or not hasattr(module, "anonymise"):
+        able = ", ".join(n for n, m in adapters.discover().items() if hasattr(m, "anonymise")) or "none"
+        raise UsageError(f"activity source {args.source!r} has no anonymiser; sources that do: {able}")
+    return {**module.anonymise(ctx, args.file, args.out, args.dry_run), "dry_run": args.dry_run}
 
 
 @command(

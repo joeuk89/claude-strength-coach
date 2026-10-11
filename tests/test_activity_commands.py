@@ -7,7 +7,7 @@ from pathlib import Path
 
 from coach import commands, jsonio
 from coach.validate import validate
-from tests.support import INSTANCES, REPO_ROOT, VALID, run_cli, run_module
+from tests.support import FIXTURES, INSTANCES, REPO_ROOT, VALID, run_cli, run_module
 
 NOW = "2026-10-11T18:00:00Z"
 ENV = {"COACH_NOW": NOW}
@@ -215,6 +215,11 @@ class DryRunTest(ActivityCase):
         "activity add": ("activity", "add", "--kind", "run", "--start", NOW, "--duration-min", "20"),
         "activity void": ("activity", "void", "manual:2026-10-08-run-1", "--reason", "duplicate"),
         "activity sync": ("activity", "sync"),
+        "activity import": ("activity", "import", "--source", "apple_health",
+                            "--file", str(FIXTURES / "apple_health" / "v2-week.json")),
+        "activity anonymise": ("activity", "anonymise", "--source", "apple_health",
+                               "--file", str(FIXTURES / "apple_health" / "v2-week.json"),
+                               "--out", "/nonexistent/coach-anonymise-dry-run"),
         "wellness add": ("wellness", "add", "--date", "2026-10-12", "--sleep-hours", "7"),
         "wellness void": ("wellness", "void", "manual:2026-10-05..2026-10-11-wellness", "--reason", "x"),
         "planned add": ("planned", "add", "--date", "2026-10-20", "--kind", "run", "--title", "Long run"),
@@ -240,6 +245,8 @@ class DisabledTest(ActivityCase):
         path.write_text(path.read_text(encoding="utf-8").replace("[activity]\nenabled = true", "[activity]\nenabled = false"),
                         encoding="utf-8")
         for argv in (("activity", "list"), ("activity", "status"), ("activity", "sync"), ("wellness", "summary"),
+                     ("activity", "import", "--source", "apple_health", "--file", "export.json"),
+                     ("activity", "anonymise", "--source", "apple_health", "--file", "export.json", "--out", "out"),
                      ("planned", "list"), ("planned", "add", "--date", "2026-10-20", "--kind", "run", "--title", "x")):
             with self.subTest(argv=argv):
                 envelope = self.cli(*argv, expect=5)

@@ -195,6 +195,22 @@ class DistanceTest(unittest.TestCase):
                 units.to_meters(value, unit)
 
 
+class MassAndEnergyTest(unittest.TestCase):
+    def test_mass_kg(self):
+        self.assertEqual(units.mass_kg(176.4, "lb"), 80.014)
+        self.assertEqual(units.mass_kg(80, "kg"), 80)
+
+    def test_energy_kcal(self):
+        self.assertEqual(units.energy_kcal(350, "kcal"), 350)
+        self.assertEqual(units.energy_kcal(4184, "kJ"), 1000)
+
+    def test_rejects_unknown_units(self):
+        for call in (lambda: units.mass_kg(12, "st"), lambda: units.energy_kcal(5, "Cal"),
+                     lambda: units.mass_kg(-1, "kg")):
+            with self.subTest(call=call), self.assertRaises(ValueError):
+                call()
+
+
 class JsonNumberTest(unittest.TestCase):
     def test_normalises(self):
         self.assertIsInstance(units.json_number(25.0), int)

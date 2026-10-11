@@ -6,7 +6,11 @@ and `normalise(item, ctx) -> list[dict]`. A module that is a synced source
 also defines CONFIG, the keys of its `[sources.<NAME>]` table; `manual`
 has no table and is never synced. Optional: `is_enabled(config)` when the
 source needs more than its own switch, and `FRESH_BY = "sync"` when its
-freshness is the last sync rather than the newest record it wrote.
+freshness is the last sync rather than the newest record it wrote;
+`fetch_file(ctx, path, sync_state) -> FetchResult` when the source can
+import one file (`activity import`); `anonymise(ctx, path, out_dir,
+dry_run) -> dict` when it can turn a real export into a fixture
+(`activity anonymise`).
 """
 
 import importlib
@@ -23,6 +27,7 @@ class FetchResult:
     items: list
     sync_state: dict
     warnings: list = field(default_factory=list)
+    info: dict = field(default_factory=dict)
 
 
 class Drop(Exception):
