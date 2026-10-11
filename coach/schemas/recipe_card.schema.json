@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Recipe card data block (contract C33), after TOML parsing",
+  "type": "object",
+  "required": ["schema_version", "title", "slots", "servings", "prep", "time_min", "status", "nutrition", "per_serving"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"type": "integer", "const": 1},
+    "title": {"type": "string", "pattern": "\\S"},
+    "slots": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"}},
+    "servings": {"type": "integer", "minimum": 1},
+    "prep": {"enum": ["assemble", "quick-cook", "cook", "eat-out"]},
+    "time_min": {"type": "integer", "minimum": 0},
+    "status": {"enum": ["active", "benched"]},
+    "nutrition": {"enum": ["estimated", "published"]},
+    "source": {"type": "string", "pattern": "^https?://\\S+$"},
+    "tags": {"type": "array", "items": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"}},
+    "per_serving": {"$ref": "#/$defs/macros_non_negative"},
+    "ingredients": {"type": "array", "items": {"$ref": "#/$defs/ingredient"}},
+    "variations": {"type": "array", "items": {"$ref": "#/$defs/variation"}}
+  },
+  "$defs": {
+    "unit": {"enum": ["g", "ml", "each", "tsp", "tbsp"]},
+    "item": {"type": "string", "pattern": "^[^A-Z\\s](?:[^A-Z]*[^A-Z\\s])?$"},
+    "aisle": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"},
+    "macros_non_negative": {
+      "type": "object",
+      "required": ["kcal", "protein_g", "carbs_g", "fat_g"],
+      "additionalProperties": false,
+      "properties": {
+        "kcal": {"type": "number", "minimum": 0},
+        "protein_g": {"type": "number", "minimum": 0},
+        "carbs_g": {"type": "number", "minimum": 0},
+        "fat_g": {"type": "number", "minimum": 0}
+      }
+    },
+    "macros": {
+      "type": "object",
+      "required": ["kcal", "protein_g", "carbs_g", "fat_g"],
+      "additionalProperties": false,
+      "properties": {
+        "kcal": {"type": "number"},
+        "protein_g": {"type": "number"},
+        "carbs_g": {"type": "number"},
+        "fat_g": {"type": "number"}
+      }
+    },
+    "ingredient": {
+      "type": "object",
+      "required": ["qty", "unit", "item", "aisle"],
+      "additionalProperties": false,
+      "properties": {
+        "qty": {"type": "number", "minimum": 0},
+        "unit": {"$ref": "#/$defs/unit"},
+        "item": {"$ref": "#/$defs/item"},
+        "aisle": {"$ref": "#/$defs/aisle"}
+      }
+    },
+    "change": {
+      "type": "object",
+      "required": ["item", "qty", "unit"],
+      "additionalProperties": false,
+      "properties": {
+        "item": {"$ref": "#/$defs/item"},
+        "qty": {"type": "number"},
+        "unit": {"$ref": "#/$defs/unit"},
+        "aisle": {"$ref": "#/$defs/aisle"}
+      }
+    },
+    "variation": {
+      "type": "object",
+      "required": ["name", "label", "changes", "delta"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string", "pattern": "^[a-z0-9+][a-z0-9+-]*$"},
+        "label": {"type": "string", "pattern": "\\S"},
+        "changes": {"type": "array", "items": {"$ref": "#/$defs/change"}},
+        "delta": {"$ref": "#/$defs/macros"}
+      }
+    }
+  }
+}
