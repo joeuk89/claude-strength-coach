@@ -748,7 +748,7 @@ none and `bodyweight`, `assisted`, `duration` or `distance`; band and
   runner owns are found through its registry (C16 `FILES`). A schema for
   any other instance document (append-only JSONL logs, `.coach/` caches,
   and committed documents no runner subpackage declares yet: the
-  readings series, the activity sync map and meal plans) carries a top-level
+  readings series and the activity sync map) carries a top-level
   `"x-coach-paths"`: globs relative to the instance root
   (`["data/hevy/writes.jsonl"]`). The validator treats it as an
   annotation, so adding it bumps no version. `schema_versions` reads both;
@@ -1578,7 +1578,8 @@ skip when there is no `data/program.json` (`state_schema`: no
   whose `__init__.py` sets `FILES`, a tuple of glob patterns from the
   instance root. R-17a declares `program` (`data/program.json`), `state`,
   `overlay` (`data/overlays/*.json`) and `exercise_library`
-  (`data/exercises.json`). An item that adds a committed JSON document
+  (`data/exercises.json`). Meal plans declare `data/nutrition/plans/*.json`
+  under `meal_plan` (C34). An item that adds a committed JSON document
   adds its own subpackage (C1: add files). Append-only JSONL logs keep
   each line at the version it was written (readers handle old lines),
   and the gitignored `.coach/` caches are rebuilt rather than migrated,
@@ -3472,7 +3473,7 @@ picks for open slots:
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "id": "2026-10-12",
   "span": {"start": "2026-10-12", "end": "2026-10-18"},
   "created_at": "2026-10-11T19:00:00Z",
@@ -3574,8 +3575,13 @@ Settled while building R-33c (`coach/schemas/meal_plan.schema.json`,
   with no assignment. `anchor_shopping_unknown` is a warning that leaves
   a bare anchor valid; dry runs and plan renders show it, and standalone
   shopping markdown and issue bodies include unresolved coverage warnings.
-  The v1 schema supports this flag; historical plans remain snapshots
-  with their original flags and approval hashes.
+  Meal plan v2 adds this flag. The migration from v1 changes only the
+  version, preserving saved meals, shopping, flags and approval stamps.
+  The version changes the approval hash: a previously approved plan needs
+  the athlete's agreement and `meals approve` again before its shopping
+  issue can be published. Migration notes name that loss of approval and
+  the `meals render` command. Historical flags stay as saved; build a new
+  plan to receive coverage warnings from current inputs.
 - **Style.** `plan_style` when set; otherwise `loose` when a standing
   row covers dinner, else `strict`.
 - **Commands.** `meals template` defaults to the first whole week after

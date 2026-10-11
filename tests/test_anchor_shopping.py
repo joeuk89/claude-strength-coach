@@ -1,12 +1,11 @@
 """Shopping coverage for scheduled protein anchors."""
 
-import json
 import unittest
 
 from coach import config as config_module
 from coach import dates, meals
 from tests.test_meals import (
-    CliMixin, DRAFT_PATH, InstanceCopy, NOW_DT, PLAN_ID, PLAN_JSON, PLAN_MD,
+    CliMixin, DRAFT_PATH, InstanceCopy, NOW_DT, PLAN_ID, PLAN_MD,
     buy, day, draft_with, flags_for, items, set_config, snapshot,
 )
 from tests.support import VALID
@@ -113,20 +112,6 @@ class AnchorShoppingTest(CliMixin, unittest.TestCase):
         self.assertEqual(flags_for(plan, "anchor_shopping_unknown"), [])
         self.assertIsNone(buy(plan, "whey protein powder"))
         self.assertEqual(items(plan, "2026-10-12", "snack")[0]["cover"], "work")
-
-    def test_historical_approved_plan_keeps_its_snapshot_and_hash(self):
-        with InstanceCopy() as root:
-            plan = self.build(root)
-            plan["flags"] = [f for f in plan["flags"] if f["code"] != "anchor_shopping_unknown"]
-            approved = meals.approve(plan, NOW_DT)
-            (root / PLAN_JSON).write_text(json.dumps(approved), encoding="utf-8")
-            loaded = meals.load(root, PLAN_ID)
-            self.assertEqual(loaded, approved)
-            self.assertTrue(meals.is_approved(loaded))
-            before = snapshot(root)
-            rendered = self.run_ok(root, "meals", "render", PLAN_ID, "--dry-run")
-            self.assertNotIn("anchor_shopping_unknown", rendered["text"])
-            self.assertEqual(snapshot(root), before)
 
     def test_linked_anchor_obeys_batch_rounding_use_up_and_pantry(self):
         with InstanceCopy() as root:

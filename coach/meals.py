@@ -24,7 +24,7 @@ from coach.validate import validate as validate_schema
 
 SCHEMA = "meal_plan"
 DRAFT_SCHEMA = "meal_plan_draft"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 ID = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 BLOCK = "block"
