@@ -90,10 +90,10 @@ def _span(value):
     return dates.Span(_as_date(start), _as_date(end))
 
 
-def _bodyweights(root, unit):
+def _bodyweights(root, unit, until=None):
     found = []
     for reading in HevyCache(root).body_measurements():
-        if reading.get("weight_kg") and reading.get("date"):
+        if reading.get("weight_kg") and reading.get("date") and (until is None or reading["date"][:10] <= until):
             weight = units.from_hevy_kg(reading["weight_kg"], "total", unit)
             found.append((dates.parse_date(reading["date"][:10]), weight))
     return found
@@ -119,13 +119,17 @@ def _formula_load(exposure, logged, readings):
     return bodyweight - load["hevy_total"]
 
 
-def e1rm_series(root, exercise_id=None, since=None, include_unsynced=False, now=None):
-    """{series, best, delta} per exercise: the best set of each usable exposure, oldest first."""
+def e1rm_series(root, exercise_id=None, since=None, include_unsynced=False, now=None, as_of=None):
+    """{series, best, delta} per exercise: the best set of each usable exposure, oldest first.
+
+    With `as_of`, only workouts started, annotations created and body weights dated by then count.
+    """
     config = config_module.load(root)
-    readings = _bodyweights(root, config.athlete.units)
+    until = _today(config, as_of).isoformat() if as_of else None
+    readings = _bodyweights(root, config.athlete.units, until)
     since = str(since) if since else None
     series = {}
-    for exposure in history.all_exposures(root, include_unsynced, now):
+    for exposure in history.all_exposures(root, include_unsynced, now, as_of):
         if exercise_id and exposure["exercise_id"] != exercise_id:
             continue
         if since and exposure["date"] < since:
@@ -235,8 +239,11 @@ def _nearest(items, day, key):
     return min(items, key=lambda item: (abs((dates.parse_date(key(item)) - day).days), key(item)), default=None)
 
 
-def adherence(root, overlay_id=None, span=None, include_unsynced=False, today=None, now=None):
-    """Planned sessions against logged workouts, per session and exercise (C18 adherence per overlay)."""
+def adherence(root, overlay_id=None, span=None, include_unsynced=False, today=None, now=None, as_of=None):
+    """Planned sessions against logged workouts, per session and exercise (C18 adherence per overlay).
+
+    With `as_of`, only workouts started and annotations created by then count.
+    """
     if (overlay_id is None) == (span is None):
         raise ValueError("give an overlay id or a span, not both")
     config = config_module.load(root)
@@ -248,7 +255,8 @@ def adherence(root, overlay_id=None, span=None, include_unsynced=False, today=No
 
     spans = [window] + [dates.Span(dates.parse_date(d["span"]["start"]), dates.parse_date(d["span"]["end"]))
                         for d, _ in planned]
-    found = history.workouts(root, min(s.start for s in spans), max(s.end for s in spans), include_unsynced, now)
+    found = history.workouts(root, min(s.start for s in spans), max(s.end for s in spans), include_unsynced, now,
+                             as_of)
     found = {w["workout_id"]: w for w in found}
 
     pairs = []
@@ -268,8 +276,8 @@ def adherence(root, overlay_id=None, span=None, include_unsynced=False, today=No
             matched[position] = workout_id
             used.add(workout_id)
 
-    unlogged_notes = history.annotations(root, "trained_unlogged")
-    misses = history.annotations(root, "miss")
+    unlogged_notes = history.annotations(root, "trained_unlogged", as_of)
+    misses = history.annotations(root, "miss", as_of)
     sessions, used_notes, miss_pairs = [], set(), []
     for position, (doc, session) in enumerate(planned):
         day = dates.parse_date(session["date"])

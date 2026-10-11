@@ -108,9 +108,14 @@ def active(all_annotations):
     return [a for a in all_annotations if a["id"] not in withdrawn and _has_effect(a)]
 
 
-def annotations(root, kind=None):
-    """The annotations in force, optionally of one kind, in file order."""
-    found = active(read_annotations(root)["annotations"])
+def created_by(annotation, as_of):
+    """True when the annotation existed at `as_of` (an aware datetime; None means now)."""
+    return as_of is None or dates.parse_timestamp(annotation["created_at"]) <= as_of
+
+
+def annotations(root, kind=None, as_of=None):
+    """The annotations in force, optionally of one kind, in file order; with `as_of`, as they stood then."""
+    found = active([a for a in read_annotations(root)["annotations"] if created_by(a, as_of)])
     return [a for a in found if kind is None or a["kind"] == kind]
 
 
@@ -136,7 +141,7 @@ class _Env:
     now: datetime
 
     @classmethod
-    def load(cls, root, now=None):
+    def load(cls, root, now=None, as_of=None):
         root = Path(root)
         config = config_module.load(root)
         zone_name = config.athlete.timezone
@@ -144,7 +149,7 @@ class _Env:
             root=root, unit=config.athlete.units, tz=dates.zone(zone_name) if zone_name else None,
             library=Library.load(root), overlays=overlay.list(root),
             state=load_optional(state, root), program=load_optional(program, root),
-            annotations=annotations(root), now=now or datetime.now(timezone.utc),
+            annotations=annotations(root, as_of=as_of), now=now or datetime.now(timezone.utc),
         )
 
     def local_date(self, timestamp):
@@ -508,13 +513,22 @@ def _apply_annotations(record, found, unit):
     return workout
 
 
-def workouts(root, since=None, until=None, include_unsynced=False, now=None):
+def _started_by(record, as_of, env):
+    if as_of is None:
+        return True
+    if record.get("start_time"):
+        return dates.parse_timestamp(record["start_time"]) <= as_of
+    return record["date"] <= as_of.astimezone(env.tz).date().isoformat()
+
+
+def workouts(root, since=None, until=None, include_unsynced=False, now=None, as_of=None):
     """Resolved workouts with annotations applied, oldest first.
 
     With include_unsynced, source workouts not yet in a month file are
     resolved in memory and returned with `unsynced: true`; nothing is written.
+    With `as_of`, only workouts started and annotations created by then count.
     """
-    env = _Env.load(root, now)
+    env = _Env.load(root, now, as_of)
     records = [dict(r, unsynced=False) for r in stored_workouts(root)]
     if include_unsynced:
         stored_ids = {r["workout_id"] for r in records}
@@ -522,7 +536,8 @@ def workouts(root, since=None, until=None, include_unsynced=False, now=None):
     since = str(since) if since else None
     until = str(until) if until else None
     chosen = [r for r in sorted(records, key=_sort_key)
-              if (since is None or r["date"] >= since) and (until is None or r["date"] <= until)]
+              if (since is None or r["date"] >= since) and (until is None or r["date"] <= until)
+              and _started_by(r, as_of, env)]
     result = []
     for record in chosen:
         workout = _apply_annotations(record, env.annotations, env.unit)
@@ -615,11 +630,12 @@ def slip_candidates(exposures, found_annotations):
     return sorted(candidates, key=lambda c: (c["date"], c["exercise_id"]))
 
 
-def all_exposures(root, include_unsynced=False, now=None):
+def all_exposures(root, include_unsynced=False, now=None, as_of=None):
     """Every exposure, oldest first, with `suspect` set from open convention-slip candidates."""
-    found = workouts(root, include_unsynced=include_unsynced, now=now)
+    found = workouts(root, include_unsynced=include_unsynced, now=now, as_of=as_of)
     exposures = _exposures_of(found)
-    open_slips = {(c["workout_id"], c["exercise_id"]) for c in slip_candidates(exposures, annotations(root))
+    found_annotations = annotations(root, as_of=as_of)
+    open_slips = {(c["workout_id"], c["exercise_id"]) for c in slip_candidates(exposures, found_annotations)
                   if c["status"] == "open"}
     for exposure in exposures:
         exposure["suspect"] = (exposure["workout_id"], exposure["exercise_id"]) in open_slips
