@@ -290,6 +290,8 @@ def _kind(inst, span, activity, until):
             kinds.add(found[0]["kind"])
     if "deload" in kinds or _light_decision(inst, span):
         return "light"
+    if (inst.root / minimum_plan_path(span.start)).exists():
+        return "minimum"
     if "one_off" in kinds:
         return "one_off"
     if _in_layoff(span, activity, until):

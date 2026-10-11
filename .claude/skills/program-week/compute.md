@@ -37,7 +37,9 @@ Run `python3 -m coach history sync`, then the proposal for the mode:
   program or design the week in constrained mode instead. `python3 -m
   coach structure minimum --week <label> --write` writes its plan, and
   `python3 -m coach propose week --week <label> --plan <the path it
-  printed>` proposes the week from it as a weekly overlay.
+  printed>` proposes the week from it as a weekly overlay. The written
+  plan also marks it a minimum week, which the hard-week count neither
+  counts nor resets.
 
 `propose week` plans the span's dated sessions with the program's
 schedule rule and asks each exercise's progression scheme for its line,

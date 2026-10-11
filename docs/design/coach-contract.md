@@ -4396,8 +4396,9 @@ null`:
   within its C19 cap, every priority floor present, every target at least
   one third met. `structure minimum --week W --write` writes the plan file
   `.coach/plans/<week start>-minimum.json` (C6), a C23 `SchedulePlan` for
-  `propose week --plan`. The overlay stays kind `weekly`; adherence is
-  judged against it like any other overlay.
+  `propose week --plan`. The overlay stays kind `weekly`; the plan file
+  makes the week kind `minimum` (C41), which adherence skips and the
+  hard-week count neither counts nor resets (C43).
 
 **Built with R-30b** (details the text above leaves open):
 
@@ -4520,9 +4521,9 @@ coach.structure.ordinary_weeks(root, until, n=4, reach=12) -> list[str]
   logged workout matching the session counted as trained (shortened
   sessions count).
 - **Ordinary week**: not a light week (overlay kind `deload`, or an
-  adopted `light_week` decision covering it), not a `one_off` week, not
-  inside a layoff gap of 11+ days. The window reaches back at most 12
-  weeks; with fewer than four ordinary weeks it reports
+  adopted `light_week` decision covering it), not a `minimum` or
+  `one_off` week, not inside a layoff gap of 11+ days. The window reaches
+  back at most 12 weeks; with fewer than four ordinary weeks it reports
   `insufficient_weeks` and raises no adherence flag.
 
 **`structure week --week 2026-W41`** →
@@ -4540,8 +4541,10 @@ coach.structure.ordinary_weeks(root, until, n=4, reach=12) -> list[str]
  "flags": []}
 ```
 
-- `kind`: `ordinary`, `light`, `one_off`, `layoff`. Session `status` from
-  C18 adherence; external `status` `done`, `not_done`, `unconfirmed`.
+- `kind`: `ordinary`, `light`, `minimum`, `one_off`, `layoff`, the first
+  that applies in the order `light`, `minimum` (a minimum plan file for
+  the week, C40), `one_off`, `layoff`. Session `status` from C18
+  adherence; external `status` `done`, `not_done`, `unconfirmed`.
 - `planned` counts core and external sessions, `unconfirmed` excluded.
   `trained` counts core sessions with status `trained` and external
   sessions `done`. Optional sessions appear with `tier: optional` and count
@@ -4695,7 +4698,9 @@ Exercise swaps are not affected.
 ```
 
 - Block ids `b-NNNN`, never reused. `end_reason`: `light`, `return`, `low`.
-- `class`: `hard`, `partial`, `low`, `light`, `return`, `one_off`.
+- `class`: `hard`, `partial`, `low`, `light`, `return`, `one_off`,
+  `minimum`. Version 1 holds `minimum` too: widening the enum leaves every
+  ledger valid, so it bumps no version.
 - `signals.readiness` and `signals.sleep`: `poor`, `ok`, `unknown`;
   `sleep_source`: `athlete`, `sleep_debt`, `none`.
 - `triggers`: the fired subset of `readiness`, `rpe_drift`, `niggle`,
@@ -4749,9 +4754,9 @@ Rules (R-02's prose, scripted; the prose stays the human copy):
   below target; sets without a logged RPE count as on target. A coach-led
   session counts when its `external` annotation says done. Session counts
   come from `coach.structure.week` (C41).
-- **Hard week**: not light, return or one-off; at least 75 % of planned
-  core and coach-led sessions trained as prescribed. Under 50 % trained
-  ends the block.
+- **Hard week**: not light, return, one-off or minimum; at least 75 % of
+  planned core and coach-led sessions trained as prescribed. Under 50 %
+  trained ends the block.
 - **Ceiling**: `program.blocks.hard_weeks_ceiling`, default 6, allowed 4–8.
 - **Triggers** (four): athlete-reported readiness, compound RPE drift two
   sessions running (`coach.patterns.rpe_drift`), an `aggravated` niggle
@@ -4815,9 +4820,10 @@ Flags (registered in `coach/flags/block.py`; rows in C20):
 - A block that ends records `ended` as the last day of the week that
   ended it; the next block starts the day after, at zero. Every reset
   week ends a block, even one with no hard week.
-- **Classes**, in order: `light` and `one_off` from `coach.structure.week`
-  `kind`; `return` when a session of the overlay in force carries a line
-  decay past `0-10` and the last lifting workout before the first such
+- **Classes**, in order: `light`, `minimum` and `one_off` from
+  `coach.structure.week` `kind` (`minimum` and `one_off` neither count
+  nor reset); `return` when a session of the overlay in force carries a
+  line decay past `0-10` and the last lifting workout before the first such
   session is more than 10 days back (R-02: a return week follows a
   layoff of 11+ days, so one stale lift rotated back in never ends a
   block); `low` when trained is under half of planned; `hard` when

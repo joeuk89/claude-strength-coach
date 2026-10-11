@@ -112,9 +112,9 @@ planned over the **trailing four ordinary weeks**:
   sessions count, as the replies confirmed them; optional sessions are
   left out; a shortened session counts as trained.
 - An **ordinary week** is any week except a deload or other light week,
-  a one-off week (illness, travel, limited kit), or a week inside a
-  layoff of 11+ days. Skip those and reach further back, at most 12
-  weeks. Fewer than four ordinary weeks in that span: no trigger yet.
+  a one-off week (illness, travel, limited kit), a minimum week, or a
+  week inside a layoff of 11+ days. Skip those and reach further back,
+  at most 12 weeks. Fewer than four ordinary weeks in that span: no trigger yet.
 
 `python3 -m coach structure adherence` works this out and raises the
 flags below; `python3 -m coach structure decide` records the athlete's

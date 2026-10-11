@@ -92,8 +92,8 @@ _Avoid_: volume target, set goal, MEV
 
 **Ordinary week**:
 A week adherence is judged on: not a deload or other light week, not a
-one-off week, and not inside a layoff of 11+ days. Adherence looks at the
-last four, reaching back at most 12 weeks.
+one-off or minimum week, and not inside a layoff of 11+ days. Adherence
+looks at the last four, reaching back at most 12 weeks.
 _Avoid_: regular week, counted week
 
 **Block**:
@@ -170,7 +170,8 @@ _Avoid_: minimum sets, maintenance sets
 The program's fallback week for when the full week cannot happen: at
 most two standby sessions, each within its time cap, carrying every
 priority lift's floor dose and at least a third of each muscle's dose
-target. Its overlay is an ordinary weekly overlay.
+target. Its overlay is a weekly overlay, but the week is not an ordinary
+week, and it neither adds to the block's count nor ends the block.
 _Avoid_: minimum-viable week (the roadmap's phrase), fallback week, deload
 
 **Progression scheme**:
