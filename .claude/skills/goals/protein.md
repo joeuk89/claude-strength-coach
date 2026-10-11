@@ -7,8 +7,8 @@ bodyweight and recent intake from the newest reading of the last 14 days
 and goal weight from `[nutrition]`. Pass what the athlete told you:
 
 - `--body-fat <pct> --body-fat-source credible|rough` for a body-fat
-  reading (`--help` says which methods count as credible), with `--sex`
-  for a rough one;
+  reading (`--help` says which methods count as credible);
+- `--sex` when `missing` asks for it;
 - `--height` when there is no reading (cm, or inches with lb);
 - `--bodyweight` for a fresh weigh-in, `--goal-weight` for the goal
   agreed in step 3, and `--recent-intake` for a typical day's protein.
@@ -16,7 +16,8 @@ and goal weight from `[nutrition]`. Pass what the athlete told you:
 When `missing` names an input, ask the athlete for it and run again.
 
 - `reference` gives the basis (the `reference_basis` value), the mass and
-  the reason: record the basis and its reason (SKILL.md step 9).
+  the reason. Record the basis and the reason, with any reading's method
+  and date (SKILL.md step 9).
 - The **target** is the number to coach toward; the **stretch** is the
   most that still adds anything (useful on a hard cut); the **floor** is
   the reachable number the athlete is held to this week. With fat-free

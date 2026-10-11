@@ -3636,12 +3636,14 @@ dates unique:
   reading yet", with no protein figure "last week not tracked". With a
   `plan`, the line ends ` · plan: <path>` (R-33c).
 - `nutrition targets` (`coach/protein.py`) computes the protein numbers
-  `/goals` quotes; it reads, never writes, and runs with nutrition off. Inputs: each flag, else bodyweight from the newest reading of the
-  last 14 days in `bodyweight_units` (`trend_weight`, else
-  `scale_weight`), recent intake from the newest such reading's
-  `avg_protein_g`, and goal weight from `[nutrition] goal_weight`.
-  `--height-unit` defaults to cm with kg bodyweight and in with lb.
-  `--body-fat` and `--body-fat-source` come together; a bad value exits 1.
+  `/goals` quotes; it reads, never writes, and runs with nutrition off.
+  Inputs: each flag, else bodyweight from the newest reading of the last
+  14 days with a weight in `bodyweight_units` (its `trend_weight`, else
+  its `scale_weight`), recent intake from the newest reading of the last
+  14 days with `avg_protein_g`, and goal weight from `[nutrition]
+  goal_weight`. `--height-unit` defaults to cm with kg bodyweight and in
+  with lb. `--body-fat` and `--body-fat-source` come together. A bad
+  value exits 1, including a height outside 1.0–2.5 m (a unit slip).
   Data: `inputs` (`bodyweight` and `goal_weight` as `{value, unit,
   from}`, `recent_intake_g` as `{value, from}`, `from` being `flag`,
   `config` or `reading D`; `body_fat` `{pct, source}`; `sex`;
@@ -3651,9 +3653,10 @@ dates unique:
     first rule that applies: a credible reading gives `fat_free_mass`
     (bodyweight × (1 − body fat)); high body fat gives `goal_weight`;
     otherwise `bodyweight`. Body fat is high on a rough reading above 25 %
-    for `male` or 35 % for `female`; with no reading, when the goal weight
-    is 10 % or more below bodyweight or BMI (to 0.1) is 30 or more. `bmi`
-    is null without a height. `basis` takes the `reference_basis` values.
+    for `male` or 35 % for `female` (`--sex` is needed only between the
+    two); with no reading, when the goal weight is 10 % or more below
+    bodyweight or BMI is 30 or more. `bmi` is truncated to 0.1 and null
+    without a height. `basis` takes the `reference_basis` values.
   - `protein`: `target` `{g, g_per_kg, refs}`, `stretch` `{g, g_high,
     g_per_kg, g_per_kg_high, refs}` and `floor` `{g, g_min, g_per_kg_min,
     from_intake_g, clamped, refs}`, computed from `mass` as shown.

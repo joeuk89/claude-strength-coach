@@ -64,6 +64,19 @@ class BasisTest(unittest.TestCase):
         result = targets(bodyweight=80, body_fat_pct=25, body_fat_source="rough", sex="male", goal_weight=75)
         self.assertEqual(result["reference"]["basis"], "bodyweight")
 
+    def test_a_rough_reading_needs_sex_only_between_the_lines(self):
+        above = targets(bodyweight=100, body_fat_pct=36, body_fat_source="rough", goal_weight=80)
+        self.assertEqual(above["reference"]["basis"], "goal_weight")
+        self.assertIn("~25 % line for men and the ~35 % line for women", above["reference"]["reason"])
+        below = targets(bodyweight=80, body_fat_pct=25, body_fat_source="rough")
+        self.assertEqual(below["reference"]["basis"], "bodyweight")
+        between = targets(bodyweight=80, body_fat_pct=25.5, body_fat_source="rough")
+        self.assertIsNone(between["reference"])
+
+    def test_bmi_just_under_30_is_not_high(self):
+        result = targets(bodyweight=97.1, height_m=1.8, goal_weight=95)
+        self.assertEqual((result["reference"]["basis"], result["reference"]["bmi"]), ("bodyweight", 29.9))
+
     def test_no_reading_and_bmi_30_uses_goal_weight(self):
         result = targets(bodyweight=97.2, height_m=1.8, goal_weight=95)
         reference = result["reference"]
@@ -85,7 +98,7 @@ class BasisTest(unittest.TestCase):
     def test_bodyweight_by_default(self):
         result = targets(bodyweight=80, height_m=1.8, goal_weight=78, recent_intake_g=104)
         reference = result["reference"]
-        self.assertEqual((reference["basis"], reference["mass"], reference["bmi"]), ("bodyweight", 80, 24.7))
+        self.assertEqual((reference["basis"], reference["mass"], reference["bmi"]), ("bodyweight", 80, 24.6))
         self.assertEqual(reference["refs"], [REF + "3", REF + "5"])
         numbers = result["protein"]
         self.assertEqual((numbers["target"]["g"], numbers["target"]["g_per_kg"]), (130, 1.6))
@@ -174,8 +187,10 @@ class ClaimTest(unittest.TestCase):
         return " ".join(research.find_claim(f"{REF}{n}", research.load_notes(REPO_ROOT)).text.split())
 
     def test_each_number_is_the_one_its_claim_states(self):
-        self.assertEqual(protein.PER_KG["other"], (1.6, 2.2, 2.2, 1.2))
-        self.assertEqual(protein.PER_KG["fat_free_mass"], (2.0, 2.6, 2.8, 1.5))
+        self.assertEqual(protein.PER_KG["other"], {"target": 1.6, "stretch": 2.2, "stretch_high": 2.2,
+                                                   "floor_min": 1.2})
+        self.assertEqual(protein.PER_KG["fat_free_mass"], {"target": 2.0, "stretch": 2.6, "stretch_high": 2.8,
+                                                           "floor_min": 1.5})
         for n, needle in ((1, "1.6 g/kg"), (2, "2.2 g/kg"), (6, "~2.0 g/kg"), (6, "~2.6–2.8 g/kg"),
                           (7, "1.2 g/kg"), (7, "~1.5 g/kg"), (4, "~25 % for men or ~35 % for women"),
                           (5, "BMI is 30 or more"), (5, "10 % or more below"), (8, "~15–20 g")):
@@ -202,6 +217,20 @@ class CliTest(unittest.TestCase):
         self.assertEqual(data["reference"]["basis"], "bodyweight")
         self.assertEqual(data["protein"]["floor"]["g"], 130)
         self.assertEqual(data["protein"]["target"]["g"], 130)
+
+    def test_a_newer_scale_weight_beats_an_older_trend_weight(self):
+        with InstanceCopy() as root:
+            later = {"COACH_NOW": "2026-10-13T08:00:00Z"}
+            code, envelope, stderr = run_cli(["--root", str(root), "nutrition", "record", "--date", "2026-10-13",
+                                              "--scale-weight", "81.5"], env=later)
+            self.assertEqual(code, 0, envelope)
+            data = self.ok(root, "--height", "180", env=later)
+            self.assertEqual(data["inputs"]["bodyweight"], {"value": 81.5, "unit": "kg", "from": "reading 2026-10-13"})
+
+    def test_a_height_in_the_wrong_unit_exits_1(self):
+        code, envelope = run(VALID, "--height", "1.8")
+        self.assertEqual(code, 1, envelope)
+        self.assertIn("cm", envelope["error"]["message"])
 
     def test_flags_override_the_files(self):
         data = self.ok(VALID, "--bodyweight", "80", "--recent-intake", "104", "--height", "180")

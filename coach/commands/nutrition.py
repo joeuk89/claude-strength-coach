@@ -34,15 +34,38 @@ def _positive(name, value):
         raise ValidationError(f"{name} must be more than 0, found {value:g}")
 
 
-def _fresh(series, today, field, unit=None):
-    """The newest reading from the last STALE_AFTER_DAYS that sets `field`, as (value, where from), or None."""
+# Plausible adult heights: a guard against a height given in metres or in the other unit.
+HEIGHT_RANGE_M = (1.0, 2.5)
+
+
+def _fresh(series, today, pick):
+    """`pick(reading)` from the newest reading of the last STALE_AFTER_DAYS that has one, as (value, where from)."""
     for reading in reversed(series):
         if (today - dates.parse_date(reading["date"])).days > nutrition.STALE_AFTER_DAYS:
             return None
-        value = reading[field] if unit is None or reading["weight_unit"] == unit else None
+        value = pick(reading)
         if value is not None:
             return value, f"reading {reading['date']}"
     return None
+
+
+def _weight(unit):
+    def pick(reading):
+        if reading["weight_unit"] != unit:
+            return None
+        return reading["trend_weight"] if reading["trend_weight"] is not None else reading["scale_weight"]
+    return pick
+
+
+def _height_m(height, height_unit, weight_unit):
+    if height is None:
+        return None
+    height_unit = height_unit or ("cm" if weight_unit == "kg" else "in")
+    metres = units.height_m(height, height_unit)
+    if not HEIGHT_RANGE_M[0] <= metres <= HEIGHT_RANGE_M[1]:
+        raise ValidationError(f"--height {height:g} {height_unit} is {metres:g} m; give the height in "
+                              f"{height_unit}, or set --height-unit")
+    return metres
 
 
 def _given(value, fallback, **extra):
@@ -88,7 +111,7 @@ def targets(args, ctx):
     goal_on_file = (ctx.config.get("nutrition") or {}).get("goal_weight")
     series = nutrition.readings(ctx.root)
     today = ctx.today()
-    weight = _fresh(series, today, "trend_weight", unit) or _fresh(series, today, "scale_weight", unit)
+    weight = _fresh(series, today, _weight(unit))
     inputs = {
         "bodyweight": _given(args.bodyweight, weight, unit=unit),
         "goal_weight": _given(args.goal_weight, None if goal_on_file is None else (goal_on_file, "config"),
@@ -96,9 +119,8 @@ def targets(args, ctx):
         "body_fat": None if args.body_fat is None else {"pct": units.json_number(args.body_fat),
                                                         "source": args.body_fat_source},
         "sex": args.sex,
-        "height_m": None if args.height is None else units.height_m(
-            args.height, args.height_unit or ("cm" if unit == "kg" else "in")),
-        "recent_intake_g": _given(args.recent_intake, _fresh(series, today, "avg_protein_g")),
+        "height_m": _height_m(args.height, args.height_unit, unit),
+        "recent_intake_g": _given(args.recent_intake, _fresh(series, today, lambda reading: reading["avg_protein_g"])),
     }
     result = protein.targets(unit=unit, bodyweight=_value(inputs["bodyweight"]),
                              goal_weight=_value(inputs["goal_weight"]), body_fat_pct=args.body_fat,
