@@ -162,7 +162,8 @@ anything. Rules that always apply:
   gets **complete logging** into the app and reads the app's numbers
   out. Complete logging means every day logged; on a day the athlete
   couldn't track, they log an estimate of the day or the missed meal,
-  and never leave a day half-logged (MacroFactor's own guidance). The
+  and never leave a day half-logged (MacroFactor's own guidance,
+  rn:protein-energy-deficit.13). The
   repo **never states its own calorie target or calorie band** for an
   app user and never runs a parallel calorie model. Any
   departure from the app's numbers is a dated **nutrition override**
@@ -185,112 +186,150 @@ anything. Rules that always apply:
 
 ## Coaching principles
 
+Each number below cites the research-note claim behind it, as
+`(rn:<note>.<n>)`; `python3 -m coach research show <ref>` prints the claim
+and its sources.
+
 - **Progressive overload** — every routine needs a built-in way to add
-  stimulus over time: load, reps, sets, range of motion, tempo, or density.
+  stimulus over time: load, reps, sets, range of motion, tempo, or density
+  (rn:progression-training-age.7).
 - **Specificity (SAID)** — match movement selection, rep ranges, and
   intensities to the athlete's stated goal.
 - **Weekly balance** — each muscle group should get appropriate weekly
   volume across **all** sessions combined, including any coach-led ones.
-- **Volume — within a recoverable range** — ~10–20 hard sets per muscle
-  group per week is a reasonable working range; more is not automatically
-  better. Count cardio as part of total training stress, especially for
-  legs.
-- **Intensity & rep ranges** — strength via heavier loads / lower reps
-  (~1–6 reps, ~80 %+ of 1RM); hypertrophy across ~5–30 reps taken close to
-  failure.
-- **Frequency** — training each muscle ~2× per week generally beats one
-  big session; count every session type when tallying weekly frequency.
+- **Volume — within a recoverable range** —
+  ~10–20 hard sets per muscle group per week is a reasonable working range; more is not automatically better (rn:volume-frequency.1).
+  Count cardio as part of total training stress, especially for legs.
+- **Intensity & rep ranges** — strength via heavier loads / lower reps (~1–6 reps, ~80 %+ of 1RM; rn:proximity-to-failure.3); hypertrophy across ~5–30 reps taken close to failure (rn:proximity-to-failure.4).
+- **Frequency** — a scheduling choice bounded by per-session volume.
+  At equal weekly sets, how often a muscle is trained matters little for size, and training it more often adds some strength (rn:volume-frequency.4).
+  Per session, keep each muscle to about 11 fractional hard sets, an indirect set counting as half; sets past that add little and belong in another session (rn:volume-frequency.2, rn:volume-frequency.3).
+  Train each muscle ~2× per week by default, which beats one big session (rn:volume-frequency.5); count every session type when tallying weekly frequency.
   When adherence demands it, fewer sessions carrying the same weekly
   hard sets per muscle beat more sessions that don't get trained.
-- **Proximity to failure** — most hypertrophy work belongs ~0–3 reps in
-  reserve; heavy strength work leaves a little more in the tank to protect
-  technique.
+- **Proximity to failure** — most hypertrophy work belongs ~0–3 reps in reserve (rn:proximity-to-failure.1); heavy strength work leaves a little more in the tank to protect technique (rn:proximity-to-failure.2).
 - **Fatigue management & deloads** — light weeks are triggered by
-  fatigue, with a ceiling on how long a block runs without one. Count
-  **completed hard weeks**, not calendar weeks:
-  - A **completed hard week** is a normal program week in which at
-    least 75 % of planned sessions, coach-led ones included, were trained
-    as prescribed. A session is trained as prescribed when at least two
-    thirds of its prescribed working sets were logged and its mean logged
-    RPE was no more than 1.5 below target; a coach-led session counts
-    when it happened.
-  - **Reset:** a deload or other light week, a return week (see return
-    after a layoff below), or any week with under 50 % of planned
-    sessions trained sets the count back to zero. The check-in that
-    closes such a week ends the block, and the next block starts at
-    zero. `/one-off-week` zeroes the count when it plans a light week,
-    but the block number moves on only when that week closes. A week at
-    50–75 %, or a one-off week for travel or limited kit, neither counts
-    nor resets.
-  - **Ceiling:** propose a light week when the count reaches the
-    program's ceiling: default 6 completed hard weeks, settable from 4
-    to 8 in `routine/program.md`. At the ceiling it is proposed whatever
-    else is true; if the athlete declines, record the reason and propose
-    it again at the next check-in.
+  fatigue, with a ceiling on how long a block runs without one
+  (rn:deloads.1). Count **completed hard weeks**, not calendar weeks:
+  - A **completed hard week** is a normal program week in which at least 75 % of planned sessions, coach-led ones included, were trained as prescribed (rn:deloads.2).
+    A session is trained as prescribed when at least two thirds of its prescribed working sets were logged and its mean logged RPE was no more than 1.5 below target; a coach-led session counts when it happened (rn:deloads.11).
+  - **Reset:** a deload or other light week, a return week (see return after a layoff below), or any week with under 50 % of planned sessions trained sets the count back to zero (rn:deloads.2).
+    The check-in that closes such a week ends the block, and the next block starts at zero.
+    `/one-off-week` zeroes the count when it plans a light week, but the block number moves on only when that week closes.
+    A week at 50–75 %, or a one-off week for travel or limited kit, neither counts nor resets (rn:deloads.2).
+  - **Ceiling:** propose a light week when the count reaches the program's ceiling: default 6 completed hard weeks, settable from 4 to 8 in `routine/program.md` (rn:deloads.3).
+    At the ceiling it is proposed whatever else is true; if the athlete declines, record the reason and propose it again at the next check-in.
   - **Fatigue triggers:** poor readiness the athlete reports; RPE drift
-    on a compound lift in two sessions running; a niggle aggravated under
-    load; poor sleep for most of the week. Two in the same week → propose
-    a light week. One → record it as a watch.
+    on a compound lift in two sessions running (rn:autoregulation.4); a
+    niggle aggravated under load; poor sleep for most of the week. Two in
+    the same week → propose a light week. One → record it as a watch
+    (rn:deloads.5).
   - **Skip rule:** below three completed hard weeks, no light week is
     scheduled, even on two triggers; the status line records it as
-    `light week: skipped (<n> hard weeks)`.
-  - The 75 % and 50 % lines are coaching heuristics. `/check-in` keeps
-    the count in a status line in `routine/program.md`'s header.
+    `light week: skipped (<n> hard weeks)` (rn:deloads.4).
+  - The 75 % and 50 % lines are coaching heuristics (rn:deloads.2).
+    `/check-in` keeps the count in a status line in `routine/program.md`'s header.
+- **Minimum and maintenance dose** — when time is short, cut sets, not
+  effort.
+  The maintenance dose is about one third of the usual weekly sets at the same load and effort, which keeps size and strength for several months (rn:minimum-effective-dose.1).
+  Lifters aged about 60 and over need more than that to keep muscle size (rn:minimum-effective-dose.2).
+  One hard set per exercise of 6–12 reps at about 70–85 % of 1RM, done 2–3 times a week, still builds strength in trained lifters (rn:minimum-effective-dose.3).
+  A priority lift keeps a floor of 2 hard sets at its prescribed load in a disrupted week (rn:minimum-effective-dose.4).
 - **Return after a layoff** — days off are the days from the last
   lifting workout of any kind, solo or coach-led, to the first session
-  back. A layoff over 10 days gets one **return week**; after it, the
-  normal progression scheme resumes from the loads the return week
-  logged.
+  back.
+  A layoff over 10 days gets one **return week** (rn:detraining-return.3); after it, the normal progression scheme resumes from the loads the return week logged.
 
   | Days off | Return week |
   | --- | --- |
-  | up to 10 | no change |
-  | 11–21 | loads −5 %, one working set fewer per exercise |
-  | 22–42 | loads −10 %, one working set fewer per exercise |
-  | 43+ | a re-test: every load −15 % from its pre-layoff working load, every set at RPE 7 or below, one working set fewer; next week's loads come from what this week logged |
+  | up to 10 | no change (rn:detraining-return.3) |
+  | 11–21 | loads −5 %, one working set fewer per exercise (rn:detraining-return.3) |
+  | 22–42 | loads −10 %, one working set fewer per exercise (rn:detraining-return.3) |
+  | 43+ | a re-test: every load −15 % from its pre-layoff working load, every set at RPE 7 or below, one working set fewer; next week's loads come from what this week logged (rn:detraining-return.3) |
 
-  **Illness adds:** no training until 48 hours symptom-free, and every
-  exercise in the first session back capped at RPE 7, whatever the gap.
+  **Illness adds:** no training until 48 hours symptom-free, and every exercise in the first session back capped at RPE 7, whatever the gap (rn:detraining-return.4).
   Fever, chest symptoms or a slow recovery mean the athlete checks with a
   qualified professional before training again.
+- **Prescription validity** — a prescription is only as current as the
+  exposure it came from.
+  Strength changes little in the first 2 weeks without training and fades after that (rn:detraining-return.1), so a lift's load decays by the return bands above.
+  A lift's days off are the longer of the layoff and the time since its newest exposure beyond its usual gap between exposures; never carry a load forward past the band those days fall in.
+- **Concurrent training** — keep hard running and heavy lifting apart.
+  Adding aerobic work costs no muscle or maximal strength on average, but trained lifters gain less lower-body strength when both share a session (rn:concurrent-training.1, rn:concurrent-training.2).
+  On a day with lifting and a quality run, lift first and keep at least 6 hours between them (rn:concurrent-training.4).
+  No quality run in the 24 hours before a heavy squat or hinge session: one with a working set at RPE 7 or above, or of 6 reps or fewer when no RPE is set (rn:concurrent-training.5).
+  Easy runs may share a day with lifting; only quality runs trigger the spacing (rn:concurrent-training.6).
 - **Adherence before structure** — a program the athlete trains beats a
   better one they don't. Adherence is defined, and checked, in
-  `/check-in`. Under 70 % over the trailing four ordinary weeks, the
-  check-in must present a smaller schedule with the same weekly hard
-  sets per muscle. Under 80 %, don't propose a new recurring session (a
-  new session or weekly slot, conditioning and optional sessions
-  included), and push back when the athlete asks for one; exercise swaps
-  within a session are fine.
+  `/check-in`.
+  Under 70 % over the trailing four ordinary weeks, the check-in must present a smaller schedule with the same weekly hard sets per muscle (rn:deloads.6).
+  Under 80 %, don't propose a new recurring session (a new session or weekly slot, conditioning and optional sessions included), and push back when the athlete asks for one; exercise swaps within a session are fine (rn:deloads.7).
   Both thresholds are coaching heuristics, not research cut-offs.
+- **Reachable targets** — set targets from what was delivered, not from
+  what was planned, so the athlete is held to a number they can reach.
+  The protein floor starts at recent average intake plus ~15–20 g and rises only once the athlete meets it (rn:protein-energy-deficit.8, rn:protein-energy-deficit.9).
+  A load goes up only once the newest exposures beat the current one (rn:progression-training-age.2), and weekly sets are judged on the dose actually trained.
 - **Recovery** — sleep, protein, calories, and stress gate progress as
-  much as the program; flag when they're the real bottleneck. Protein is
-  set per kg of a **reference mass** — bodyweight, goal weight when body
-  fat is high, or fat-free mass when a credible body-fat reading exists —
-  as a floor, a target (1.6 g/kg; ~2.0 of fat-free mass) and a stretch
-  (2.2 g/kg); the rules are in `/goals`. Sleep gates deficits: a trailing
-  14-day sleep average under ~7 h means recomp at maintenance instead of
-  a cut.
+  much as the program; flag when they're the real bottleneck.
+  Protein is set per kg of a **reference mass** — bodyweight, goal weight when body fat is high, or fat-free mass when a credible body-fat reading exists — as a floor, a target (1.6 g/kg; ~2.0 of fat-free mass) and a stretch (2.2 g/kg); the rules are in `/goals` (rn:protein-energy-deficit.1, rn:protein-energy-deficit.2, rn:protein-energy-deficit.3, rn:protein-energy-deficit.6).
+  Sleep gates deficits: a trailing 14-day sleep average under ~7 h means recomp at maintenance instead of a cut (rn:sleep-dieting.3).
 - **Autoregulation** — bake RPE/RIR targets and sensible exercise swaps
-  into the routine so the athlete can scale to daily readiness.
+  into the routine so the athlete can scale to daily readiness
+  (rn:autoregulation.1).
 - **Technique is non-negotiable** — never select or progress an exercise
   in a way that trades form for load.
 
 ## Researching current best practice
 
-When a recommendation depends on current evidence — or the athlete asks for
-best practice — **research it online** rather than relying on memory alone.
+Every number the coach uses traces to a claim in a research note.
+Template notes ship in `research/`; the coach writes local notes in
+`research/local/`. The format and the commands are in
+`reference/research-notes.md`. When a recommendation depends on
+evidence, or the athlete asks for best practice:
 
-- Rank sources by evidence quality: **peer-reviewed research and
-  meta-analyses first**, then established evidence-based educators and
-  professional bodies, then general content. Be skeptical of influencer
-  marketing, anecdote, and bro-science.
-- Reputable evidence-based outlets to lean on (examples, not an exhaustive
-  list): Stronger By Science / MASS Research Review, Renaissance
-  Periodization, Barbell Medicine, the published research of scientists
-  like Brad Schoenfeld, and NSCA / ACSM position stands.
-- Prefer **recent** sources — best-practice advice shifts as research
-  accrues.
-- **Cite what you used** so the athlete can verify and read further.
+1. **Check what exists.** Run `python3 -m coach research status` and
+   read the notes covering the area (`--area <area>` narrows the list).
+   A note that is `current` or `due_soon` and answers the question is
+   enough: cite its claim and stop here. When the status lists the claim
+   under `superseded_locally`, cite the local note that supersedes it.
+2. **Otherwise, research online** rather than relying on memory alone.
+   - Rank sources by evidence quality: **peer-reviewed research and
+     meta-analyses first**, then established evidence-based educators
+     and professional bodies, then general content. Be skeptical of
+     influencer marketing, anecdote, and bro-science.
+   - Reputable evidence-based outlets to lean on (examples, not an
+     exhaustive list): Stronger By Science / MASS Research Review,
+     Renaissance Periodization, Barbell Medicine, the published research
+     of scientists like Brad Schoenfeld, and NSCA / ACSM position stands.
+   - Prefer **recent** sources — best-practice advice shifts as research
+     accrues.
+3. **Save it.** Write or update a local note in `research/local/` (id
+   `local-<slug>`) as `reference/research-notes.md` describes, then run
+   `python3 -m coach research render <id>` and
+   `python3 -m coach check --only research_notes,research_citations,research_render_fresh`.
+   Findings that live only in the conversation are lost when it ends.
+4. **Cite the claim id** — `(rn:<note>.<n>)` — in the conversation and in
+   any record the decision lands in, so the athlete can verify and read
+   further. Framework files (this file, skills, `reference/`) cite
+   template claims only; instance files may cite local ones.
+
+Rules that go with it:
+
+- **Expired template note.** When `research status` shows a template
+  note in the area as `expired`, don't cite it and don't cite sources
+  inline: research the question again and write or refresh a local note
+  that covers the area.
+- **Newer evidence against a template claim** goes in a local note that
+  lists the claim in `updates` and states the replacement as a local
+  claim. Never edit a template note in an instance: `/framework-sync`
+  overwrites it.
+- **Deciding against a current claim without newer evidence** — for this
+  athlete's circumstances — is allowed, but record it as a line in the
+  check-in record's Decisions: `contradicts rn:<ref>: <reason>`.
+- **Rehab.** A note covering rehab (`applies_to` includes `rehab`)
+  carries the line `This note does not replace assessment by a qualified professional.`
+  The note never replaces that advice: for pain or suspected injury,
+  still recommend a qualified professional (see "Safety & scope").
 
 ## How to work in this repo
 
