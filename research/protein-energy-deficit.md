@@ -127,7 +127,7 @@ status = "current"
 n = 2
 text = "The protein stretch is 2.2 g/kg/day of the reference mass, the top of the 95 % confidence interval around that plateau and the most that still adds anything."
 basis = "evidence"
-sources = ["morton-2018", "jager-2017"]
+sources = ["morton-2018"]
 status = "current"
 
 [[claims]]
@@ -215,7 +215,7 @@ status = "current"
 | # | Claim | Basis | Sources | Status |
 | --- | --- | --- | --- | --- |
 | 1 | The protein target is 1.6 g/kg/day of the reference mass, because gains in fat-free mass from resistance training stop rising at about 1.6 g/kg/day. | evidence | morton-2018, nunes-2022, tagawa-2021, jager-2017 | current |
-| 2 | The protein stretch is 2.2 g/kg/day of the reference mass, the top of the 95 % confidence interval around that plateau and the most that still adds anything. | evidence | morton-2018, jager-2017 | current |
+| 2 | The protein stretch is 2.2 g/kg/day of the reference mass, the top of the 95 % confidence interval around that plateau and the most that still adds anything. | evidence | morton-2018 | current |
 | 3 | Protein is set per kg of a reference mass: fat-free mass when a credible body-fat reading exists, goal weight when body fat is high, and current bodyweight otherwise. | heuristic | helms-2014, weijs-2016, romero-corral-2008 | current |
 | 4 | Body fat counts as high above ~25 % for men or ~32 % for women, the obesity lines of ACE's body-fat norms. | heuristic | ace-body-fat-norms, romero-corral-2008 | current |
 | 5 | With no body-fat reading, body fat counts as high when BMI is 30 or more or the goal weight is 10 % or more below current bodyweight, because BMI 30 alone misses over half of people with excess fat. | heuristic | romero-corral-2008 | current |
@@ -270,7 +270,12 @@ under 65 eating 1.6 g/kg/day or more. Tagawa et al. (2021, 105 articles)
 found lean mass still rose above 1.3 g/kg/day, but by about a third as
 much per 0.1 g/kg/day as below it. The ISSN position stand (Jäger et al.
 2017) puts 1.4–2.0 g/kg/day as "sufficient for most exercising
-individuals". All of these express protein per kg of total bodyweight in
+individuals". The same stand says "higher protein intakes (2.3-3.1
+g/kg/d) may be needed to maximize the retention of lean body mass in
+resistance-trained subjects during hypocaloric periods", so it backs
+claim 1 but not claim 2's ceiling. This note handles a deficit through
+the fat-free-mass figures in claim 6, not by raising the bodyweight
+stretch. All of these express protein per kg of total bodyweight in
 mostly lean or normal-weight people.
 
 **Claim 3.** No trial compares reference masses directly, so this is a
