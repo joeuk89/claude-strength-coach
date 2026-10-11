@@ -155,7 +155,9 @@ and `config.toml` (units, equipment and its increments).
    exercise picked from the exercise library (`python3 -m coach library
    search <name>`). Respect every profile constraint (equipment load
    caps, session time limits, recovery windows around coach-led
-   sessions and cardio).
+   sessions and cardio). The program's interference rules flag quality
+   cardio placed too close to lifting: `python3 -m coach interference
+   list` shows the rules available and their defaults.
 4. **Walk the athlete through it** — the reasoning, not just the tables.
    Iterate until they'd actually train it. Confirm before writing files,
    then write the draft to `.coach/drafts/program.json` and adopt it as
@@ -164,6 +166,9 @@ and `config.toml` (units, equipment and its increments).
    - `source` `design`, `hevy_folder` null (adopt then keeps the
      current program folder), `report` `[]`, and `detected`
      `{"percentage_based": false, "evidence": [], "suggested_schemes": []}`.
+   - The program's `interference`: each rule from `interference list`
+     `available` with its defaults, as `{"name", "params"}`, unless the
+     athlete agreed otherwise; `[]` turns the rules off.
    - `hevy_routines` `{}` for a first program. For a redesign, adopt
      builds `hevy.routines` only from the draft, so carry the mapping
      over: take each `hevy.routines` entry from `python3 -m coach state

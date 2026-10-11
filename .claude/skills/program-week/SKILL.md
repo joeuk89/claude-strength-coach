@@ -168,6 +168,12 @@ formula applied blindly is not coaching.
      illness cap. Name the band in the week focus; with illness, confirm
      48 hours symptom-free. The next pass progresses from what the return
      week logged.
+   - `collision` (an interference rule: a quality activity on a lifting
+     day, or in the 24 hours before a heavy squat or hinge session; the
+     message names the rule, both bouts and the gap): the script never
+     moves anything. Agree with the athlete what moves — usually the
+     run — or keep the plan and resolve the flag with the reason (step
+     4). `python3 -m coach interference list` shows the program's rules.
    - `no_data` (set the first load with the athlete), `stalled`,
      `constraint_applied`, `override_standing`, `scheme_reset`,
      `rotation_unconfirmed` (state the position for confirmation, as
