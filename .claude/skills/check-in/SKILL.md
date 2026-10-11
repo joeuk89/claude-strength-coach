@@ -326,9 +326,13 @@ concrete: did the athlete hit the prescribed load × reps @ RPE?
   or more working sets of one exposure. Drift on isolation work gets one
   summary line in the record ("isolation RPE ran about 1 high on curls
   and raises") and never drives a decision.
-- Priority work: if the program names priority lifts or protocols,
-  did they happen as written? Watch for this athlete's known
-  drift patterns (Coach's notes).
+- Priority work: `python3 -m coach structure priority` gives each
+  priority lift's KPI now, its trend, and its exposures per week
+  against plan. Name each `priority_exposures_missed` flag (a planned
+  exposure missed with no floor dose in its place) in the Coach's read.
+  For priority protocols the program holds only in prose: did they
+  happen as written? Watch for this athlete's known drift patterns
+  (Coach's notes).
 
 **Deep tier** — all of the above, plus:
 - Per main lift: loads/reps across the window, and the e1RM trend from

@@ -94,6 +94,16 @@ training may restart, the first session's cap, when the athlete checks
 with a qualified professional first) and, after a long gap, its
 matching band.
 
+**Short on time, at the usual kit** — when the program has a minimum
+week (`minimum_week` in `program show`), use it rather than designing
+sessions. `python3 -m coach structure balance --variant minimum`
+confirms it still holds; exit 1 names each reason it fails, so fix the
+program or design the week instead. `python3 -m coach structure
+minimum --week <label> --write` writes its plan, and `python3 -m coach
+propose week --week <label> --plan <the path it printed>` proposes the
+week from it as a weekly overlay. Review and finalize as for a deload,
+then go to step 3 with that id.
+
 **Constrained week** — a short design conversation (what kit, what
 time, what state), then sessions that keep the program's priority work
 alive at a maintainable dose. Maintenance, not progress: ~⅓–½ of
