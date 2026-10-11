@@ -295,6 +295,17 @@ class LoadCapsTest(unittest.TestCase):
         [row] = failures(results, "load_caps")
         self.assertIn("db_single_arm_row", row["message"])
 
+    def test_loads_with_broken_arithmetic_are_left_to_overlay_arithmetic(self):
+        with TempCopy(INSTANCES / "overlay-bad-arithmetic") as tmp:
+            text = (tmp.root / "config.toml").read_text(encoding="utf-8").replace("dumbbell_max = 40.0",
+                                                                                   "dumbbell_max = 10.0")
+            tmp.write("config.toml", text)
+            tmp.edit_overlay(lambda doc: db_bench(doc)["sets"][1]["load"].update(per_hand=None))
+            _, results, _ = check(tmp.root, "load_caps")
+        messages = " ".join(row["message"] for row in failures(results, "load_caps"))
+        self.assertNotIn("crashed", messages)
+        self.assertIn("db_single_arm_row", messages)
+
     def test_ended_overlays_are_not_checked(self):
         _, results, _ = check(INSTANCES / "load-over-cap", "load_caps", env={"COACH_NOW": "2026-10-19T09:00:00Z"})
         self.assertEqual(statuses(results, "load_caps"), ["skip"])

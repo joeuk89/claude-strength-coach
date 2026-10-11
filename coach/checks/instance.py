@@ -288,8 +288,9 @@ def load_caps(ctx):
                 continue
             if cap is None:
                 continue
-            over = [s["load"] for s in line["sets"]
-                    if s.get("load") and s["load"]["unit"] == unit and _capped_value(s["load"]) > cap]
+            sound = [s["load"] for s in line["sets"]
+                     if s.get("load") and s["load"]["unit"] == unit and not units.check_load(s["load"])]
+            over = [load for load in sound if _capped_value(load) > cap]
             if not over:
                 continue
             heaviest = max(over, key=_capped_value)
