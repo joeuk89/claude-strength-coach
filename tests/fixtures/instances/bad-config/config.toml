@@ -1,0 +1,5 @@
+schema_version = 1
+
+[athlete]
+units = "kg"
+week_start = "monday"

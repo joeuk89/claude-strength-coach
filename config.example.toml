@@ -1,0 +1,49 @@
+# Coach settings. Copy this file to config.toml in the workspace root and
+# edit it. Scripts read it and never write it. Unknown tables and keys are
+# errors, so a typo stops the scripts instead of being ignored.
+#
+# Check it with: python3 -m coach config validate
+
+schema_version = 1
+
+[athlete]
+units = "kg"                  # "kg" | "lb": the units for every load. Required.
+bodyweight_units = "kg"       # "kg" | "lb"; default: the same as units
+week_starts = "monday"        # "monday" | "sunday"
+timezone = ""                 # IANA name such as "Europe/London"; "" = this computer's local time
+experience = "intermediate"   # "beginner" | "intermediate" | "advanced"
+available_days = []           # days the athlete can train: "mon" .. "sun"; [] = not stated
+session_minutes = 60          # default time cap per session; 0 = no cap
+
+[hevy]
+enabled = true                # false if the athlete doesn't log in Hevy
+cache_max_age_hours = 24      # `coach check` warns when the Hevy cache is older than this
+
+# The main place the athlete trains. Every weight is in [athlete] units.
+# With units = "kg", any key left out takes the value shown here. With
+# units = "lb", the increments, dumbbell_max, bar_weight and plates have no
+# default and must be set.
+[equipment]
+available = []                # equipment the athlete has; [] = assume every piece (not checked)
+dumbbells = []                # per-hand dumbbell weights available; [] = not checked
+dumbbell_increment = 2.0      # smallest per-hand dumbbell jump
+dumbbell_max = 40.0           # heaviest per-hand dumbbell; prescriptions are capped here
+barbell_increment = 2.5       # smallest jump in total bar load
+bar_weight = 20.0
+plates = [25, 20, 15, 10, 5, 2.5, 1.25]  # plate sizes you have in pairs, one per side; any number of each
+machine_increment = 5.0
+cable_increment = 2.5
+
+# Other places the athlete trains, one table each. The name uses lowercase
+# letters, digits and hyphens. Any [equipment] key may appear; at that place
+# it replaces the main table's value, and keys left out keep it.
+#
+# [equipment.locations.home]
+# available = ["dumbbell", "bench", "band", "bodyweight"]
+# dumbbells = [5, 10, 15, 20]
+# dumbbell_max = 20.0
+
+# Optional load caps, by exercise id, in athlete units: per hand for
+# dumbbell exercises, total otherwise.
+[caps]
+# db_bench_press = 30.0
