@@ -82,7 +82,8 @@ research and save a local note when none answers it, and cite claim ids.
 Fixed points that must survive any research:
 
 - No extreme cuts or bulks. Sustainable only.
-- Bulk: ~+0.25–0.5 lb/week (rn:protein-energy-deficit.12). Cut: lose no
+- Bulk: gain ~0.25–0.5 % of bodyweight per week, nearer the low end for
+  advanced lifters (rn:protein-energy-deficit.12). Cut: lose no
   faster than ~0.5–1% bodyweight/week, slower when close to the goal
   (rn:protein-energy-deficit.11). Recomp at maintenance is
   a legitimate choice for a returning or newer lifter with elevated body
@@ -131,7 +132,7 @@ multiplied by. Take the first rule that applies:
 1. **Fat-free mass** when a credible body-fat reading exists (DEXA, a
    BodPod or underwater weighing, or skinfolds by an experienced tester,
    from the last ~3 months): bodyweight × (1 − body-fat fraction).
-2. **Goal weight** when body fat is high: above ~25 % for men or ~32 %
+2. **Goal weight** when body fat is high: above ~25 % for men or ~35 %
    for women on a rougher reading (a smart scale, a tape method). With
    no reading at all, treat body fat as high when BMI is 30 or more, or
    when the goal weight is 10 % or more below current bodyweight.
@@ -170,8 +171,8 @@ because muscle loss during weight loss is more likely at lower intakes
 (rn:protein-energy-deficit.7), and starts from recent intake so it is
 reachable this week (rn:protein-energy-deficit.8). The reference mass
 keeps every figure reachable for an athlete carrying a lot of fat
-(rn:protein-energy-deficit.3). The ~25 %/~32 % body-fat lines are the
-obesity lines of common body-fat norms (rn:protein-energy-deficit.4),
+(rn:protein-energy-deficit.3). The ~25 %/~35 % body-fat lines are the
+WHO obesity lines that research uses (rn:protein-energy-deficit.4),
 and BMI ≥ 30 alone misses over half of people with excess fat — hence
 the goal-weight fallback (rn:protein-energy-deficit.5).
 

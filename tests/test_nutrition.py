@@ -8,7 +8,7 @@ import unittest
 from datetime import date
 from pathlib import Path
 
-from coach import nutrition
+from coach import nutrition, research
 from tests.support import FIXTURES, INSTANCES, REPO_ROOT, VALID, run_cli, run_module
 
 NOW = {"COACH_NOW": "2026-10-11T18:00:00Z"}
@@ -414,6 +414,40 @@ class SkillWiringTest(unittest.TestCase):
         for needle in ("[nutrition.protein]", "[[nutrition.anchors]]", "[nutrition.override]", "config validate",
                        "What stays prose"):
             self.assertIn(needle, text)
+
+    def test_goals_uses_the_who_body_fat_line_and_a_relative_bulk_rate(self):
+        text = (self.SKILLS / "goals" / "SKILL.md").read_text(encoding="utf-8")
+        flat = " ".join(text.split())
+        self.assertIn("~25 % for men or ~35 % for women", flat)
+        self.assertIn("~25 %/~35 % body-fat lines", flat)
+        self.assertNotRegex(flat, r"32 ?% for women|/~32 ?%")
+        self.assertIn("~0.25–0.5 % of bodyweight per week, nearer the low end for advanced lifters", flat)
+        self.assertNotRegex(text, r"lb ?(/|a |per )w(ee)?k")
+
+
+class ProteinNoteTest(unittest.TestCase):
+    def claim(self, n):
+        return research.find_claim(f"rn:protein-energy-deficit.{n}", research.load_notes(REPO_ROOT))
+
+    def test_womens_high_body_fat_line_is_the_who_line(self):
+        claim = self.claim(4)
+        self.assertIn("~25 % for men or ~35 % for women", claim.text)
+        self.assertEqual(claim.basis, "heuristic")
+        self.assertEqual(claim.sources[0], "romero-corral-2008")
+
+    def test_bulk_rate_is_a_share_of_bodyweight(self):
+        claim = self.claim(12)
+        self.assertIn("~0.25–0.5 % of bodyweight per week, nearer the low end for advanced lifters", claim.text)
+        self.assertEqual((claim.basis, claim.confidence), ("evidence", "low"))
+        self.assertEqual(sorted(claim.sources), ["helms-2023", "iraki-2019"])
+
+    def test_floor_clamp_is_unchanged(self):
+        self.assertIn("never below 1.2 g/kg", self.claim(7).text)
+
+    def test_no_lb_rate_or_32_percent_line_in_the_note(self):
+        text = (REPO_ROOT / "research" / "protein-energy-deficit.md").read_text(encoding="utf-8")
+        self.assertNotRegex(" ".join(text.split()), r"32 ?% for women")
+        self.assertNotRegex(text, r"lb ?(/|a |per )w(ee)?k")
 
 
 class SubprocessTest(unittest.TestCase):

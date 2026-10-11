@@ -73,14 +73,6 @@ type = "observational"
 year = 2008
 
 [[sources]]
-id = "ace-body-fat-norms"
-citation = "American Council on Exercise. Percent body fat norms for men and women. ACE percent body fat calculator page (archived 1 December 2023; the live page has since been withdrawn)."
-url = "https://web.archive.org/web/20231201104650/https://www.acefitness.org/resources/everyone/tools-calculators/percent-body-fat-calculator/"
-type = "educator"
-year = 2023
-accessed = 2026-10-11
-
-[[sources]]
 id = "murphy-koehler-2022"
 citation = "Murphy C, Koehler K. Energy deficiency impairs resistance training gains in lean mass but not strength: a meta-analysis and meta-regression. Scand J Med Sci Sports. 2022;32(1):125-137."
 url = "https://doi.org/10.1111/sms.14075"
@@ -139,9 +131,9 @@ status = "current"
 
 [[claims]]
 n = 4
-text = "Body fat counts as high above ~25 % for men or ~32 % for women, the obesity lines of ACE's body-fat norms."
+text = "Body fat counts as high above ~25 % for men or ~35 % for women, the WHO obesity lines that research uses."
 basis = "heuristic"
-sources = ["ace-body-fat-norms", "romero-corral-2008"]
+sources = ["romero-corral-2008"]
 status = "current"
 
 [[claims]]
@@ -196,10 +188,11 @@ status = "current"
 
 [[claims]]
 n = 12
-text = "A bulk gains ~0.25–0.5 lb per week, because faster gain adds mostly fat rather than more muscle or strength."
-basis = "heuristic"
-sources = ["helms-2023", "iraki-2019"]
+text = "A bulk gains ~0.25–0.5 % of bodyweight per week, nearer the low end for advanced lifters, because faster gain adds mostly fat rather than more muscle or strength."
+basis = "evidence"
+sources = ["iraki-2019", "helms-2023"]
 status = "current"
+confidence = "low"
 
 [[claims]]
 n = 13
@@ -217,7 +210,7 @@ status = "current"
 | 1 | The protein target is 1.6 g/kg/day of the reference mass, because gains in fat-free mass from resistance training stop rising at about 1.6 g/kg/day. | evidence | morton-2018, nunes-2022, tagawa-2021, jager-2017 | current |
 | 2 | The protein stretch is 2.2 g/kg/day of the reference mass, the top of the 95 % confidence interval around that plateau and the most that still adds anything. | evidence | morton-2018 | current |
 | 3 | Protein is set per kg of a reference mass: fat-free mass when a credible body-fat reading exists, goal weight when body fat is high, and current bodyweight otherwise. | heuristic | helms-2014, weijs-2016, romero-corral-2008 | current |
-| 4 | Body fat counts as high above ~25 % for men or ~32 % for women, the obesity lines of ACE's body-fat norms. | heuristic | ace-body-fat-norms, romero-corral-2008 | current |
+| 4 | Body fat counts as high above ~25 % for men or ~35 % for women, the WHO obesity lines that research uses. | heuristic | romero-corral-2008 | current |
 | 5 | With no body-fat reading, body fat counts as high when BMI is 30 or more or the goal weight is 10 % or more below current bodyweight, because BMI 30 alone misses over half of people with excess fat. | heuristic | romero-corral-2008 | current |
 | 6 | Per kg of fat-free mass the protein target is ~2.0 g/kg and the stretch ~2.6–2.8 g/kg, the bodyweight figures converted at ~15–20 % body fat, with the stretch inside the 2.3–3.1 g/kg of fat-free mass that lean lifters likely need in a deficit. | evidence | morton-2018, helms-2014, helms-aragon-2014 | current |
 | 7 | The protein floor is never below 1.2 g/kg of bodyweight or goal weight (~1.5 g/kg of fat-free mass), because muscle loss during weight loss is more likely at lower intakes. | evidence (low confidence) | kokura-2024, weijs-2016 | current |
@@ -225,7 +218,7 @@ status = "current"
 | 9 | When the weekly average protein meets or beats the floor at two consecutive check-ins, the floor rises by ~10–15 g, never above the target. | heuristic | tagawa-2021 | current |
 | 10 | An energy deficit blunts the lean mass gained from resistance training but not the strength gained, and a deficit of about 500 kcal/day is enough to stop lean-mass gain. | evidence | murphy-koehler-2022 | current |
 | 11 | A cut loses no faster than ~0.5–1 % of bodyweight per week, slower when close to the goal, because slower loss keeps more lean mass. | evidence | garthe-2011, helms-aragon-2014, murphy-koehler-2022 | current |
-| 12 | A bulk gains ~0.25–0.5 lb per week, because faster gain adds mostly fat rather than more muscle or strength. | heuristic | helms-2023, iraki-2019 | current |
+| 12 | A bulk gains ~0.25–0.5 % of bodyweight per week, nearer the low end for advanced lifters, because faster gain adds mostly fat rather than more muscle or strength. | evidence (low confidence) | iraki-2019, helms-2023 | current |
 | 13 | With an adaptive nutrition app, a missed day is logged as an estimate within about 30 % of what was eaten rather than left half-logged, because partial logging skews the app's expenditure estimate most. | heuristic | macrofactor-partial-logging | current |
 
 | Source | Citation | Type | Year |
@@ -239,7 +232,6 @@ status = "current"
 | weijs-2016 | [Weijs PJM, Wolfe RR. Exploration of the protein requirement during weight loss in obese older adults. Clin Nutr. 2016;35(2):394-398.](<https://doi.org/10.1016/j.clnu.2015.02.016>) | observational | 2016 |
 | kokura-2024 | [Kokura Y, Ueshima J, Saino Y, Maeda K. Enhanced protein intake on maintaining muscle mass, strength, and physical function in adults with overweight/obesity: a systematic review and meta-analysis. Clin Nutr ESPEN. 2024;63:417-426.](<https://doi.org/10.1016/j.clnesp.2024.06.030>) | meta-analysis | 2024 |
 | romero-corral-2008 | [Romero-Corral A, Somers VK, Sierra-Johnson J, et al. Accuracy of body mass index in diagnosing obesity in the adult general population. Int J Obes (Lond). 2008;32(6):959-966.](<https://doi.org/10.1038/ijo.2008.11>) | observational | 2008 |
-| ace-body-fat-norms | [American Council on Exercise. Percent body fat norms for men and women. ACE percent body fat calculator page (archived 1 December 2023; the live page has since been withdrawn).](<https://web.archive.org/web/20231201104650/https://www.acefitness.org/resources/everyone/tools-calculators/percent-body-fat-calculator/>) | educator, accessed 2026-10-11 | 2023 |
 | murphy-koehler-2022 | [Murphy C, Koehler K. Energy deficiency impairs resistance training gains in lean mass but not strength: a meta-analysis and meta-regression. Scand J Med Sci Sports. 2022;32(1):125-137.](<https://doi.org/10.1111/sms.14075>) | meta-analysis | 2022 |
 | garthe-2011 | [Garthe I, Raastad T, Refsnes PE, Koivisto A, Sundgot-Borgen J. Effect of two different weight-loss rates on body composition and strength and power-related performance in elite athletes. Int J Sport Nutr Exerc Metab. 2011;21(2):97-104.](<https://doi.org/10.1123/ijsnem.21.2.97>) | rct | 2011 |
 | helms-2023 | [Helms ER, Spence AJ, Sousa C, et al. Effect of small and large energy surpluses on strength, muscle, and skinfold thickness in resistance-trained individuals: a parallel groups design. Sports Med Open. 2023;9:102.](<https://doi.org/10.1186/s40798-023-00651-y>) | rct | 2023 |
@@ -255,7 +247,8 @@ as the most that still helps and a reachable floor no lower than
 1.2 g/kg/day. The reference mass is fat-free mass with a credible
 body-fat reading, goal weight when body fat is high, and bodyweight
 otherwise. Cut at ~0.5–1 % of bodyweight per week and bulk at
-~0.25–0.5 lb per week.
+~0.25–0.5 % of bodyweight per week, nearer the low end for advanced
+lifters.
 
 ## Evidence
 
@@ -286,12 +279,12 @@ per kg of both in adults with obesity. Per kg of bodyweight, an athlete
 carrying a lot of fat would be set a number well above what their muscle
 needs. Goal weight or fat-free mass keeps the number reachable.
 
-**Claim 4.** ACE's percent body fat norms list "Obesity" as above 25 %
-for men and above 32 % for women. Research more often uses the WHO lines
-of above 25 % for men and above 35 % for women (Romero-Corral et al.
-2008), so the women's line here is the stricter of the two (see Open
-questions). These lines are applied to rougher readings (a smart scale or
-a tape method), where the error is a few percentage points either way.
+**Claim 4.** Romero-Corral et al. (2008) define obesity by the WHO
+lines: body fat above 25 % for men and above 35 % for women. No trial
+tests these lines as the point to switch the reference mass to goal
+weight, so the claim stays a coaching rule. The lines are applied to
+rougher readings (a smart scale or a tape method), where the error is a
+few percentage points either way.
 
 **Claim 5.** Romero-Corral et al. (2008, 13,601 adults) found BMI 30 or
 more had high specificity but "poor sensitivity" (36 % in men, 49 % in
@@ -347,12 +340,12 @@ smaller deficit (Helms et al. 2014).
 maintenance, a 5 % surplus or a 15 % surplus for 8 weeks. Their
 regression found "faster rates of BM gain (and by proxy larger surpluses)
 primarily increase rates of fat gain rather than augmenting 1-RM or MT".
-Iraki et al. (2019) recommend "a target weight gain of ~0.25-0.5% of
-bodyweight/week for novice/intermediate bodybuilders", and slower for
-advanced ones. For an 80 kg lifter that is about 0.45–0.9 lb a week, so
-the framework's 0.25–0.5 lb is about half as fast. That makes it a
-heuristic: the sources support the direction (slow), not the figure
-(see Open questions).
+Iraki et al. (2019) recommend "a target weight gain of ~0.25–0.5% of
+bodyweight/week for novice/intermediate bodybuilders" and say advanced
+ones "should be more conservative"; their summary table gives them
+~0.25 %. For an 80 kg lifter, 0.25–0.5 % is 0.2–0.4 kg a week. The claim
+carries low confidence: one narrative review sets the figure and one
+small trial supports the direction.
 
 **Claim 13.** MacroFactor's help centre names "partial food logging" as
 its algorithms' "one major Achilles heel" and advises estimating a missed
@@ -368,15 +361,12 @@ is close enough. This is the app maker's guidance, not a trial.
   at or above it (claim 9) and never lowers it.
 - On a cut, hold the trend to ~0.5–1 % of bodyweight a week and push
   protein toward the stretch as the athlete gets leaner (claims 6, 10,
-  11). On a bulk, hold the trend to ~0.25–0.5 lb a week (claim 12).
+  11). On a bulk, hold the trend to ~0.25–0.5 % of bodyweight a week,
+  nearer the low end for advanced lifters (claim 12).
 - App users log every day; a missed day gets an estimate, not a gap
   (claim 13).
 
 ## Open questions
 
-- Whether the women's high-body-fat line should be ~35 % (WHO and most
-  research) rather than ACE's ~32 %.
-- Whether the bulk rate should be stated as a share of bodyweight
-  (~0.25–0.5 % a week, as Iraki et al. recommend) rather than in pounds.
 - How well the 1.2 g/kg floor, drawn from adults with obesity, holds for
   lean, younger lifters.
