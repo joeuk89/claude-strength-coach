@@ -59,6 +59,13 @@ dumbbells = []                # per-hand dumbbell weights available; [] = not ch
 [checkin]
 cadence_days = 7
 
+# "coach": the coach reviews the program's structure and proposes changes.
+# "run": the athlete's own program is run as written. Loads still progress
+# and every safety check still runs, but structural flags are shown as
+# information and the coach never proposes a restructure or a redesign.
+[coaching]
+mode = "coach"                # "coach" | "run"
+
 # Nutrition strategy, set by /goals with the athlete's approval. Left out,
 # or with enabled = false, nutrition is off: the check-in asks for one
 # morning weigh-in and /goals sets things up. Weights are in [athlete]

@@ -20,6 +20,8 @@ from pathlib import Path
 from coach import block as block_module
 from coach import checkin, dates, history, overlay, page_parts, paths, program, render, state, stats, units
 from coach import config as config_module
+from coach import flags as flags_module
+from coach.config_tables import coaching
 from coach.errors import ConfigError, NetworkError, RefusedError, ValidationError
 from coach.hevy.cache import HevyCache
 from coach.library import Library
@@ -200,6 +202,7 @@ class _View:
         self.week = dates.week_span(self.today + timedelta(days=1), self.week_starts)
         self.unit = self.config.athlete.units
         self.show_hevy = self.config.hevy.enabled
+        self.coaching_mode = coaching.mode(self.config)
 
     @cached_property
     def program(self):
@@ -381,6 +384,8 @@ class _View:
         phase = self.slot("brief.header.phase")
         if phase:
             parts.append(phase[-1].text)
+        if self.coaching_mode == coaching.RUN:
+            parts.append("run mode")
         parts.append(_checkin_text(facts["checkin"], self.today))
         return " · ".join(parts)
 
@@ -433,8 +438,8 @@ class _View:
         return [d for i in ids for d in self.overlays if d["id"] == i]
 
     def open_flags(self):
-        return [f for doc in self.week_docs() for f in doc["flags"]
-                if not f["resolved"] and f["severity"] in ("block", "warn")]
+        found = flags_module.for_mode([f for doc in self.week_docs() for f in doc["flags"]], self.coaching_mode)
+        return [f for f in found if not f["resolved"] and f["severity"] in ("block", "warn")]
 
     def watch(self):
         items = [Item(f["message"], PRIORITY[f["severity"]]) for f in self.open_flags()]
