@@ -33,3 +33,25 @@ dumbbell_max = 20.0
 
 [activity]
 enabled = true
+
+[nutrition]
+enabled = true
+app = "macrofactor"
+phase = "recomp"
+target_rate_per_week = 0.0
+
+[nutrition.protein]
+reference_basis = "bodyweight"
+reference_mass = 80.0
+floor_g = 110
+target_g = 128
+stretch_g = 176
+floor_since = 2026-09-28
+floor_step_g = 10
+
+[[nutrition.anchors]]
+name = "Whey shake"
+slot = "snack"
+days = ["daily"]
+kcal = 150
+protein_g = 30
