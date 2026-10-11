@@ -28,7 +28,6 @@ _SMALLEST_PLATE = {"kg": 1.25, "lb": 2.5}
 
 
 def suggest(unit, gym="commercial"):
-    """{"values": {table: {key: value}}, "notes": [{key, message}]} for a unit and a kind of gym."""
     if unit not in UNITS:
         raise ValueError(f"unit must be one of {', '.join(UNITS)}")
     if gym not in GYMS:

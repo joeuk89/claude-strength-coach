@@ -32,9 +32,9 @@
     },
     {
       "asked": "Profile questions 4 to 6: your training week; equipment, per place you train; injuries and limitations.",
-      "athlete": "Mon, Wed and Fri, about an hour each, no PT or classes, and two easy runs a week. A commercial gym with everything, dumbbells up to 50; at home, dumbbells 5 to 22.5 in 2.5 steps and a band. My lower back has flared on deadlifts from the floor for years, so I won't do those.",
+      "athlete": "Mon, Wed and Fri, about 75 minutes each, no PT or classes, and two easy runs a week. A commercial gym with everything, dumbbells up to 50; at home, dumbbells 5 to 22.5 in 2.5 steps and a band. My lower back has flared on deadlifts from the floor for years, so I won't do those.",
       "config": {
-        "athlete": {"available_days": ["mon", "wed", "fri"], "session_minutes": 60},
+        "athlete": {"available_days": ["mon", "wed", "fri"], "session_minutes": 75},
         "equipment": {"available": ["barbell", "dumbbell", "machine", "cable", "plate", "bodyweight"]},
         "equipment.locations.home": {
           "available": ["dumbbell", "band", "bodyweight"],

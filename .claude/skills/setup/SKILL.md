@@ -39,7 +39,9 @@ change.
 
 Skip when `config.toml` exists and `python3 -m coach config validate`
 exits 0. On a re-run, report the three answers from `python3 -m coach
-config show` and ask what to change.
+config show` and ask what to change. A `config.toml` without a
+`[nutrition]` table means a yes not yet set up or a later; step 7
+settles which.
 
 Welcome the athlete in two lines: this repo plans and reviews their
 training, their logging app records it, and a weekly `/check-in` keeps
@@ -204,9 +206,11 @@ Then follow that path in the **new-program** skill:
   <exercise id>=<load>` for each working weight from question 3, by the
   ids in the preview's `program.priority`. Don't ask for the weights
   again.
-- **Import path** (its Path A): `python3 -m coach library seed`,
-  `python3 -m coach library confirm`, then `python3 -m coach program
-  import-hevy`. Ask once: **run it as written, or coach it?** Write
+- **Import path** (its Path A): `python3 -m coach library seed`; then
+  its step 3 confirmation: `python3 -m coach library set-mode <id>
+  <mode>` for each `low`-confidence or `guessed` row, and `python3 -m
+  coach library confirm <ids>` (or `--all`) for the rest; then `python3
+  -m coach program import-hevy`. Ask once: **run it as written, or coach it?** Write
   `[coaching] mode` from the answer: `"run"` to run their program as
   written, `"coach"` (the default) to have it reviewed and improved.
   Then finish the draft as Path A says.
@@ -227,22 +231,28 @@ write `data/program.json` yourself.
 exercise without a confirmed load mode. Show it as one table (exercise,
 load mode, and how the athlete sets the weight: one total, per hand, or
 one dumbbell) in step 5's adopt message. With their yes, record every
-row: `python3 -m coach library set-mode <id> <mode>`, or `python3 -m
-coach library confirm <ids>` for rows an import proposed, changing any
-row they correct. Never ask about it again.
+row with `python3 -m coach library set-mode <id> <mode>`, changing any
+row they correct. The import path confirmed its load modes before the
+import, so its table holds only exercises added while finishing the
+draft. Never ask about it again.
 
 Then run week one through the **program-week** skill: it runs `python3
 -m coach propose week`, builds and checks the overlay, presents the
 coach's brief and stops at the approval gate. The athlete's "go"
 approves the week and its writes.
 
-## 7. Nutrition (only when the athlete said yes in step 1)
+## 7. Nutrition (only when the athlete wants it now)
 
-Skip this step unless the athlete said yes to nutrition coaching in
-step 1. It runs after week one is approved, never before. Invoke the
-**goals** skill (`/goals`): it asks the nutrition questions, sets
-`[nutrition]` in `config.toml` and adds the "Nutrition & goals" section
-to `profile.md`.
+Skip this step when `config.toml` has a `[nutrition]` table, or when
+the athlete said no or later in step 1 of this run. It runs after week
+one is approved, never before. On a resumed run, when the step 1 answer
+isn't in this conversation and `[nutrition]` is absent, ask once: set up
+nutrition coaching now, or later? A later skips the step and goes into
+the close-out's deferred list.
+
+Invoke the **goals** skill (`/goals`) on a yes: it asks the nutrition
+questions, sets `[nutrition]` in `config.toml` and adds the "Nutrition &
+goals" section to `profile.md`.
 
 ## 8. Close out
 

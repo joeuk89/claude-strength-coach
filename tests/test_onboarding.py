@@ -193,7 +193,7 @@ class WorkedExampleTest(unittest.TestCase):
         athlete = config["athlete"]
         self.assertEqual(athlete["experience"], "beginner")
         self.assertEqual(athlete["available_days"], ["mon", "wed", "fri"])
-        self.assertEqual(athlete["session_minutes"], 60)
+        self.assertEqual(athlete["session_minutes"], 75)
         self.assertIn("barbell", config["equipment"]["available"])
         self.assertEqual(config["equipment"]["dumbbell_max"], 50)
         self.assertEqual(config["equipment"]["locations"]["home"]["dumbbell_max"], 22.5)
