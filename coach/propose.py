@@ -16,7 +16,8 @@ from pathlib import Path
 
 from coach import config as config_module
 from coach import constraints as constraints_module
-from coach import dates, decisions, flags, history, jsonio, overlay, paths, patterns, plugins, program, research
+from coach import dates, decisions, flags, followups, history, jsonio, niggles, overlay, paths, patterns, plugins
+from coach import program, research
 from coach import state as state_module
 from coach import stats, units, validity
 from coach.checks.instance import cap_for
@@ -765,6 +766,7 @@ def propose_week(root, config, today, now, span, kind="weekly", transform_name=N
             "temporary": kind == "deload", "location": session["location"], "focus": session["focus"],
             "exercises": lines,
         })
+    all_flags += followups.due_flags(root, today) + niggles.week_flags(root)
 
     draft = {
         "schema_version": overlay.current_version(), "kind": kind, "span": span.to_json(),

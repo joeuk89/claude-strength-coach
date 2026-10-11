@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "niggles": [
+    {
+      "id": "n-0001",
+      "area": "synthetic left knee",
+      "first_noted": "2026-09-14",
+      "last_noted": "2026-10-11",
+      "mentions": 2,
+      "status": "watching",
+      "notes": null,
+      "applies_to": {"patterns": ["squatt"], "exercises": ["no_such_exercise"], "activity_kinds": []},
+      "constraints": [{"kind": "rpe_cap", "value": 7, "reason": "synthetic left knee"}],
+      "constrain_while": ["aggravated", "watching"],
+      "history": [
+        {"date": "2026-09-14", "status": "watching", "note": null},
+        {"date": "2026-10-11", "status": "watching", "note": null}
+      ]
+    }
+  ]
+}
