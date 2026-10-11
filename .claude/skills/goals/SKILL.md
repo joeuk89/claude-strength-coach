@@ -163,7 +163,7 @@ fat.
 Why these numbers: gains in fat-free mass stop rising at ~1.6 g/kg/day,
 which sets the target (rn:protein-energy-deficit.1), and the top of the
 95 % confidence interval around that plateau, 2.2 g/kg, sets the stretch
-(rn:protein-energy-deficit.2). The fat-free-mass column sits inside the
+(rn:protein-energy-deficit.2). The fat-free-mass stretch sits inside the
 2.3–3.1 g/kg of fat-free mass that lean lifters likely need in a deficit
 (rn:protein-energy-deficit.6). The floor never drops under 1.2 g/kg
 because muscle loss during weight loss is more likely at lower intakes
