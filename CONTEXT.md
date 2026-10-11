@@ -121,6 +121,15 @@ closing line names. Reversible writes to git-tracked records need no
 gate.
 _Avoid_: confirmation step, sign-off
 
+**Session-start status**:
+The few lines of `coach status` the coach sees at the start of every
+session: where the instance stands now (the overlay in force and whether
+it reached Hevy, failing checks, the cache age, the block, the next
+check-in), with the items that need raising first. Read from local files
+only.
+_Avoid_: briefing, dashboard (the rendered `README.md`), status line (a
+check-in record's line)
+
 **Activity source**:
 Where logged cardio and health signals come from: a phone health export,
 a training-analysis service, a run-plan calendar feed, or the athlete by
