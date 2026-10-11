@@ -74,10 +74,11 @@ session keeps its lines from the overlay in force
 light` or `--transform return`). It applies the program's deload rule (`blocks.deload_rule` in
 `program show`) to every program session in the span; the standard rule
 keeps two thirds of each line's working sets, takes 10 % off loads from
-the current working weights and puts every set at RPE 6, with bodyweight
-work cut by sets and taken further from failure. Its sessions are temp
-sessions (`"temporary": true`, titled "Deload — <session title>") that
-keep their program session ids. Review each line, change one with
+the current working weights and puts every set at RPE 6 (rn:deloads.9);
+these numbers are a coaching heuristic. It cuts bodyweight work by sets
+and takes it further from failure. Its sessions are temp sessions
+(`"temporary": true`, titled "Deload — <session title>") that keep their
+program session ids. Review each line, change one with
 `python3 -m coach propose override` and a reason, settle a flag with
 `python3 -m coach propose resolve`, then run `python3 -m coach propose
 finalize --proposal <id>`, which writes the overlay. Then go to step 3
