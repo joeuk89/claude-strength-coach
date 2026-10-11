@@ -34,6 +34,7 @@ NUTRITION_READINGS = DATA_DIR / "nutrition" / "readings.json"
 MEAL_PLANS_DATA_DIR = DATA_DIR / "nutrition" / "plans"
 
 ROUTINE_DIR = _P("routine")
+ROUTINE_PROGRAM_PAGE = ROUTINE_DIR / "program.md"
 CHECKINS_DIR = _P("check-ins")
 NUTRITION_DIR = _P("nutrition")
 MEAL_PLANS_DIR = NUTRITION_DIR / "plans"

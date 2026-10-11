@@ -8,7 +8,8 @@ description: Use when the user wants to update this workspace's framework files 
 Update this workspace's **framework files** from the template repo's
 `main` branch. One direction only: the template is the source of truth
 for the framework, this workspace is the source of truth for the
-athlete's data — and this skill never touches the data.
+athlete's data. This skill never edits the data by hand: its only data
+change is `migrate run`, which upgrades schema versions in step 6.
 
 **The framework set:** every file tracked in `template/main` **except**
 `docs/**` (the template's own development history), `tests/**` (the
@@ -77,13 +78,33 @@ delivered.
 - First run (no marker): there's no baseline to detect drift against, so
   list every file the sync will change and confirm once.
 
-## 5. Apply and commit
+## 5. Apply
 
 - Copies: `git checkout template/main -- "<path>"` per file.
 - Deletions: `git rm "<path>"` per file.
 - Write the marker: `template_commit` from
   `git rev-parse template/main`, `synced_at` today.
-- **One commit** for everything, marker included:
+
+## 6. Migrate the data files
+
+The new framework may read a newer schema version of the athlete's data
+files (`data/**/*.json`). Bring them up to it before committing:
+
+- Run `python3 -m coach migrate run --dry-run` and show the athlete
+  which files move from which version to which, plus any notes it
+  reports. An empty `files` list means nothing to migrate; go to step 7.
+- If it exits 1, stop before committing and show the problems it
+  names. No data file has been written, but the framework files from
+  step 5 are staged and not committed. Tell the athlete to report the
+  named problems, or to run `git reset --hard` to back out the sync.
+- Otherwise run `python3 -m coach migrate run`. It backs every file up
+  under `.coach/backups/`, writes the upgraded files and stages them
+  with `git add`. It never commits; the commit in step 7 takes the
+  migrated files with the framework files.
+
+## 7. Commit
+
+- **One commit** for everything, marker and migrated data files included:
   - Subject: `Sync from template: <one-line gist of what came in>`
   - Body: the template commit subjects being pulled in
     (`git log --reverse --format='- %s' <marker sha>..template/main`);
@@ -94,7 +115,7 @@ delivered.
 commits, stage and show the diff instead of committing — user rules
 win over this skill.)
 
-## 6. Close out
+## 8. Close out
 
 - Summarize what came in, in plain words ("check-in skill updated, new
   deload skill added") — not just filenames.
