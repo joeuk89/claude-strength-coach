@@ -32,7 +32,7 @@ year = 2024
 
 [[claims]]
 n = 1
-text = "Deloads are triggered by fatigue signals rather than fixed on the calendar, with a ceiling on how long a block runs without one."
+text = "Deloads may be pre-planned or triggered by fatigue at any point in a block; this framework triggers them by fatigue, with a ceiling on how long a block runs without one."
 basis = "consensus"
 sources = ["bell-2023", "coleman-2024"]
 status = "current"
@@ -46,8 +46,8 @@ status = "current"
 
 [[claims]]
 n = 3
-text = "A light week is proposed when the count reaches the program's ceiling: default 6 completed hard weeks, settable from 4 to 8."
-basis = "consensus"
+text = "A light week is proposed when the count reaches the program's ceiling: default 6 completed hard weeks, settable from 4 to 8, the usual deload interval of 4 to 8 weeks counted in completed hard weeks instead of calendar weeks."
+basis = "heuristic"
 sources = ["bell-2023", "rogerson-2024"]
 status = "current"
 
@@ -120,9 +120,9 @@ status = "current"
 
 | # | Claim | Basis | Sources | Status |
 | --- | --- | --- | --- | --- |
-| 1 | Deloads are triggered by fatigue signals rather than fixed on the calendar, with a ceiling on how long a block runs without one. | consensus | bell-2023, coleman-2024 | current |
+| 1 | Deloads may be pre-planned or triggered by fatigue at any point in a block; this framework triggers them by fatigue, with a ceiling on how long a block runs without one. | consensus | bell-2023, coleman-2024 | current |
 | 2 | A completed hard week is a normal program week in which at least 75 % of planned sessions, coach-led ones included, were trained as prescribed, and a week with under 50 % of planned sessions trained resets the count to zero. | heuristic | none | current |
-| 3 | A light week is proposed when the count reaches the program's ceiling: default 6 completed hard weeks, settable from 4 to 8. | consensus | bell-2023, rogerson-2024 | current |
+| 3 | A light week is proposed when the count reaches the program's ceiling: default 6 completed hard weeks, settable from 4 to 8, the usual deload interval of 4 to 8 weeks counted in completed hard weeks instead of calendar weeks. | heuristic | bell-2023, rogerson-2024 | current |
 | 4 | Below 3 completed hard weeks no light week is scheduled, even when two fatigue triggers fire. | heuristic | none | current |
 | 5 | Two of the four fatigue triggers (poor reported readiness, compound RPE drift two sessions running, a niggle aggravated under load, poor sleep for most of the week) in one week propose a light week, and one trigger is recorded as a watch. | heuristic | bell-2023 | current |
 | 6 | When adherence over the trailing four ordinary weeks is under 70 %, the check-in presents a smaller schedule with the same weekly hard sets per muscle. | heuristic | none | current |
@@ -172,9 +172,13 @@ happened, not weeks that passed.
 4–6 weeks" and regular pre-planned deloading as "every 4–8 weeks".
 rogerson-2024 surveyed 246 strength and physique athletes, who deloaded
 every 5.6 ± 2.3 weeks (range 1 to 12) for about 6 days. A default of 6 and
-a range of 4 to 8 match that practice. Both sources count calendar or
-training weeks, not completed hard weeks, so counting hard weeks can space
-light weeks further apart than 8 calendar weeks.
+a range of 4 to 8 match that practice. Neither figure is one of the Delphi
+panel's consensus statements: bell-2023 cites them from the literature,
+and the panel set no interval, agreeing instead that deload frequency may
+depend on how the athlete responds. Both sources count calendar or
+training weeks, not completed hard weeks. Counting hard weeks is this
+framework's adaptation, so the ceiling is a coaching heuristic. It can
+space light weeks further apart than 8 calendar weeks.
 
 **Claim 4.** No source sets a floor. The rule stops two bad weeks early in
 a block from cutting it short before any hard training has built up.
@@ -218,7 +222,7 @@ than calendar weeks still gets one every six weeks.
   rather than RPE drift or a niggle: the loads stay, so strength is kept,
   and the reduced sets and RPE ceiling let recovery catch up.
 - `/check-in` schedules a deep review by claim 12.
-- Treat claims 2, 4 to 7, 11 and 12 as rules of thumb. If the athlete's history
+- Treat claims 2 to 7 and 9 to 12 as rules of thumb. If the athlete's history
   shows they do not fit, write a local note that supersedes them.
 
 ## Open questions

@@ -1,5 +1,6 @@
 """CLAUDE.md's coaching principles and research practice cite research-note claims (contract C28)."""
 
+import json
 import re
 import subprocess
 import unittest
@@ -106,6 +107,56 @@ class HeuristicLabelsTest(unittest.TestCase):
         self.assertEqual(checkin.DEEP_AFTER_DAYS, 42)
         self.assertIn("`DEEP_AFTER_DAYS` after the last one, a coaching heuristic (rn:deloads.12)",
                       flat(checkin.__doc__.splitlines()))
+
+    def test_deload_timing_claim_accepts_planned_or_fatigue_triggered_deloads(self):
+        claim = self.claim("rn:deloads.1")
+        self.assertEqual(claim.basis, "consensus")
+        self.assertIn("pre-planned or triggered by fatigue", claim.text)
+        self.assertIn("ceiling", claim.text)
+
+    def test_ceiling_is_a_heuristic_counted_in_completed_hard_weeks(self):
+        claim = self.claim("rn:deloads.3")
+        self.assertEqual(claim.basis, "heuristic")
+        self.assertEqual(set(claim.sources), {"bell-2023", "rogerson-2024"})
+        for phrase in ("default 6 completed hard weeks", "4 to 8", "calendar weeks"):
+            self.assertIn(phrase, claim.text)
+
+    def test_deload_rules_are_labelled_heuristics(self):
+        text = flat(claude_section("Coaching principles"))
+        bullet = text.split("**Fatigue management & deloads**", 1)[1].split("**Minimum and maintenance dose**", 1)[0]
+        labels = bullet.split("These rules are coaching heuristics, not research cut-offs.", 1)[1]
+        for rule, refs in (
+            ("the 75 % and 50 % lines", ("rn:deloads.2",)),
+            ("the trained-as-prescribed rule", ("rn:deloads.11",)),
+            ("the ceiling counted in completed hard weeks", ("rn:deloads.3",)),
+            ("the four fatigue triggers with the two-trigger rule", ("rn:autoregulation.4", "rn:deloads.5")),
+            ("the three-week skip rule", ("rn:deloads.4",)),
+        ):
+            with self.subTest(rule=rule):
+                self.assertIn(f"{rule} ({', '.join(refs)})", labels)
+                for ref in refs:
+                    self.assertEqual(self.claim(ref).basis, "heuristic")
+
+    def test_standard_deload_cites_its_claim_as_a_heuristic(self):
+        text = flat(_read(".claude/skills/one-off-week/SKILL.md").splitlines())
+        sentence = next(s for s in text.split(". ") if "(rn:deloads.9)" in s)
+        self.assertIn("RPE 6", sentence)
+        self.assertIn("coaching heuristic", sentence)
+        self.assertEqual(self.claim("rn:deloads.9").basis, "heuristic")
+
+    def test_rpe_accuracy_claim_no_longer_rests_on_training_experience(self):
+        retired = research.find_claim("rn:autoregulation.3", self.notes)
+        self.assertEqual(retired.status, "retired")
+        self.assertEqual(retired.superseded_by, "rn:autoregulation.7")
+        claim = self.claim("rn:autoregulation.7")
+        self.assertEqual((claim.basis, claim.confidence), ("heuristic", "low"))
+        self.assertEqual(set(claim.sources), {"halperin-2022", "zourdos-2016", "helms-2016"})
+        self.assertIn("near failure", claim.text)
+        cites = json.loads(_read("coach/starters/rpe-full-body-3.json"))["cites"]
+        self.assertIn("rn:autoregulation.7", cites)
+        citing_retired = [f"{c.path}:{c.line}" for c in research.scan_citations(REPO_ROOT, self.notes)
+                          if c.ref == "rn:autoregulation.3"]
+        self.assertEqual(citing_retired, [])
 
 
 def text_of_bullet(text, lead):

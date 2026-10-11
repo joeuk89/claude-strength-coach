@@ -2781,7 +2781,7 @@ year = 2023
 
 [[claims]]
 n = 1
-text = "Deloads are better triggered by fatigue signals than fixed on the calendar."
+text = "Deloads may be pre-planned or triggered by fatigue at any point in a block."
 basis = "consensus"             # evidence | consensus | heuristic
 sources = ["bell-2023"]
 status = "current"              # current | retired

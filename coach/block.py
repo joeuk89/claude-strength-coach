@@ -1,11 +1,11 @@
 """Blocks and light weeks: the hard-week count, the fatigue triggers and the status line (contract C42, C43).
 
 R-02's rules scripted; `CLAUDE.md` "Fatigue management & deloads" is the
-prose copy (rn:deloads.1, rn:deloads.3). The 75 % and 50 % lines
-(rn:deloads.2), the three-week skip rule (rn:deloads.4), the two-of-four
-trigger rule (rn:deloads.5), the trained-as-prescribed rule
-(rn:deloads.11) and the `light` and `return` transform numbers are
-coaching heuristics, not research cut-offs.
+prose copy (rn:deloads.1). The 75 % and 50 % lines (rn:deloads.2), the
+hard-week ceiling (rn:deloads.3), the three-week skip rule (rn:deloads.4),
+the two-of-four trigger rule (rn:deloads.5), the trained-as-prescribed rule
+(rn:deloads.11) and the `light` and `return` transform numbers are coaching
+heuristics, not research cut-offs.
 """
 
 import re

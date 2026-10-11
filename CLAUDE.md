@@ -260,7 +260,9 @@ and its sources.
   - **Skip rule:** below three completed hard weeks, no light week is
     scheduled, even on two triggers; the status line records it as
     `light week: skipped (<n> hard weeks)` (rn:deloads.4).
-  - The 75 % and 50 % lines are coaching heuristics (rn:deloads.2).
+  - These rules are coaching heuristics, not research cut-offs.
+    They are the 75 % and 50 % lines (rn:deloads.2), the trained-as-prescribed rule (rn:deloads.11) and the ceiling counted in completed hard weeks (rn:deloads.3).
+    They also include the four fatigue triggers with the two-trigger rule (rn:autoregulation.4, rn:deloads.5) and the three-week skip rule (rn:deloads.4).
     `/check-in` keeps the count in `block` in `data/state.json` and shows it in each record's status line.
 - **Minimum and maintenance dose** — when time is short, cut sets, not
   effort.

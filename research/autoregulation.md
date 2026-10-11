@@ -84,8 +84,10 @@ n = 3
 text = "Reps-in-reserve ratings are expected to grow more accurate as a lifter gains experience with the scale, so a novice's RPE targets carry more error."
 basis = "heuristic"
 sources = ["zourdos-2016", "helms-2016", "halperin-2022"]
-status = "current"
+status = "retired"
 confidence = "low"
+retired_on = 2026-10-11
+superseded_by = "rn:autoregulation.7"
 
 [[claims]]
 n = 4
@@ -110,6 +112,14 @@ basis = "heuristic"
 sources = ["lesuer-1997", "halperin-2022"]
 status = "current"
 confidence = "low"
+
+[[claims]]
+n = 7
+text = "Reps-in-reserve ratings do not clearly grow more accurate with training experience but do grow more accurate near failure, so a lifter new to RPE practises rating sets near failure before relying on RPE targets."
+basis = "heuristic"
+sources = ["halperin-2022", "zourdos-2016", "helms-2016"]
+status = "current"
+confidence = "low"
 -->
 <!-- coach:begin research autoregulation -->
 
@@ -119,10 +129,11 @@ confidence = "low"
 | --- | --- | --- | --- | --- |
 | 1 | RPE targets anchored to reps in reserve (RPE 10 is 0 reps in reserve, RPE 9 is 1) are a usable way to prescribe and adjust load, giving strength gains at least similar to percentage-of-1RM loading. | evidence | hickmott-2022, helms-2018, larsen-2021, zourdos-2016 | current |
 | 2 | Reps-in-reserve ratings are more accurate close to failure and in sets of 12 reps or fewer than far from failure or in long sets. | evidence | halperin-2022, helms-2016 | current |
-| 3 | Reps-in-reserve ratings are expected to grow more accurate as a lifter gains experience with the scale, so a novice's RPE targets carry more error. | heuristic (low confidence) | zourdos-2016, helms-2016, halperin-2022 | current |
+| 3 | Reps-in-reserve ratings are expected to grow more accurate as a lifter gains experience with the scale, so a novice's RPE targets carry more error. | heuristic (low confidence) | zourdos-2016, helms-2016, halperin-2022 | retired 2026-10-11, see rn:autoregulation.7 |
 | 4 | A compound lift drifts when logged RPE is 1 or more over target on 2 or more working sets of one exposure, and drift in two sessions running is a fatigue signal. | heuristic (low confidence) | larsen-2021 | current |
 | 5 | An e1RM is computed only from a set of 12 or fewer reps to failure (reps, plus 10 minus RPE when one is logged): linear 1RM equations are advised up to 10 reps, but 12 matches the accuracy limit in claim 2 and keeps an e1RM for 10-rep lines at RPE 8. | heuristic (low confidence) | reynolds-2006, halperin-2022 | current |
 | 6 | A prescribed load whose implied RPE at the recent e1RM is above 10.5 is unearned, and an RPE target more than 1 from the implied RPE is infeasible; Epley underestimated the deadlift 1RM in untrained lifters, so both flags can misfire on hinge lifts. | heuristic (low confidence) | lesuer-1997, halperin-2022 | current |
+| 7 | Reps-in-reserve ratings do not clearly grow more accurate with training experience but do grow more accurate near failure, so a lifter new to RPE practises rating sets near failure before relying on RPE targets. | heuristic (low confidence) | halperin-2022, zourdos-2016, helms-2016 | current |
 
 | Source | Citation | Type | Year |
 | --- | --- | --- | --- |
@@ -167,13 +178,15 @@ closer to failure and when sets to failure were 12 reps or fewer.
 helms-2016 makes the same point from earlier trials: the closer to
 failure, the more accurate the estimate.
 
-**Claim 3.** zourdos-2016 found experienced squatters rated a true 1RM
-higher (closer to RPE 10) than novices did, and helms-2016 advises novices
-to practise rating before relying on it. But halperin-2022, the larger and
-more recent analysis, found training status "did not seem to influence
-prediction accuracy". The claim is kept as a coaching heuristic at low
-confidence: practice with this scale likely helps, but experience in
-general has not been shown to.
+**Claims 3 and 7.** Claim 3 said ratings grow more accurate with
+experience. zourdos-2016 found experienced squatters rated a true 1RM
+higher (closer to RPE 10) than novices did, but halperin-2022, the largest
+and most recent analysis, found training status "did not seem to influence
+prediction accuracy" (β = −0.006 reps), while predictions made closer to
+failure were more accurate. Claim 7 replaces claim 3 and keeps what the
+evidence supports: accuracy improves near failure, and helms-2016 advises
+lifters new to the scale to practise rating before relying on it. Claim 7 is a coaching heuristic at low confidence: no trial
+tests whether practising near failure makes later ratings more accurate.
 
 **Claim 4.** No study tests this drift rule. larsen-2021 frames
 autoregulation as adjusting to daily fitness, fatigue and readiness, which
@@ -214,8 +227,9 @@ e1RM came from longer sets than the prescription. `unearned_load` or
   a lift on that alone.
 - `/check-in` and `/program-week` apply claim 4 to compound lifts and
   recovery-capped sets. Isolation drift is noted, not acted on.
-- With a new lifter, expect ratings to run low (more reps left than they
-  think) and coach the scale before leaning on it.
+- With a lifter new to RPE, have them practise rating sets near failure
+  before leaning on RPE targets (claim 7). Expect ratings to run low (more
+  reps left than they think) at any experience level.
 - Before lowering a deadlift or other hinge load for `unearned_load` or
   `rpe_infeasible`, check the athlete's recent logged sets of that lift:
   the flag may come from Epley's low estimate rather than the load.
@@ -223,7 +237,8 @@ e1RM came from longer sets than the prescription. `unearned_load` or
 ## Open questions
 
 - Does practice with the RIR scale itself improve accuracy, as distinct
-  from years of lifting? halperin-2022 could not separate the two.
+  from years of lifting? halperin-2022 tested training status, not
+  practice with the scale.
 - Is RPE drift across sessions a better fatigue signal than a drop in
   reps at a fixed load? No trial compares them.
 - Does Epley underestimate the deadlift 1RM in trained lifters who log
