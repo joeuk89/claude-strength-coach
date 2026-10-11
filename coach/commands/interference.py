@@ -23,7 +23,8 @@ def list_rules(args, ctx):
 
 
 @command("interference check",
-         help="Run the interference rules alone: logged bouts to today, plans from today on; flags, never moves",
+         help="Run the interference rules alone over logged workouts and planned activities; planned lifting "
+              "sessions are judged by propose week. Flags, never moves",
          args=(arg("--week", metavar="W", help="week label (2026-W41) or any date in it"),
                arg("--span", metavar="A..B", help="an explicit span, YYYY-MM-DD..YYYY-MM-DD")))
 def check(args, ctx):

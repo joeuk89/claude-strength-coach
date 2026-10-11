@@ -166,9 +166,12 @@ and `config.toml` (units, equipment and its increments).
    - `source` `design`, `hevy_folder` null (adopt then keeps the
      current program folder), `report` `[]`, and `detected`
      `{"percentage_based": false, "evidence": [], "suggested_schemes": []}`.
-   - The program's `interference`: each rule from `interference list`
-     `available` with its defaults, as `{"name", "params"}`, unless the
-     athlete agreed otherwise; `[]` turns the rules off.
+   - The program's `interference`, as `{"name", "params"}` entries,
+     unless the athlete agreed otherwise; `[]` turns the rules off. For
+     a first program, take each rule from `interference list`
+     `available` with its defaults. For a redesign, carry over
+     `interference list` `rules` (each rule's name and params), so a
+     tuned param or a rule the athlete left off survives.
    - `hevy_routines` `{}` for a first program. For a redesign, adopt
      builds `hevy.routines` only from the draft, so carry the mapping
      over: take each `hevy.routines` entry from `python3 -m coach state

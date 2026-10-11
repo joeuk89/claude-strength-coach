@@ -88,7 +88,6 @@ def flags(root, config, span, mode, bouts, today, overlay=None):
     return found
 
 
-
 def _order(bout):
     return bout.date, bout.start.isoformat() if bout.start else "", bout.kind, bout.ref
 

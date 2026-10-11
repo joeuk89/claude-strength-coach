@@ -5486,6 +5486,9 @@ class InterferenceContext:
   and `cites` (null with no valid program), `available` every valid
   interference plugin with its defaults. `interference check` reads the
   bouts `cardio flags` reads and returns `{span, today, rules, flags}`.
+  Those bouts hold lifting only once it is logged, so for an upcoming
+  week it judges planned activities against logged lifting alone;
+  `propose week` judges the week's planned sessions.
 - Messages start with the rule name, e.g. `quality_before_heavy_lower:
   planned run "Tempo" (2026-10-11) is the day before planned Session A
   (2026-10-12), a heavy squat or hinge session. Keep quality activities
