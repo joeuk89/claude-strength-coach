@@ -10,6 +10,15 @@ The whole training structure an athlete follows: its sessions, how they
 rotate across the calendar, how it progresses, and when it lightens.
 _Avoid_: routine (Hevy's word for a session template), plan, split
 
+**Program draft**:
+A complete proposed program, plus a report of what its source could not
+settle (converted loads, mixed loads, the missing schedule), that the
+coach and athlete finish before it becomes the program. Every new
+program, whether imported from Hevy, drawn from a starter or designed,
+becomes the program only by being adopted, which validates it, archives
+any old program and stages the files.
+_Avoid_: proposal (a week's proposed prescriptions), candidate program, import file
+
 **Session**:
 One training day's template inside a program: the exercises, sets, reps,
 intensity and rest it prescribes. A session is **core** when it carries
