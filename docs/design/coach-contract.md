@@ -42,7 +42,7 @@ coach/                       # framework: synced to instances
   schemas/<name>.schema.json # one file per JSON document type; envelope.schema.json (C3) is R-10's
   catalogue/exercises.json   # builtin exercise catalogue                                (R-11)
   library.py                                                                             (R-11)
-  hevy/{client,transport,cache,ratelimit,anonymise,envfile}.py                           (R-12)
+  hevy/{client,transport,cache,ratelimit,anonymise,envfile,pull,record}.py              (R-12)
   overlay.py, render.py                                                                  (R-13)
   routines.py                # diff, push, verify, retire; create                        (R-14, R-14b)
   gate.py                    # PreToolUse hook logic                                     (R-15)
@@ -144,8 +144,9 @@ Rules that stop parallel agents colliding:
   too). A test in R-10 asserts every writing command accepts the flag; each
   item's tests assert their dry run writes nothing.
 - Test-only environment overrides: `COACH_NOW` (ISO timestamp, fixes "now"
-  and "today") and `COACH_HEVY_FIXTURES` (directory; makes the Hevy client
-  replay fixtures instead of calling the network, R-12).
+  and "today") and `COACH_HEVY_FIXTURES` (one or more fixture-set
+  directories joined with `os.pathsep`; makes the Hevy client replay
+  fixtures instead of calling the network, R-12; C15).
 - Runtime switch: `COACH_READ_ONLY=1` refuses every data, Hevy and git
   write (C39, R-45).
 - Each owner adds its read-only and local-write commands to the R-15
@@ -622,6 +623,18 @@ Every cache file wraps the raw API payload unchanged:
 Collections hold a list in `data`; workout files hold one object. Readers
 in R-11, R-14 and R-16 use `coach.hevy.cache.HevyCache` once R-12 merges;
 before that, they read these files directly from fixtures in this format.
+Schemas: `hevy_cache_file` and `hevy_cache_meta`.
+
+- `hevy pull` with no `meta.json`, or with `--full`, pages every workout
+  and rewrites the set (removing files for workouts Hevy no longer has).
+  Otherwise it reads `/v1/workouts/events` from `events_since` minus a
+  10-minute overlap (re-applying an event changes nothing) and applies
+  them oldest first. Either way it refreshes the four collections and sets
+  `events_since` to the time this pull started.
+- `HevyCache.workouts(since)` returns workouts oldest first; a date
+  `since` means midnight UTC.
+- R-12 registers the check `hevy_cache_age` (C13): `warn` past
+  `[hevy] cache_max_age_hours` or with no cache, `skip` when Hevy is off.
 
 ## C9. Audit log line (`data/hevy/writes.jsonl`)
 
@@ -634,7 +647,10 @@ before that, they read these files directly from fixtures in this format.
 ```
 
 `kind` is `write`, `verify` or `retire`. The client appends a `write` line
-for every non-GET request, success or failure. The API key never appears.
+for every non-GET request, success or failure, once its retries are over.
+`status` is the final HTTP status, or null when no response arrived
+(timeout, unreachable). Schema: `hevy_write_line` (R-14 adds the `verify`
+and `retire` line schemas). The API key never appears.
 
 ## C10. Overlay document (R-13 owns; R-14, R-15, R-16 read)
 
@@ -846,6 +862,8 @@ Unless stated, each is a copy of `valid/` plus what is listed.
 | `block/` | R-31 | program with `hard_weeks_ceiling` 6 and `pt-tue`; a ledger with block `b-0001` started 2026-08-31 and no closed weeks; weekly overlays for 2026-W36 to W41; workouts matching each overlay (every core session at the prescribed sets and RPE) plus `external` done annotations. Closing W36 to W41 gives six hard weeks |
 | `nohevy/` | R-40c | the valid program and overlay; `[hevy] enabled = false`; no Hevy cache; `data/log/workouts.jsonl` holding the two Session A workouts of the logged-workouts table, logged by hand (squat 3×5 @ 95 RPE 7, DB bench 3×10 @ 22.5/hand RPE 8; the same on 2026-10-05 at 97.5) |
 | `empty/` | R-41a | `config.toml` and an instance library only: no program, no state. Not a copy of `valid/` |
+| `hevy-fresh/` | R-12 | `valid/`'s `config.toml` and a cache `meta.json` with the last pull at 2026-10-11T12:00:00Z (6 hours before `COACH_NOW`) |
+| `hevy-stale/` | R-12 | the same with the last pull at 2026-10-09T12:00:00Z (54 hours) |
 | `cardio/` | R-43 | see C50 |
 | `research-bad/` | R-32a | not a copy of `valid/`: the valid config; `fixture-dose` with a hand-edited claims table; `fixture-broken` with two claims numbered 1; `fixture-old` expired 2026-10-01 (area `sleep`); `reference/fixture-guide.md` citing a missing claim |
 | `interference/` | R-44a | a planned quality run on 2026-10-11 and Session A (squat at RPE 7) on 2026-10-12 |
@@ -863,31 +881,56 @@ Unless stated, each is a copy of `valid/` plus what is listed.
 
 Trailing four ordinary weeks to 2026-10-11 (W38–W41): 7 of 12 = 58 %.
 
-Synthetic Hevy fixture `routines_wave.json` (R-41a): four routines "W1
+Synthetic Hevy fixture set `tests/fixtures/hevy/wave/` (R-41a; its
+`routines.json`, layered over `synthetic/`, C15): four routines "W1
 Squat Day", "W2 Squat Day", "W3 Squat Day", "Bench Day", squat top loads
 85, 90, 95, with "TM 100" in a note.
 
 ## C15. Hevy fixtures and anonymisation (R-12)
 
+- **A fixture set is a directory** with one file per collection:
+  `workouts.json`, `workout_events.json`, `routines.json`,
+  `routine_folders.json`, `exercise_templates.json`,
+  `body_measurements.json`, each `{"x-synthetic": true, "<stem>": [...]}`
+  holding the raw items. A missing file is an empty collection.
+  `FixtureTransport` serves Hevy's pages (newest first; page sizes past
+  the API's limits are a 400), single-item GETs, `/v1/workouts/count`, and
+  events filtered by `since`; it answers any write with a 405. Several
+  directories joined with `os.pathsep` layer: for each file, the last
+  directory that has it wins.
+- `tests/fixtures/hevy/synthetic/` holds the C14 exercises, routines (in
+  folder 1 "Program"), the four C14 workouts and two body measurements.
+  `tests/fixtures/hevy/synthetic-later/` holds one updated and one deleted
+  workout event dated 2026-10-12, for layering over it.
+- `tests/support/fake_hevy.py` (`FakeHevy`, `FakeClock`) is a stateful fake
+  seeded from a fixture set: it stores writes, drops routine-level
+  `notes`, answers a `null` set field with a 400, answers 429 to an eighth
+  write inside 10 seconds, and bumps `updated_at` on every write. Tests
+  inject it by patching `coach.hevy.transport.from_env`.
 - Synthetic fixtures (hand-written from the documented API shape) are
   marked `"x-synthetic": true` at the top of the fixture file and are what
   every agent uses. The API shape comes from
   `https://api.hevyapp.com/docs/swagger-ui-init.js`, which needs no key.
 - Recorded fixtures come from `hevy record-fixtures`, run by a human with a
   real key, GET requests only. The anonymiser:
-  - replaces routine, workout, folder and custom-template ids with
-    deterministic fake UUIDs (salted hash, so joins survive);
+  - replaces routine, workout and custom-template ids with
+    deterministic fake UUIDs (salted hash, so joins survive), and folder
+    ids, which Hevy gives as integers, with deterministic fake integers;
   - keeps built-in exercise template ids and titles (public catalogue);
-  - replaces workout titles, routine titles and custom exercise titles
-    with `Workout N`, `Routine N`, `Custom exercise N`;
+  - replaces workout titles, routine titles, folder titles and custom
+    exercise titles with `Workout N`, `Routine N`, `Folder N`,
+    `Custom exercise N`;
   - replaces every `description` and `notes` with `note N` (non-empty
     stays non-empty, empty stays empty);
-  - shifts every timestamp by a whole number of weeks (keeps weekdays and
-    gaps);
+  - shifts every timestamp and date by a whole number of weeks (keeps
+    weekdays and gaps);
   - keeps sets, reps, weights and RPE; replaces body-measurement values
     with synthetic ones; drops `/v1/user/info` entirely;
   - asserts the output contains none of: the API key, any original id, any
-    original title or note text.
+    original title or note text (titles that equal a built-in exercise
+    title are public and allowed);
+  - refuses a collection it has no rule for. The salt is random per run
+    and never stored. Recorded files are marked `"x-anonymised": true`.
 
 ## C16. Program and state documents (R-17a owns; R-22, R-23a, R-30a, R-31, R-41a, R-44a read)
 

@@ -244,7 +244,7 @@ class CitationTest(InstanceCase):
         code, statuses, rows = self.checks()
         self.assertEqual(code, 0, rows)
         self.assertEqual(statuses["research_citations"], ["warn"])
-        warning = next(row for row in rows if row["status"] == "warn")
+        warning = next(row for row in rows if row["id"] == "research_citations")
         self.assertIn("profile.md:3", warning["message"])
 
     def test_checkin_citing_a_retired_claim_passes(self):

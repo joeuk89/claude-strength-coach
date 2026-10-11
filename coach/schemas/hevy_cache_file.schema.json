@@ -1,0 +1,12 @@
+{
+  "title": "One file in .coach/cache/hevy/: the raw Hevy payload, unchanged, in data (contract C8)",
+  "type": "object",
+  "required": ["schema_version", "fetched_at", "source", "data"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": 1},
+    "fetched_at": {"type": "string"},
+    "source": {"const": "hevy"},
+    "data": {"type": ["array", "object"]}
+  }
+}
