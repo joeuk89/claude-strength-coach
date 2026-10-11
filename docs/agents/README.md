@@ -18,3 +18,12 @@ The five canonical triage roles, each label string equal to its name. See
 
 Single-context: one `CONTEXT.md` and `docs/adr/` at the repo root. See
 `docs/agents/domain.md`.
+
+### Workspace identity
+
+With neither `profile.md` nor `config.toml`, `coach status` and the
+SessionStart hook treat a checkout as the template only when its own Git
+config says so: `coach.workspace = template`, or no setting and an `origin`
+on the canonical GitHub repository. A fork or local development copy runs
+`git config --local coach.workspace template`. Any other copy gets the
+`/setup` prompt. Contract C52 has the full rule.

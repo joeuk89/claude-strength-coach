@@ -37,18 +37,11 @@ targets. With them, the loop is much tighter.
    it), building your athlete profile, setting your goals, and creating
    your program.
 
-The local Git setting identifies this checkout as your training workspace before
-Claude starts, even when it includes the framework tests. For a local file
-copy, run `git init` and `git config --local coach.workspace athlete` inside
-it before opening Claude. Keep the tests; setup does not require deleting them.
-
-For template development, the canonical GitHub repository in `origin` is
-recognised automatically; a fork or local development copy can use
-`git config --local coach.workspace template`. These local settings are not
-committed or copied by Git cloning. Without a template identity, missing
-setup files produce the `/setup` prompt. Once either setup file exists,
-status names any missing file; both `profile.md` and `config.toml` mean a
-configured instance, regardless of repository identity.
+The local Git setting marks this checkout as your training workspace before
+Claude starts, even though it includes the framework tests. Git never commits
+or clones this setting, so set it in each new clone. For a local file copy,
+run `git init` and `git config --local coach.workspace athlete` inside it
+before opening Claude. Keep the tests; setup does not require deleting them.
 
 ## The weekly rhythm
 

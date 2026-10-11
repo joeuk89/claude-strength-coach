@@ -2,7 +2,6 @@
 
 import json
 import shutil
-import subprocess
 import tempfile
 import unittest
 from datetime import date
@@ -12,6 +11,7 @@ from unittest import mock
 from coach import overlay, status
 from coach.status import Provider, Section
 from tests.support import INSTANCES, VALID, run_cli
+from tests.support.git import git
 
 NOW = "2026-10-11T18:00:00Z"
 ENV = {"COACH_NOW": NOW}
@@ -225,8 +225,8 @@ class StatusCommandTest(unittest.TestCase):
 
     def test_template_repo_is_recognised(self):
         with tempfile.TemporaryDirectory() as tmp:
-            subprocess.run(["git", "init", "-q", tmp], check=True)
-            subprocess.run(["git", "-C", tmp, "config", "--local", "coach.workspace", "template"], check=True)
+            git(tmp, "init", "-q")
+            git(tmp, "config", "--local", "coach.workspace", "template")
             envelope = self.run_status(Path(tmp))
         self.assertEqual(envelope["data"]["instance"], "template")
 

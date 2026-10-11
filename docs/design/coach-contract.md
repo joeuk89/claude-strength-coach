@@ -73,6 +73,7 @@ coach/                       # framework: synced to instances
   status/__init__.py         # status provider registry + auto-discovery                 (R-26b)
   status/<topic>.py          # one module per item that adds status lines                (R-26b and later items)
   hooks.py                   # SessionStart and PostToolUse hook logic                   (R-26b)
+  workspace.py               # template vs athlete-copy identity from local Git          (C52)
   research.py                # research notes, claim refs, citation scan                 (R-32a)
   structure.py               # dose targets, structure accounting, priority, minimum week (R-30a, R-30b)
   block.py                   # block ledger, light weeks, status line                    (R-31)
@@ -6000,7 +6001,8 @@ def overlay(ctx) -> Section | None: ...
   from local Git config `coach.workspace = template`, or (when the setting
   is absent) the canonical `joeuk89/claude-strength-coach` GitHub `origin`
   URL (HTTPS or SSH). `coach.workspace = athlete` overrides that origin.
-  Only the requested root's own `.git` is consulted, never a parent repo.
+  Only the requested root's own `.git` is consulted, never a parent repo
+  or one an inherited `GIT_DIR`, `GIT_COMMON_DIR` or `GIT_WORK_TREE` names.
   Missing/unreadable Git identity and unknown settings default to
   `uninitialised`; bundled tests never establish identity. The README's
   clone/bootstrap step sets the local athlete identity before Claude starts;
