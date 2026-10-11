@@ -58,7 +58,7 @@ value into the athlete's number with `python3 -m coach units convert
 -m coach library show <id>`). No Hevy → run `python3 -m coach history
 sync`, then `python3 -m coach log list --since <date>` for the workouts
 the athlete reported; each set's `value` is already their number. Read
-each logged workout's `description` and
+each logged workout's `description` (`notes` in the manual log) and
 per-exercise `notes` too — the athlete's own account of how the sets
 felt ("target too high, did back-off sets", "wiped out after
 yesterday's run") should temper the next week's loads as much as the

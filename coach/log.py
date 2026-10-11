@@ -142,12 +142,15 @@ class Slots:
             s["session_id"] for doc in self.overlays.values() for s in doc["sessions"]}
 
     def session(self, line):
-        """The overlay session the workout was planned as, or None."""
+        """The overlay session the workout was planned as, or None (also when its date is not a real date)."""
         doc = self.overlays.get(line.get("overlay_id"))
         if doc is None or not line.get("session_id"):
             return None
         sessions = [s for s in doc["sessions"] if s["session_id"] == line["session_id"]]
-        return _nearest(sessions, line["date"]) if sessions else None
+        try:
+            return _nearest(sessions, line["date"]) if sessions else None
+        except ValueError:
+            return None
 
     def title(self, line):
         session = self.session(line)
@@ -184,7 +187,7 @@ def problems(line, slots, library, config, today):
         problem("$.session_id", f"session {line['session_id']} is not in the program or any overlay")
     if line["overlay_id"] and line["overlay_id"] not in slots.overlays:
         problem("$.overlay_id", f"overlay {line['overlay_id']} does not exist")
-    elif line["overlay_id"] and line["session_id"] and slots.session(line) is None:
+    elif day is not None and line["overlay_id"] and line["session_id"] and slots.session(line) is None:
         problem("$.session_id", f"overlay {line['overlay_id']} has no session {line['session_id']}")
     session = slots.session(line)
     for e_index, exercise in enumerate(line["exercises"]):

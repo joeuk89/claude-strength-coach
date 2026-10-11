@@ -154,14 +154,14 @@ def sets_text(line, show_hevy=True):
 
 
 def _change_text(line, show_hevy=True):
-    """The line's `change`, with the Hevy value added when it ends on a bare per-hand load."""
+    """The line's `change`, with the Hevy value added when Hevy is on and it ends on a bare per-hand load."""
     change = line["change"]
     load = next((s["load"] for s in line["sets"] if overlay.is_working(s) and s.get("load")), None)
     if load is None:
         return change
     full = _load(load, show_hevy)
     short = full.split(" (Hevy: ", 1)[0]
-    # The coach writes `22.5 → 25/hand`; a dumbbell load on the page always shows both numbers.
+    # The coach writes `22.5 → 25/hand`; with Hevy on, a dumbbell load on the page shows both numbers.
     if "/hand" in short and short != full and change.endswith(short):
         return change + full[len(short):]
     return change

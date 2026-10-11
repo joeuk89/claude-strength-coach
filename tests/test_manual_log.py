@@ -209,9 +209,12 @@ class AddTest(NoHevyCase):
         def given_id(draft):
             draft["id"] = "manual:2026-10-12-session-a-9"
 
+        def impossible_date(draft):
+            draft["date"] = "2026-10-32"
+
         before = (self.root / LOG).read_bytes()
         for edit in (unknown_exercise, other_mode, null_reps, future, value_on_a_null_load_mode, other_unit,
-                     given_id):
+                     given_id, impossible_date):
             with self.subTest(edit=edit.__name__):
                 envelope = self.add(self.filled(edit), expect=1)
                 self.assertEqual(envelope["error"]["code"], "validation")
@@ -286,6 +289,13 @@ class HistoryFromTheLogTest(NoHevyCase):
             for set_ in bench["sets"]:
                 self.assertEqual(set_["load"], DB_BENCH_LOAD)
                 self.assertIsNone(set_["weight_kg"])
+
+    def test_a_workout_without_an_overlay_takes_its_program_session_title(self):
+        self.coach("history", "sync")
+        doc = read_json(self.root / "data" / "history" / "2026-09.json")
+        record = next(w for w in doc["workouts"] if w["workout_id"] == "manual:2026-09-28-session-a-1")
+        self.assertIsNone(record["overlay_id"])
+        self.assertEqual(record["title"], "Session A")
 
     def test_a_second_sync_changes_nothing(self):
         self.coach("history", "sync")
@@ -362,6 +372,14 @@ class ManualLogCheckTest(NoHevyCase):
             self.assertIn(expected, messages)
         self.assertTrue(all(r["path"] == "data/log/workouts.jsonl" for r in results))
 
+    def test_a_line_with_an_impossible_date_fails(self):
+        line = dict(self.log_lines()[0], id="manual:2026-10-32-session-a-1", date="2026-10-32", overlay_id=WEEKLY)
+        with open(self.root / LOG, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(line) + "\n")
+        results = self.check(expect=1)
+        self.assertEqual([r["status"] for r in results], ["fail"])
+        self.assertIn("line 3: $.date: '2026-10-32' is not a real date", results[0]["message"])
+
     def test_a_line_that_is_not_json_fails(self):
         with open(self.root / LOG, "a", encoding="utf-8") as handle:
             handle.write("{not json\n")
@@ -375,6 +393,12 @@ class HevyOffTest(NoHevyCase):
     def test_routines_push_exits_5_naming_hevy_enabled(self):
         envelope = self.coach("routines", "push", "--overlay", WEEKLY, "--dry-run", expect=5)
         self.assertIn("[hevy] enabled", envelope["error"]["message"])
+
+    def test_check_on_the_nohevy_fixture_has_no_fail(self):
+        code, envelope, stderr = run_cli(["--root", str(NOHEVY), "check"], env={"COACH_NOW": self.now})
+        failed = [r for r in envelope["data"]["results"] if r["status"] == "fail"]
+        self.assertEqual(failed, [], stderr)
+        self.assertEqual(code, 0)
 
     def test_hevy_checks_skip(self):
         ids = "hevy_cache_age,overlay_hevy_drift,dangling_routine_ids"
