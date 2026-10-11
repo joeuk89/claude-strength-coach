@@ -90,7 +90,7 @@ class DiscoveryTest(unittest.TestCase):
         self.assertEqual(reg.documents["program"].files, ("data/program.json",))
         for document in reg.documents.values():
             with self.subTest(document=document.name):
-                self.assertEqual(document.target, 1)
+                self.assertEqual(document.target, 1 + len(document.steps))
 
     def test_steps_load_from_a_package(self):
         with TempRegistry() as reg:
@@ -124,10 +124,11 @@ class StatusAndPlanTest(unittest.TestCase):
     def test_status_on_the_valid_instance(self):
         rows = migrate.status(VALID)
         paths = {row["path"]: row for row in rows}
-        for path in ("data/program.json", "data/state.json", "data/exercises.json", OVERLAY):
+        expected = {"data/program.json": 1, "data/state.json": 2, "data/exercises.json": 1, OVERLAY: 1}
+        for path, version in expected.items():
             with self.subTest(path=path):
-                self.assertEqual(paths[path]["version"], 1)
-                self.assertEqual(paths[path]["target"], 1)
+                self.assertEqual(paths[path]["version"], version)
+                self.assertEqual(paths[path]["target"], version)
                 self.assertEqual(paths[path]["state"], "current")
 
     def test_plan_lists_the_step(self):

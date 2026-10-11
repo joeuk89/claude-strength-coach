@@ -321,7 +321,8 @@ class SettingsTest(unittest.TestCase):
                 for rule in bash_rules():
                     with self.subTest(rule=rule, command=command):
                         self.assertFalse(rule_matches(rule, command))
-        for command in ("python3 -m coach routines push --overlay x", "python3 -m coach routines retire --overlay x"):
+        for command in ("python3 -m coach routines push --overlay x", "python3 -m coach routines retire --overlay x",
+                        "python3 -m coach routines create --overlay x"):
             self.assertFalse(any(rule_matches(rule, command) for rule in bash_rules()), command)
 
     def test_every_allowlisted_coach_command_exists_and_never_writes_to_hevy(self):
@@ -339,8 +340,8 @@ class SettingsTest(unittest.TestCase):
 
     def test_commands_that_stay_behind_a_prompt(self):
         names = {text[len("python3 -m coach "):] for text, _ in bash_rules() if text.startswith("python3 -m coach")}
-        for name in ("routines push", "routines retire", "migrate run", "hevy record-fixtures", "plugins test",
-                     "gate pretooluse"):
+        for name in ("routines push", "routines retire", "routines create", "migrate run",
+                     "hevy record-fixtures", "plugins test", "gate pretooluse"):
             self.assertNotIn(name, names)
         for text, _ in bash_rules():
             self.assertNotIn(text.strip(), ("python3 -m coach", "python3", "python3 -m"))

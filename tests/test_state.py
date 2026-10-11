@@ -3,8 +3,9 @@
 import json
 import tempfile
 import unittest
+from datetime import datetime, timezone
 
-from coach import program, state
+from coach import migrate, program, state
 from coach.errors import ValidationError
 from tests.support import INSTANCES, VALID
 from tests.test_cli import EnvelopeMixin
@@ -58,6 +59,21 @@ class StateTest(unittest.TestCase):
         doc = valid_state()
         doc["block"]["started"] = "2026-02-30"
         self.assertIn("$.block.started", problem_paths(doc))
+
+
+class TemporaryRoutineMigrationTest(unittest.TestCase):
+    def test_v1_routine_ids_become_entries_that_carry_nothing(self):
+        doc = valid_state()
+        doc["schema_version"] = 1
+        doc["hevy"]["temporary_routines"] = ["t-1", "t-2"]
+        with Instance() as root:
+            (root / "data" / "state.json").write_text(json.dumps(doc), encoding="utf-8")
+            migrate.run(root, dry_run=False, now=datetime(2026, 10, 11, 18, tzinfo=timezone.utc))
+            upgraded = state.load(root)
+        self.assertEqual(upgraded["schema_version"], 2)
+        self.assertEqual(upgraded["hevy"]["temporary_routines"],
+                         [{"routine_id": "t-1", "overlay_id": None, "session_id": None},
+                          {"routine_id": "t-2", "overlay_id": None, "session_id": None}])
 
 
 class StateShowTest(EnvelopeMixin, unittest.TestCase):

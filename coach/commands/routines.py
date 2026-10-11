@@ -1,4 +1,4 @@
-"""`routines` commands: diff, verify, push and retire an overlay's Hevy routines (contract C2, C3, C9)."""
+"""`routines` commands: diff, verify, push, create and retire an overlay's Hevy routines (contract C2, C3, C9)."""
 
 from coach import routines
 from coach.commands import arg, command
@@ -54,3 +54,15 @@ def push(args, ctx):
 )
 def retire(args, ctx):
     return routines.retire(ctx, args.overlay, args.dry_run, refresh=args.refresh)
+
+
+@command(
+    "routines create",
+    help="Create the Hevy routines (and the one-off folder) an approved overlay's sessions lack; ids go in state.json",
+    args=(_OVERLAY,),
+    writes=True,
+    hevy_write=True,
+    network=True,
+)
+def create(args, ctx):
+    return routines.create(ctx, args.overlay, args.dry_run)

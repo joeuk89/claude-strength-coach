@@ -4,7 +4,7 @@
   "required": ["schema_version", "rotation", "block", "one_off", "scheme_state", "hevy"],
   "additionalProperties": false,
   "properties": {
-    "schema_version": {"const": 1},
+    "schema_version": {"const": 2},
     "rotation": {
       "type": "object",
       "required": ["position", "confirmed", "confirmed_at"],
@@ -74,7 +74,19 @@
             "one_off": {"type": ["integer", "null"], "minimum": 0}
           }
         },
-        "temporary_routines": {"type": "array", "items": {"type": "string", "pattern": "\\S"}}
+        "temporary_routines": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["routine_id", "overlay_id", "session_id"],
+            "additionalProperties": false,
+            "properties": {
+              "routine_id": {"type": "string", "pattern": "\\S"},
+              "overlay_id": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}-[a-z0-9-]+$"},
+              "session_id": {"type": ["string", "null"], "pattern": "^[a-z0-9-]+$"}
+            }
+          }
+        }
       }
     }
   }

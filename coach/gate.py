@@ -126,8 +126,9 @@ class _HttpWrite:
 
     def review(self):
         return ASK, (f"Approval gate: this command writes to the Hevy API directly ({self.label}), skipping the "
-                     "coach's approval check, read-back and audit log. Use python3 -m coach routines push "
-                     "instead. Allow it only if the athlete asked for this exact write.")
+                     "coach's approval check, read-back and audit log. Use python3 -m coach routines push, or "
+                     "routines create for a routine or folder that does not exist yet, instead. Allow it only if "
+                     "the athlete asked for this exact write.")
 
 
 class _Unreadable:
