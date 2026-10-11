@@ -50,9 +50,8 @@ intermediate, and advanced lifters. You:
 | `routine/program.md` | The active program's shared rules (progression, RPE, deload policy), an index of every session file, and how the sessions rotate. Created by `/new-program`. |
 | `routine/*.md` | The session files — however many the program's structure needs. |
 | `routine/hevy-map.json` | Hevy routine IDs → plan locations (if the athlete uses Hevy). Update it when routines are added/renamed on either side. |
-| `notion-map.json` | Notion mirror mapping (parent page, section pages, file → page IDs) — only exists if the athlete enabled Notion sync. Managed by `/notion-sync`; mechanics in `reference/notion-sync.md`. |
 | `check-ins/` | Dated check-in records (`YYYY-MM-DD.md`) — the progress history. On normal weeks the newest record's "The week ahead" section carries the **weekly overlay**: the per-exercise prescription `/program-week` wrote for the current week (on deload weeks `/one-off-week` fills that section instead). |
-| `nutrition/` | Meal planning: `menu/` (the recipe bank — one card per recipe plus `index.md`; format in `reference/recipe-cards.md`), dated meal plans (`YYYY-MM-DD.md`), and `pantry.md` (what's actually in the house — perishables, partial packs, staple states; format in `reference/pantry.md`). Bank managed by `/recipes`, plans by `/meal-plan`, stock by `/pantry`. |
+| `nutrition/` | Meal planning: `menu/` (the recipe bank — one card per recipe plus `index.md`; format in `reference/recipe-cards.md`) and dated meal plans (`YYYY-MM-DD.md`). Bank managed by `/recipes`, plans by `/meal-plan`. |
 | `reference/` | Supporting docs: the Hevy API cheatsheet plus any coaching docs written for this athlete (progressions, protocols). |
 | `.env` | `HEVY_API_KEY` — never print or commit it. |
 
@@ -101,11 +100,6 @@ anything. Rules that always apply:
 - **`/recipes`** — manage the recipe bank: add recipes (from a link, a
   description, or sourced online against the athlete's goals), edit or
   bench them, and run the first-time food interview.
-- **`/pantry`** — update or reconcile what's actually in the house:
-  ad-hoc purchases, used-up or binned food, or a full
-  estimate-and-correct pass. `/meal-plan` reconciles weekly as part of
-  its review; this covers everything in between, and the first-time
-  setup.
 - **`/hevy-sync`** — reconcile `routine/` with the athlete's Hevy routines
   in either direction, one discrepancy at a time. Editing routines in the
   app mid-block is normal, not an error.
@@ -116,10 +110,6 @@ anything. Rules that always apply:
   deload, or a disrupted/constrained week (travel, limited kit) —
   without touching `routine/`. Temp sessions go to a standing Hevy
   folder; the record lands in the check-in history.
-- **`/notion-sync`** — optional one-way mirror of coaching docs
-  (check-ins, meal plans, recipes, routine) to Notion. First run picks
-  a parent page and creates `notion-map.json`; later runs backfill and
-  repair. Local files stay the source of truth.
 
 ## Hevy
 

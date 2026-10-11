@@ -155,9 +155,6 @@ it.
 (Per-session prescription tables underneath.)
 ```
 
-If `notion-map.json` exists and covers check-ins, mirror the updated
-record per `reference/notion-sync.md` — local file first, Notion after.
-
 ## 6. Close out
 
 Recap in plain words: what changed this week and why, what was written

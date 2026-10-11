@@ -81,9 +81,9 @@ together:
    including **benched** ones, where un-bench-and-improve may be the
    cheaper path. Don't build what the bank already has.
 2. If the brief is **ingredient-driven** (using up what's in the
-   house), read `nutrition/pantry.md` — quantities on hand shape the
-   design. Skip the pantry for abstract briefs; `/meal-plan` handles
-   shopping later.
+   house), ask the athlete what they have on hand and how much —
+   quantities shape the design. Skip this for abstract briefs;
+   `/meal-plan` handles shopping later.
 3. Research: bring back **2–3 real published starting points** that
    fit the brief and the profile.
 4. Iterate with the athlete — pick a base, adapt it to their macros,
@@ -139,10 +139,6 @@ the start of each planning run.
 
 - **Same-write rule:** any card create/edit/bench updates `index.md`
   in the same operation.
-- **Notion mirror:** if `notion-map.json` exists and covers recipes,
-  card writes (create/edit/bench) mirror to Notion per
-  `reference/notion-sync.md`; if no Notion MCP is connected this
-  session, the sync is pending — `/notion-sync` catches it up.
 - **Exact quantities, no ranges** — ranges become named variations.
 - **Provenance:** sourced cards record the URL in `source`.
 - **All four macros on every card**, `estimated` or `published`.

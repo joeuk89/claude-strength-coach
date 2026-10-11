@@ -101,10 +101,3 @@ _Avoid_: reference, evidence doc, wiki page
 The athlete's set of approved recipe cards in `nutrition/menu/`, plus
 its index — what `/meal-plan` selects from.
 _Avoid_: food bank, menu (ambiguous with the directory name)
-
-**Pantry**:
-What's actually in the house — perishables, partial packs, staple
-states — recorded in `nutrition/pantry.md`. Distinct from the recipe
-bank: the bank is what the athlete can make; the pantry is what they
-have. Scheduled for removal (see `docs/roadmap/2026-10-11-system-review.md`, R-04).
-_Avoid_: food bank, stock
