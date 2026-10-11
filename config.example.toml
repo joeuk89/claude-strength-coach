@@ -59,7 +59,8 @@ dumbbells = []                # per-hand dumbbell weights available; [] = not ch
 #     the floor rises once average protein meets it at two check-ins running
 #     (never above target).
 #   anchors: the 2-3 standing protein anchors. days: "daily", "office",
-#     "home" or weekday ids "mon" .. "sun".
+#     "home" or weekday ids "mon" .. "sun". Give kcal and protein_g, or
+#     recipe naming a card in nutrition/menu/ instead.
 #   override: at most one, expiring no more than 21 days after it starts;
 #     renewal is 0 for a first override, 1 once renewed, 2 renewed twice.
 # What stays prose in profile.md: the goal in the athlete's words, the
@@ -115,6 +116,50 @@ dumbbells = []                # per-hand dumbbell weights available; [] = not ch
 #
 # [nutrition.bank.slot_notes]
 # breakfast = "must be fast or it gets skipped"
+
+# The standing week /meal-plan starts from (python3 -m coach meals template).
+# Each week's plan is only the exceptions to it. Optional; without it
+# /meal-plan has nothing to start from.
+#   slots: the meal slots, in day order; anchors and cards use these names.
+#   office_days: weekday ids; "office" and "home" in days lists mean these
+#     days and the rest.
+#   staples: ingredient items (as cards name them) kept in by default; the
+#     shopping list moves them to "check you have".
+#   plan_style: "loose" (the pool is fixed, the week table is a suggestion)
+#     or "strict"; left out, loose when a standing row covers dinner.
+#   kcal_tolerance_pct: how far a day may sit from the calorie target
+#     before the plan flags it.
+#   shopping_issue: true offers the approved shopping list as a GitHub
+#     issue with tick boxes.
+#   standing: one row per slot and set of days, each with exactly one of
+#     recipe (a card), pool (cards to pick from each week) or cover
+#     (someone else decides; give its estimated kcal and protein_g). Two
+#     rows may not fill the same slot on the same day.
+#
+# [nutrition.template]
+# slots = ["breakfast", "lunch", "dinner", "snack"]
+# office_days = ["tue", "thu"]
+# staples = ["eggs", "rolled oats", "olive oil"]
+# # plan_style = "loose"
+# kcal_tolerance_pct = 15
+# shopping_issue = false
+#
+# [[nutrition.template.standing]]
+# days = ["daily"]
+# slot = "breakfast"
+# recipe = "overnight-oats"
+#
+# [[nutrition.template.standing]]
+# days = ["office"]
+# slot = "lunch"
+# pool = ["chicken-rice-bowl"]
+#
+# [[nutrition.template.standing]]
+# days = ["mon", "tue", "wed", "thu"]
+# slot = "dinner"
+# cover = "family"
+# kcal = 700
+# protein_g = 35
 
 # Activity sources: runs, rides, conditioning and wellness (sleep, resting
 # heart rate, steps, body mass) logged outside the lifting log. Manual entry

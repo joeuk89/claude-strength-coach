@@ -1,0 +1,22 @@
+{
+  "span": {"start": "2026-10-12", "end": "2026-10-18"},
+  "exceptions": [
+    {"date": "2026-10-14", "slot": "dinner", "entry": {"cover": "out", "kcal": 1100, "protein_g": 45},
+     "note": "birthday"},
+    {"date": "2026-10-18", "slot": "lunch", "entry": {"cover": "roast at a friend's", "kcal": 800, "protein_g": 45}}
+  ],
+  "assignments": [
+    {"date": "2026-10-12", "slot": "lunch", "entry": {"recipe": "turkey-chilli"}},
+    {"date": "2026-10-13", "slot": "lunch",
+     "entry": {"recipe": "chicken-rice-bowl", "variations": ["light"], "lock": "post-run, must be quick"}},
+    {"date": "2026-10-14", "slot": "lunch", "entry": {"recipe": "turkey-chilli"}},
+    {"date": "2026-10-15", "slot": "lunch", "entry": {"recipe": "chicken-rice-bowl", "variations": ["light"]}},
+    {"date": "2026-10-16", "slot": "lunch", "entry": {"recipe": "turkey-chilli"}},
+    {"date": "2026-10-17", "slot": "lunch", "entry": {"recipe": "turkey-chilli"}},
+    {"date": "2026-10-16", "slot": "dinner", "entry": {"recipe": "spinach-omelette"}},
+    {"date": "2026-10-17", "slot": "dinner", "entry": {"recipe": "spinach-omelette"}},
+    {"date": "2026-10-18", "slot": "dinner", "entry": {"recipe": "spinach-omelette"}}
+  ],
+  "use_up": [{"item": "spinach", "qty": 100, "unit": "g"}],
+  "notes": "Batch the chilli on Sunday."
+}

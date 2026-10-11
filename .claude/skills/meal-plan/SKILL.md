@@ -5,234 +5,163 @@ description: Use when the athlete wants help planning what to eat — meals, sna
 
 # Meal planning & shopping list
 
-Turn the nutrition targets on file into real food: plan the athlete's
-meals and snacks for a chosen window (default: the week ahead) and build
-a shopping list for **exactly** what the plan needs. Plan only the
-**gaps** — meals already covered (meal kit, canteen, eating out, family
-dinners) and the athlete's standing protein anchors are declared up
-front and treated as fixed blocks.
+A week's plan is the **standing template** (`[nutrition.template]` in
+`config.toml`) plus that week's **plan exceptions**. The athlete's effort
+per plan is **one exceptions line and one approval**: you draft the
+exceptions and the picks for open slots, the `meals` commands do the
+arithmetic (day totals, flags, the pool, the shopping list), and the
+athlete says "go".
 
-**Division of labour:** `/goals` decides the strategy and records its
-numbers in `config.toml` (`[nutrition]`; `python3 -m coach nutrition
-status` returns them) and the reasoning in `profile.md` (Nutrition &
-goals). MacroFactor, if the athlete uses it,
-holds the live daily kcal/macro targets. `/recipes` owns the recipe
-bank. This skill composes food to the targets from the bank — it never
-computes TDEE, never revises targets, and never edits recipes beyond
-status changes agreed in the opening review. If the targets look wrong,
-send the athlete to `/goals`; if the bank needs work, `/recipes`.
+**Division of labour:** `/goals` owns the strategy and its numbers
+(`[nutrition]`; `python3 -m coach nutrition status` returns them). This
+skill owns the standing template (`[nutrition.template]`). The nutrition app, if the athlete uses one, owns the
+calorie target; without one, `kcal_target` does. `/recipes` owns the
+recipe bank. This skill picks food from the bank to those numbers and
+never computes a calorie target. If the targets look wrong, send the
+athlete to `/goals`; if the bank needs work, `/recipes`.
 
-Requires nutrition to be set up — if `nutrition status` says `enabled:
-false`, run `/setup` or `/goals` first.
+Requires nutrition to be set up: if `nutrition status` says `enabled:
+false`, run `/setup` or `/goals` first. If `meals template` exits 5 for
+want of `[nutrition.template]`, run **Set up the standing template**
+below once before planning.
 
 ## The files
 
-- **`nutrition/menu/`** — the recipe bank: one card per recipe plus
-  `index.md`. Format: `reference/recipe-cards.md`. Owned by `/recipes`.
-- **`nutrition/YYYY-MM-DD.md`** — one dated plan per run: exact meal
-  pool, day-by-day table, and the shopping list.
-- **`profile.md` → "Food & eating"** — what this skill never re-asks:
-  preferences, staples, shopping style, standing coverage, and the
-  plan-style preference (loose ↔ strict).
+- **`nutrition/menu/`**: the recipe bank, owned by `/recipes`.
+- **`data/nutrition/plans/<id>.json`**: the plan, written by `meals
+  build`; the id is the first day of the window.
+- **`nutrition/plans/<id>.md`**: the rendered plan, written by `meals
+  render`. Never hand-edited: change the draft and build again.
+- **`.coach/drafts/meal-plan-<id>.json`**: your draft (gitignored).
 
 **No bank?** If `nutrition/menu/` doesn't exist, invoke the `/recipes`
-skill now — run its interview and seeding flow, then come back here and
-continue. Never plan from an empty bank, and never dead-end the athlete.
+skill now: run its interview and seeding flow, then come back here and
+continue. Never plan from an empty bank.
 
-## 1. Read the context
+## Set up the standing template (first run only)
 
-Read `profile.md` (Nutrition & goals, Food & eating, the training week),
-the output of `python3 -m coach nutrition status`, `routine/program.md` (training days, double days, rest days — count
-cardio), `nutrition/menu/index.md`, and the newest dated plan in
-`nutrition/`. If `python3 -m coach check --only
-recipe_index_fresh,recipe_render_fresh` fails, run `python3 -m coach
-recipes render` before reading the index.
+1. Draft `[nutrition.template]` and its `[[nutrition.template.standing]]`
+   rows from `profile.md` → Food & eating (written by `/recipes`'
+   interview: staples, office days, who covers which meals, plan style)
+   and the bank's card slugs, using the example in
+   `config.example.toml` for the shape.
+2. Show the athlete the exact TOML and what each standing row means in
+   plain words. Write it to `config.toml` only on their approval.
+3. Run `python3 -m coach config validate`, then `python3 -m coach check
+   --only nutrition_template`. Fix anything either names, with the
+   athlete, before planning.
 
-## 2. Review the last plan (feedback loop)
+This is the only time the skill asks more than the exceptions line and
+the approval; later changes to the typical week are edits to this
+table, made the same way.
 
-Open with a quick review of the most recent dated plan: what got eaten,
-skipped, swapped, disliked? Agree any card status changes (bench /
-un-bench) and apply them: set `status` in each card's data block, then
-run `python3 -m coach recipes render`.
+## 1. Read the standing week
 
-Then a **bank-fit check** against the current phase: if `/goals` has
-changed the phase since the bank was last touched and the bank skews
-wrong for it (e.g. entering a deficit with a carb-heavy, low-satiety
-bank), say so and offer a `/recipes` sweep before planning.
+Run `python3 -m coach meals template` (the week ahead; `--week D` for
+another) and `python3 -m coach nutrition status`. The template gives
+every day's standing entries, the anchors, the open slots, the office
+days, the staples, the plan style and the targets. Read
+`routine/program.md` for training and rest days, and the index
+`nutrition/menu/index.md` for the active cards (run `python3 -m coach
+recipes render` first if `check --only recipe_index_fresh` fails).
 
-## 3. Current targets
+## 2. Take the one exceptions line
 
-- **MacroFactor users:** ask for today's kcal and protein targets off
-  the dashboard, and whether calorie shifting is configured. If MF is
-  still calibrating (a new account, or a fresh phase on-ramp) and shows
-  no target yet, fall back to the numbers `nutrition status` returns
-  and say you've done so.
-- **Without MacroFactor:** use `kcal_target` and the protein numbers
-  from `nutrition status`.
-- **Protein:** plan every day to at least the **protein floor** and
-  toward the **target** (both in `nutrition status` → `protein`). For
-  MacroFactor users the app's protein target is the floor.
-- Sanity-check either against those numbers. A big mismatch (wrong
-  phase, stale targets) means the strategy needs attention — flag it
-  and point at `/goals` before planning to a number you don't trust.
+If the check-in already asked the food-exceptions question (`/check-in`,
+Food field c), use that answer. Otherwise ask it once, as the only
+question before the plan:
 
-## 4. Coverage for the window
+> Anything different about food next week? Who cooks which nights,
+> office-day changes, meals out, anything in the house to use up?
 
-Confirm the window (default: the week ahead), then what's already
-covered — which day × meal slots, and what with. Confirm which days are
-training / double / rest days from the routine (don't assume — weeks
-have one-off changes), and ask about anything unusual: travel, meals
-out, guests.
+"Nothing" is a complete answer: the plan is the template plus your picks.
+Everything else in this skill is yours to decide; anything you assume
+(an estimate for a meal out, a pick for an open slot) is stated in the
+presentation, where the athlete can correct it in their reply.
 
-**Protein anchors are fixed blocks.** Take the anchors from
-`nutrition status` (`anchors`) and place each anchor in its slot on every day it
-applies, before planning anything else. Like a covered meal, an anchor
-is counted in the day's macros and never swapped or dropped;
-unlike one, it is shopped for (step 6) unless it's on the staples list.
-Don't re-ask about anchors — changing them is `/goals`' job.
+## 3. Draft
 
-**Ask once: "Anything in the house to use up?"** Leftovers, short-dated
-meat, wilting veg, a half-finished pack. Note each item and the amount
-the athlete gives. Ask it once per run and don't ask for a full stock
-list: these named items are the only stock the plan accounts for.
+Write `.coach/drafts/meal-plan-<window start>.json` in the C34 draft
+shape (`docs/design/coach-contract.md`):
 
-**Covered meals with no card** (a family dinner, a canteen lunch):
-estimate their per-serving macros with the athlete and record the
-assumption in the plan — the day's totals lean on them. Ask which are
-the **low-protein nights** (e.g. a veg-curry dinner) so any protein
-top-up lands on the right day. Protein is the hard constraint; a covered
-block's calories are an estimate, so treat the daily kcal as approximate
-when much of the day is family-cooked.
+- **`span`**: the window, `{"start", "end"}`; default the week the
+  template showed.
+- **`exceptions`**: one per change the athlete named. A slot change is
+  `{"date", "slot", "entry", "note"}` and replaces everything the
+  template puts in that slot that day, anchors included; an office-day
+  change is `{"date", "office": true|false}`. An entry is
+  `{"recipe", "variations", "covered_by", "lock"}`, or
+  `{"cover", "kcal", "protein_g"}` for a meal someone else decides (your
+  estimate, stated in the presentation), or `{"skip": true}`.
+- **`assignments`**: a pick for every open slot and every pool slot,
+  from active cards. An assignment adds to its slot, so a protein
+  top-up on a low-protein covered night is an assignment beside the
+  cover. Use `lock` with a reason for a day-locked entry (a post-run
+  lunch that must be quick). A meal-kit box meal is a recipe with
+  `covered_by` set to the provider: counted, not shopped. A box meal
+  with no card is a cover entry with the box's numbers.
+- **`use_up`**: each item the athlete named, `{"item", "qty", "unit"}`
+  with the item spelt as the cards spell it. Plan those items into
+  meals early in the window.
+- **`notes`**: batch-cook days, timing cues.
 
-**Meal-kit boxes:** if any coverage is a recipe box (Gousto etc.), ask
-the athlete to link the provider's recipe pages for the meals in this
-window's box, and import any that aren't in the bank yet — same flow as
-`/recipes`' exact-link add, tagged `meal-kit` + provider. No shareable
-pages? Ask for name + per-serving macros off the app instead. Box meals
-then appear in the pool and day table like any other recipe — linked
-and counted in the day's macros — but marked **covered**, which
-excludes them from the shopping list (their ingredients arrive in the
-box).
+How to pick: protein first (the anchors cover part of the floor; spread
+the rest over the day's meals), then calories toward the target, then
+variety and what the athlete likes to eat. A card with `servings` above
+1 fills that many slots from one batch; schedule the cook day in
+`notes`. Variations stack only when they change different ingredients.
 
-## 5. Compose the plan
+## 4. Dry run and fix the flags
 
-Select from **active** cards via the index (read only the chosen cards
-in full). Compose each day to land close to the targets.
+Run `python3 -m coach meals build --input .coach/drafts/meal-plan-<id>.json
+--dry-run`. It writes nothing and returns the plan (`data.plan`) and its
+rendered page (`data.rendered`). Fix the draft and re-run until no
+`block` flag remains:
 
-**The exact-pool rule — both plan styles.** Every plan fixes the
-window's exact meal pool: each recipe — or named variation — with its
-count, e.g. `chicken-rice-bowl ×2 · cod-traybake ×2 · omelette (+egg)
-×1`. The pool is the plan's contract; its **non-covered** entries are
-the sole input to the shopping list (covered entries — meal-kit box
-meals — count toward macros but aren't shopped). Never leave a slot as
-an unresolved either/or.
-
-- **Strict style:** every pool item is pinned to a day × slot in the
-  day table.
-- **Loose style:** the day table is a **suggested** assignment from the
-  pool; the athlete swaps freely within a slot — **except day-locked
-  entries** (a post-run lunch that must be quick, a pre-session snack),
-  which are marked 🔒 with the reason. The pool table is the contract;
-  the day table is advice.
-
-Also:
-
-- **Use it up.** Items the athlete named to use up get planned into
-  meals **early in the window**, and the pool rationale says so ("cod
-  traybake Monday — the cod needs eating"). Partial packs steer
-  selection toward recipes that finish them. A tiebreaker with teeth,
-  not a straitjacket: macro fit and what the athlete wants to eat still
-  win.
-- **Protein comes first.** The anchors cover part of the floor; spread
-  the rest across the day's meals (~4 feeds including the anchors is a
-  good default; ~0.4 g/kg of the reference mass in `nutrition status` per
-  meal is a heuristic, not dogma).
-- **Train-day awareness:** bigger fuelling on double days, leaner rest
-  days; calorie cycling if the profile opts in (carbs/kcal toward
-  higher-output days, protein flat). Timing notes only where they
-  matter — around training slots.
-- **Stacking variations:** a pool entry may carry more than one variation
-  when they hit different ingredients (`oats (+banana, +PB)`) — the deltas
-  add. See `reference/recipe-cards.md`.
-- **Batch cooking:** a card with `servings` > 1 covers multiple slots —
-  schedule the cook day and the leftover day explicitly, and count the
-  recipe once per serving in the pool.
-- Favour variety and meals the athlete wants to eat. Close-enough
-  daily, corrected weekly, beats gram-perfect and abandoned.
-
-## 6. Shopping list — arithmetic, never assumption
-
-Derive from the pool's **non-covered** entries and the anchors (each
-anchor × the days it applies): per-serving ingredient
-quantities × counts, with variation deltas applied, aggregated across
-the window. **Then subtract the use-up items:** the amounts the athlete
-named in step 4 come off the totals before anything lands in Buy.
-
-A **staple** is anything on the athlete's staples list in `profile.md`
-(Food & eating) — what they keep in by default; everything else is a
-Buy item, even cupboard basics not on that list. Two sections, both
-exact:
-
-1. **Buy** — non-staple ingredients with exact quantities (and pack
-   sizes where they help), net of the use-up amounts — plus any staple
-   the athlete says they're short of.
-2. **Staples — confirm you have enough** — every staple the pool
-   needs, each with the required amount (e.g. "eggs: 14"). Ask the
-   athlete about every one of them and promote any shortfall to Buy.
-
-Nothing the pool needs may be missing from both sections. Shape the
-list to the athlete's shopping style (one basket for a weekly online
-shop; grouped by category in person; staples-vs-extras for ad hoc).
-If a grocery integration is connected, offer to push the list.
-
-## 7. Write and close out
-
-Write `nutrition/YYYY-MM-DD.md`:
-
-```markdown
-# Meal plan — <window start> → <window end>
-
-**Targets used:** ~X kcal · protein floor Y g, target Z g (source: MacroFactor dashboard /
-profile) · plan style: loose/strict
-**Anchors:** <anchor> (<slot>, <days>) · …
-
-## This week's pool
-| Meal | Count | Per serving |
+| Flag | Severity | What to do |
 | --- | --- | --- |
-| [Chicken + rice bowl](menu/chicken-rice-bowl.md) | 2 | 610 kcal · 50 g P |
-| [Cod traybake](menu/cod-traybake.md) (light) | 2 | 420 kcal · 38 g P |
-| [Chorizo rice](menu/chorizo-rice.md) | 2 | 650 kcal · 32 g P · **covered — Gousto box** |
-(The contract. Counts are exact; variations named; covered entries are
-in the plan and the macros but not the shopping list.)
+| `recipe_unknown`, `variation_unknown` | block | Correct the slug or variation name, or pick another card. |
+| `variation_conflict` | block | Keep one of the two variations. |
+| `slot_open` | warn | Add an assignment; leave it open only on purpose (say so). |
+| `protein_below_floor` | warn | Add a top-up or swap a meal; present any that remain. |
+| `kcal_off_target` | warn | Adjust portions or picks; present any that remain, with the reason. |
+| `recipe_benched` | warn | Pick an active card, unless the athlete asked for it. |
+| `use_up_unmatched`, `units_mixed` | warn | Match the item's spelling and unit to the card's. |
+| `no_target` | warn | Say the days are checked against protein only; `/goals` or the next reading fixes it. |
 
-## The week
-| Day | Type | Breakfast | Lunch | Dinner | Snacks |
-| --- | --- | --- | --- | --- | --- |
-| Mon | training | [Overnight oats](menu/overnight-oats.md) | [Chicken + rice bowl](menu/chicken-rice-bowl.md) 🔒 post-run — quick | family: chicken + pasta *(covered)* | … |
-(Every slot the plan touches gets a column, dinner included. Covered
-entries — family dinners, meal-kit boxes, eat-out — sit in their slot's
-cell marked *(covered)*: counted in the day's macros, absent from the
-shopping list. Anchors sit in their slot's cell marked *(anchor)*. A
-linked top-up recipe on a low-protein night goes in the
-Dinner cell alongside the covered block. Strict: assignments are fixed.
-Loose: suggested — swap within a slot except 🔒 day-locked entries.
-Recipes always linked by full name.)
+## 5. Present
 
-## Notes
-Used up this week: what the athlete named to use up, and where it went.
-Timing cues, batch-cook schedule, anything decided this run.
+Show, in one message:
 
-## Shopping list
-### Buy
-| Item | Quantity | Covers |
-| --- | --- | --- |
+1. The week: the "## The week" table from the dry run's
+   `data.rendered` (one column per slot, day totals; covered entries
+   marked *(covered)*, anchors *(anchor)*, locked entries 🔒 with the
+   reason), and the pool table above it in loose style, where the pool
+   is the contract.
+2. The flags that remain, one line each.
+3. The shopping summary: the Buy count by aisle, and the "check you
+   have" staples with the amounts needed.
+4. Every assumption you made (cover estimates, picks you chose).
+5. One closing line naming what "go" does: build, approve and render
+   the plan, and, only when `shopping_issue = true` in
+   `[nutrition.template]`, post the shopping list as a GitHub issue.
 
-### Staples — confirm you have enough
-| Staple | Needed this week |
-| --- | --- |
-```
+Presenting and writing never happen in the same turn. A tweak in the
+reply means a revised draft, a new dry run and a new presentation.
 
-Then close out: apply any remaining card status changes agreed this
-run (then `recipes render`); update Food & eating for any preference the athlete confirmed
-changed; remind the athlete that logging (MacroFactor, if used) stays
-the ground truth — the next `/check-in` reviews how the plan went.
+## 6. On "go"
+
+1. `python3 -m coach meals build --input .coach/drafts/meal-plan-<id>.json`
+2. `python3 -m coach meals approve <id>`
+3. `python3 -m coach meals render <id>`
+4. Only when `shopping_issue = true`: `python3 -m coach meals shopping
+   <id> --format issue`. Write the returned `body` to
+   `.coach/shopping-<id>.md` with the Write tool, then run
+   `gh issue create --title "<title>" --body-file .coach/shopping-<id>.md`,
+   so the shell never expands the body's text. Otherwise give the
+   athlete `meals shopping <id>` (markdown) inline if they want the
+   list in the chat.
+
+Then close out: remind the athlete that logging (in the nutrition app, if
+used) stays the ground truth, and that the next `/check-in` asks what in
+the plan didn't work.

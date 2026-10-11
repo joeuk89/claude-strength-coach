@@ -204,7 +204,7 @@ class SchemaVersionsTest(unittest.TestCase):
         claimed = instance.claimed_documents()
         for name in ("hevy_write_line", "hevy_verify_line", "hevy_retire_line", "hevy_cache_meta", "hevy_cache_file",
                      "nutrition_readings", "activity_sync", "activity_record", "activity_void", "planned_record",
-                     "wellness_record"):
+                     "wellness_record", "meal_plan"):
             self.assertIn(name, claimed)
         for name in migrate.registry().documents:
             self.assertNotIn(name, claimed, "the migration registry already says where it lives")

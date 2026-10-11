@@ -57,9 +57,10 @@ class ValidateCommandTest(CliMixin, unittest.TestCase):
     def test_valid_instance_passes_as_a_subprocess(self):
         code, envelope, stderr = run_module(["--root", "tests/fixtures/instances/valid", "recipes", "validate"])
         self.assertEqual(code, 0, stderr)
-        self.assertEqual(envelope["data"]["summary"], {"pass": 3, "warn": 0, "fail": 0})
+        self.assertEqual(envelope["data"]["summary"], {"pass": 5, "warn": 0, "fail": 0})
         self.assertEqual([c["slug"] for c in envelope["data"]["cards"]],
-                         ["chicken-rice-bowl", "overnight-oats", "whey-shake"])
+                         ["chicken-rice-bowl", "overnight-oats", "spinach-omelette", "turkey-chilli",
+                          "whey-shake"])
 
     def test_macro_sum_fail_and_warn(self):
         with InstanceCopy(VALID) as root:
@@ -108,9 +109,9 @@ class ValidateCommandTest(CliMixin, unittest.TestCase):
 class ListShowTest(CliMixin, unittest.TestCase):
     def test_list_filters(self):
         cards = self.run_ok(VALID, "recipes", "list")["data"]["cards"]
-        self.assertEqual(len(cards), 3)
+        self.assertEqual(len(cards), 5)
         cards = self.run_ok(VALID, "recipes", "list", "--slot", "lunch")["data"]["cards"]
-        self.assertEqual([c["slug"] for c in cards], ["chicken-rice-bowl"])
+        self.assertEqual([c["slug"] for c in cards], ["chicken-rice-bowl", "turkey-chilli"])
         self.assertEqual(self.run_ok(VALID, "recipes", "list", "--status", "benched")["data"]["cards"], [])
 
     def test_show(self):

@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "x-coach-paths": ["data/nutrition/plans/*.json"],
+  "title": "Meal plan, data/nutrition/plans/<id>.json (contract C34)",
+  "type": "object",
+  "required": ["schema_version", "id", "span", "created_at", "style", "targets", "input", "days", "pool",
+               "shopping", "flags", "approval"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"type": "integer", "const": 1},
+    "id": {"$ref": "#/$defs/date"},
+    "span": {"$ref": "#/$defs/span"},
+    "created_at": {"$ref": "#/$defs/timestamp"},
+    "style": {"enum": ["loose", "strict"]},
+    "targets": {
+      "type": "object",
+      "required": ["kcal", "kcal_source", "protein_floor_g"],
+      "additionalProperties": false,
+      "properties": {
+        "kcal": {"type": ["number", "null"], "minimum": 0},
+        "kcal_source": {"type": ["string", "null"]},
+        "protein_floor_g": {"type": "number", "minimum": 0}
+      }
+    },
+    "input": {
+      "type": "object",
+      "required": ["exceptions", "assignments", "use_up", "notes"],
+      "additionalProperties": false,
+      "properties": {
+        "exceptions": {"type": "array", "items": {"type": "object"}},
+        "assignments": {"type": "array", "items": {"type": "object"}},
+        "use_up": {"type": "array", "items": {"type": "object"}},
+        "notes": {"type": ["string", "null"]}
+      }
+    },
+    "days": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/day"}},
+    "pool": {"type": "array", "items": {"$ref": "#/$defs/pool_entry"}},
+    "shopping": {
+      "type": "object",
+      "required": ["buy", "check", "used_up"],
+      "additionalProperties": false,
+      "properties": {
+        "buy": {"type": "array", "items": {"$ref": "#/$defs/buy_line"}},
+        "check": {"type": "array", "items": {"$ref": "#/$defs/amount"}},
+        "used_up": {"type": "array", "items": {"$ref": "#/$defs/amount"}}
+      }
+    },
+    "flags": {"type": "array", "items": {"$ref": "#/$defs/flag"}},
+    "approval": {
+      "type": ["object", "null"],
+      "required": ["approved_at", "hash"],
+      "additionalProperties": false,
+      "properties": {
+        "approved_at": {"$ref": "#/$defs/timestamp"},
+        "hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    }
+  },
+  "$defs": {
+    "date": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+    "timestamp": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"},
+    "slug": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+    "unit": {"enum": ["g", "ml", "each", "tsp", "tbsp"]},
+    "macro": {"type": ["number", "null"]},
+    "span": {
+      "type": "object",
+      "required": ["start", "end"],
+      "additionalProperties": false,
+      "properties": {"start": {"$ref": "#/$defs/date"}, "end": {"$ref": "#/$defs/date"}}
+    },
+    "day": {
+      "type": "object",
+      "required": ["date", "office", "items", "totals"],
+      "additionalProperties": false,
+      "properties": {
+        "date": {"$ref": "#/$defs/date"},
+        "office": {"type": "boolean"},
+        "items": {"type": "array", "items": {"$ref": "#/$defs/item"}},
+        "totals": {
+          "type": "object",
+          "required": ["kcal", "protein_g"],
+          "additionalProperties": false,
+          "properties": {"kcal": {"type": "number"}, "protein_g": {"type": "number"}}
+        }
+      }
+    },
+    "item": {
+      "type": "object",
+      "required": ["slot", "source", "recipe", "title", "variations", "covered_by", "cover", "name", "skip", "lock",
+                   "note", "kcal", "protein_g"],
+      "additionalProperties": false,
+      "properties": {
+        "slot": {"type": "string"},
+        "source": {"enum": ["template", "exception", "assignment", "anchor"]},
+        "recipe": {"type": ["string", "null"], "pattern": "^[a-z0-9-]+$"},
+        "title": {"type": ["string", "null"]},
+        "variations": {"type": "array", "items": {"type": "string"}},
+        "covered_by": {"type": ["string", "null"]},
+        "cover": {"type": ["string", "null"]},
+        "name": {"type": ["string", "null"]},
+        "skip": {"type": "boolean"},
+        "lock": {"type": ["string", "null"]},
+        "note": {"type": ["string", "null"]},
+        "kcal": {"$ref": "#/$defs/macro"},
+        "protein_g": {"$ref": "#/$defs/macro"}
+      }
+    },
+    "pool_entry": {
+      "type": "object",
+      "required": ["recipe", "title", "variations", "count", "covered_by", "servings", "batches", "kcal",
+                   "protein_g"],
+      "additionalProperties": false,
+      "properties": {
+        "recipe": {"$ref": "#/$defs/slug"},
+        "title": {"type": ["string", "null"]},
+        "variations": {"type": "array", "items": {"type": "string"}},
+        "count": {"type": "integer", "minimum": 1},
+        "covered_by": {"type": ["string", "null"]},
+        "servings": {"type": ["integer", "null"], "minimum": 1},
+        "batches": {"type": ["integer", "null"], "minimum": 1},
+        "kcal": {"$ref": "#/$defs/macro"},
+        "protein_g": {"$ref": "#/$defs/macro"}
+      }
+    },
+    "buy_line": {
+      "type": "object",
+      "required": ["aisle", "item", "qty", "unit", "for"],
+      "additionalProperties": false,
+      "properties": {
+        "aisle": {"type": "string"},
+        "item": {"type": "string"},
+        "qty": {"type": "number", "minimum": 0},
+        "unit": {"$ref": "#/$defs/unit"},
+        "for": {"type": "array", "items": {"$ref": "#/$defs/slug"}}
+      }
+    },
+    "amount": {
+      "type": "object",
+      "required": ["item", "qty", "unit"],
+      "additionalProperties": false,
+      "properties": {
+        "item": {"type": "string"},
+        "qty": {"type": "number", "minimum": 0},
+        "unit": {"$ref": "#/$defs/unit"}
+      }
+    },
+    "flag": {
+      "type": "object",
+      "required": ["code", "severity", "date", "slot", "message", "resolved", "resolution"],
+      "additionalProperties": false,
+      "properties": {
+        "code": {"enum": ["protein_below_floor", "kcal_off_target", "slot_open", "recipe_unknown",
+                          "variation_unknown", "variation_conflict", "recipe_benched", "use_up_unmatched",
+                          "units_mixed", "no_target"]},
+        "severity": {"enum": ["info", "warn", "block"]},
+        "date": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+        "slot": {"type": ["string", "null"]},
+        "message": {"type": "string"},
+        "resolved": {"type": "boolean"},
+        "resolution": {"type": ["string", "null"]}
+      }
+    }
+  }
+}

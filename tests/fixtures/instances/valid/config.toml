@@ -55,3 +55,27 @@ slot = "snack"
 days = ["daily"]
 kcal = 150
 protein_g = 30
+
+[nutrition.template]
+slots = ["breakfast", "lunch", "dinner", "snack"]
+office_days = ["tue", "thu"]
+staples = ["eggs", "rolled oats", "olive oil"]
+kcal_tolerance_pct = 15
+shopping_issue = false
+
+[[nutrition.template.standing]]
+days = ["daily"]
+slot = "breakfast"
+recipe = "overnight-oats"
+
+[[nutrition.template.standing]]
+days = ["office"]
+slot = "lunch"
+pool = ["chicken-rice-bowl"]
+
+[[nutrition.template.standing]]
+days = ["mon", "tue", "wed", "thu"]
+slot = "dinner"
+cover = "family"
+kcal = 900
+protein_g = 40
