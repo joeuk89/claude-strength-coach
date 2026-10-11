@@ -159,3 +159,39 @@ _Avoid_: instance note, personal research, override note
 The athlete's set of approved recipe cards in `nutrition/menu/`, plus
 its index — what `/meal-plan` selects from.
 _Avoid_: food bank, menu (ambiguous with the directory name)
+
+**Protein floor / target / stretch**:
+The three daily protein numbers `/goals` sets, each per kg of a
+**reference mass** (current bodyweight, goal weight when body fat is
+high, or fat-free mass when a credible body-fat reading exists). The
+**target** is what the coach steers toward, the **stretch** is the most
+that still adds anything, and the **floor** is the reachable number the
+athlete is held to now: recent intake plus a little, never under
+1.2 g/kg or over the target. The floor rises after two consecutive
+check-ins at or over it and only `/goals` lowers it. For a nutrition app
+user the floor is the protein number set in the app.
+_Avoid_: protein goal, protein minimum, macro target, g/kg bodyweight (without the reference mass)
+
+**Protein anchor**:
+One of 2–3 standing daily items, each carrying ~25 g protein or more
+and needing no cooking, eaten in a fixed slot on set days so that with
+typical meals the athlete reaches the protein floor. Agreed in `/goals`;
+`/meal-plan` places anchors as fixed blocks.
+_Avoid_: protein snack, top-up, staple (an item kept in stock, not one eaten daily)
+
+**Nutrition override**:
+A dated period in which the athlete eats to a number other than the
+nutrition app's (or, without an app, the trend-driven calorie target):
+start date, what is overridden, reason, exit condition, and an expiry no
+more than 21 days after the start. At most one at a time; `/check-in`
+expires it, renewal needs `/goals`, and a second consecutive renewal is
+flagged.
+_Avoid_: manual targets, calorie band, adjustment (a trend-driven change, not an override)
+
+**Sleep gate**:
+The check `/goals` runs before agreeing a deficit: a trailing 14-day
+sleep average under ~7 h means recomp at maintenance instead. With no
+sleep source it is recorded as `pending measurement` (short sleep
+reported, recomp by default) or `not evaluated`; `/check-in` re-checks it
+during a deficit once a source exists.
+_Avoid_: sleep check, sleep rule, recovery gate
