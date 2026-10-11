@@ -421,7 +421,9 @@ def evaluate(ctx):
     store = ActivityStore(ctx.root, config)
     judged = [b for b in ctx.bouts if b.is_activity() and (b.source == "logged" or plans_read(config))]
     spikes, skipped = _spike_flags(store, judged, settings)
-    found = _cap_flags(judged, settings, config["athlete"]["week_starts"]) + spikes + _stack_flags(judged)
+    week_starts = config["athlete"]["week_starts"]
+    earlier = _logged_earlier_in_week(ctx, week_starts) if ctx.mode == "proposal" else []
+    found = _cap_flags(judged, settings, week_starts, earlier) + spikes + _stack_flags(judged, earlier)
     end = evaluation_date(ctx)
     short, nights, debt = sleep_judgement(store, settings, end)
     if debt:
@@ -430,6 +432,15 @@ def evaluate(ctx):
             f"asleep ({nights} with data): recovery, not the program, may be the bottleneck this week.")))
     found += status + _niggle_flags(ctx.root, judged, ctx.span, settings["distance_unit"])
     return {"flags": found, "skipped": skipped}
+
+
+def _logged_earlier_in_week(ctx, week_starts):
+    """Logged activities in the proposal span's week before the span starts: a midweek draft adds to them."""
+    week_of = dates.week_span(ctx.span.start, week_starts)
+    if week_of.start >= ctx.span.start:
+        return []
+    before = dates.Span(week_of.start, ctx.span.start - timedelta(days=1))
+    return [bout for bout, _ in _Week(ctx.root, ctx.config, before).activity_entries()]
 
 
 def _status_flags(ctx):
@@ -457,12 +468,13 @@ def _runs(bouts):
     return [b for b in bouts if b.kind == "run"]
 
 
-def _cap_flags(bouts, settings, week_starts):
+def _cap_flags(bouts, settings, week_starts, earlier=()):
+    """`earlier` bouts count toward the weekly caps only; single-run caps judge `bouts`."""
     unit = settings["distance_unit"]
     found = []
     weeks = sorted({dates.week_span(b.date, week_starts) for b in bouts}, key=lambda s: s.start)
     for week_of in weeks:
-        inside = [b for b in bouts if week_of.contains(b.date)]
+        inside = [b for b in (*earlier, *bouts) if week_of.contains(b.date)]
         runs = _runs(inside)
         label = week_of.label()
         meters = sum(b.distance_meters for b in runs if b.distance_meters is not None)
@@ -475,8 +487,8 @@ def _cap_flags(bouts, settings, week_starts):
         if cap > 0 and minutes > cap:
             found.append(flags.make("cap_breach", message=(
                 f"Run time {_number(minutes):g} min in {label} is over the {cap:g} min weekly cap.")))
-        for run in runs:
-            what = f"{'Planned' if run.source == 'planned' else 'The'} run on {run.date.isoformat()}"
+        for run in _runs(b for b in bouts if week_of.contains(b.date)):
+            what = f"{'Planned activity (run)' if run.source == 'planned' else 'The run'} on {run.date.isoformat()}"
             cap = settings["single_run_distance"]
             if cap > 0 and run.distance_meters is not None and run.distance_meters > units.to_meters(cap, unit):
                 found.append(flags.make("cap_breach", message=(
@@ -508,7 +520,7 @@ def _spike_flags(store, bouts, settings):
         reason = None
         if history_days < settings["spike_min_history_days"]:
             reason = (f"store history shorter than the {lookback}-day lookback: the first logged activity is "
-                      f"{max(history_days, 0)} days before this run, under spike_min_history_days "
+                      f"{_count_text(max(history_days, 0), 'day')} before this run, under spike_min_history_days "
                       f"({settings['spike_min_history_days']})")
         window = dates.Span(run.date - timedelta(days=lookback), run.date - timedelta(days=1))
         before = store.activities(window, kinds=("run",))
@@ -527,7 +539,7 @@ def _spike_flags(store, bouts, settings):
             else:
                 size, reference = f"{value:g} min", f"{longest:g} min"
             severity = "info" if run.source == "planned" else "warn"
-            what = "Planned run" if run.source == "planned" else "Run"
+            what = "Planned activity (run)" if run.source == "planned" else "Run"
             found.append(flags.make("run_volume_spike", severity, message=(
                 f"{what} on {run.date.isoformat()} is {size}, more than {ratio:g} × the longest run in the "
                 f"{lookback} days before it ({reference}). In one observational cohort, single runs this far "
@@ -535,11 +547,12 @@ def _spike_flags(store, bouts, settings):
     return found, skipped
 
 
-def _stack_flags(bouts):
-    quality = sorted((b for b in bouts if b.quality), key=lambda b: (b.date, b.ref))
+def _stack_flags(bouts, earlier=()):
+    """A pair of two `earlier` bouts is not judged again."""
+    quality = sorted((b for b in (*earlier, *bouts) if b.quality), key=lambda b: (b.date, b.ref))
     found = []
     for first, second in zip(quality, quality[1:]):
-        if (second.date - first.date).days <= 1:
+        if (second.date - first.date).days <= 1 and (first not in earlier or second not in earlier):
             found.append(flags.make("quality_stack", message=(
                 f"Quality activities on {_bout_text(first)} and {_bout_text(second)}: keep an easy day between "
                 "quality sessions.")))

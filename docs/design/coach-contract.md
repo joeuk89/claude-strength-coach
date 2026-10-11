@@ -5138,12 +5138,14 @@ coach.cardio.bouts(root, span, mode, overlay=None, today=None) -> list[Bout]
 #   mode "proposal": the overlay's sessions (kind "conditioning" for a conditioning session, else
 #                    "lifting"; ref "<overlay id>/<session id>", minutes None), external sessions
 #                    placed on their `weekday`, and at tier review|program the planned activities
-#                    no logged Activity matched; with `today`, only dates from today on
+#                    no logged Activity matched; with `today`, only dates from today on.
+#                    No logged bouts: `evaluate` reads those itself (see Flags)
 coach.cardio.match(planned, logged, move_days, today=None) -> list[dict]   # the reconcile matcher; R-44b reuses it
 #   planned: C30 planned records; logged: resolved Activities. With today None every
 #   unmatched plan is "missed".
 coach.cardio.flag_bouts(root, config, span, today) -> list[Bout]   # what `cardio flags` judges
 coach.cardio.evaluate(ctx) -> {"flags": [...], "skipped": [...]}  # every C49 rule; the provider returns "flags"
+coach.cardio.evaluation_date(ctx) -> date   # the last night the `sleep_debt` flag judges
 ```
 
 `Bout.to_json()` gives the dataclass as JSON (dates `YYYY-MM-DD`,
@@ -5184,12 +5186,24 @@ week-flag provider in `propose week`; registered in
 | `status_active` | A status day overlaps the span or today. Warn `ill`/`injured` (`injured` adds "check with a qualified professional"), info `travel`. |
 | `niggle_link` | An active niggle's `applies_to.activity_kinds` holds the kind of a logged or planned activity in the span. The message gives the count and distance of those activities. |
 
+In proposal mode, `evaluate` also reads the logged activities in the
+span's C7 week dated before the span starts, so a midweek draft is judged
+with the week's runs so far. They count toward that week's
+`cap_breach` totals (run distance, run minutes, quality activities) and
+as `quality_stack` neighbours. The single-run caps judge only the span's
+bouts, and a pair of two earlier activities is not flagged again.
+
 `coach.cardio.sleep_debt(root, span) -> bool | None` is the one reader of
-the sleep rule: it judges the 7 nights ending on `span.end` of whatever
-span the caller passes (R-31 passes the configured week from
-`coach.dates`), returns None when `[activity]` is off or fewer than
-`sleep_min_nights` nights have data, and the `sleep_debt` flag is raised
-exactly when it returns True. R-31 calls it for its poor-sleep trigger.
+the sleep rule for other items: it judges the 7 nights ending on
+`span.end` of whatever span the caller passes (R-31 passes the configured
+week from `coach.dates`), and returns None when `[activity]` is off or
+fewer than `sleep_min_nights` nights have data. The `sleep_debt` flag
+judges the nights ending on the evaluation date
+(`coach.cardio.evaluation_date(ctx)`) instead. For a span ending on or
+before today the two agree: the flag is raised exactly when
+`sleep_debt(root, span)` returns True. For a span ending later they can
+differ, because `sleep_debt` does not clamp to today. R-31 calls it for
+its poor-sleep trigger.
 
 **Week-flag providers.** `coach/weekflags/<name>.py`, discovered with
 `pkgutil.iter_modules`:

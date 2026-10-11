@@ -258,6 +258,8 @@ class FlagsTest(CardioCase):
         self.assertNotIn("run_volume_spike", self.codes(data["flags"]))
         skipped = {s["ref"]: s["reason"] for s in data["skipped"]}
         self.assertIn("store history shorter than the 30-day lookback", skipped["manual:2026-10-09-run-1"])
+        self.assertIn(" 1 day before this run", skipped["manual:2026-10-06-run-1"])
+        self.assertIn(" 4 days before this run", skipped["manual:2026-10-09-run-1"])
 
     def test_no_reference_run_is_skipped(self):
         self.drop_lines("data/activity/activities.jsonl", lambda line: line["id"] == "manual:2026-09-21-run-1")
@@ -278,7 +280,7 @@ class FlagsTest(CardioCase):
         spikes = [f for f in found if f["code"] == "run_volume_spike"]
         self.assertEqual(len(spikes), 1)
         self.assertEqual(spikes[0]["severity"], "info")
-        self.assertIn("2026-10-17", spikes[0]["message"])
+        self.assertIn("Planned activity (run) on 2026-10-17", spikes[0]["message"])
 
     def test_ill_and_injured_status_days_warn(self):
         self.coach("status-days", "add", "--kind", "injured", "--from", "2026-10-10", "--note", "calf")
@@ -329,6 +331,23 @@ class ProposeTest(CardioCase):
         week_flags = [f for f in overlay["flags"] if f["code"] in CODES]
         self.assertIn("status_active", self.codes(week_flags))
         self.assertTrue(all(f["session_id"] is None for f in week_flags))
+
+    def test_a_midweek_draft_counts_the_activities_logged_earlier_that_week(self):
+        self.config("weekly_run_distance = 12")
+        midweek = "2026-10-08T06:00:00Z"
+        self.coach("planned", "add", "--date", "2026-10-08", "--kind", "run", "--title", "Tempo", "--quality",
+                   "--distance-km", "6", now=midweek)
+        envelope = self.coach("propose", "week", "--kind", "midweek", "--dry-run", now=midweek)
+        self.assertEqual(envelope["data"]["span"]["start"], "2026-10-08")
+        found = [f for f in envelope["data"]["overlay"]["flags"] if f["code"] in CODES]
+        caps = [f["message"] for f in found if f["code"] == "cap_breach"]
+        self.assertEqual(len(caps), 2)
+        self.assertIn("Run distance 18 km in 2026-W41", caps[0])
+        self.assertIn("3 quality activities in 2026-W41", caps[1])
+        stacks = [f["message"] for f in found if f["code"] == "quality_stack"]
+        self.assertEqual(len(stacks), 1)
+        self.assertIn("2026-10-07", stacks[0])
+        self.assertIn("2026-10-08", stacks[0])
 
     def test_a_provider_is_discovered_without_a_registry(self):
         directory = Path(tempfile.mkdtemp(dir=self.tmp))

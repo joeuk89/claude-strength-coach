@@ -143,7 +143,7 @@ fields, always in this order:
    confirmation.
 3. **Runs** — with an activity source, the card states the window's
    runs from `python3 -m coach cardio week` (count, distance, quality
-   runs) and any planned run `cardio reconcile` found missed, and asks
+   runs) and any planned activity `cardio reconcile` found missed, and asks
    only for runs no source logged. Without one, ask count and total
    distance.
 4. **Sleep** — with a sleep source and enough tracked nights, the card
