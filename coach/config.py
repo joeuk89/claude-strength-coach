@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
 
-from coach import paths
+from coach import dates, paths
 from coach.errors import ConfigError
 
 SCHEMA_VERSION = 1
@@ -295,7 +295,7 @@ class _Validator:
         return out
 
 
-def parse(raw, path):
+def parse(raw, path, today=None):
     path = Path(path)
     validator = _Validator(path)
     tables = registered_tables()
@@ -337,6 +337,17 @@ def parse(raw, path):
             continue
         data[name] = validator.table(name, value or {}, spec)
 
+    if not validator.problems and today is not None:
+        if isinstance(today, str):
+            today = dates.parse_timestamp(today)
+        if isinstance(today, datetime):
+            name = data["athlete"]["timezone"]
+            today = today.astimezone(dates.zone(name) if name else None).date()
+        birth_year = data["athlete"].get("birth_year")
+        if birth_year is not None and birth_year > today.year:
+            validator.problem("athlete.birth_year",
+                              f"[athlete] birth_year must not be in the future (after {today.year})")
+
     if not validator.problems:
         sectioned = Section({name: _sectioned(value) for name, value in data.items()})
         for rule in registered_rules():
@@ -353,20 +364,20 @@ def parse(raw, path):
     return Config({name: _sectioned(value) for name, value in data.items()}, path)
 
 
-def parse_file(path):
+def parse_file(path, today=None):
     path = Path(path)
     try:
         raw = tomllib.loads(path.read_text(encoding="utf-8"))
     except tomllib.TOMLDecodeError as exc:
         raise ConfigError(f"{path} is not valid TOML: {exc}") from None
-    return parse(raw, path)
+    return parse(raw, path, today=today)
 
 
-def load(root):
+def load(root, today=None):
     path = Path(root) / paths.CONFIG
     if not path.is_file():
         raise ConfigError(f"No config.toml in {root}: copy {paths.CONFIG_EXAMPLE} to {paths.CONFIG} and edit it.")
-    return parse_file(path)
+    return parse_file(path, today=today)
 
 
 def equipment_for(config, location=None):
@@ -382,3 +393,11 @@ def equipment_for(config, location=None):
         )
     main.update(locations[location])
     return main
+
+
+def approximate_age(config, today):
+    birth_year = config.athlete.get("birth_year")
+    if birth_year is None:
+        return None
+    return {"years": today.year - birth_year, "approximate": True, "as_of": today.isoformat(),
+            "note": "Approximate age from birth year; birthday is unknown, so actual age may be one year less."}

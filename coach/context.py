@@ -23,7 +23,7 @@ class Context:
     def config(self):
         """The validated config; raises ConfigError (exit 5) when it is missing or invalid."""
         if not hasattr(self, "_config"):
-            self._config = config_module.load(self.root)
+            self._config = config_module.load(self.root, today=self.now())
         return self._config
 
     def warn(self, message):

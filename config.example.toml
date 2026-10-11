@@ -12,7 +12,9 @@ units = "kg"                  # "kg" | "lb": the units for every load. Required.
 bodyweight_units = "kg"       # "kg" | "lb"; default: the same as units
 week_starts = "monday"        # "monday" | "sunday"
 timezone = ""                 # IANA name such as "Europe/London"; "" = this computer's local time
-experience = "intermediate"   # "beginner" | "intermediate" | "advanced"
+experience = "intermediate"   # current level confirmed with the athlete: beginner, intermediate or advanced
+# birth_year = 1980           # optional; omitted means unknown, derived age is approximate
+# desired_sessions = 4        # sessions wanted each week, separate from available weekdays
 available_days = []           # days the athlete can train: "mon" .. "sun"; [] = not stated
 session_minutes = 60          # default time cap per session; 0 = no cap
 

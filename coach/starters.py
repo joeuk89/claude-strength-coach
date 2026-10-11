@@ -274,7 +274,7 @@ def _apply_start_loads(doc, start_loads):
             line["start_load"] = load
 
 
-def draft(root, starter_id, days=None, start_loads=None, now=None, directory=STARTERS_DIR):
+def draft(root, starter_id, days=None, start_loads=None, now=None, directory=STARTERS_DIR, config=None):
     """A program draft from a starter, on the athlete's days and kit, for `program adopt`.
 
     Raises ValidationError (exit 1) for an unknown starter, a day count the
@@ -282,7 +282,7 @@ def draft(root, starter_id, days=None, start_loads=None, now=None, directory=STA
     load for an exercise the draft does not hold.
     """
     root = Path(root)
-    config = config_module.load(root)
+    config = config if config is not None else config_module.load(root, today=now)
     library = Library.load(root)
     starter = load(starter_id, directory)
     chosen = _days_for(starter, days, config)

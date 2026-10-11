@@ -9,7 +9,8 @@ from coach.commands import arg, command
 )
 def show(args, ctx):
     cfg = ctx.config
-    data = {"path": cfg.path, "config": cfg}
+    data = {"path": cfg.path, "config": cfg,
+            "age": config_module.approximate_age(cfg, ctx.today())}
     if args.location:
         data["location"] = args.location
         data["equipment"] = config_module.equipment_for(cfg, args.location)

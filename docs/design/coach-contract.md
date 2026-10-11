@@ -323,7 +323,7 @@ stderr carries human-readable diagnostics and progress, each line prefixed
   their problems exit 5 like any other. R-42a's rule checks `[activity]
   precedence` against the enabled sources (C32); R-33a's check the
   `[nutrition]` cross-key rules (C4).
-- `coach.config.load(root) -> Config`. `Config` is a dict with attribute
+- `coach.config.load(root, today=None) -> Config`. `Config` is a dict with attribute
   access (`config.athlete.units`, `config["equipment"]`) and a `path`.
 - `plates` lists the plate sizes the athlete has in pairs, one per side;
   `units.plate_breakdown` uses any number of each size and returns the
@@ -340,7 +340,9 @@ units = "kg"              # "kg" | "lb" — loads
 bodyweight_units = "kg"   # "kg" | "lb"
 week_starts = "monday"    # "monday" | "sunday"
 timezone = ""             # IANA name; empty = system local time
-experience = "intermediate"   # "beginner" | "intermediate" | "advanced"
+experience = "intermediate"   # current level, explicitly confirmed during setup
+# birth_year = 1980           # optional positive whole year, not in the future
+# desired_sessions = 4        # optional weekly session target, 1..7; not availability
 available_days = []       # weekday ids "mon".."sun"; empty = not stated
 session_minutes = 60      # default time cap per session; 0 = no cap; [sessions.cap_minutes] overrides (C19)
 
@@ -5114,7 +5116,7 @@ writes `data/program.json` directly.
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "source": "hevy_import",
   "created_at": "2026-10-11T18:00:00Z",
   "program": { "...": "a complete program.json document (C16 / C23 v2 or later)" },
@@ -5131,7 +5133,13 @@ writes `data/program.json` directly.
 }
 ```
 
-- `source`: `starter:<id>`, `hevy_import`, `design`.
+- `source`: `starter:<id>`, `hevy_import`, `manual_import`, `design`.
+  `manual_import` means a supplied paper/manual program transcribed with its
+  exercise/scheme structure preserved unless the athlete agreed edits. It
+  uses no Hevy mapping or detection. Draft v2 adds this source. For an existing
+  v1 draft, change only its top-level `schema_version` to 2, preserving its
+  source, program and report, then rerun adoption's dry run. Drafts remain
+  outside the migration runner; the nested program retains its own version.
 - `hevy_folder` (R-41a): the Hevy folder id the imported routines share
   (`--folder`, else the one folder they all sit in), or null. Adopt
   writes it to `state.hevy.folders.program`; null keeps the old state's.
@@ -6088,7 +6096,8 @@ prose in `profile.md` is only what a human reads.
 
 | Fact | Where | Owner |
 |---|---|---|
-| experience, available training days, default session length | `[athlete] experience`, `available_days`, `session_minutes` (C4) | R-10 |
+| current experience, desired weekly sessions, available days, session length | `[athlete] experience`, `desired_sessions`, `available_days`, `session_minutes` (C4) | R-10 |
+| optional birth year | `[athlete] birth_year`; `config show` reports explicitly approximate age, or null when unknown | R-10 |
 | equipment at the main place and at other places | `[equipment]`, `[equipment.locations.<name>]` (C4) | R-10 |
 | which place a session or a one-off week uses | session `location` in `program.json` (C16) and the overlay (C10) | R-17a, R-13 |
 | per-session time caps | `[sessions.cap_minutes]` (C19) | R-20 |
@@ -6097,8 +6106,23 @@ prose in `profile.md` is only what a human reads.
 | exercises the athlete cannot or will not do | `avoid` in the instance library (below) | R-11 |
 | nutrition strategy | `[nutrition]` (C4, which also lists what stays prose) | R-33a |
 
-Stays prose: the goal narrative, height, age, recovery habits, food
-preferences and the coach's notes.
+Stays prose: the goal narrative, historical training and time off, height,
+recovery habits, food preferences and the coach's notes. Setup confirms current
+experience independently of lifetime years and records that confirmation in
+notes. No automatic layoff-to-level conversion applies. `birth_year` is an
+optional positive integer no later than the validation clock's year; absent
+stays absent. Config loading accepts an optional `today` (date or timestamp) and checks the
+future-year rule only against it, never the wall date; timestamps use the athlete timezone. Command
+contexts pass their clock, and the starter, import and adoption paths reuse the command's config. `config show` adds `age`: null
+when unknown, otherwise `{years, approximate: true, as_of, note}`. Calendar-year
+subtraction is approximate, since actual age may be one less. Calculators
+keep their own validated age bounds and require actual age when necessary.
+
+`desired_sessions` is the total weekly target, including coach-led sessions;
+setup settles the solo share, calls `starters list --days` with that count,
+and passes agreed available weekdays explicitly to `starters draft`. Profile
+corrections replace the corresponding config/data fact and prose paragraph
+before completion; machine-owned values stay only in structured sources.
 
 **Equipment resolver.** `coach.config.equipment_for(config, location=None)
 -> dict` is the one resolver: the main `[equipment]` table with the named

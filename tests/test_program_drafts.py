@@ -698,7 +698,7 @@ class NewProgramSkillTest(unittest.TestCase):
             self.assertTrue(name in self.text, name)
 
     def test_the_import_path_runs_its_commands_in_order(self):
-        path = flat(step_text("new-program", "import.md"))
+        path = flat(step_text("new-program", "import.md").split("## Hevy route", 1)[1])
         order = [path.index(name) for name in ("library seed", "library confirm", "program import-hevy",
                                                "one table", "program adopt")]
         self.assertEqual(order, sorted(order))

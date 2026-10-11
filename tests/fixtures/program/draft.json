@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "source": "hevy_import",
   "created_at": "2026-10-11T18:00:00Z",
   "program": {

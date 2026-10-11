@@ -105,7 +105,9 @@ answer.)
 
 ## Coach's notes
 
-(Per-athlete patterns the coach learns over time. Starts empty.)
+(Historical training, recent consistency and time off; confirmation of the
+current programming level, and unresolved/deferred setup answers. Later,
+per-athlete patterns. Machine-owned numeric facts stay in config/data.)
 ```
 
 ## profile.md: Nutrition & goals
