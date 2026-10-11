@@ -161,6 +161,29 @@ class ProblemsTest(unittest.TestCase):
         self.assert_problem(doc, "$.sessions[0].exercises[0].exercise_id", "no_such_exercise",
                             kind=program.EXERCISE_PROBLEM)
 
+    def test_no_e1rm_warnings_read_working_groups_of_fixed_reps_rpe_lines_only(self):
+        doc = valid_doc()
+        squat, bench = doc["sessions"][0]["exercises"]
+        squat["scheme"] = {"name": "fixed_reps_rpe", "params": {}}
+        squat["sets"] = [{"count": 2, "type": "warmup", "reps": 15},
+                         {"count": 3, "type": "normal", "reps": 10, "rpe": 8}]
+        bench["sets"] = [{"count": 3, "type": "normal", "rep_range": {"start": 12, "end": 15}, "rpe": 8}]
+        self.assertEqual(program.warnings(doc), [])
+        bench["scheme"] = {"name": "fixed_reps_rpe", "params": {}}
+        found = program.warnings(doc)
+        self.assertEqual(len(found), 1, found)
+        self.assertIn("db_bench_press", found[0])
+        self.assertIn("14 reps to failure", found[0])
+
+    def test_a_fixed_reps_rpe_line_without_rpe_counts_its_reps_to_failure(self):
+        doc = valid_doc()
+        squat = doc["sessions"][0]["exercises"][0]
+        squat["scheme"] = {"name": "fixed_reps_rpe", "params": {}}
+        squat["sets"] = [{"count": 3, "type": "normal", "reps": 13}]
+        found = program.warnings(doc)
+        self.assertEqual(len(found), 1, found)
+        self.assertIn("13 reps to failure", found[0])
+
     def test_top_set_and_back_off_groups_validate(self):
         doc = read_program(INSTANCES / "program-top-set")
         self.assertEqual(problem_paths(doc, INSTANCES / "program-top-set"), [])
@@ -206,6 +229,28 @@ class ValidateCommandTest(EnvelopeMixin, unittest.TestCase):
         details = envelope["error"]["details"]
         self.assertEqual([d["path"] for d in details], ["$.sessions[1].location"])
         self.assertIn("hotel", details[0]["message"])
+
+    def validate_with_row(self, sets):
+        doc = valid_doc()
+        row = doc["sessions"][1]["exercises"][0]
+        row["scheme"] = {"name": "fixed_reps_rpe", "params": {}}
+        row["sets"] = sets
+        with Instance() as root:
+            write_program(root, doc)
+            code, envelope, stderr = run_cli(["--root", str(root), "program", "validate"])
+        self.assertEqual(code, 0, (envelope, stderr))
+        self.assertTrue(envelope["data"]["valid"])
+        return envelope["warnings"]
+
+    def test_a_fixed_reps_rpe_line_past_the_e1rm_cap_passes_with_a_warning(self):
+        warnings = self.validate_with_row([{"count": 3, "type": "normal", "reps": 12, "rpe": 8}])
+        self.assertEqual(len(warnings), 1, warnings)
+        self.assertTrue(warnings[0].startswith("fixed_reps_no_e1rm: "), warnings)
+        for text in ("session-b", "db_single_arm_row", "14 reps to failure", "double_progression"):
+            self.assertIn(text, warnings[0])
+
+    def test_a_fixed_reps_rpe_line_within_the_e1rm_cap_passes_without_a_warning(self):
+        self.assertEqual(self.validate_with_row([{"count": 3, "type": "normal", "reps": 10, "rpe": 8}]), [])
 
     def test_no_program(self):
         envelope, _ = self.run_fail(1, "--root", str(INSTANCES / "hevy-fresh"), "program", "validate")
