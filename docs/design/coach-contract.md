@@ -221,7 +221,7 @@ Phase 2 to 4 command inventory. No command here writes to Hevy.
 | `structure decide --rule restructure\|add_session --outcome adopted\|declined\|deferred [--reason T] [--revisit D]` | R-30a | W |
 | `structure priority [--since D]`, `structure minimum --week W` | R-30b | W with `--write` |
 | `block status` | R-31 | |
-| `block close --week W [--readiness poor\|ok] [--sleep poor\|ok] [--deep]`, `block decide`, `block init` | R-31 | W |
+| `block close --week W [--readiness poor\|ok] [--sleep poor\|ok] [--deep]`, `block decide --outcome adopted\|declined [--type deload\|light\|return] [--week W] [--reason T]`, `block init --hard-weeks N [--through W] [--started D] [--reason T]` | R-31 | W |
 | `nutrition status`, `nutrition readings [--last N]` | R-33a | |
 | `nutrition record`, `nutrition import --input FILE` | R-33a | W |
 | `recipes list`, `recipes show`, `recipes validate`, `recipes import --html FILE`, `recipes draft --input FILE` | R-33b | |
@@ -1540,7 +1540,10 @@ group; start loads through `units.format_load` on the first working
 group's row; cues and constraints listed below). It renders from
 `data/program.json`, the exercise library (names) and `[athlete] units`
 only, never from state, so a weekly state change never makes a page
-stale. Each page starts with the C11 header naming `data/program.json`
+stale. The one exception is the block status line (C43) on
+`routine/program.md`, which reads `data/state.json` and
+`data/blocks.json`; every `block` command that writes re-renders that
+page. Each page starts with the C11 header naming `data/program.json`
 and `program render`. `program render` writes changed pages, deletes
 generated pages for sessions the program no longer has, and leaves any
 other `routine/*.md` in place with a warning.
@@ -1570,7 +1573,12 @@ skip when there is no `data/program.json` (`state_schema`: no
 - A step is a module `NNNN_<slug>.py` in that subpackage defining `DOC`
   (the subpackage name), `FROM`, `TO` (= `FROM` + 1) and `migrate(doc) ->
   doc`, plus optionally `notes(before, after) -> list[str]` for lines the
-  report should carry (R-24 lists the overlays that lose their approval).
+  report should carry (R-24 lists the overlays that lose their approval)
+  and `creates(before, after) -> {path: doc}` for documents the step
+  brings into being (R-31's state step seeds `data/blocks.json`). A
+  created file is validated against the owned document whose `FILES`
+  match its path, written with the migrated files only where no file
+  exists yet, staged with them, and listed in the report's `created`.
   The runner sets `schema_version` to `TO` after each step. The target
   version is the `schema_version` const of `coach/schemas/<schema
   name>.schema.json`. Discovery rejects a step past that version, two
@@ -1603,7 +1611,7 @@ bump takes the next free version when it merges and adds one step to the
 R-17a migration chain, so the chain stays linear.
 Program bumps: R-22 (executable `missed_day_rules`, C37), R-30b (`priority`, `minimum_week`, C40), R-44a
 (`interference`, C51), R-44b (session `scheme`, C51). State bump: R-31
-(`block`, C42). Overlay: R-24 takes it to v2 (C21) and R-22 to v3 (C37). A
+took state to v4 (`block`, C42). Overlay: R-24 takes it to v2 (C21) and R-22 to v3 (C37). A
 brief or section that names a version number means the next free one.
 
 ## C17. History cache (R-20 writes; R-21a, R-23a, R-24, R-25, R-30a, R-31, R-43 read)
@@ -4636,7 +4644,7 @@ R-31's state bump (C16 schema versions) replaces `state.json` `block` with:
 
 - `light_week.status`: `not_due`, `watch`, `skipped`, `proposed`, `agreed`,
   `declined`. `type`: `deload`, `light`, `return`, or null. `reason`:
-  `ceiling`, `triggers`, `coach`, or null.
+  `ceiling`, `triggers`, `illness`, `coach`, or null.
 - When the agreed week closes as class `light`, the block ends and this
   object resets to `not_due`.
 - Migration: `hard_weeks_completed` kept; `deload.status` `not_due` and
@@ -4708,6 +4716,89 @@ Block <n> · <count> of <ceiling> hard weeks · triggers <k> of 4 (<names>) · l
 Flags (registered in `coach/flags/block.py`; rows in C20):
 `light_week_due`, `light_week_skipped`, `fatigue_watch`,
 `deep_review_due`.
+
+**Built with R-31** (details C42 and C43 leave open):
+
+- Signatures: `close(root, week_start, readiness=None, sleep=None,
+  deep=False, dry_run=False, *, today=None, now=None)`, `status(root, *,
+  today, now)`, `classify(root, week_start, *, today, now)`;
+  `status_line_for(block_state, ceiling, ledger=None, decisions=None)` is
+  the pure form `status_line(root)` and `program adopt` call.
+  `coach.block.trained_as_prescribed(lines, workout)` is the C43 rule;
+  `coach.block.outcome_for(class, count, fired, ceiling, ill)` the light
+  week rules.
+- **Which weeks a close covers**: every week after the newest closed one
+  up to `--week`. With none closed yet: after the week
+  `state.block.last_closed_week` names (`block init` sets it), else only
+  `--week` when the open block carries a seed (`seed_reason` set: a
+  migrated or state-seeded count already covers the weeks before), else
+  from the block's `started` week. A week that has not started exits 1;
+  re-closing the newest closed week replaces its entry (undoing the
+  block end it caused); an older week exits 1. With no `data/blocks.json`
+  the first close seeds one from `state.block`.
+- A block that ends records `ended` as the last day of the week that
+  ended it; the next block starts the day after, at zero. Every reset
+  week ends a block, even one with no hard week.
+- **Classes**, in order: `light` and `one_off` from `coach.structure.week`
+  `kind`; `return` when a session of the overlay in force carries a line
+  decay past `0-10` and the last lifting workout before the first such
+  session is more than 10 days back (R-02: a return week follows a
+  layoff of 11+ days, so one stale lift rotated back in never ends a
+  block); `low` when trained is under half of planned; `hard` when
+  trained as prescribed is at least three quarters of planned; else
+  `partial` (also with nothing planned). Trained as prescribed counts
+  coach-led sessions `done` and core sessions logged against the overlay
+  line (or the program session when no overlay covered the day),
+  comparing `min(logged, prescribed)` working sets per line; a
+  `trained_unlogged` session has no logged sets, so it is not.
+- **Triggers**: readiness and sleep only for the week `--week` names
+  (earlier weeks of a catch-up close read sleep from
+  `coach.block.sleep_debt` only, else `unknown`). RPE drift: a compound
+  or recovery-capped lift whose two newest non-excluded exposures up to
+  the week's end, the newer inside the week, both drift (prescriptions
+  from `coach.propose.Run.exposures`). Niggle: a row whose status on the
+  week's last day (today for the week closed today or later) is
+  `aggravated`. `coach.block.sleep_debt(root, span)` calls
+  `coach.cardio.sleep_debt` when that module exists.
+- **Illness**: a `low` week with an `ill` miss proposes a `return` week
+  with reason `illness` (C42's reason enum gains `illness`), whatever
+  the count.
+- **Light-week state after a close**: an `agreed` week later than the
+  closed week is kept; otherwise the closed week's outcome sets it
+  (`due` → `proposed` for the next week, `watch`, `skipped`, `none` →
+  `not_due`). The status line adds ", proposed again next check-in" to
+  a decline only when the reason is `ceiling`; a declined trigger week
+  is proposed again only if the triggers fire again.
+- **Deep review** reasons: `first_close` (no deep review on record: the
+  later of `state.block.last_deep_review` and the newest deep
+  `check-ins/` record), `six_weeks` (42 days or more since it),
+  `light_week_proposed`, and `restructure_required` (the adherence
+  trigger from `coach.structure.adherence`). R-02's prose names the
+  adherence trigger, not every structural flag, so `volume_undershoot`
+  and `add_session_type_blocked` do not make a check-in deep. `--deep`
+  marks the closed week `deep` and sets `last_deep_review` to today.
+- `block decide`: `declined` needs a proposed (or declined) week and
+  `--reason`; at the ceiling its `revisit_on` is the end of the proposed
+  week. `adopted` takes the proposal's type and week by default; another
+  type needs `--reason`, and with nothing proposed it needs `--reason`
+  and records reason `coach`. An agreed week refuses a second decision
+  until its decision is withdrawn. The output carries `command`, the
+  `propose week --kind deload` run that builds the week (`--transform
+  light` or `--transform return`; none for `deload`, which uses the
+  program's `deload_rule`).
+- `block init --hard-weeks N [--through W] [--started D]` replaces a
+  ledger with no closed week (the migration's seed included): the block
+  keeps the state's id, `--through` defaults to last week and becomes
+  `last_closed_week`, and `--started` defaults to N weeks back from it.
+- `program adopt` keeps the current `block` when a state exists, and
+  starts `b-0001` today when it does not.
+- `block_state` compares `id`, `started`, `hard_weeks_completed` and,
+  once a week is closed, `last_closed_week` with the ledger; it skips
+  without a ledger. `light_week_overlay` warns on an agreed week with no
+  `deload` overlay covering it, and on a current `deload` overlay that
+  no adopted `light_week` decision covers.
+- The status provider `program` (C52) and the dashboard (C38) show the
+  status line instead of the deload status.
 
 ## C44. Coaching mode and config suggestions (R-40a, R-40b; R-21a, R-25, R-30a, R-31 read)
 
