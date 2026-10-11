@@ -4310,10 +4310,11 @@ and `render_card` would capture R-33b's `card` regions.
   deep. A part's tier reason is not recorded, so only record-based
   reasons carry over. `checkin due` uses the same rule.
 - `due_date` = last completed review date + `[checkin] cadence_days`.
-  Before the first review, anchor it to the earliest Program start record,
-  otherwise the earliest ledger block start, otherwise `state.block.started`
-  (set on adoption). These last two are legacy provenance fallbacks; a
-  dedicated adoption provenance field can replace them. Without an anchor,
+  Before the first review, anchor it to the earliest known start across
+  Program start records, ledger block starts and `state.block.started`
+  (set on adoption). A later setup record or block rollover cannot postpone
+  an earlier known adoption. Block dates are legacy provenance fallbacks;
+  a dedicated adoption provenance field can replace them. Without an anchor,
   the date is unknown. Setup-day status is informational until the due date;
   the first actual review is still deep. The 42-day clock starts at that review.
 - `checkin prepare --deep-reason CODE` (repeatable) carries the block preview's

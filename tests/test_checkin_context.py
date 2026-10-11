@@ -63,6 +63,22 @@ class ReviewContextTest(HistoryCase):
                 self.assertEqual(checkin.due(self.root, date(2026, 10, 18)).due_date, date(2026, 10, 25))
                 self.assertEqual(self.status("2026-10-25")["level"], "attention")
 
+    def test_later_setup_record_cannot_postpone_adoption_due_date(self):
+        config_path = self.root / "config.toml"
+        config = config_path.read_text(encoding="utf-8")
+        for cadence, due_day in ((7, "2026-10-18"), (14, "2026-10-25")):
+            with self.subTest(cadence=cadence):
+                (self.root / "check-ins/2026-10-12.md").unlink(missing_ok=True)
+                config_path.write_text(config + f"\n[checkin]\ncadence_days = {cadence}\n", encoding="utf-8")
+                before = self.status(due_day)
+                self.assertEqual((before["level"], before["data"]["due_date"]), ("attention", due_day))
+                setup = self.record("2026-10-12", "# Program start — 2026-10-12")
+                after = self.status(due_day)
+                self.assertEqual(after, before)
+                self.assertEqual(checkin.due(self.root, dates.parse_date(due_day)).due_date.isoformat(), due_day)
+                self.assertEqual(self.status("2026-10-11")["level"], "info")
+                setup.unlink()
+
     def test_setup_anchor_survives_a_later_block_start(self):
         self.record("2026-10-11", "# Program start — 2026-10-11")
         self.edit_json("data/state.json", lambda doc: doc["block"].update(started="2026-11-01"))
@@ -74,6 +90,9 @@ class ReviewContextTest(HistoryCase):
             "id": "b-0001", "started": "2026-10-11", "seed_hard_weeks": 0, "seed_reason": None,
             "ended": None, "end_reason": None, "weeks": []}]})
         self.assertEqual(checkin.due(self.root, date(2026, 11, 1)).due_date, date(2026, 10, 18))
+        self.record("2026-10-12", "# Program start — 2026-10-12")
+        self.assertEqual(checkin.due(self.root, date(2026, 11, 1)).due_date, date(2026, 10, 18))
+        self.assertEqual(self.status("2026-10-18")["level"], "attention")
 
     def test_malformed_and_mismatched_titles_do_not_count_but_legacy_checkins_do(self):
         for day, title in (("2026-10-11", "# Notes"),

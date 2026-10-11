@@ -212,18 +212,16 @@ def mode_for(found, day):
 
 
 def first_review_anchor(root):
-    """Setup is explicit provenance; older instances retain the initial start in the block ledger or state."""
-    starts = [record.date for record in records(root) if record.tier == PROGRAM_START]
-    if starts:
-        return min(starts)
+    """Later setup records and block rollovers cannot postpone the earliest persisted start."""
     from coach import block
+    starts = [record.date for record in records(root) if record.tier == PROGRAM_START]
     ledger = block.load(root)
-    starts = [dates.parse_date(item["started"]) for item in (ledger or {}).get("blocks", []) if item["started"]]
-    if starts:
-        return min(starts)
+    starts += [dates.parse_date(item["started"]) for item in (ledger or {}).get("blocks", []) if item["started"]]
     state_doc = history.load_optional(state, root)
     started = (state_doc or {}).get("block", {}).get("started")
-    return dates.parse_date(started) if started else None
+    if started:
+        starts.append(dates.parse_date(started))
+    return min(starts, default=None)
 
 
 def due(root, today):
