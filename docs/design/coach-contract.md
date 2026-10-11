@@ -46,7 +46,7 @@ coach/                       # framework: synced to instances
   overlay.py, render.py                                                                  (R-13)
   routines.py                # diff, push, verify, retire; create                        (R-14, R-14b)
   gate.py                    # PreToolUse hook logic                                     (R-15)
-  program.py, state.py, migrate.py, migrations/<doc>/NNNN_<slug>.py                      (R-17a)
+  program.py, state.py, migrate.py, migrations/<doc>/{__init__,NNNN_<slug>}.py           (R-17a)
                              # program.py also holds import_hevy and adopt               (R-41a)
   history.py                 # resolve workouts, annotations, exposures                  (R-20)
   history_sources/<name>.py  # one module per history input: hevy (R-20), manual (R-40c)
@@ -1076,6 +1076,7 @@ files to it; nobody edits another item's files.
 | exercises (`id`, mode, Hevy template id) | `bb_back_squat` total `F0000001`; `db_bench_press` per_hand_x2 `F0000002`; `db_single_arm_row` single_implement `F0000003`; `pull_up` bodyweight `F0000004` |
 | routines | `00000000-0000-4000-8000-000000000001` "Session A" (squat, DB bench); `...0002` "Session B" (row, pull-up) |
 | sessions | `session-a`, `session-b` |
+| program and state (R-17a) | `data/program.json`: Session A squat 3×5 RPE 7 from 100, DB bench 3×8–10 RPE 8 from 25/hand; Session B row 3×10 RPE 8 from 30, pull-up 3×8 RPE 8 at BW; `fixed_weekdays` mon/thu; no external sessions; `data/state.json` mapping both C14 routines, folder 1; `routine/` pages rendered from it |
 | overlay | `2026-10-12-weekly`, span 2026-10-12 to 2026-10-18, approved; Session A 2026-10-12 (squat 100, DB bench 25/hand (Hevy: 50)), Session B 2026-10-15 (row 30 (Hevy: 30), pull-up BW); built from `tests/fixtures/overlay/draft-kg.json` |
 | check-in (R-13) | `check-ins/2026-10-11.md` holding the rendered region of `2026-10-12-weekly` |
 | `COACH_NOW` | `2026-10-11T18:00:00Z` |
@@ -1122,6 +1123,7 @@ Unless stated, each is a copy of `valid/` plus what is listed.
 | `interference/` | R-44a | a planned quality run on 2026-10-11 and Session A (squat at RPE 7) on 2026-10-12 |
 | `overlay-bad-schema/`, `overlay-bad-arithmetic/`, `overlay-stale-render/` | R-13 | `config.toml` plus the valid overlay with one fault each: Session B dated outside the span; DB bench working sets at `hevy_total` 25 for 25/hand; a hand-edited check-in region |
 | `routines-drift/`, `routines-pushed/` | R-14 | not copies of `valid/`: its `config.toml`, the valid overlay and a Hevy cache (`meta.json`, `routines.json`). `routines-drift/` caches the synthetic routines as pulled; `routines-pushed/` caches them after `routines push` of the valid overlay to the fake |
+| `program-bad-schema/`, `program-misspelt-key/`, `program-unknown-exercise/`, `program-avoided/`, `program-stale-render/`, `program-top-set/`, `state-bad-schema/` | R-17a | not copies of `valid/`: `config.toml` plus the valid program with one change each: DB bench without `load_mode`; squat `rest_secs`; squat as `no_such_exercise`; an instance library marking DB bench `avoid`; the valid routine pages with one character of `session-a.md` edited; squat as a 1×3 top set and 3×5 back-offs; a state with deload status `pending` |
 
 `dose/` weeks:
 
@@ -1189,9 +1191,9 @@ Squat Day", "W2 Squat Day", "W3 Squat Day", "Bench Day", squat top loads
 
 ## C16. Program and state documents (R-17a owns; R-22, R-23a, R-30a, R-31, R-41a, R-44a read)
 
-A starting design, not a fixed one. The R-17a builder may change or improve
-it where building it shows a better shape; the change goes in this section in
-the same PR and is listed in the PR description under "Schema changes".
+Built by R-17a; the schemas are `coach/schemas/program.schema.json` and
+`coach/schemas/state.schema.json`. Later items change them only through a
+version bump (below).
 
 `data/program.json`:
 
@@ -1237,22 +1239,46 @@ the same PR and is listed in the PR description under "Schema changes".
 }
 ```
 
+- Every key shown is required except session `location`. A session
+  without it reads as `location: null`; `coach.program.load(root)` fills
+  it, so readers always see the key.
 - `kind`: `lifting`, `conditioning`. `tier`: `core`, `optional`. `status`:
-  `active`, `parked`, `standby`.
+  `active`, `parked`, `standby`. A session needs at least one exercise.
+- Session ids are unique and never `program` (its page would overwrite
+  `routine/program.md`). An exercise appears at most once per session:
+  a top set and back-offs are one entry with two set groups, which keeps
+  `<session_id>/<exercise_id>` a unique slot key.
 - `location`: null (the main `[equipment]` table) or the name of a
   `[equipment.locations.*]` table (C54); `program validate` fails on a name
-  config does not define.
+  config does not define, at the session's JSONPath.
 - `sets` is a list of set groups. Each group has `count`, `type` (as in
   C10), exactly one of `reps` or `rep_range`, and optional `rpe`,
-  `duration_seconds`, `distance_meters`. A plain 3×5 is one group.
+  `duration_seconds`, `distance_meters`. A plain 3×5 is one group. As in
+  C10, a `duration` group needs `duration_seconds`, a `distance` group
+  needs `distance_meters`, and for those two modes `reps` and `rep_range`
+  are optional.
 - `start_load` is in athlete units and per hand for per-hand modes, like
-  every load a human writes; code builds load objects from it (C5).
+  every load a human writes; code builds load objects from it (C5). Null
+  on a loaded mode means the coach picks the first load; it must be null
+  for `band`, `duration` and `distance`.
+- `constraints` items are free text in v1 (R-23a's v2 gives them the C26
+  shape).
+- `external_sessions`: `weekday` is a weekday id or null (no fixed day);
+  `estimated_sets` keys are the C5 muscle ids, values whole hard sets.
+  External ids may not repeat a session id.
 - `schedule.rule`: `fixed_weekdays`, `alternating_external_anchor`,
   `next_in_sequence`, `explicit_calendar`.
-- Scheme, schedule and deload names are checked against a fixed list; their
-  `params` are free-form objects in v1. R-23a adds a schema per plugin and
-  bumps the version (C23).
-- Missed-day rules are free text in v1; R-22 makes them executable (C37).
+- `blocks.hard_weeks_ceiling` is 4 to 8 (`CLAUDE.md` "Fatigue management
+  & deloads"). `blocks.deload_rule.name`: `standard`, `scheme`, `light`
+  (C23 transforms).
+- Scheme names: the C23 schemes of kind `scheme` (`hold`, `linear`,
+  `double_progression`, `fixed_reps_rpe`, `rpe_anchored`, `wave_531`,
+  `assistance_ladder`, `maintenance`). Scheme, schedule and deload names
+  are checked against these fixed lists; their `params` are free-form
+  objects in v1. R-23a adds a schema per plugin and bumps the version
+  (C23).
+- Missed-day rules are free text in v1; each names a program session.
+  R-22 makes them executable (C37).
 
 `data/state.json`:
 
@@ -1269,17 +1295,94 @@ the same PR and is listed in the PR description under "Schema changes".
   "scheme_state": {"session-a/bb_back_squat": {}},
   "hevy": {
     "routines": {"00000000-0000-4000-8000-000000000001": {"session_id": "session-a"}},
-    "folders": {"program": null, "one_off": null},
+    "folders": {"program": 1, "one_off": null},
     "temporary_routines": []
   }
 }
 ```
 
+- `rotation.position` is null when the schedule has no rotation
+  (`fixed_weekdays`); `confirmed_at` is a date or null.
 - `deload.status`: `not_due`, `due`, `in_progress`, `done`, `skipped`.
   R-31 replaces `block` with the C42 shape.
 - `one_off`: null or `{"overlay_id": id, "span": span}`.
-- `hevy.routines` replaces `routine/hevy-map.json`. R-14b's `routines
-  create` records new routine ids here, never in the overlay.
+- `scheme_state` keys are `<session_id>/<exercise_id>` and name a slot the
+  program has; values are free-form objects in v1.
+- `hevy.routines` replaces `routine/hevy-map.json`; each `session_id`
+  names a program session. Folder ids are Hevy's integers or null. R-14b's
+  `routines create` records new routine ids here, never in the overlay.
+
+**Reading and validating.** `coach.program.load(root)` and
+`coach.state.load(root)` return the schema-checked document (ValidationError,
+exit 1, when absent, malformed or at another version).
+`coach.program.problems(doc, config, library)` adds the cross-checks
+(duplicate ids, set groups, start loads, locations, library ids) as
+`(kind, Error)` pairs; `coach.state.problems(doc, program)` adds dates and
+references into the program. `program validate` reports all of them;
+`state show` refuses an invalid state the same way.
+
+**Rendered pages.** `coach.program.render_all(root) -> {path: text}` gives
+`routine/program.md` (sessions with links, schedule rule, coach-led
+sessions, block ceiling and deload rule, missed-day rules) and
+`routine/<session id>.md` for every session (one table row per set
+group; start loads through `units.format_load` on the first working
+group's row; cues and constraints listed below). It renders from
+`data/program.json`, the exercise library (names) and `[athlete] units`
+only, never from state, so a weekly state change never makes a page
+stale. Each page starts with the C11 header naming `data/program.json`
+and `program render`. `program render` writes changed pages, deletes
+generated pages for sessions the program no longer has, and leaves any
+other `routine/*.md` in place with a warning.
+
+**Checks** (R-17a): `program_schema` (schema and cross-checks, one `fail`
+per problem), `state_schema`, `program_exercise_ids` (every exercise id
+in the library, every `load_mode` set; reads the raw file, so it works on
+a program the schema rejects), `routine_render_fresh` (every page equals
+a fresh render; a missing page, a stale generated page or any other
+`routine/*.md` fails, naming the file), and `avoided_in_program` (`warn`
+for each active session's exercise the library marks `avoid`, C54). All
+skip when there is no `data/program.json` (`state_schema`: no
+`data/state.json`).
+
+**Migration runner** (`coach/migrate.py`; commands `migrate status`,
+`migrate run [--dry-run]`).
+
+- An owned document type is a subpackage `coach/migrations/<schema name>/`
+  whose `__init__.py` sets `FILES`, a tuple of glob patterns from the
+  instance root. R-17a declares `program` (`data/program.json`), `state`,
+  `overlay` (`data/overlays/*.json`) and `exercise_library`
+  (`data/exercises.json`). An item that adds a committed JSON document
+  adds its own subpackage (C1: add files). Append-only JSONL logs keep
+  each line at the version it was written (readers handle old lines),
+  and the gitignored `.coach/` caches are rebuilt rather than migrated,
+  so neither is declared.
+- A step is a module `NNNN_<slug>.py` in that subpackage defining `DOC`
+  (the subpackage name), `FROM`, `TO` (= `FROM` + 1) and `migrate(doc) ->
+  doc`, plus optionally `notes(before, after) -> list[str]` for lines the
+  report should carry (R-24 lists the overlays that lose their approval).
+  The runner sets `schema_version` to `TO` after each step. The target
+  version is the `schema_version` const of `coach/schemas/<schema
+  name>.schema.json`. Discovery rejects a step past that version, two
+  steps from one version, a `DOC` that does not match its directory and
+  a misnamed file.
+- `migrate status`: one row per owned file with `version`, `target` and
+  `state` (`current`, `behind`, `ahead`, `unreadable`), plus `behind`, the
+  count behind.
+- `migrate run`: plans the step chain for every file behind; a file ahead
+  ("run /framework-sync"), unreadable, or missing a step exits 1 before
+  anything is written. It then copies each file to be migrated to
+  `.coach/backups/<YYYYMMDDTHHMMSSZ>/<its path>` (`-2`, `-3` on a clash),
+  migrates every file in memory and validates each result against its
+  schema. Any invalid result exits 1 with each problem as
+  `<file>: <JSONPath>` and writes nothing. Otherwise it writes every file
+  (restoring all of them from the backup if a write fails) and runs `git
+  add` on them. It never commits. Outside a git work tree it writes and
+  warns that nothing is staged. Output: `files` (path, doc, from, to,
+  steps), `notes`, `backup`, `written`, `staged`.
+- `--dry-run` does the same reads, migration and validation in memory,
+  writes no backup and no file, and exits as the real run would.
+- `/framework-sync` runs the dry run after copying files, shows it, runs
+  `migrate run`, and commits the staged files with the framework.
 
 **Schema versions.** R-17a ships program and state v1; R-23a takes both to
 v2 (C23). Every later bump takes the next free version when it merges and
