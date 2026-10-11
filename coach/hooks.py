@@ -49,6 +49,9 @@ PATH_MAP = (
     ("nutrition/menu/*.md", ("recipe_cards", "recipe_render_fresh", "recipe_index_fresh", "nutrition_template")),
     ("research/local/*.md", _RESEARCH_CHECKS + ("research_citations",)),
     ("research/*.md", _RESEARCH_CHECKS),
+    ("this-week.md", ("pages_fresh", "pages_line_ceiling")),
+    ("README.md", ("pages_fresh",)),
+    ("progress.md", ("pages_fresh",)),
 )
 
 
