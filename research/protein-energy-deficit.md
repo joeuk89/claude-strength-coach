@@ -155,18 +155,22 @@ n = 1
 text = "The protein target is 1.6 g/kg/day of the reference mass, because gains in fat-free mass from resistance training stop rising at about 1.6 g/kg/day."
 basis = "evidence"
 sources = ["morton-2018", "nunes-2022", "tagawa-2021", "jager-2017"]
-status = "current"
+status = "retired"
+retired_on = 2026-10-11
+superseded_by = "rn:protein-energy-deficit.17"
 
 [[claims]]
 n = 2
 text = "The protein stretch is 2.2 g/kg/day of the reference mass, the top of the 95 % confidence interval around that plateau and the most that still adds anything."
 basis = "evidence"
 sources = ["morton-2018"]
-status = "current"
+status = "retired"
+retired_on = 2026-10-11
+superseded_by = "rn:protein-energy-deficit.18"
 
 [[claims]]
 n = 3
-text = "Protein is set per kg of a reference mass: fat-free mass when a credible body-fat reading exists, goal weight when body fat is high, and current bodyweight otherwise."
+text = "Protein is set per kg of a reference mass: fat-free mass when a credible body-fat reading exists, goal weight when any available rough/no-reading high-body-fat cue is positive, and current bodyweight otherwise."
 basis = "heuristic"
 sources = ["helms-2014", "weijs-2016", "romero-corral-2008"]
 status = "current"
@@ -183,7 +187,9 @@ n = 5
 text = "With no body-fat reading, body fat counts as high when BMI is 30 or more or the goal weight is 10 % or more below current bodyweight, because BMI 30 alone misses over half of people with excess fat."
 basis = "heuristic"
 sources = ["romero-corral-2008"]
-status = "current"
+status = "retired"
+retired_on = 2026-10-11
+superseded_by = "rn:protein-energy-deficit.19"
 
 [[claims]]
 n = 6
@@ -202,16 +208,16 @@ confidence = "low"
 
 [[claims]]
 n = 8
-text = "The protein floor starts at recent average intake plus ~15–20 g, no higher than the target, so the athlete is held to a number they can reach this week."
+text = "The protein floor is a minimum commitment starting at recent average intake plus ~15–20 g, bounded by the minimum and target, while app settings or actual intake at or above it remain compatible."
 basis = "heuristic"
 sources = []
 status = "current"
 
 [[claims]]
 n = 9
-text = "When the weekly average protein meets or beats the floor at two consecutive check-ins, the floor rises by ~10–15 g, never above the target."
+text = "When measured weekly average protein meets or beats the floor at two consecutive check-ins since floor_since, propose raising the floor by ~10–15 g, never above the target, increasing an app setting only if below the new floor and reviewing any active protein override."
 basis = "heuristic"
-sources = ["tagawa-2021"]
+sources = []
 status = "current"
 
 [[claims]]
@@ -264,6 +270,34 @@ basis = "heuristic"
 sources = ["hall-2008", "slater-2019"]
 status = "current"
 confidence = "low"
+
+[[claims]]
+n = 17
+text = "The protein target remains 1.6 g/kg/day of the reference mass, a coaching application of Morton's estimated average breakpoint rather than a universal individual benefit cap."
+basis = "heuristic"
+sources = ["morton-2018"]
+status = "current"
+
+[[claims]]
+n = 18
+text = "The protein stretch remains 2.2 g/kg/day of the reference mass, informed by the upper 95 % confidence limit around Morton's breakpoint, without requiring a compatible higher intake to be reduced."
+basis = "heuristic"
+sources = ["morton-2018"]
+status = "current"
+
+[[claims]]
+n = 19
+text = "With rough or absent body-fat evidence, any available positive cue selects goal weight: body fat above ~25 % for men or ~35 % for women, goal weight 10 % or more below bodyweight, or BMI 30 or more; this combination and goal-gap threshold are coaching heuristics."
+basis = "heuristic"
+sources = ["romero-corral-2008"]
+status = "current"
+
+[[claims]]
+n = 20
+text = "Three consecutive no-app check-in readings since floor_since without measured weekly average protein, while the floor is below target, prompt optional calibration, explicit goals review or a deliberate hold; anchor adherence and one-day estimates cannot qualify a numerical raise."
+basis = "heuristic"
+sources = []
+status = "current"
 -->
 <!-- coach:begin research protein-energy-deficit -->
 
@@ -271,15 +305,15 @@ confidence = "low"
 
 | # | Claim | Basis | Sources | Status |
 | --- | --- | --- | --- | --- |
-| 1 | The protein target is 1.6 g/kg/day of the reference mass, because gains in fat-free mass from resistance training stop rising at about 1.6 g/kg/day. | evidence | morton-2018, nunes-2022, tagawa-2021, jager-2017 | current |
-| 2 | The protein stretch is 2.2 g/kg/day of the reference mass, the top of the 95 % confidence interval around that plateau and the most that still adds anything. | evidence | morton-2018 | current |
-| 3 | Protein is set per kg of a reference mass: fat-free mass when a credible body-fat reading exists, goal weight when body fat is high, and current bodyweight otherwise. | heuristic | helms-2014, weijs-2016, romero-corral-2008 | current |
+| 1 | The protein target is 1.6 g/kg/day of the reference mass, because gains in fat-free mass from resistance training stop rising at about 1.6 g/kg/day. | evidence | morton-2018, nunes-2022, tagawa-2021, jager-2017 | retired 2026-10-11, see rn:protein-energy-deficit.17 |
+| 2 | The protein stretch is 2.2 g/kg/day of the reference mass, the top of the 95 % confidence interval around that plateau and the most that still adds anything. | evidence | morton-2018 | retired 2026-10-11, see rn:protein-energy-deficit.18 |
+| 3 | Protein is set per kg of a reference mass: fat-free mass when a credible body-fat reading exists, goal weight when any available rough/no-reading high-body-fat cue is positive, and current bodyweight otherwise. | heuristic | helms-2014, weijs-2016, romero-corral-2008 | current |
 | 4 | Body fat counts as high above ~25 % for men or ~35 % for women, the WHO obesity lines that research uses. | heuristic | romero-corral-2008 | current |
-| 5 | With no body-fat reading, body fat counts as high when BMI is 30 or more or the goal weight is 10 % or more below current bodyweight, because BMI 30 alone misses over half of people with excess fat. | heuristic | romero-corral-2008 | current |
+| 5 | With no body-fat reading, body fat counts as high when BMI is 30 or more or the goal weight is 10 % or more below current bodyweight, because BMI 30 alone misses over half of people with excess fat. | heuristic | romero-corral-2008 | retired 2026-10-11, see rn:protein-energy-deficit.19 |
 | 6 | Per kg of fat-free mass the protein target is ~2.0 g/kg and the stretch ~2.6–2.8 g/kg, the bodyweight figures converted at ~15–20 % body fat, with the stretch inside the 2.3–3.1 g/kg of fat-free mass that lean lifters likely need in a deficit. | evidence | morton-2018, helms-2014, helms-aragon-2014 | current |
 | 7 | The protein floor is never below 1.2 g/kg of bodyweight or goal weight (~1.5 g/kg of fat-free mass), because muscle loss during weight loss is more likely at lower intakes. | evidence (low confidence) | kokura-2024, weijs-2016 | current |
-| 8 | The protein floor starts at recent average intake plus ~15–20 g, no higher than the target, so the athlete is held to a number they can reach this week. | heuristic | none | current |
-| 9 | When the weekly average protein meets or beats the floor at two consecutive check-ins, the floor rises by ~10–15 g, never above the target. | heuristic | tagawa-2021 | current |
+| 8 | The protein floor is a minimum commitment starting at recent average intake plus ~15–20 g, bounded by the minimum and target, while app settings or actual intake at or above it remain compatible. | heuristic | none | current |
+| 9 | When measured weekly average protein meets or beats the floor at two consecutive check-ins since floor_since, propose raising the floor by ~10–15 g, never above the target, increasing an app setting only if below the new floor and reviewing any active protein override. | heuristic | none | current |
 | 10 | An energy deficit blunts the lean mass gained from resistance training but not the strength gained, and a deficit of about 500 kcal/day is enough to stop lean-mass gain. | evidence | murphy-koehler-2022 | current |
 | 11 | A cut loses no faster than ~0.5–1 % of bodyweight per week, slower when close to the goal, because slower loss keeps more lean mass. | evidence | garthe-2011, helms-aragon-2014, murphy-koehler-2022 | current |
 | 12 | A bulk gains ~0.25–0.5 % of bodyweight per week, nearer the low end for advanced lifters, because faster gain adds mostly fat rather than more muscle or strength. | evidence (low confidence) | iraki-2019, helms-2023 | current |
@@ -287,6 +321,10 @@ confidence = "low"
 | 14 | Without a nutrition app, maintenance starts from the Mifflin–St Jeor resting rate, 10 × weight in kg + 6.25 × height in cm − 5 × age in years, + 5 for men or − 161 for women, the predictive equation most often within 10 % of measured resting rate in non-obese and obese adults. | evidence | mifflin-1990, frankenfield-2005 | current |
 | 15 | The resting rate is multiplied by a physical activity level of 1.53 for a sedentary or lightly active lifestyle, 1.76 for an active or moderately active one and 2.25 for a vigorous one, the FAO/WHO/UNU worked examples for those three lifestyles. | consensus | fao-2004 | current |
 | 16 | Each phase's starting calorie estimate adds its weekly rate × 7700 kcal per kg ÷ 7 to maintenance, rounded to the nearest 50 kcal, and is only a start: 7700 kcal overstates the energy in a kg of weight change for lean athletes and no surplus for muscle gain has been validated, so the weight trend moves calories after that. | heuristic (low confidence) | hall-2008, slater-2019 | current |
+| 17 | The protein target remains 1.6 g/kg/day of the reference mass, a coaching application of Morton's estimated average breakpoint rather than a universal individual benefit cap. | heuristic | morton-2018 | current |
+| 18 | The protein stretch remains 2.2 g/kg/day of the reference mass, informed by the upper 95 % confidence limit around Morton's breakpoint, without requiring a compatible higher intake to be reduced. | heuristic | morton-2018 | current |
+| 19 | With rough or absent body-fat evidence, any available positive cue selects goal weight: body fat above ~25 % for men or ~35 % for women, goal weight 10 % or more below bodyweight, or BMI 30 or more; this combination and goal-gap threshold are coaching heuristics. | heuristic | romero-corral-2008 | current |
+| 20 | Three consecutive no-app check-in readings since floor_since without measured weekly average protein, while the floor is below target, prompt optional calibration, explicit goals review or a deliberate hold; anchor adherence and one-day estimates cannot qualify a numerical raise. | heuristic | none | current |
 
 | Source | Citation | Type | Year |
 | --- | --- | --- | --- |
@@ -316,33 +354,22 @@ confidence = "low"
 ## Answer
 
 Coach protein toward 1.6 g/kg/day of a reference mass, with 2.2 g/kg/day
-as the most that still helps and a reachable floor no lower than
+as an optional stretch and a minimum commitment no lower than
 1.2 g/kg/day. The reference mass is fat-free mass with a credible
-body-fat reading, goal weight when body fat is high, and bodyweight
+body-fat reading, goal weight from rough/no-reading cues, and bodyweight
 otherwise. Cut at ~0.5–1 % of bodyweight per week and bulk at
 ~0.25–0.5 % of bodyweight per week, nearer the low end for advanced
 lifters.
 
 ## Evidence
 
-**Claims 1 and 2.** Morton et al. (2018, 49 trials, 1,863 participants)
-found that "protein supplementation beyond total protein intakes of
-1.62 g/kg/day resulted in no further RET-induced gains in FFM". The full
-text gives the 95 % confidence interval as 1.03 to 2.20 g/kg/day and
-says "it may be prudent to recommend ~2.2 g protein/kg/d for those
-seeking to maximise resistance training-induced gains in FFM". Nunes et
-al. (2022, 74 trials) found the lean-mass benefit significant in lifters
-under 65 eating 1.6 g/kg/day or more. Tagawa et al. (2021, 105 articles)
-found lean mass still rose above 1.3 g/kg/day, but by about a third as
-much per 0.1 g/kg/day as below it. The ISSN position stand (Jäger et al.
-2017) puts 1.4–2.0 g/kg/day as "sufficient for most exercising
-individuals". The same stand says "higher protein intakes (2.3-3.1
-g/kg/d) may be needed to maximize the retention of lean body mass in
-resistance-trained subjects during hypocaloric periods", so it backs
-claim 1 but not claim 2's ceiling. This note handles a deficit through
-the fat-free-mass figures in claim 6, not by raising the bodyweight
-stretch. All of these express protein per kg of total bodyweight in
-mostly lean or normal-weight people.
+**Claims 17 and 18 (replace 1 and 2).** Morton et al. (2018) estimate
+an average breakpoint of 1.62 g/kg/day, with a 95 % confidence interval
+of 1.03–2.20, from resistance-training studies in people meeting or
+exceeding energy needs. These are uncertain population estimates, not
+an individual benefit ceiling or instructions to lower intake to a
+floor. Applying the unchanged multipliers to a reference mass is a
+coaching policy; deficit-specific fat-free-mass figures remain in claim 6.
 
 **Claim 3.** No trial compares reference masses directly, so this is a
 coaching rule. It follows from how the evidence is reported: Morton and
@@ -359,11 +386,13 @@ weight, so the claim stays a coaching rule. The lines are applied to
 rougher readings (a smart scale or a tape method), where the error is a
 few percentage points either way.
 
-**Claim 5.** Romero-Corral et al. (2008, 13,601 adults) found BMI 30 or
-more had high specificity but "poor sensitivity" (36 % in men, 49 % in
-women) for excess body fat: it "misses more than half of people with
-excess fat". The goal-weight test catches the rest. The 10 % figure is a
-coaching rule.
+**Claim 19 (replaces 5).** Romero-Corral et al. (2008) found BMI 30 or
+more missed many people with excess body fat despite high specificity.
+It does not validate a goal-weight gap or combining cues with OR. Those
+are reference-selection heuristics, not a body-composition diagnosis.
+With rough or absent readings, a positive available cue selects goal
+weight; a rough reading below its line cannot erase a positive goal-gap
+or BMI cue. Necessary missing inputs are requested, not inferred.
 
 **Claim 6.** The conversion is arithmetic: 1.6 g/kg at 15–20 % body fat
 is 1.9–2.0 g/kg of fat-free mass, and 2.2 g/kg is 2.6–2.75 g/kg.
@@ -387,10 +416,12 @@ figure is 1.2 g/kg converted at ~20 % body fat.
 **Claim 8.** A coaching rule with no direct trial. It sets a floor the
 athlete can meet now and leaves the target as the direction of travel.
 
-**Claim 9.** A coaching rule for building the habit. Tagawa et al.
-(2021) found each extra 0.1 g/kg/day of protein added lean mass across
-0.5 to 3.5 g/kg/day, so small steps up are worth taking. For a 75–100 kg
-reference mass, 0.1–0.15 g/kg/day is about 10–15 g.
+**Claims 9 and 20.** The two measured readings for a raise and three
+unmeasured readings for a prompt are workflow choices without direct
+trial validation. Anchor adherence is habit evidence, not measured
+protein grams. Calibration is optional; the athlete can choose goals
+review or hold the floor. A single-day estimate stays in notes, while
+`avg_protein_g` is reserved for an observed weekly average.
 
 **Claim 10.** Murphy and Koehler (2022) found lean-mass gains "impaired"
 in resistance training with an energy deficit compared with without one
@@ -463,14 +494,19 @@ number from looking more precise than it is.
 
 ## Applying it
 
-- `coach nutrition targets` picks the reference mass (claims 3–5) and
-  gives the floor, target and stretch from it (claims 1, 2, 6–8), each
+- `coach nutrition targets` picks the reference mass (claims 3, 4, 19) and
+  gives the floor, target and stretch from it (claims 17, 18, 6–8), each
   rounded to 5 g; `/goals` quotes them.
 - Without a nutrition app, the same command gives one starting calorie
   estimate per phase (claims 14–16); only the weight trend moves it
   after that.
 - `/check-in` raises the floor by ~10–15 g after two consecutive check-ins
-  at or above it (claim 9) and never lowers it.
+  with measured weekly averages at or above it (claim 9) and never lowers it.
+  App settings at or above the floor remain compatible; increases only
+  require an app change if below the new floor, respecting active overrides.
+- Three unmeasured no-app readings since `floor_since`, with the floor
+  below target, prompt optional calibration, explicit goals review or
+  a deliberate hold (claim 20).
 - On a cut, hold the trend to ~0.5–1 % of bodyweight a week and push
   protein toward the stretch as the athlete gets leaner (claims 6, 10,
   11). On a bulk, hold the trend to ~0.25–0.5 % of bodyweight a week,

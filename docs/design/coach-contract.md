@@ -3610,8 +3610,8 @@ dates unique:
   are the app's numbers. The one calorie figure the package computes is
   `nutrition targets`' starting estimate for `app = "none"`, and only
   `coach/calories.py` names a calorie equation.
-- `nutrition status` flags: `protein_floor_raise`, `override_expired`,
-  `override_renewed_twice`, `app_protein_mismatch`, `logging_incomplete`,
+- `nutrition status` flags: `protein_floor_raise`, `protein_unmeasured`,
+  `override_expired`, `override_renewed_twice`, `app_protein_mismatch`, `logging_incomplete`,
   `no_recent_reading`. It returns `data.brief_line` and `data.questions`;
   R-25 and R-21a print them when nutrition is enabled (a soft dependency:
   absent or `{"enabled": false}` means nothing is printed).
@@ -3645,11 +3645,21 @@ dates unique:
   on or after `floor_since` both have `avg_protein_g >= floor_g`, and
   the floor is under the target; it proposes `min(floor_g +
   floor_step_g, target_g)`, with `floor_since` set to the day after the
-  later of `dates` so neither counted reading counts again. `override_expired`
-  (`expires`): today is on or after `expires`. `override_renewed_twice`
+  later of `dates` so neither counted reading counts again. App targets
+  at or above the new floor stay unchanged; only a below-floor setting
+  prompts an increase. Active overrides are reviewed before changing
+  agreed values. `protein_unmeasured` (`floor_g`, `target_g`, `dates`,
+  `refs`): the three latest readings since `floor_since` all have
+  `source: "scale"` and null `avg_protein_g`, with no app and floor below
+  target. Offer optional calibration, explicit goals review or a deliberate
+  hold (claim 20); anchors and one-day estimates cannot qualify a raise.
+  Store a one-day estimate in `note`, not `avg_protein_g`.
+  `override_expired` (`expires`): today is on or after `expires`. `override_renewed_twice`
   (`renewal`): `renewal` is 2. `app_protein_mismatch` (`app_protein_g`,
   `floor_g`, `override_active`): an app is in use and the latest
-  reading's `target_protein_g` differs from `floor_g`.
+  reading's `target_protein_g` is below `floor_g`; equal and higher settings
+  are compatible. The reading retains the app's actual target, while config
+  keeps `floor_g <= target_g <= stretch_g`.
   `logging_incomplete` (`days_logged`): the latest reading logged fewer
   than 7 days. `no_recent_reading` (`last_reading`): no reading, or the
   latest is more than 14 days old.
@@ -3683,12 +3693,15 @@ dates unique:
   `protein`, `calories` and `missing`.
   - `reference`: `{basis, mass, unit, mass_kg, reason, refs, bmi}`. The
     first rule that applies: a credible reading gives `fat_free_mass`
-    (bodyweight × (1 − body fat)); high body fat gives `goal_weight`;
-    otherwise `bodyweight`. Body fat is high on a rough reading above 25 %
-    for `male` or 35 % for `female` (`--sex` is needed only between the
-    two); with no reading, when the goal weight is 10 % or more below
-    bodyweight or BMI is 30 or more. `bmi` is truncated to 0.1 and null
-    without a height. `basis` takes the `reference_basis` values.
+    (bodyweight × (1 − body fat)). For rough or absent readings, combine
+    available cues: rough body fat above 25 % for `male` or 35 % for
+    `female`, goal weight at least 10 % below bodyweight, or BMI at least
+    30. Any positive cue gives `goal_weight`, with the cues in `reason`;
+    otherwise `bodyweight`. With no positive cue, an ambiguous rough
+    reading needs `--sex`; without a usable rough cue, BMI needs height.
+    A positive cue needs goal weight if absent. Nothing is invented.
+    `bmi` is truncated to 0.1 and null without height. `basis` takes the
+    `reference_basis` values. These selection gates are heuristics.
   - `protein`: `target` `{g, g_per_kg, refs}`, `stretch` `{g, g_high,
     g_per_kg, g_per_kg_high, refs}` and `floor` `{g, g_min, g_per_kg_min,
     from_intake_g, clamped, refs}`, computed from `mass` as shown.
@@ -3723,9 +3736,11 @@ dates unique:
     `height` or `goal_weight`), then `recent_intake`, then any the
     calorie estimate needs (`app`, or `sex`, `height`, `age`, `activity`,
     `phase`) not already named. Nothing is guessed.
-  - `refs` are `rn:protein-energy-deficit` claims: 3 with 4 (a rough
-    reading) or 5 (no reading) for the basis; 1, 2 and 6 (fat-free mass)
-    for target and stretch; 8 and 7 for the floor.
+  - `refs` are `rn:protein-energy-deficit` claims: 3 for a credible
+    reading, 3/4/19 for a rough reading, 3/19 without a reading;
+    17, 18 and 6 (fat-free mass) for target and stretch; 8 and 7 for
+    the floor. The floor is a minimum commitment, the target a coaching
+    aim, and the stretch an optional higher aim, not a universal benefit cap.
 - Readers: R-25 reads C4 `phase` and may read C35 weights for
   `progress.md`'s bodyweight trend; R-40a reads `[nutrition] enabled` and
   writes the table at setup.

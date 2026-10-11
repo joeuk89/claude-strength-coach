@@ -458,15 +458,15 @@ _Avoid_: food bank, menu (ambiguous with the directory name)
 
 **Protein floor / target / stretch**:
 The three daily protein numbers `/goals` sets, each per kg of a
-**reference mass** (current bodyweight, goal weight when body fat is
-high, or fat-free mass when a credible body-fat reading exists). The
-**target** is what the coach steers toward, the **stretch** is the most
-that still adds anything, and the **floor** is the reachable number the
-athlete is held to now: recent intake plus a little, never under
+**reference mass** (current bodyweight, goal weight from rough/no-reading
+cues, or fat-free mass when a credible body-fat reading exists). The
+**target** is what the coach steers toward, the **stretch** an optional
+higher aim, and the **floor** the minimum commitment now: recent intake plus a little, never under
 1.2 g/kg of bodyweight or goal weight (~1.5 g/kg of fat-free mass) or
 over the target. The floor rises after two consecutive
-check-ins at or over it and only `/goals` lowers it. For a nutrition app
-user the floor is the protein number set in the app.
+measured weekly averages at or over it since `floor_since`, and only
+`/goals` lowers it. An app setting at or above the floor is compatible;
+actual intake and app targets remain separate from that commitment.
 _Avoid_: protein goal, protein minimum, macro target, g/kg bodyweight (without the reference mass)
 
 **Protein anchor**:

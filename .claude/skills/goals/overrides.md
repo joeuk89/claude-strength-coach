@@ -4,7 +4,8 @@ A **nutrition override** is any period in which the athlete eats to a
 number other than the app's (or, without an app, other than the
 trend-driven calorie target on file): holding calories at expenditure
 instead of the app's deficit, a manual calorie band, a protein figure
-other than the floor. If one is agreed, record it as the
+below the floor. An app setting at or above the floor is compatible.
+If an override is agreed, record it as the
 `[nutrition.override]` table in `config.toml` (SKILL.md step 9) with
 every field:
 

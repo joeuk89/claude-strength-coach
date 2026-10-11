@@ -9,7 +9,8 @@ and goal weight from `[nutrition]`. Pass what the athlete told you:
 - `--body-fat <pct> --body-fat-source credible|rough` for a body-fat
   reading (`--help` says which methods count as credible);
 - `--sex` when `missing` asks for it;
-- `--height` when there is no reading (cm, or inches with lb);
+- `--height` for the BMI cue with a rough or absent reading (cm, or
+  inches with lb);
 - `--bodyweight` for a fresh weigh-in, `--goal-weight` for the goal
   agreed in step 3, and `--recent-intake` for a typical day's protein.
 
@@ -19,29 +20,38 @@ When `missing` names an input, ask the athlete for it and run again.
   the reason. Record the basis and the reason, with any reading's method
   and date (SKILL.md step 9).
 - The **target** is the number to coach toward; the **stretch** is the
-  most that still adds anything (useful on a hard cut); the **floor** is
-  the reachable number the athlete is held to this week. With fat-free
-  mass the stretch is a range: agree a number from `g` to `g_high`.
-- **MacroFactor users:** the floor is the protein number set in the app
-  (SKILL.md step 6). The app's protein figure and the floor on file are
-  the same number unless an active nutrition override covers protein.
+  optional higher aim, not a universal benefit cap; the **floor** is
+  the minimum commitment this week. Actual intake can be higher. With
+  fat-free mass the stretch is a range: agree a number from `g` to `g_high`.
+- **MacroFactor users:** keep a comfortable app protein setting at or
+  above the floor (SKILL.md step 6). A below-floor setting prompts review,
+  respecting any active protein override. Record the actual app number;
+  retain floor ≤ target ≤ stretch rather than raising the floor to match it.
 
-Per kg of bodyweight, protein overshoots for an athlete carrying a lot of
-fat; goal weight or fat-free mass keeps it reachable. When the athlete
-asks why a number, `python3 -m coach research show <ref>` prints the
-claim behind each of its `refs`.
+Reference selection uses the available rough body-fat, goal-gap and BMI
+cues together; a positive cue selects goal weight. A credible reading
+uses fat-free mass. Explain the reported reason as a coaching heuristic.
+When the athlete asks why a number, `python3 -m coach research show <ref>`
+prints the claim behind each of its `refs`.
 
 **Habit progression.** The floor moves up as the habit sticks: when
-the weekly average protein meets or beats the floor at **two
+the measured weekly average protein meets or beats the floor at **two
 consecutive check-ins** since the floor last changed, the floor rises by
 ~10–15 g, **never above the target** (rn:protein-energy-deficit.9).
 Missing the floor never lowers it; only `/goals` lowers it, with a
 reason. `/check-in` applies the raise. For MacroFactor users the athlete
-sets the app's protein to the new floor the same day. Whenever `/goals`
-changes `floor_g`, set `floor_since` to the day after the newest reading
+raises the app setting only if below the new floor, after reviewing any
+active protein override. Whenever `/goals` changes `floor_g`, set `floor_since` to the day after the newest reading
 on file (`python3 -m coach nutrition readings --last 1`), or today if
 that is later: a reading already on file measured the old floor and must
 not count toward the next raise.
+
+Three unmeasured no-app check-ins since `floor_since` while below target
+produce `protein_unmeasured`: offer optional calibration, explicit `/goals`
+review or a deliberate hold (rn:protein-energy-deficit.20). Anchor adherence
+cannot qualify a gram-based raise. Keep a typical-day estimate used at
+setup in context notes; only an observed weekly average belongs in
+`avg_protein_g`.
 
 ## Agree the protein anchors
 
