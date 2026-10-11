@@ -170,8 +170,8 @@ Command inventory (owner in brackets). Read-only unless marked W
 | `hevy status` | R-12 | |
 | `hevy pull [--full]` | R-12 | W (gitignored cache only) |
 | `hevy record-fixtures --out DIR` | R-12 | W (GET only, needs a real key) |
-| `overlay list`, `overlay current`, `overlay validate`, `overlay notes` | R-13 | |
-| `overlay build --input FILE`, `overlay render [--into FILE]`, `overlay approve ID` | R-13 | W |
+| `overlay list`, `overlay current [--date D]`, `overlay validate [ID \| --file PATH]` (no argument: every overlay), `overlay notes ID [--session S]` | R-13 | |
+| `overlay build --input FILE`, `overlay render ID [--into FILE]`, `overlay approve ID` | R-13 | W |
 | `routines diff --overlay ID`, `routines verify --overlay ID` | R-14 | |
 | `routines push --overlay ID`, `routines retire --overlay ID` | R-14 | H |
 | `routines create --overlay ID [--dry-run]` | R-14b | H |
@@ -706,13 +706,22 @@ and `retire` line schemas). The API key never appears.
   of `reps` or `rep_range`, optional `rpe`, `load` (null or absent for
   `band`, `duration`, `distance`), `duration_seconds`, `distance_meters`.
   Absent and null are equivalent in the overlay; the Hevy writer omits
-  them (Hevy rejects nulls).
+  them (Hevy rejects nulls). A `duration` set needs `duration_seconds` and
+  a `distance` set needs `distance_meters`; for those two modes `reps` and
+  `rep_range` are optional (at most one). `rep_range.start` is at most
+  `end`. `rpe` is 1 to 10. Working sets are `normal`, `dropset` and
+  `failure`.
+- Loads: every load object passes `units.check_load`, its `mode` equals
+  the line's `load_mode` and its `unit` equals `[athlete] units`. The
+  validator reports each problem at the field's JSONPath
+  (`...load.hevy_total`).
 - **Null load on a loaded mode.** A working set of `total`,
   `per_hand_x2`, `single_implement`, `bodyweight` (added load) or
   `assisted` may carry `load: null` only when its line has a `no_data`
   flag (R-23a) or is a calibration line (R-41b week one). R-13's validator
   accepts it only with that flag on the line; otherwise it is a validation
-  error. R-14's writer omits `weight_kg` for such a set.
+  error. A warm-up set may leave its load null without a flag. R-14's
+  writer omits `weight_kg` for such a set.
 - Session `location`: null or a `[equipment.locations.*]` name (C54),
   defaulting to the program session's location. A constrained one-off week
   (hotel, home) sets it so caps, representable loads and substitution use
@@ -722,12 +731,37 @@ and `retire` line schemas). The API key never appears.
   is the canonical hash (C7) of the whole document with `approval`
   removed. Any edit after approval, including resolving a flag, breaks it.
 - Flag `severity`: `info`, `warn`, `block`. Push refuses any `block` flag
-  with `resolved: false`. Flag codes are registered (C20).
+  with `resolved: false`, and so does `overlay approve` (exit 3). Flag codes
+  are registered (C20). A flag naming an exercise names its session too,
+  and both exist in the overlay. A resolved flag has a non-empty
+  `resolution`; an unresolved one has null.
+- `superset_id`: null or a non-negative integer (Hevy's shape).
 - **Overlay in force** for a date D: of the overlays whose span contains D
   and which have a session dated D, the one with the latest `created_at`.
-  `supersedes` is an audit link; resolution does not depend on it.
+  On a day none of them has a session (a rest day), the latest-created
+  overlay whose span contains D is in force with no session. Ties on
+  `created_at` go to the later id. `supersedes` is an audit link;
+  resolution does not depend on it. `coach.overlay.in_force(root, date)`
+  returns `(overlay, session)`, with session None on a rest day, or None
+  when no span contains D.
 - File name is `data/overlays/<id>.json`; id is `<span.start>-<kind>`,
-  with `-2`, `-3` on collision.
+  with `-2`, `-3` on collision. The kind's underscore becomes a hyphen in
+  the id, because ids match `^\d{4}-\d{2}-\d{2}-[a-z0-9-]+$`:
+  `2026-10-12-one-off`.
+- **Draft** (`coach/schemas/overlay_draft.schema.json`). The coach writes
+  the overlay's shape in athlete units, each set's `load` a number (per
+  hand for per-hand modes, added load for `bodyweight`, assistance for
+  `assisted`, else the total) or null. `overlay build --input FILE`
+  fills what the draft leaves out: `id` (from span and kind, next free
+  suffix), `created_at` (now), `supersedes` null, `flags` [] (each flag
+  `resolved` false, `resolution` null), `approval` null, session
+  `hevy_routine_id` null, `temporary` false, `location` from the program
+  session of the same id when `data/program.json` exists (else null),
+  and null for every optional line field. A draft that names an existing
+  `id` rebuilds that overlay, unless it is approved (exit 3).
+- `overlay approve ID` validates first (exit 1), refuses unresolved `block`
+  flags (exit 3), and leaves an overlay whose approval still holds
+  untouched.
 - Later versions: v2 adds line `provenance` (R-24, C21); v3 adds line
   `fold` and session `moved_from` (R-22, C37).
 
@@ -746,7 +780,14 @@ and `retire` line schemas). The API key never appears.
   (R-13), `week-review <record date>` (R-21a), `research <note id>`
   (R-32a), `card <slug>` (R-33b), `cardio <week label>` (R-43).
 - Freshness means the bytes equal a fresh render. Each renderer exposes
-  `render_<kind>(id) -> str` so `coach check` can compare.
+  `render_<kind>(root, id) -> str` so `coach check` can compare; R-13's is
+  `coach.render.render_overlay(root, id)`. The region's bytes run from the
+  start of the begin marker to the end of the end marker.
+- `coach.render.find_regions(text, kind)` and `coach.render.splice_region(text,
+  kind, id, region)` (R-13) find and replace marked regions for every
+  renderer. `splice_region` replaces the region in place; when the file has
+  none, it adds the region at the end of the `## The week ahead` section,
+  or at the end of the file, and changes nothing else.
 - **Archive rule:** `week-review` regions in any record but the newest are
   archive. `render_week_review(id)` returns them unchanged, so R-16's sweep
   never fails an old record because history was later corrected. `cardio`
@@ -778,13 +819,16 @@ Cues: <cues>
 
 - Warm-up sets are left out of the Target line. Consecutive working sets
   with equal reps or range, load and RPE collapse to `N×reps`; groups join
-  with ` + `.
+  with ` + `. A `total` load carries its unit (`3×5 @ 100 kg @ RPE 7`, as
+  in `reference/hevy-api.md`); every other load prints exactly as
+  `format_load` gives it.
 - The Target line is absolute. It never carries `target_note` or `change`:
   relative wording ("add 2.5 from last week") goes stale in the app. Those
   fields appear in the brief and the check-in only.
 - A working set with a null load on a loaded mode (C10) prints the sets,
   reps and RPE followed by ` · choose the load`:
-  `Target: 3×8–10 @ RPE 7 · choose the load`.
+  `Target: 3×8–10 @ RPE 7 · choose the load`. The suffix appears once, at
+  the end of the line.
 - The first exercise's note carries an extra first line, because Hevy
   drops routine-level notes on PUT: `Wk of <span.start as D Mon>: ` then the
   overlay `focus`, about 80 characters at most. The date lets the athlete
@@ -827,7 +871,8 @@ files to it; nobody edits another item's files.
 | exercises (`id`, mode, Hevy template id) | `bb_back_squat` total `F0000001`; `db_bench_press` per_hand_x2 `F0000002`; `db_single_arm_row` single_implement `F0000003`; `pull_up` bodyweight `F0000004` |
 | routines | `00000000-0000-4000-8000-000000000001` "Session A" (squat, DB bench); `...0002` "Session B" (row, pull-up) |
 | sessions | `session-a`, `session-b` |
-| overlay | `2026-10-12-weekly`, span 2026-10-12 to 2026-10-18; squat 100, DB bench 25/hand (Hevy: 50), row 30 (Hevy: 30), pull-up BW |
+| overlay | `2026-10-12-weekly`, span 2026-10-12 to 2026-10-18, approved; Session A 2026-10-12 (squat 100, DB bench 25/hand (Hevy: 50)), Session B 2026-10-15 (row 30 (Hevy: 30), pull-up BW); built from `tests/fixtures/overlay/draft-kg.json` |
+| check-in (R-13) | `check-ins/2026-10-11.md` holding the rendered region of `2026-10-12-weekly` |
 | `COACH_NOW` | `2026-10-11T18:00:00Z` |
 | activities (R-42a) | `manual:2026-10-08-run-1` run 5 km, 30 min, RPE 6; Hevy workout `00000000-0000-4000-8000-0000000000c1` "Conditioning", all-conditioning, starting 6 min after `manual:2026-10-10-conditioning-1` (the dedup pair) |
 | wellness (R-42a) | daily device-style records 2026-10-05 to 2026-10-10 with sleep; one manual span record 2026-10-05 to 2026-10-11 at 7.0 h |
@@ -867,6 +912,7 @@ Unless stated, each is a copy of `valid/` plus what is listed.
 | `cardio/` | R-43 | see C50 |
 | `research-bad/` | R-32a | not a copy of `valid/`: the valid config; `fixture-dose` with a hand-edited claims table; `fixture-broken` with two claims numbered 1; `fixture-old` expired 2026-10-01 (area `sleep`); `reference/fixture-guide.md` citing a missing claim |
 | `interference/` | R-44a | a planned quality run on 2026-10-11 and Session A (squat at RPE 7) on 2026-10-12 |
+| `overlay-bad-schema/`, `overlay-bad-arithmetic/`, `overlay-stale-render/` | R-13 | `config.toml` plus the valid overlay with one fault each: Session B dated outside the span; DB bench working sets at `hevy_total` 25 for 25/hand; a hand-edited check-in region |
 
 `dose/` weeks:
 
