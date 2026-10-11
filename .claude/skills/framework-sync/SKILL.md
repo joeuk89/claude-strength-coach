@@ -13,8 +13,9 @@ change is `migrate run`, which upgrades schema versions in step 6.
 
 **The framework set:** every file tracked in `template/main` **except**
 `docs/**` (the template's own development history), `tests/**` (the
-template's own test suite and fixtures) and `.gitkeep`
-placeholders. There is no separate manifest — the template repo is the
+template's own test suite and fixtures), `README.md` (the template's
+front page; here `README.md` is the dashboard `pages render` writes) and
+`.gitkeep` placeholders. There is no separate manifest — the template repo is the
 manifest. Personal files (`profile.md`, `routine/`, `check-ins/`,
 `nutrition/`, athlete-specific docs in `reference/`, `.env`) are not
 tracked in the template, so the sync cannot touch them.

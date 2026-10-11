@@ -79,12 +79,20 @@ class TemplateGitTest(unittest.TestCase):
         result = _git("check-ignore", "-q", "--no-index", "tests/fixtures/instances/valid/.coach/x")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
 
+    def test_the_brief_and_the_progress_page_are_not_tracked(self):
+        self.assertEqual(_git("ls-files", "--", "this-week.md", "progress.md").stdout, "")
+
 
 class FrameworkSyncTest(unittest.TestCase):
     def test_skill_excludes_tests(self):
         text = (REPO_ROOT / ".claude" / "skills" / "framework-sync" / "SKILL.md").read_text(encoding="utf-8")
         self.assertIn("`tests/**`", text)
         self.assertIn("`docs/**`", text)
+
+    def test_skill_excludes_the_readme(self):
+        text = (REPO_ROOT / ".claude" / "skills" / "framework-sync" / "SKILL.md").read_text(encoding="utf-8")
+        framework_set = text[text.index("**The framework set:**"):text.index("**The marker:**")]
+        self.assertIn("`README.md`", framework_set)
 
 
 if __name__ == "__main__":

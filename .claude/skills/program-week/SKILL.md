@@ -357,6 +357,20 @@ and every Hevy write and verification are logged in
 
 ## 7. Close out
 
+**Publish the week.** Hevy users: only once `routines verify` reports
+every routine verified; a routine left unverified means no publish, and
+the recap says why. No Hevy: once `overlay approve` has stamped the
+approval. Run `python3 -m coach pages render`, then `python3 -m coach
+pages publish --overlay <id>`: it commits exactly the brief
+(`this-week.md`), the dashboard (`README.md`), `progress.md`, the overlay
+and the newest check-in record, and pushes them so the athlete's phone
+shows the week. If `pages render` exits 3 because `README.md` is still
+the template's copy, ask once whether the dashboard may replace it, then
+run `python3 -m coach pages render --replace-readme`. A publish that
+exits 3 (overlay not approved, another file already staged) is reported,
+never worked around; exit 4 means the push failed and the commit is
+kept: tell the athlete to push by hand.
+
 Recap in plain words: what changed this week and why, what was written
 to Hevy (quote `routines verify`: each routine verified, or not and
 why, plus, on a hold-steady week, any routine that was STALE before

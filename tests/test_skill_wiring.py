@@ -132,6 +132,20 @@ class ProgramChangesGoThroughTheDataTest(unittest.TestCase):
         self.assertEqual(found, [])
 
 
+class ProgramWeekSkillTest(unittest.TestCase):
+    def test_program_week_close_out_renders_then_publishes_after_a_verified_push(self):
+        text = skill_text("program-week")
+        start = text.index("## 7. Close out")
+        close_out, rest = " ".join(text[start:].split()), text[:start]
+        verify = close_out.index("routines verify")
+        render = close_out.index("python3 -m coach pages render")
+        publish = close_out.index("python3 -m coach pages publish --overlay")
+        self.assertLess(verify, render)
+        self.assertLess(render, publish)
+        self.assertNotIn("pages render", rest)
+        self.assertNotIn("pages publish", rest)
+
+
 class SkillsStartWithCheckTest(unittest.TestCase):
     def test_wired_skills_run_check_first_and_stop_before_the_bootstrap(self):
         for name in WIRED:
