@@ -82,10 +82,18 @@ every programming pass; the thing the athlete reads during the week.
 _Avoid_: dashboard, summary, this-week doc
 
 **Sunday message**:
-The athlete's single check-in reply covering the week just trained:
-sessions done, runs, sleep, niggles, nutrition readings, and anything
-different next week. Replaces an interview.
+The check-in's single exchange about the week just trained: one message
+from the coach that states what the log shows and numbers what it cannot
+(sessions done, runs, sleep, niggles, nutrition readings, anything
+different next week), and the athlete's one reply. Replaces an interview.
 _Avoid_: check-in form, intake, questionnaire
+
+**Hold-steady week**:
+A weekly-tier check-in week, not a deload, with no structural change, no
+new or worsening niggle, no goals or phase flag, nothing different next
+week, and only progression-scheme changes. Its coach's brief shrinks to
+three sentences and the closing line; the tables are offered, not shown.
+_Avoid_: quiet week, maintenance week
 
 **Approval gate**:
 The rule that content the athlete has not yet seen (a coach's brief, a

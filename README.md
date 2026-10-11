@@ -45,12 +45,16 @@ The heartbeat is one check-in a week. Around it:
    the review).
 2. **Log food** (MacroFactor users): daily, with 2–3 morning weigh-ins a
    week.
-3. **`/check-in`** once a week (~10 min). It reviews the week against the
-   plan, asks a few questions, and saves a dated record to `check-ins/`.
-   Then it programs the week ahead — exact loads, rep targets, and
-   coaching notes, set in your Hevy routines (or recorded in the check-in
-   if you don't use Hevy) with one approval for the whole week. Every ~6
-   weeks it runs deeper, as a block-level review.
+3. **`/check-in`** once a week (~10 min). It sends one message with
+   what your log already shows filled in and a short numbered list of
+   what it can't see (sleep, niggles, your nutrition numbers). You answer
+   in one reply. It reviews the week against the plan and saves a dated
+   record to `check-ins/`. Then it programs the week ahead — exact
+   loads, rep targets, and coaching notes, set in your Hevy routines (or
+   recorded in the check-in if you don't use Hevy) with one approval for
+   the whole week. A week
+   where nothing needs deciding gets a three-sentence brief and a "go".
+   Every ~6 weeks it runs deeper, as a block-level review.
 
 That loop is most of it. The flows below are for when something changes.
 

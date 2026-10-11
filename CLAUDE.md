@@ -68,9 +68,11 @@ anything. Rules that always apply:
 - **Sessions the athlete doesn't program here still count.** PT-led or
   class sessions add real volume and fatigue — include them in weekly
   balance, and confirm what actually happened in them rather than assuming.
-- **If the program rotates** (e.g. alternating weeks), confirm where the
-  athlete currently is in the rotation before programming or adjusting
-  anything.
+- **If the program rotates** (e.g. alternating weeks), infer where the
+  athlete is in the rotation — from the coach-led session's log, then the
+  program's current-position line, then the newest check-in — and state
+  it for confirmation before programming or adjusting anything. Don't
+  ask it as its own question.
 - **Mind recovery windows between adjacent sessions** — a hard session the
   evening before a morning session must not collide with what it hit
   hardest. When you edit a day, re-check the day before and after it.
@@ -82,10 +84,11 @@ anything. Rules that always apply:
   program. Re-runnable; picks up where it left off.
 - **`/new-program`** — create the training program (import from Hevy or
   design from scratch), or redesign it at a block boundary.
-- **`/check-in`** — weekly progress review; runs a deeper block-level
-  review on deload weeks or when one is 6+ weeks overdue. Suggest one if
-  it's been over a week since the last entry in `check-ins/` and the
-  conversation is heading that way anyway.
+- **`/check-in`** — weekly progress review: one Sunday message,
+  pre-filled from the log, that the athlete answers in one reply. Runs a
+  deeper block-level review on deload weeks or when one is 6+ weeks
+  overdue. Suggest one if it's been over a week since the last entry in
+  `check-ins/` and the conversation is heading that way anyway.
 - **`/program-week`** — the weekly programming pass: coach-set loads,
   rep targets, RPE, and per-exercise notes for the coming week, written
   to Hevy and recorded as the weekly overlay in the newest check-in.

@@ -2403,7 +2403,7 @@ with no ask). Builtin fields:
 | `sleep` | R-01 wording |
 | `niggles` | asks for anything new |
 | `nutrition`, `meal_plan` | R-01 wording (R-06's two additions included) |
-| `next_week` | R-01 wording |
+| `next_week` | R-01 wording; states `state.rotation` for confirmation when there is no `coach_led` field |
 
 **Card parts** (`coach/checkin_parts/<topic>.py`), the way later items
 change the card without editing R-21a's modules:
