@@ -90,7 +90,6 @@ def _span(value):
     return dates.Span(_as_date(start), _as_date(end))
 
 
-
 def _bodyweights(root, unit):
     found = []
     for reading in HevyCache(root).body_measurements():
@@ -158,7 +157,6 @@ def e1rm_series(root, exercise_id=None, since=None, include_unsynced=False, now=
         best[key] = {"e1rm": top["e1rm"], "date": top["date"]}
         delta[key] = _round(points[-1]["e1rm"] - points[-2]["e1rm"]) if len(points) > 1 else None
     return {"series": series, "best": best, "delta": delta}
-
 
 
 def _half(increment):
@@ -272,7 +270,7 @@ def adherence(root, overlay_id=None, span=None, include_unsynced=False, today=No
 
     unlogged_notes = history.annotations(root, "trained_unlogged")
     misses = history.annotations(root, "miss")
-    sessions, used_notes = [], set()
+    sessions, used_notes, miss_pairs = [], set(), []
     for position, (doc, session) in enumerate(planned):
         day = dates.parse_date(session["date"])
         in_span = (lambda a, d=doc: d["span"]["start"] <= a["date"] <= d["span"]["end"]
@@ -307,11 +305,18 @@ def adherence(root, overlay_id=None, span=None, include_unsynced=False, today=No
         elif day > today:
             row["status"] = "upcoming"
         else:
-            miss = _nearest([a for a in misses if in_span(a)], day, lambda a: a["date"])
-            row.update(status="missed", tag=(miss or {}).get("tag") or "untagged")
+            row.update(status="missed", tag="untagged")
+            miss_pairs += [(abs((dates.parse_date(a["date"]) - day).days), a["date"], position, a["id"], a)
+                           for a in misses if in_span(a)]
         if conditioning:
             row["conditioning"] = True
         sessions.append(row)
+    tagged, used_misses = set(), set()
+    for _, _, position, miss_id, miss in sorted(miss_pairs, key=lambda p: p[:4]):
+        if position not in tagged and miss_id not in used_misses:
+            sessions[position]["tag"] = miss.get("tag") or "untagged"
+            tagged.add(position)
+            used_misses.add(miss_id)
 
     extra = [{"workout_id": w["workout_id"], "date": w["date"], "title": w["title"], "session_id": w["session_id"],
               "unsynced": w["unsynced"]}
@@ -330,7 +335,6 @@ def adherence(root, overlay_id=None, span=None, include_unsynced=False, today=No
             summary["exercises"][line["status"]] += 1
     return {"overlay_id": overlay_id, "span": window.to_json(), "today": today.isoformat(), "sessions": sessions,
             "extra": sorted(extra, key=lambda w: (w["date"], w["workout_id"])), "summary": summary}
-
 
 
 def _week_label(span):
@@ -396,7 +400,6 @@ def dose(root, week=None, span=None, include_unsynced=False, now=None):
             "by_workout": by_workout, "weeks": weeks}
 
 
-
 def durations(root, span=None, include_unsynced=False, now=None):
     """Each workout's minutes against its session cap (C19), with a duration_over_cap flag per breach."""
     config = config_module.load(root)
@@ -415,7 +418,6 @@ def durations(root, span=None, include_unsynced=False, now=None):
                                      message=f"{workout['date']} {workout['title']}: {minutes} min against a "
                                              f"{cap} min cap"))
     return {"span": window.to_json() if window else None, "workouts": rows, "flags": raised}
-
 
 
 def audit(root, weeks=8, include_unsynced=False, today=None, now=None):

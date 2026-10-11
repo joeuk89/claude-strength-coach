@@ -90,6 +90,23 @@ class RepairTest(HistoryCase):
         self.assertEqual(stored["exercises"][0]["sets"][2]["reps"], 55)
 
 
+    def test_withdrawing_a_repair_with_flags_alone_restores_the_logged_value(self):
+        def typo(workouts):
+            squat = next(w for w in workouts if w["id"] == W[3])["exercises"][0]
+            squat["sets"][2].update(weight_kg=105.0, reps=55)
+
+        self.cache(edit=typo)
+        self.sync()
+        repair = self.coach("history", "annotate", "--kind", "repair", "--workout", W[3], "--exercise",
+                            "bb_back_squat", "--set", "2", "--field", "reps", "--value", "5",
+                            "--reason", "typo: 55")["data"]["annotation"]
+        withdrawal = self.coach("history", "annotate", "--kind", "repair", "--withdraws", repair["id"],
+                                "--reason", "the 55 was real")["data"]["annotation"]
+        self.assertNotIn("set_index", withdrawal)
+        after = self.coach("stats", "e1rm", "--exercise", "bb_back_squat")["data"]["series"]["bb_back_squat"]
+        self.assertEqual(after[1]["e1rm"], 121.88)
+
+
 def session_a_workout(day="2026-10-12", squat_sets=3):
     return hevy_workout(W[5], R_A, "Session A", day, [
         hevy_exercise(0, "Squat (Barbell)", "F0000001",
@@ -151,6 +168,20 @@ class AdherenceTest(HistoryCase):
         self.assertEqual((self.session(data, "session-b")["status"], self.session(data, "session-b")["tag"]),
                          ("missed", "sleep"))
         self.assertEqual(data["summary"]["missed"], {"sleep": 1})
+
+    def test_one_miss_annotation_tags_one_missed_session(self):
+        def second_session_a(doc):
+            doc["sessions"].append(dict(copy.deepcopy(doc["sessions"][0]), date="2026-10-17"))
+
+        self.edit_json("data/overlays/2026-10-12-weekly.json", second_session_a)
+        self.cache(workouts=[])
+        self.sync()
+        self.coach("history", "annotate", "--kind", "miss", "--date", "2026-10-17", "--session", "session-a",
+                   "--tag", "sleep")
+        data = self.adherence()
+        tags = {s["date"]: (s["status"], s["tag"]) for s in data["sessions"] if s["session_id"] == "session-a"}
+        self.assertEqual(tags, {"2026-10-12": ("missed", "untagged"), "2026-10-17": ("missed", "sleep")})
+        self.assertEqual(data["summary"]["missed"]["sleep"], 1)
 
     def test_trained_unlogged_counts_trained_with_unknown_exercises_and_no_dose_or_e1rm(self):
         self.cache(workouts=[session_a_workout()])

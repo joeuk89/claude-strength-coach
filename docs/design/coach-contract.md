@@ -1813,7 +1813,9 @@ come from the Hevy cache.
   or for a manual workout its `session_id`, inside the overlay span,
   matched once, nearest date first; `moved: true` when the date differs;
   or a `trained_unlogged` annotation, with `unlogged: true`), `missed`
-  (with `tag` from a `miss` annotation, else `untagged`), `upcoming`.
+  (with `tag` from a `miss` annotation for that session inside the
+  overlay span, each matched once, nearest date first; else `untagged`),
+  `upcoming`.
   Workouts matching no planned session are listed as `extra`.
 - Exercise `status` for a trained session, comparing working sets in order:
   `missing` (no logged working set of that exercise), `under` (any

@@ -76,7 +76,6 @@ def stored_workouts(root):
     return sorted(found, key=_sort_key)
 
 
-
 def annotations_path(root):
     return Path(root) / paths.ANNOTATIONS
 
@@ -122,7 +121,6 @@ def next_annotation_id(doc):
 
 def _in_span(span, day):
     return span["start"] <= day <= span["end"]
-
 
 
 @dataclass
@@ -454,7 +452,6 @@ def _set_differences(before, after):
     return found
 
 
-
 def _unsynced(root, env, stored_ids):
     found = []
     for module in history_sources.discover().values():
@@ -652,7 +649,6 @@ def last_lifting_date(root, before, include_unsynced=False, now=None):
              if w["date"] < before and not w["conditioning"]
              and any(_is_lifting(e, library) for e in w["exercises"])]
     return dates.parse_date(max(dated)) if dated else None
-
 
 
 def _known_sessions(program_doc, overlays):

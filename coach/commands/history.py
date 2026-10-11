@@ -96,7 +96,8 @@ def _from_flags(args):
         annotation["workout_id"] = args.workout
     if args.exercise:
         annotation["exercise_id"] = args.exercise
-    if kind in ("discount", "repair") or args.set is not None:
+    withdraws_only = args.withdraws and not (args.workout or args.exercise or args.field or args.value is not None)
+    if args.set is not None or kind == "discount" or (kind == "repair" and not withdraws_only):
         annotation["set_index"] = args.set
     if args.field:
         annotation["field"] = args.field
