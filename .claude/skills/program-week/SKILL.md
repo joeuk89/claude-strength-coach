@@ -10,7 +10,7 @@ prescriptions for the coming week — per session, per exercise: working
 load, rep target, RPE, a weekly focus where warranted, and the standing
 form cues. Hevy users get it written into their routines so the app
 shows exactly what the coach wants this week; everyone gets it recorded
-in the check-in history as the **weekly overlay** — the effective
+in the check-in history as the **overlay** — the effective
 prescription the next check-in judges adherence against.
 
 `routine/` stays the block-level plan — never write weekly numbers into
@@ -46,6 +46,25 @@ header carries a one-off/override pointer covering this span,
 **Mid-week?** Invoked standalone partway through a trained week, first
 ask what prompted it (missed session, easy/hard day, schedule change),
 then reprogram only the remaining days.
+
+**Hevy freshness (Hevy users).** When `/check-in` invoked this skill,
+reuse the routines its data pull fetched; otherwise GET every mapped
+routine in the span. **The last pass** is the newest `**Written to
+Hevy:**` line in `check-ins/` that names any of them (none yet → skip
+both checks).
+
+- **STALE** — a routine whose `updated_at` is before the last pass was
+  not written by it, so the athlete would train from old notes. List
+  each in the coach's brief as STALE with its last-written date (its
+  `updated_at`).
+- **Edited in the app** — compare each routine structurally with what
+  the last pass wrote (its session in `routine/` with that pass's
+  overlay applied): exercises, their order, set counts, rep ranges,
+  rest. Any difference is an in-app edit made since the last pass.
+  **Load-only edits are overwritten without comment** — the log already
+  holds what was lifted, and this week's loads come from the log.
+  **Structural edits** go in the coach's brief as keep-or-replace
+  questions, settled by the same approval as the week.
 
 **First run: cue backfill.** If the session files have no `Cues:`
 lines, offer a one-time backfill before programming: agree the
@@ -100,36 +119,64 @@ first, tables second.
    overlay.
 4. **Structural changes** (if any) — their own short section with
    before/after and trade-offs.
-5. End with an open question ("Happy to train this, or want anything
-   tweaked?"). Don't mention Hevy yet.
+5. **Hevy housekeeping** (only when there's something to say) — each
+   STALE routine with its last-written date, and each structural in-app
+   edit with your keep-or-replace recommendation ("You swapped leg
+   press for hack squat in Lower A — keep it; I'll add it to
+   `routine/lower-a.md`"). A kept edit is a structural change and lands
+   in `routine/`; a replaced one is overwritten.
+6. **The write line** — the brief's last line names exactly what "go"
+   will write: each Hevy routine in the span by its Hevy title (every
+   one, changed or not), then each `routine/` file with a structural
+   change:
+
+   `Reply "go" to train this and write: Upper A, Lower A, Upper B (Hevy) · routine/upper-a.md (structural change).`
+
+   No structural change → drop the `routine/` part. Nothing going to
+   Hevy (the athlete doesn't use it) → the line says so:
+   `Reply "go" to train this and write: routine/upper-a.md (structural change). Nothing goes to Hevy (no Hevy).`
+   or, with no structural change either,
+   `Reply "go" to train this. Nothing goes to Hevy (no Hevy).`
 
 Then **stop and wait for the athlete's reply. Never present and write
 in the same turn** — the brief is a proposal, not a notification, and
-that holds even on a hold-steady week. Tweaks loop back into a revised
-brief presented the same way. The athlete approves the week **once**;
-iterate until they would train it.
+that holds even on a hold-steady week. **"go" (or a clear yes) approves
+the week and every write the line names** — don't ask again before
+writing to Hevy. Anything else is a tweak: revise and present the brief
+again, write line included. Iterate until they would train it.
 
 ## 4. Write
 
-**Only enter this step after the athlete has approved the brief
-above.** "OK to write to Hevy?" is not a substitute for presenting the
-week — if no brief has been presented and approved this session, go
-back to step 3.
+**Only enter this step after the athlete has replied "go" (or a clear
+yes) to the brief above.** If no brief with a write line has been
+presented and approved this session, go back to step 3. Write exactly
+what the write line named — nothing more.
 
-1. **Structural changes first** — edit the affected `routine/*.md`
-   files (an execution change like grip width edits that exercise's
-   `Cues:` line), then re-check the day before and after each edited
-   session and the program's weekly balance.
-2. **Then Hevy** (key in `.env`): for each mapped routine in the span,
-   GET it, update its sets (`weight_kg` converted from the athlete's
-   units, `rep_range`) and each exercise's `notes` in the standard
-   three-line format — Target / Focus / Cues, see
-   `reference/hevy-api.md` — then PUT the whole routine back and GET to
-   verify. Space writes a few seconds apart; back off ~30 s on a 429.
-   **For dumbbell exercises `weight_kg` is the Hevy value** (the
-   combined total — double the per-hand figure on two-arm work), and the
-   `Target:` line states both numbers so the athlete enters the right
-   one.
+1. **Structural changes first** — edit the `routine/*.md` files the
+   write line named (an execution change like grip width edits that
+   exercise's `Cues:` line), then re-check the day before and after
+   each edited session and the program's weekly balance.
+2. **Then Hevy** (key in `.env`). Note the current time in UTC before
+   the first write — that is this pass's timestamp. Write **every**
+   mapped routine in the span, **including unchanged ones**: a routine
+   left alone keeps last week's notes. For each, GET it, update its sets
+   (`weight_kg` converted from the athlete's units, `rep_range`) and
+   each exercise's `notes` in the standard format (see
+   `reference/hevy-api.md`):
+   - the **week line** on the first exercise: `Wk of <span start as D
+     Mon>: <week focus>`, about 80 characters at most;
+   - **Target** transcribed from the approved overlay — absolute
+     sets × reps @ load @ RPE, never relative or narrative wording;
+   - **Focus** where set, and **Cues** from `routine/`.
+
+   Then PUT the whole routine back and GET to verify. Space writes a few
+   seconds apart; back off ~30 s on a 429. **For dumbbell exercises
+   `weight_kg` is the Hevy value** (the combined total — double the
+   per-hand figure on two-arm work), and the `Target:` line states both
+   numbers so the athlete enters the right one.
+3. **Freshness check** — after the last write, GET every routine in the
+   span again and confirm each `updated_at` is after this pass's
+   timestamp. Name any that isn't in the close-out.
 
 **No Hevy?** Skip the writes — the recorded overlay below is the
 deliverable, and the athlete trains from it.
@@ -147,16 +194,24 @@ noting the program start date and structure, then "The week ahead"
 holding the overlay. The first `/check-in` judges adherence against
 it.
 
+Whichever record holds the overlay, end it with one line stating when
+this pass wrote to Hevy (the timestamp from step 4, ISO 8601 UTC) and
+which routines it wrote — the next pass's STALE check reads it. No
+Hevy writes → leave the line out.
+
 ```markdown
 ## Week reprogrammed — YYYY-MM-DD
 
 **Span:** <start> → <end> · **Reason:** <missed session / …>
 
 (Per-session prescription tables underneath.)
+
+**Written to Hevy:** 2026-10-12T18:05:00Z · Upper A, Lower A, Upper B
 ```
 
 ## 6. Close out
 
 Recap in plain words: what changed this week and why, what was written
-to Hevy, and the one thing to focus on. If a structural change landed,
+to Hevy (and any routine the freshness check found not updated by this
+pass), and the one thing to focus on. If a structural change landed,
 note it for the next check-in's Decisions section.

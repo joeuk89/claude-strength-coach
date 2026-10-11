@@ -81,20 +81,30 @@ first:
    before/after where days moved.
 3. **Temp sessions in full** (temp tier) — the per-session
    prescriptions, concrete enough to train directly.
-4. End with an open question ("Does this week work for you?"). Don't
-   mention Hevy yet.
+4. **The write line** — the brief's last line names exactly what "go"
+   will write: each temp routine by the Hevy title it will carry.
+
+   `Reply "go" to train this and write: Deload Mon — Lower, Deload Wed — Upper (Hevy).`
+
+   Nothing going to Hevy (a reshuffle, or no Hevy) → the line says so:
+   `Reply "go" to train this. Nothing goes to Hevy (reshuffle only).`
 
 Then **stop and wait for the athlete's reply. Never present and write
 in the same turn** — the brief is a proposal, not a notification.
-Tweaks loop back into a revised brief; iterate until the athlete would
-train it.
+**"go" (or a clear yes) approves the week and every write the line
+names** — don't ask again before writing to Hevy. Anything else is a
+tweak: revise and present the brief again, write line included.
+Iterate until the athlete would train it.
 
 ## 4. Write to Hevy (temp tier, Hevy users)
 
-**Only enter this step after the athlete has approved the brief
-above** — if no brief has been presented and approved this session, go
-back to step 3.
+**Only enter this step after the athlete has replied "go" (or a clear
+yes) to the brief above** — if no brief with a write line has been
+presented and approved this session, go back to step 3. Write exactly
+the routines the write line named.
 
+- Note the current time in UTC before the first write — this pass's
+  timestamp. Write **every** temp routine in the span.
 - Find the standing **"One-off weeks"** folder in
   `GET /v1/routine_folders`. Absent → create it
   (`POST /v1/routine_folders`) and record its ID in `hevy-map.json`
@@ -105,10 +115,18 @@ back to step 3.
   if this week needs more than exist, and add the new IDs to the map.
   The API has no delete — reuse **is** the cleanup, and leftover
   content in the folder between one-off weeks is harmless.
-- Fill each exercise's `notes` in the standard three-line format
-  (Target / Focus / Cues — see `reference/hevy-api.md`), as always.
-  Space writes a few seconds apart (rate limit); GET back after to
-  verify.
+- Fill each exercise's `notes` in the standard format (see
+  `reference/hevy-api.md`):
+  - the **week line** on the first exercise of every routine:
+    `Wk of <span start as D Mon>: <week focus>`, about 80 characters
+    at most, where the focus is what this week is for
+    (`Wk of 19 Oct: deload — fewer sets at RPE 6, recover for next block`);
+  - **Target** — the absolute sets × reps @ load @ RPE, never relative
+    wording like "10% off last week";
+  - **Focus** where set, and **Cues**.
+- Space writes a few seconds apart (rate limit). GET back after to
+  verify, and name in the close-out any routine whose `updated_at`
+  isn't after this pass's timestamp.
 - Update `temporary` in `hevy-map.json` in the same operation as any
   folder/routine creation.
 
@@ -130,7 +148,12 @@ athlete trains the temp sessions from it.
 
   (Temp-session prescriptions in full underneath the table. End with:
   "Normal program resumes <date>.")
+
+  **Written to Hevy:** 2026-10-19T18:05:00Z · Deload Mon — Lower, Deload Wed — Upper
   ```
+
+  The last line records when this pass wrote to Hevy (ISO 8601 UTC) and
+  which routines it wrote; leave it out when nothing went to Hevy.
 
   If `/check-in` invoked this skill, put the same content in the new
   check-in's "The week ahead" section instead of an addendum.
