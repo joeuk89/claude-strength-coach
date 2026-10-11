@@ -14,11 +14,13 @@ arithmetic in `/meal-plan` depends on it. Online sourcing follows
 
 ## 1. Read the context
 
-Read `profile.md` (Nutrition & goals, Food & eating, the training week)
-and `nutrition/menu/index.md` if it exists. Everything this skill does
-is **goal-aware**: adds and sweeps serve the athlete's current phase and
-targets. If Nutrition & goals is missing or TBD, send the athlete to
-`/goals` before building a bank around numbers that don't exist.
+Read `profile.md` (Nutrition & goals, Food & eating, the training week),
+the output of `python3 -m coach nutrition status` (phase and protein
+numbers) and `nutrition/menu/index.md` if it exists. Everything this
+skill does is **goal-aware**: adds and sweeps serve the athlete's current
+phase and targets. If `nutrition status` says `enabled: false`, send the
+athlete to `/goals` before building a bank around numbers that don't
+exist.
 
 Then run `python3 -m coach recipes validate`. If it reports old YAML
 cards, convert the bank first (`reference/recipe-cards.md`, "Converting

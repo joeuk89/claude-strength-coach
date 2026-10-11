@@ -165,13 +165,17 @@ anything. Rules that always apply:
   and never leave a day half-logged (MacroFactor's own guidance). The
   repo **never states its own calorie target or calorie band** for an
   app user and never runs a parallel calorie model. Any
-  departure from the app's numbers is a dated **nutrition override** in
-  `profile.md`, with an exit condition, that expires within 21 days.
+  departure from the app's numbers is a dated **nutrition override**
+  (`[nutrition.override]` in `config.toml`), with an exit condition,
+  that expires within 21 days.
 - This repo owns the **strategy**: phase (bulk/cut/maintain), goal weight,
   target trend rate, the protein floor, target and stretch, and the
-  standing protein anchors — recorded in `profile.md` under "Nutrition &
-  goals" and revised via **`/goals`**. Protein is coached through the
-  anchors and a floor that rises as the habit sticks, not a daily plan.
+  standing protein anchors — the numbers in `config.toml` (`[nutrition]`),
+  the reasoning in `profile.md` under "Nutrition & goals", both revised
+  via **`/goals`**. Each check-in's app numbers go into the readings
+  series with `python3 -m coach nutrition record`. Protein is coached
+  through the anchors and a floor that rises as the habit sticks, not a
+  daily plan.
 - **No MacroFactor?** Check-ins track scale weight against the goal.
   `/goals` gives one transparent starting calorie estimate per phase;
   after that, calories move only from the weight trend.

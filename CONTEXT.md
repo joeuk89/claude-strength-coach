@@ -99,8 +99,9 @@ _Avoid_: dashboard, summary, this-week doc
 **Sunday message**:
 The one message the coach sends at check-in about the week just
 trained: it states what the log shows and numbers what it cannot
-(sessions, coach-led content, runs, sleep, niggles, nutrition readings,
-meal plan, anything different next week), for the athlete to answer in
+(sessions, coach-led content, runs, sleep, niggles, food — nutrition
+readings, habits and next week's food exceptions — and anything
+different next week), for the athlete to answer in
 one reply. Replaces an interview.
 _Avoid_: check-in form, intake, questionnaire
 
@@ -202,6 +203,15 @@ more than 21 days after the start. At most one at a time; `/check-in`
 expires it, renewal needs `/goals`, and a second consecutive renewal is
 flagged.
 _Avoid_: manual targets, calorie band, adjustment (a trend-driven change, not an override)
+
+**Nutrition reading**:
+The numbers recorded at one check-in about eating and bodyweight: the
+nutrition app's trend weight, expenditure, targets, 7-day averages and
+days logged, or, without an app, the mean of the week's morning
+weigh-ins; plus whether the protein anchors happened most days. One per
+check-in date, kept as a series in `data/nutrition/readings.json`. A
+reading copies the app's numbers; nothing in the repo computes them.
+_Avoid_: weigh-in (one scale reading), nutrition log (the app is the log), check-in numbers
 
 **Sleep gate**:
 The check `/goals` runs before agreeing a deficit: a trailing 14-day

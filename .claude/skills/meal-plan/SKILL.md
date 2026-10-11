@@ -12,16 +12,18 @@ a shopping list for **exactly** what the plan needs. Plan only the
 dinners) and the athlete's standing protein anchors are declared up
 front and treated as fixed blocks.
 
-**Division of labour:** `/goals` decides the strategy and records it in
-`profile.md` (Nutrition & goals). MacroFactor, if the athlete uses it,
+**Division of labour:** `/goals` decides the strategy and records its
+numbers in `config.toml` (`[nutrition]`; `python3 -m coach nutrition
+status` returns them) and the reasoning in `profile.md` (Nutrition &
+goals). MacroFactor, if the athlete uses it,
 holds the live daily kcal/macro targets. `/recipes` owns the recipe
 bank. This skill composes food to the targets from the bank — it never
 computes TDEE, never revises targets, and never edits recipes beyond
 status changes agreed in the opening review. If the targets look wrong,
 send the athlete to `/goals`; if the bank needs work, `/recipes`.
 
-Requires `profile.md` with a real Nutrition & goals section — if it's
-missing or still TBD, run `/setup` or `/goals` first.
+Requires nutrition to be set up — if `nutrition status` says `enabled:
+false`, run `/setup` or `/goals` first.
 
 ## The files
 
@@ -40,7 +42,7 @@ continue. Never plan from an empty bank, and never dead-end the athlete.
 ## 1. Read the context
 
 Read `profile.md` (Nutrition & goals, Food & eating, the training week),
-`routine/program.md` (training days, double days, rest days — count
+the output of `python3 -m coach nutrition status`, `routine/program.md` (training days, double days, rest days — count
 cardio), `nutrition/menu/index.md`, and the newest dated plan in
 `nutrition/`. If `python3 -m coach check --only
 recipe_index_fresh,recipe_render_fresh` fails, run `python3 -m coach
@@ -63,14 +65,14 @@ bank), say so and offer a `/recipes` sweep before planning.
 - **MacroFactor users:** ask for today's kcal and protein targets off
   the dashboard, and whether calorie shifting is configured. If MF is
   still calibrating (a new account, or a fresh phase on-ramp) and shows
-  no target yet, fall back to the profile's Nutrition & goals numbers
+  no target yet, fall back to the numbers `nutrition status` returns
   and say you've done so.
-- **Without MacroFactor:** use the calorie target and protein numbers
-  in `profile.md`.
+- **Without MacroFactor:** use `kcal_target` and the protein numbers
+  from `nutrition status`.
 - **Protein:** plan every day to at least the **protein floor** and
-  toward the **target** (both in Nutrition & goals). For MacroFactor
-  users the app's protein target is the floor.
-- Sanity-check either against Nutrition & goals. A big mismatch (wrong
+  toward the **target** (both in `nutrition status` → `protein`). For
+  MacroFactor users the app's protein target is the floor.
+- Sanity-check either against those numbers. A big mismatch (wrong
   phase, stale targets) means the strategy needs attention — flag it
   and point at `/goals` before planning to a number you don't trust.
 
@@ -82,8 +84,8 @@ training / double / rest days from the routine (don't assume — weeks
 have one-off changes), and ask about anything unusual: travel, meals
 out, guests.
 
-**Protein anchors are fixed blocks.** Read the anchors table in
-Nutrition & goals and place each anchor in its slot on every day it
+**Protein anchors are fixed blocks.** Take the anchors from
+`nutrition status` (`anchors`) and place each anchor in its slot on every day it
 applies, before planning anything else. Like a covered meal, an anchor
 is counted in the day's macros and never swapped or dropped;
 unlike one, it is shopped for (step 6) unless it's on the staples list.
@@ -143,7 +145,7 @@ Also:
   win.
 - **Protein comes first.** The anchors cover part of the floor; spread
   the rest across the day's meals (~4 feeds including the anchors is a
-  good default; ~0.4 g/kg of the reference mass in Nutrition & goals per
+  good default; ~0.4 g/kg of the reference mass in `nutrition status` per
   meal is a heuristic, not dogma).
 - **Train-day awareness:** bigger fuelling on double days, leaner rest
   days; calorie cycling if the profile opts in (carbs/kcal toward

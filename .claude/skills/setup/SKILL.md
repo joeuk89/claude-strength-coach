@@ -116,10 +116,12 @@ watching for recurrence; it's created when the first one appears.)
 
 ## Nutrition & goals
 
-(Filled by /goals — phase sequence, trend rate, calories (the app's, or
-a no-app starting estimate), protein reference mass and basis, protein
-floor / target / stretch, a Protein anchors table, an Active override
-block, sleep-gate status, app config, revision date.)
+(Filled by /goals, prose only: the goal in the athlete's words, the
+phase sequence and its triggers, how calories are set (the app, or the
+no-app starting estimate's method), why that protein basis, how the
+anchors were chosen, sleep-gate status, app setup notes, revision date.
+The numbers — phase, trend rate, protein floor / target / stretch,
+anchors, any override — live in `config.toml` → `[nutrition]`.)
 
 - **Apps:** Hevy: yes-Pro / yes-free / no · MacroFactor: yes / no
 
