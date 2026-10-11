@@ -44,6 +44,21 @@ url = "https://doi.org/10.3389/fphys.2021.651112"
 type = "meta-analysis"
 year = 2021
 
+[[sources]]
+id = "helms-2018"
+citation = "Helms ER, Cross MR, Brown SR, Storey A, Cronin J, Zourdos MC. Rating of perceived exertion as a method of volume autoregulation within a periodized program. J Strength Cond Res. 2018;32(6):1627-1636."
+url = "https://doi.org/10.1519/JSC.0000000000002032"
+type = "observational"
+year = 2018
+
+[[sources]]
+id = "wendler-2011"
+citation = "Wendler J. 5/3/1: The Simplest and Most Effective Training System to Increase Raw Strength. 2nd ed. Jim Wendler LLC; 2011."
+url = "https://www.jimwendler.com/products/5-3-1-second-edition-ebook"
+type = "educator"
+year = 2011
+accessed = 2026-10-11
+
 [[claims]]
 n = 1
 text = "Strength comes fastest to untrained lifters and slows as training age rises, and trained lifters need heavier loads to keep progressing."
@@ -92,6 +107,20 @@ text = "Every training age needs progressive overload, but no one periodization 
 basis = "consensus"
 sources = ["acsm-2026", "acsm-2009"]
 status = "current"
+
+[[claims]]
+n = 8
+text = "Back-off sets sit at a set RPE below the top set, about a 2–6 % load drop: the RPE-anchored scheme loads them from the e1RM at the back-off RPE, by default 1 below the top set's, and never above the top set's load."
+basis = "heuristic"
+sources = ["helms-2018"]
+status = "current"
+
+[[claims]]
+n = 9
+text = "The 3-week wave uses the published 5/3/1 numbers: a training max of 90 % of the 1RM, waves at 65/75/85, 70/80/90 and 75/85/95 % of it, a 40/50/60 % deload, and a training-max raise per wave of 2.5 kg (5 lb) for upper-body and 5 kg (10 lb) for lower-body lifts."
+basis = "heuristic"
+sources = ["wendler-2011"]
+status = "current"
 -->
 <!-- coach:begin research progression-training-age -->
 
@@ -106,6 +135,8 @@ status = "current"
 | 5 | Advanced lifters, with years of consistent training, progress over blocks of several weeks rather than week to week, so their main lifts suit the RPE-anchored scheme. | heuristic | acsm-2009 | current |
 | 6 | Autoregulated loading, such as an RPE-anchored top set, builds strength at least as well as fixed percentages of 1RM. | evidence | hickmott-2022, zhang-2021 | current |
 | 7 | Every training age needs progressive overload, but no one periodization model consistently beats another. | consensus | acsm-2026, acsm-2009 | current |
+| 8 | Back-off sets sit at a set RPE below the top set, about a 2–6 % load drop: the RPE-anchored scheme loads them from the e1RM at the back-off RPE, by default 1 below the top set's, and never above the top set's load. | heuristic | helms-2018 | current |
+| 9 | The 3-week wave uses the published 5/3/1 numbers: a training max of 90 % of the 1RM, waves at 65/75/85, 70/80/90 and 75/85/95 % of it, a 40/50/60 % deload, and a training-max raise per wave of 2.5 kg (5 lb) for upper-body and 5 kg (10 lb) for lower-body lifts. | heuristic | wendler-2011 | current |
 
 | Source | Citation | Type | Year |
 | --- | --- | --- | --- |
@@ -114,6 +145,8 @@ status = "current"
 | acsm-2026 | [Currier BS, D'Souza AC, Singh MAF, et al. American College of Sports Medicine position stand. Resistance training prescription for muscle function, hypertrophy, and physical performance in healthy adults: an overview of reviews. Med Sci Sports Exerc. 2026;58(4):851-872.](<https://doi.org/10.1249/MSS.0000000000003897>) | position-stand | 2026 |
 | hickmott-2022 | [Hickmott LM, Chilibeck PD, Shaw KA, Butcher SJ. The effect of load and volume autoregulation on muscular strength and hypertrophy: a systematic review and meta-analysis. Sports Med Open. 2022;8:9.](<https://doi.org/10.1186/s40798-021-00404-9>) | meta-analysis | 2022 |
 | zhang-2021 | [Zhang X, Li H, Bi S, Luo Y, Cao Y, Zhang G. Auto-regulation method vs. fixed-loading method in maximum strength training for athletes: a systematic review and meta-analysis. Front Physiol. 2021;12:651112.](<https://doi.org/10.3389/fphys.2021.651112>) | meta-analysis | 2021 |
+| helms-2018 | [Helms ER, Cross MR, Brown SR, Storey A, Cronin J, Zourdos MC. Rating of perceived exertion as a method of volume autoregulation within a periodized program. J Strength Cond Res. 2018;32(6):1627-1636.](<https://doi.org/10.1519/JSC.0000000000002032>) | observational | 2018 |
+| wendler-2011 | [Wendler J. 5/3/1: The Simplest and Most Effective Training System to Increase Raw Strength. 2nd ed. Jim Wendler LLC; 2011.](<https://www.jimwendler.com/products/5-3-1-second-edition-ebook>) | educator, accessed 2026-10-11 | 2011 |
 
 <!-- coach:end research progression-training-age -->
 
@@ -167,6 +200,24 @@ impact training outcomes", while still recommending that "healthy adults should 
 progressive RT". The scheme matters less than the athlete actually
 progressing on it.
 
+**Claim 8.** Helms et al. (2018, 12 nationally qualified powerlifters)
+had each session open with a top set at a target RPE, then back-off sets
+"at a reduced load" of 2, 4 or 6 % below the top set for the same reps,
+stopping once RPE reached the target again. The 6 % drop gave the most
+combined volume across the three lifts. One RPE
+lower for 3 to 5 reps is about a 2.5–3 % drop on the e1RM curve the
+scheme uses, inside that range. The study tested how many back-off sets
+to do, not which RPE to set them at, so the default of 1 below the top
+set is a heuristic. A fixed share such as 90 % of the top set's load
+sits far below the top set's effort: for a top set of 5 at RPE 8, 5 reps
+at 90 % is about RPE 4.
+
+**Claim 9.** These are the numbers of Wendler's published program, a
+program design rather than a research finding. The coach starts the
+training max from the e1RM, not a tested 1RM. Wendler gives the
+increments as 5 lb and 10 lb; 2.5 kg and 5 kg are their kilogram
+equivalents.
+
 ## Applying it
 
 - Read the athlete's experience from the profile, then check it against
@@ -176,6 +227,9 @@ progressing on it.
   jumps start to fail, not on a calendar date.
 - Use RPE-anchored top sets when daily readiness swings a lot (sleep,
   work, cardio load) or progress has slowed to block-to-block.
+- Set the back-offs' RPE, not a percentage: the scheme loads them from
+  the same e1RM as the top set. Set `backoff_pct` only when the athlete
+  wants a fixed drop.
 
 ## Open questions
 
