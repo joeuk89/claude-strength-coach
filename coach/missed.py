@@ -1,8 +1,8 @@
 """Missed-day rules: match a missed session to the program's rule and apply it as a mid-week overlay (contract C37).
 
 Matching (`match`) and application (`apply_rule`) stay separate so a caller
-can apply a rule it builds itself (a priority lift's floor dose), ahead of
-the program's rules.
+can apply a rule it builds itself (a priority lift's floor dose), after the
+program's rules as a fallback, alone or on top of a program fold.
 `plan` is read-only; `apply` writes the miss, the overlay and the record
 lines once the athlete has said "go".
 """
@@ -245,26 +245,55 @@ def apply_rule(root, doc, session_id, day, rule, now=None, config=None, library=
     when the rule cannot apply: `manual`, a fold with no later target, a
     shift with no free day. A day before today is never a target or free.
     """
+    _missed_session(doc, session_id, day)
+    kind = rule["action"]["kind"]
+    if kind == "manual":
+        raise Unmatched(f"rule {rule['id']} is manual")
+    if kind == "skip":
+        return None
+    return _build(root, doc, session_id, day, [rule], now, config, library)
+
+
+def _build(root, doc, session_id, day, rules, now, config, library):
+    """The mid-week overlay for `fold` and `shift` rules applied in turn, each to the week the one before left."""
     root = Path(root)
     config = config or config_module.load(root)
     now = now or datetime.now(timezone.utc)
     today = _today(config, now)
     names = _names_for(root, library=library)
     missed = _missed_session(doc, session_id, day)
-    kind = rule["action"]["kind"]
-    if kind == "manual":
-        raise Unmatched(f"rule {rule['id']} is manual")
-    if kind == "skip":
-        return None
-    if kind == "fold":
-        sessions, extra = _fold(doc, missed, day, rule, names, today)
-    else:
-        sessions, extra = _shift(doc, missed, day, rule, config, today)
+    sessions, extra = None, []
+    for rule in rules:
+        source = doc if sessions is None else dict(doc, sessions=[missed] + sessions)
+        if rule["action"]["kind"] == "fold":
+            sessions, found = _fold(source, missed, day, rule, names, today)
+        else:
+            sessions, found = _shift(source, missed, day, rule, config, today)
+        extra += found
     if not sessions:
         raise Unmatched("no session is left in the overlay's span")
     built = overlay.build(_draft(doc, sessions, extra), config, root=root, now=now)
     built["flags"] = validity.merge_flags(built, validity.check_overlay(root, built))
     return built
+
+
+def _left_out(floor_rule, rule, applied):
+    """The part of the priority floor rule the program's rule leaves out of the week, or None.
+
+    A shift that applied takes every lift with the session; a fold that applied covers the lifts it lists.
+    """
+    if floor_rule is None:
+        return None
+    if not applied or rule["action"]["kind"] == "skip":
+        return floor_rule
+    if rule["action"]["kind"] == "shift":
+        return None
+    folded = {item["exercise_id"] for item in rule["action"]["exercises"]}
+    left = [item for item in floor_rule["action"]["exercises"] if item["exercise_id"] not in folded]
+    if not left:
+        return None
+    return dict(floor_rule, id=structure.floor_rule_id([item["exercise_id"] for item in left]),
+                action=dict(floor_rule["action"], exercises=left))
 
 
 def _floor_missed(rule, missed, day, reason, names):
@@ -352,25 +381,34 @@ def plan(root, session_id, day, now=None):
     missed = _missed_session(doc, session_id, day)
     missed_text = f"Missed {render.day_label(day)} {missed['title']}"
     found = {"session_id": session_id, "date": day.isoformat(), "title": missed["title"], "overlay_id": doc["id"],
-             "matched": False, "rule": None, "action": None, "description": None, "reason": None, "summary": [],
-             "write_line": None, "draft": None, "flags": []}
+             "matched": False, "rule": None, "floor_rule": None, "action": None, "description": None, "reason": None,
+             "summary": [], "write_line": None, "draft": None, "flags": []}
 
-    floor_rule = structure.priority_floor(root, session_id, day, doc, program_doc)
-    floor_flags, draft = [], None
-    if floor_rule is not None:
-        try:
-            draft = apply_rule(root, doc, session_id, day, floor_rule, now, config, library)
-        except Unmatched as reason:
-            floor_flags = _floor_missed(floor_rule, missed, day, reason, names)
-    rule = floor_rule if draft is not None else match(root, session_id, day, doc, program_doc)
+    rule = match(root, session_id, day, doc, program_doc)
+    draft, reason = None, None
     try:
         if rule is None:
             raise Unmatched("no rule names this session with its condition met")
+        draft = apply_rule(root, doc, session_id, day, rule, now, config, library)
+    except Unmatched as why:
+        reason = why
+
+    floor_rule = _left_out(structure.priority_floor(root, session_id, day, doc, program_doc), rule, reason is None)
+    floor_flags, added = [], None
+    if floor_rule is not None:
+        try:
+            if draft is not None:
+                draft, added = _build(root, doc, session_id, day, [rule, floor_rule], now, config, library), floor_rule
+            else:
+                draft = apply_rule(root, doc, session_id, day, floor_rule, now, config, library)
+                rule, reason = floor_rule, None
+        except Unmatched as why:
+            floor_flags = _floor_missed(floor_rule, missed, day, why, names)
+
+    if rule is not None:
         found.update(rule=rule, action=rule["action"]["kind"],
                      description=describe(rule, program_doc=program_doc, library=library))
-        if draft is None:
-            draft = apply_rule(root, doc, session_id, day, rule, now, config, library)
-    except Unmatched as reason:
+    if reason is not None:
         found["reason"] = str(reason)
         found["flags"] = floor_flags + [flags.make("missed_rule_unmatched", session_id=session_id, message=(
             f"No missed-day rule applies to {missed['title']} on {render.day_label(day)} ({reason}); "
@@ -379,11 +417,9 @@ def plan(root, session_id, day, now=None):
                             f"Next: {FALLBACK_WORDS}."]
         return found
 
-    if draft is not None and any(s.get("moved_from") == day.isoformat() and s["session_id"] == session_id
-                                 for s in draft["sessions"]):
-        floor_flags = []
-    found.update(matched=True, draft=draft, write_line=write_line(config, draft), flags=floor_flags)
-    summary = [f"{missed_text}; rule {rule['id']} applies ({rule['action']['kind']})."]
+    found.update(matched=True, draft=draft, floor_rule=added, write_line=write_line(config, draft), flags=floor_flags)
+    with_floor = f", with the priority floor {added['id']}" if added else ""
+    summary = [f"{missed_text}; rule {rule['id']} applies ({rule['action']['kind']}){with_floor}."]
     if draft is None:
         summary.append("Nothing else changes this week; only the miss is recorded.")
     else:
@@ -437,8 +473,9 @@ def _annotation(root, session_id, day, tag, now):
 
 def record_lines(found, tag, names, config):
     rule, draft = found["rule"], found["draft"]
+    rule_words = f"Rules {rule['id']} and {found['floor_rule']['id']}" if found["floor_rule"] else f"Rule {rule['id']}"
     lines = [f"- Missed {render.day_label(found['date'])} {found['title']} ({tag or 'untagged'}).",
-             f"- Rule {rule['id']}: {_change_text(draft, names, with_rpe=False, show_hevy=config.hevy.enabled) or 'nothing changes this week'}."]
+             f"- {rule_words}: {_change_text(draft, names, with_rpe=False, show_hevy=config.hevy.enabled) or 'nothing changes this week'}."]
     if draft is None:
         lines.append("- No overlay; nothing goes to Hevy.")
     elif config.hevy.enabled:
