@@ -1,4 +1,4 @@
-"""Load modes, Hevy conversion, rounding and load formatting.
+"""Load modes, Hevy conversion, distances, rounding and load formatting.
 
 This is the only module that doubles, halves or converts kg and lb, and the
 only one that formats a load (contract C5). An AST test enforces it.
@@ -13,6 +13,8 @@ PER_HAND_MODES = ("per_hand_x2", "single_implement")
 UNITS = ("kg", "lb")
 LB_TO_KG = 0.45359237
 ROUND_DIRECTIONS = ("nearest", "down", "up")
+DISTANCE_UNITS = ("m", "km", "mi", "ft")
+_METRES_PER = {"m": 1, "km": 1000, "mi": 1609.344, "ft": 0.3048}
 
 _HEVY_KG_PLACES = 4
 # Hevy stores kg to 4 places, which is about 0.0001 lb; 3 places in athlete
@@ -73,6 +75,23 @@ def from_hevy_kg(weight_kg, load_mode, unit):
     if load_mode == "per_hand_x2":
         total = round(total / 2, _ATHLETE_PLACES)
     return json_number(total)
+
+
+def _distance_factor(unit):
+    if unit not in DISTANCE_UNITS:
+        raise ValueError(f"unknown distance unit {unit!r}; expected one of {', '.join(DISTANCE_UNITS)}")
+    return _METRES_PER[unit]
+
+
+def to_meters(value, unit):
+    """Metres for a distance in m, km, mi or ft, to the millimetre."""
+    _number(value, "distance")
+    return json_number(round(value * _distance_factor(unit), 3))
+
+
+def from_meters(meters, unit):
+    _number(meters, "meters")
+    return json_number(round(meters / _distance_factor(unit), 6))
 
 
 def make_load(value, load_mode, unit):

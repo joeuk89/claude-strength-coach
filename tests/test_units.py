@@ -177,6 +177,24 @@ class PlateTest(unittest.TestCase):
         self.assertEqual(plate_breakdown(60, 20, [15, 10]), [10, 10])
 
 
+class DistanceTest(unittest.TestCase):
+    def test_to_meters(self):
+        self.assertEqual(units.to_meters(5, "km"), 5000)
+        self.assertEqual(units.to_meters(1, "mi"), 1609.344)
+        self.assertEqual(units.to_meters(100, "ft"), 30.48)
+        self.assertEqual(units.to_meters(400, "m"), 400)
+
+    def test_from_meters(self):
+        self.assertEqual(units.from_meters(5000, "km"), 5)
+        self.assertEqual(units.from_meters(1609.344, "mi"), 1)
+        self.assertEqual(units.from_meters(30.48, "ft"), 100)
+
+    def test_rejects_bad_input(self):
+        for value, unit in ((5, "yd"), (-1, "km"), (True, "km"), ("5", "km")):
+            with self.subTest(value=value, unit=unit), self.assertRaises(ValueError):
+                units.to_meters(value, unit)
+
+
 class JsonNumberTest(unittest.TestCase):
     def test_normalises(self):
         self.assertIsInstance(units.json_number(25.0), int)
