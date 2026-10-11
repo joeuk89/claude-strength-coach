@@ -381,7 +381,7 @@ for every non-GET request, success or failure. The API key never appears.
 ## C12. Hevy routine note (R-13 renders, R-14 writes)
 
 ```
-<week focus line — first exercise of each routine only>
+Wk of 12 Oct: <week focus>        (first exercise of each routine only)
 Target: 3×8–10 @ 25/hand (Hevy: 50) @ RPE 8
 Focus: <exercise focus, only when set>
 Cues: <cues>
@@ -393,9 +393,11 @@ Cues: <cues>
 - The Target line is absolute. It never carries `target_note` or `change`:
   relative wording ("add 2.5 from last week") goes stale in the app. Those
   fields appear in the brief and the check-in only.
-- The first exercise's note carries the overlay `focus` (or the session
-  `focus` if set) as an extra first line, because Hevy drops routine-level
-  notes on PUT.
+- The first exercise's note carries an extra first line, because Hevy
+  drops routine-level notes on PUT: `Wk of <span.start as D Mon>: ` then the
+  overlay `focus`, about 80 characters at most. The date lets the athlete
+  spot a stale note mid-session. It is always the week focus; a session's
+  own emphasis goes in its exercises' `Focus:` lines.
 
 ## C13. Checks (R-10 registry; every item adds its own)
 
