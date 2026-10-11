@@ -100,7 +100,15 @@
       "Bash(python3 -m coach niggles update:*)",
       "Bash(python3 -m coach niggles resolve:*)",
       "Bash(python3 -m coach niggles import:*)",
-      "Bash(python3 -m coach niggles constraints:*)"
+      "Bash(python3 -m coach niggles constraints:*)",
+      "Bash(python3 -m coach cardio week:*)",
+      "Bash(python3 -m coach cardio reconcile:*)",
+      "Bash(python3 -m coach cardio flags:*)",
+      "Bash(python3 -m coach cardio render:*)",
+      "Bash(python3 -m coach status-days list:*)",
+      "Bash(python3 -m coach status-days add:*)",
+      "Bash(python3 -m coach status-days end:*)",
+      "Bash(python3 -m coach status-days withdraw:*)"
     ]
   },
   "hooks": {

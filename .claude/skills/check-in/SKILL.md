@@ -141,9 +141,14 @@ fields, always in this order:
 2. **Coach-led** — ask what each coach-led session in the window covered.
    State what its log shows and the inferred rotation position for
    confirmation.
-3. **Runs** — count and total distance. Runs the athlete logged as Hevy
-   workouts are read from the log and stated, not asked.
-4. **Sleep** — always asked, in one line: "average hours a night (from
+3. **Runs** — with an activity source, the card states the window's
+   runs from `python3 -m coach cardio week` (count, distance, quality
+   runs) and any planned run `cardio reconcile` found missed, and asks
+   only for runs no source logged. Without one, ask count and total
+   distance.
+4. **Sleep** — with a sleep source and enough tracked nights, the card
+   states the last seven nights (average and short nights) and asks how
+   it felt. Otherwise ask, in one line: "average hours a night (from
    your watch or phone if it tracks sleep), and how it felt".
 5. **Niggles** — anything new? Name each open niggle-log row (`watching`
    or `easing`) and ask whether it is quiet or still there.
@@ -214,7 +219,14 @@ run `python3 -m coach history annotate --input <that file>`, with
   covered.
 
 Exit 1 names each annotation that doesn't fit; fix the file and run it
-again. Then run `checkin prepare` again: the card now carries the reply.
+again. Days the reply says the athlete was ill, injured or away go in as
+status days: `python3 -m coach status-days add --kind ill|injured|travel
+--from D --to D --note "<one line>" --source "check-in <date>"` (leave
+out `--to` while it is still going on; `status-days end <id> --date D`
+closes it later, `status-days withdraw <id> --reason <text>` takes back a
+wrong one). An ill status day in the gap brings in the illness return
+rule, exactly as an `ill` miss tag does. Then run `checkin prepare`
+again: the card now carries the reply.
 
 **At most one follow-up turn**, and only for a gap that blocks
 programming: an unresolved rotation position, a new niggle's severity, or
@@ -278,8 +290,16 @@ concrete: did the athlete hit the prescribed load × reps @ RPE?
   (trained, missed with its miss tag or `untagged`, upcoming) and each
   exercise's result against the prescription (hit, under, over,
   missing). Sessions trained vs. planned, including coach-led ones as
-  the reply confirmed them (that's the "n of ~m" in the record header;
-  note cardio separately); which days slipped, with their miss tags.
+  the reply confirmed them (that's the "n of ~m" in the record header);
+  which days slipped, with their miss tags.
+- Cardio, kept separate from lifting adherence: `python3 -m coach cardio
+  week --week <the week>` for runs, conditioning and other activity, with
+  each one's quality and session-RPE load (information only, never a
+  ratio); `cardio reconcile --week <the week>` for planned against
+  logged when the cardio tier is `review` or `program`; and `cardio
+  flags --week <the week>` (`cap_breach`, `run_volume_spike`,
+  `quality_stack`, `sleep_debt`, `status_active`, `niggle_link`). Name
+  each flag in the Coach's read.
 - Notable sets: PRs, rep-range top-outs due a load increase, anything way
   off prescription.
 - RPE drift: check only **compound lifts** (multi-joint squat, hinge,
@@ -508,6 +528,12 @@ byte as it was. Once the week's overlay is approved (step 7), run it
 with `--refresh --overlay <id>` to put the prescription in a collapsed
 appendix; it also collapses a region `overlay render --into` already
 wrote.
+
+Add the cardio block with `python3 -m coach cardio render --week <the
+week> --into check-ins/<today>.md`: the week's numbers, the reconcile
+and the cardio flags. It is a snapshot, which no check re-renders, so
+run it again only when the week's data changes before the record is
+committed.
 
 Write the prose, each section short:
 
