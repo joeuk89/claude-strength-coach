@@ -704,7 +704,7 @@ none and `bodyweight`, `assisted`, `duration` or `distance`; band and
 | `plugins/<kind>/<name>.py`, `plugins/tests/test_<name>.py` | instance plugins and their tests | committed | the athlete, as a code change |
 | `.coach/cache/hevy/` | raw Hevy cache, rebuildable with `hevy pull --full` | **gitignored** | R-12 |
 | `.coach/backups/<UTC timestamp>/` | pre-migration copies; old recipe cards and index before conversion | gitignored | R-17a; R-33b (`recipes convert --apply`) |
-| `.coach/proposals/<id>.json`, `<id>.proposed.json` | editable proposal draft and its untouched original | gitignored | R-23a |
+| `.coach/proposals/<id>.json`, `<id>.proposed.json`, `<id>.meta.json` | editable proposal draft (an overlay draft, C10), its untouched original, and the run's facts (kind, span, transform, rotation, each slot's proposed scheme state) | gitignored | R-23a |
 | `.coach/plans/<week start>-<name>.json` | schedule plans handed to `propose week --plan` | gitignored | R-30b; R-22 may |
 | `.coach/drafts/` | drafts the coach edits before a command applies them (program drafts, log drafts, recipe drafts and saved recipe pages), and the scheduled run's `checkin-<date>.md` | gitignored | R-40c, R-41a, R-41b, R-45; the coach (R-33b recipe pages) |
 | `.coach/nudge.json` | nudge state | gitignored | R-45 |
@@ -1295,6 +1295,8 @@ Unless stated, each is a copy of `valid/` plus what is listed.
 | `meals-bad-arithmetic/`, `meals-stale-render/` | R-33c | not copies of `valid/`: the valid config and the valid plan, with one fault each: Monday's kcal total 100 over its items; a hand-edited Monday row in the rendered plan |
 | `overlay-bad-schema/`, `overlay-bad-arithmetic/`, `overlay-stale-render/` | R-13 | `config.toml` plus the valid overlay with one fault each: Session B dated outside the span; DB bench working sets at `hevy_total` 25 for 25/hand; a hand-edited check-in region |
 | `routines-drift/`, `routines-pushed/` | R-14 | not copies of `valid/`: its `config.toml`, the valid overlay and a Hevy cache (`meta.json`, `routines.json`). `routines-drift/` caches the synthetic routines as pulled; `routines-pushed/` caches them after `routines push` of the valid overlay to the fake |
+| `plugins-invalid/` | R-23a | not a copy of `valid/`: its config and an instance scheme `plugins/schemes/custom_untested.py` with no test file |
+| `decisions-invalid/` | R-23a | not a copy of `valid/`: its config and a `data/decisions.json` holding one standing override with no `until` |
 | `program-bad-schema/`, `program-misspelt-key/`, `program-unknown-exercise/`, `program-avoided/`, `program-stale-render/`, `program-top-set/`, `state-bad-schema/` | R-17a | not copies of `valid/`: `config.toml` plus the valid program with one change each: DB bench without `load_mode`; squat `rest_secs`; squat as `no_such_exercise`; an instance library marking DB bench `avoid`; the valid routine pages with one character of `session-a.md` edited; squat as a 1×3 top set and 3×5 back-offs; a state with deload status `pending` |
 | `schema-version-log/`, `schema-newer/`, `schema-older/`, `dangling-exercise/`, `dangling-routine/`, `overlay-library-mismatch/`, `load-over-cap/`, `bare-hevy-value/`, `render-stale-sweep/` | R-16 | not copies of `valid/`: its `config.toml`, library and overlay, with one fault each: an audit-log line at schema version 2; the overlay at version 2; at 0; DB bench as `db_bench_pres`; Session B naming an uncached routine (with `routines-drift/`'s cache); DB bench naming template `F0000003`; DB bench working sets at 45/hand (Hevy: 90); DB bench `target_note` "go to 50 kg"; a hand-edited overlay region in `profile.md`. Overlays are re-approved. `env_untracked` builds its git repositories in temp directories, since fixtures hold no `.env` (C6) |
 
@@ -1383,7 +1385,7 @@ version bump (below).
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "name": "Upper/lower, 4 days",
   "sessions": [
     {
@@ -1468,15 +1470,15 @@ version bump (below).
 
 ```json
 {
-  "schema_version": 2,
-  "rotation": {"position": "week-a", "confirmed": true, "confirmed_at": "2026-10-11"},
+  "schema_version": 3,
+  "rotation": {"position": "week-a", "confirmed": true, "confirmed_at": "2026-10-11", "week": "2026-10-12"},
   "block": {
     "started": "2026-09-01",
     "hard_weeks_completed": 3,
     "deload": {"status": "not_due", "since": null}
   },
   "one_off": null,
-  "scheme_state": {"session-a/bb_back_squat": {}},
+  "scheme_state": {"session-a/bb_back_squat": {"scheme": "double_progression", "data": {}, "pending": null}},
   "hevy": {
     "routines": {"00000000-0000-4000-8000-000000000001": {"session_id": "session-a"}},
     "folders": {"program": 1, "one_off": 2},
@@ -1494,7 +1496,8 @@ version bump (below).
   R-31 replaces `block` with the C42 shape.
 - `one_off`: null or `{"overlay_id": id, "span": span}`.
 - `scheme_state` keys are `<session_id>/<exercise_id>` and name a slot the
-  program has; values are free-form objects in v1.
+  program has; values are free-form objects in v1 and v2, and take the
+  C23 shape in v3.
 - `hevy.routines` replaces `routine/hevy-map.json`; each `session_id`
   names a program session. Folder ids are Hevy's integers or null. R-14b's
   `routines create` records new routine ids here, never in the overlay.
@@ -1577,8 +1580,8 @@ skip when there is no `data/program.json` (`state_schema`: no
   `migrate run`, and commits the staged files with the framework.
 
 **Schema versions.** R-17a ships program and state v1. R-14b takes state
-to v2 (`temporary_routines` entries). R-23a takes program to v2 and state
-to the next free version (C23). Every later bump takes the next free version when it merges and
+to v2 (`temporary_routines` entries). R-23a took program to v2 and state
+to v3 (C23). Every later bump takes the next free version when it merges and
 adds one step to the R-17a migration chain, so the chain stays linear.
 Program bumps: R-22 (executable `missed_day_rules`, C37), R-30a
 (`dose_targets`, C40), R-30b (`priority`, `minimum_week`, C40), R-44a
@@ -1967,7 +1970,7 @@ Reserved codes:
 | `rotation_unconfirmed` | warn | R-23a | | The schedule rule advanced the rotation without confirmation. |
 | `niggle_escalate` | warn | R-27 | | Niggle reported three check-ins running, or worse: recommend a qualified professional. |
 | `followup_due` | info | R-27 | | An open follow-up is past its review date. |
-| `evidence_expired` | info | R-32 (module added by R-32a if R-20 has merged, otherwise by R-23a) | | A plugin's cited research note has expired; the rationale says the evidence is under review. |
+| `evidence_expired` | info | R-32 (module `coach/flags/research.py` added by R-23a) | | A plugin's cited research note has expired; the rationale says the evidence is under review. |
 | `stale_routine` | warn | R-21a | | A routine for an active session does not hold the newest approved overlay's content: the last pass did not write and verify it. |
 | `missed_day_rule` | info | R-22 | | A missed-day rule changed this line or session; the message names the rule. |
 | `missed_rule_unmatched` | info | R-22 | | No missed-day rule matched; reprogram the rest of the week with `propose week --kind midweek` and a coach's brief. |
@@ -2264,13 +2267,54 @@ and `plugins test` runs them. Loaded with
   `PARAMS` by `program validate`; exercise `constraints` items take the
   C26 shape. Migration: names unchanged, `constraints` emptied with a
   report row for any v1 free-form entry.
-- `state.json`, the next free version (R-14b took 2): `scheme_state["<session_id>/<exercise_id>"]` becomes
+- `state.json` 3 (R-14b took 2): `scheme_state["<session_id>/<exercise_id>"]` becomes
   `{"scheme": name, "data": {...}, "pending": null | {"overlay_id": id, "data": {...}}}`;
-  `data` validated against the scheme's `STATE`. Migration wraps v1
-  entries.
+  `data` validated against the scheme's `STATE`. Migration wraps v2
+  entries with `scheme: null`, since the state alone does not name the
+  scheme; the next `propose week` adopts the slot's current scheme
+  (its `data` when it fits the scheme's `STATE`, else `initial`, with no
+  `scheme_reset`). `rotation` gains `week`: the start date of the week
+  its `position` names, or null (read as the week holding today).
 - Scheme state advances only through approval: `propose finalize` writes
   `pending`; the next `propose week` promotes `pending` to `data` when
   that overlay is approved with a matching hash, and drops it otherwise.
+  A deload run writes no pending state: a deload never advances a
+  scheme.
+
+**Built with R-23a** (additions to the shapes above):
+
+- `SchemeContext` also carries `scheme` (the slot's scheme name) and
+  `scheme_deload` (that scheme's `deload`, or None), so the `scheme`
+  transform needs no import. A transform's `apply` gets the context with
+  `params` replaced by the transform's own merged `PARAMS`.
+- `Proposal` also carries `round_down` (default false): a scheme whose
+  load is an estimate (`fixed_reps_rpe`) asks for its loads rounded
+  down; decay and the deload transforms set it too.
+- The `Exposure` a plugin sees is `coach.plugins.base.Exposure`: C17's
+  fields with every load as the coaching number, plus `prescribed` (the
+  working sets the overlay in force that day asked for; the slot's
+  program sets when none did) and `week_kind` (that overlay's kind).
+  `base.baseline(exposures)` is the exposure loads derive from: the
+  newest neither excluded, `suspect` nor trained in a `deload` week. The
+  core refuses a proposal derived from an excluded or suspect exposure.
+- `last_prescription` is `{overlay_id, session_id, date, exercise_id,
+  load_mode, sets, override}` with `sets` as `base.SetSpec`s.
+- A schedule rule may define `problems(params, program) -> [(path,
+  message)]` for what its schema cannot say (session ids the program
+  lacks); `program validate` reports them under `$.schedule.params`.
+  A plan's `rotation` is `{position, confirmed, week}`.
+- `base.default_decay` cuts each working load from the lower of the
+  proposal and the derived-from load, so a return week never carries a
+  progression; it keeps `max(1, min(proposal sets, derived-from sets) +
+  set_delta)` working sets.
+- **Rounding** (step 3 of C24): a load equal to one the slot already
+  knows (the derived-from load, a load of the last approved line, the
+  start load) stays as it is. Otherwise a per-hand dumbbell load snaps to
+  the location's `dumbbells` when that list is set; any other load
+  rounds to the increment (`Library.increment`, else the equipment
+  increment) on a grid anchored at the derived-from load (else the last
+  approved load, else the start load, else 0). A load clipped by a cap or
+  a load constraint is not rounded up, and no rounding goes past the cap.
 
 ## C24. Proposal pipeline and `coach propose` (R-23a; R-21b, R-22, R-25, R-26, R-30b, R-31, R-40a, R-41a, R-43, R-44a, R-44b, R-45 read)
 
@@ -2324,6 +2368,36 @@ A hand edit of the draft is allowed; finalize catches unexplained
 changes. One-off weeks (travel, limited kit) stay coach-built through
 `overlay build` until R-26 merges the skills.
 
+**Built with R-23a** (details the steps above leave open):
+
+- Default span: the week holding tomorrow. `--kind midweek` starts the
+  span at today when today falls inside the week. A run that plans no
+  active session exits 1.
+- `--kind deload` writes overlay kind `deload` whose sessions keep their
+  program session ids, are `temporary: true` (so R-14b gives them
+  temporary routines, as `/one-off-week` expects) and are titled
+  `Deload — <session title>`. `--transform NAME` applies that transform
+  to any kind; a deload with none uses the program's `deload_rule`.
+- The `--plan FILE` shape is `schedule plan`'s output:
+  `{"sessions": [{"date", "session_id"}], "flags": [...]}`; other keys
+  are ignored and the rotation is left unchanged.
+- `propose override` takes `--sets SPEC`, comma-separated groups
+  `COUNTxREPS[-REPS][@LOAD][ rpeN]` (`"3x5@95 rpe7"`), which replace the
+  line's working sets and keep its warm-ups, or `--load N`. It re-runs
+  the R-24 check and stores the merged flags in the draft, so a block an
+  override creates can be resolved there. A standing override's decision
+  is appended when the command runs.
+- `propose finalize` also appends a one-week override decision
+  (`standing: false`, `until` the overlay's span end) for each line whose
+  `override` no decision yet records.
+- `propose show ID` returns the built overlay, `lines`, `unexplained`
+  (what finalize would refuse with exit 1) and `unresolved_blocks`.
+- `schedule confirm --position P [--week W]` records the position for
+  the week holding tomorrow by default, with `confirmed_at` today.
+- Steps 5a and 5b are left to R-43 and R-44b, which own those providers.
+- R-23a adds the status provider `proposal` (C52, order 35): drafts in
+  `.coach/proposals/` with no overlay yet, at `attention`.
+
 ## C25. Decisions file and `last_override` (R-23a; R-25, R-30a, R-31 read and append)
 
 `data/decisions.json`:
@@ -2362,12 +2436,21 @@ changes. One-off weeks (travel, limited kit) stay coach-built through
   Records are never deleted.
 - **`last_override`** for a slot = the newest `override` decision for
   that scope with effective status `active`, or null. When `standing`,
-  the core keeps `chosen_sets` (re-deriving loads only through decay and
-  caps), puts the scheme's own proposal in the rationale, and raises
+  the core keeps `chosen_sets` (re-deriving loads only through decay,
+  the load constraints, the illness cap, caps and rounding), puts the scheme's own proposal in the rationale, and raises
   `override_standing`. A one-week override (not standing) is only
   information to the scheme.
 - Standing overrides need an `until` date, default four weeks after
-  `made_at`, at most eight.
+  `made_at`, at most eight. Renewing one is another `propose override
+  --standing`: the newest active decision for a scope wins.
+- `details` per kind, checked by `coach.decisions.problems` (the JSON
+  schema subset has no per-kind branching): `adherence_trigger` requires
+  `rule`, `adherence_pct` (0–100) and `weeks` (dates); `light_week`
+  requires `type` (`deload`, `light`, `return`), `week` (a date),
+  `reason`, `triggers` (strings) and `hard_weeks` (integer). An override
+  scope names both ids; other kinds' scope is `{}` and they carry no
+  sets. Check `decisions_schema`: the file passes the schema and these
+  rules (skip when there is no file).
 
 ## C26. Load constraints (R-23a defines and enforces; R-27 adds the niggle source; R-31, R-43, R-44a read)
 
