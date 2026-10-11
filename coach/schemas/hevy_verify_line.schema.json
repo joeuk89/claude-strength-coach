@@ -1,0 +1,30 @@
+{
+  "title": "One verify line in data/hevy/writes.jsonl (contract C9): did a routine read back as the overlay asks",
+  "type": "object",
+  "required": ["schema_version", "at", "kind", "routine_id", "overlay_id", "overlay_hash", "verified", "diff"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": 1},
+    "at": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"},
+    "kind": {"const": "verify"},
+    "routine_id": {"type": "string"},
+    "overlay_id": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}-[a-z0-9-]+$"},
+    "overlay_hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "verified": {"type": "boolean"},
+    "diff": {"type": "array", "items": {"$ref": "#/$defs/change"}}
+  },
+  "$defs": {
+    "change": {
+      "type": "object",
+      "required": ["routine_id", "class", "path", "before", "after"],
+      "additionalProperties": false,
+      "properties": {
+        "routine_id": {"type": ["string", "null"]},
+        "class": {"enum": ["prescription", "structural"]},
+        "path": {"type": "string"},
+        "before": {},
+        "after": {}
+      }
+    }
+  }
+}
