@@ -1,0 +1,80 @@
+{
+  "title": "data/history/<YYYY-MM>.json: resolved workouts for one calendar month (contract C17)",
+  "type": "object",
+  "required": ["schema_version", "month", "workouts"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": 1},
+    "month": {"type": "string", "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"},
+    "workouts": {"type": "array", "items": {"$ref": "#/$defs/workout"}}
+  },
+  "$defs": {
+    "date": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+    "timestamp": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$"},
+    "workout": {
+      "type": "object",
+      "required": ["workout_id", "source", "source_version", "hevy_updated_at", "resolved_at", "date", "start_time", "end_time",
+                   "duration_minutes", "title", "description", "routine_id", "session_id", "overlay_id", "exercises"],
+      "additionalProperties": false,
+      "properties": {
+        "workout_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"},
+        "source": {"enum": ["hevy", "manual"]},
+        "source_version": {"type": "string"},
+        "hevy_updated_at": {"type": ["string", "null"], "pattern": "\\S"},
+        "resolved_at": {"$ref": "#/$defs/timestamp"},
+        "date": {"$ref": "#/$defs/date"},
+        "start_time": {"type": ["string", "null"], "pattern": "\\S"},
+        "end_time": {"type": ["string", "null"], "pattern": "\\S"},
+        "duration_minutes": {"type": ["integer", "null"], "minimum": 0},
+        "title": {"type": "string"},
+        "description": {"type": "string"},
+        "routine_id": {"type": ["string", "null"], "pattern": "\\S"},
+        "session_id": {"type": ["string", "null"], "pattern": "^[a-z0-9-]+$"},
+        "overlay_id": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}-[a-z0-9-]+$"},
+        "exercises": {"type": "array", "items": {"$ref": "#/$defs/exercise"}}
+      }
+    },
+    "exercise": {
+      "type": "object",
+      "required": ["exercise_id", "title", "hevy_template_id", "load_mode", "load_mode_source", "notes", "sets"],
+      "additionalProperties": false,
+      "properties": {
+        "exercise_id": {"type": ["string", "null"], "pattern": "^[a-z0-9_]+$"},
+        "title": {"type": "string"},
+        "hevy_template_id": {"type": ["string", "null"], "pattern": "\\S"},
+        "load_mode": {"enum": ["total", "per_hand_x2", "single_implement", "bodyweight", "assisted", "band",
+                               "duration", "distance", null]},
+        "load_mode_source": {"enum": ["annotation", "overlay", "library", "log", null]},
+        "notes": {"type": "string"},
+        "sets": {"type": "array", "items": {"$ref": "#/$defs/set"}}
+      }
+    },
+    "set": {
+      "type": "object",
+      "required": ["index", "type", "reps", "rpe", "weight_kg", "load", "duration_seconds", "distance_meters"],
+      "additionalProperties": false,
+      "properties": {
+        "index": {"type": "integer", "minimum": 0},
+        "type": {"enum": ["normal", "warmup", "dropset", "failure"]},
+        "reps": {"type": ["integer", "null"], "minimum": 0},
+        "rpe": {"type": ["number", "null"], "minimum": 1, "maximum": 10},
+        "weight_kg": {"type": ["number", "null"], "minimum": 0},
+        "load": {"$ref": "#/$defs/load"},
+        "duration_seconds": {"type": ["number", "null"], "minimum": 0},
+        "distance_meters": {"type": ["number", "null"], "minimum": 0}
+      }
+    },
+    "load": {
+      "type": ["object", "null"],
+      "required": ["mode", "unit", "per_hand", "hevy_total", "hevy_kg"],
+      "additionalProperties": false,
+      "properties": {
+        "mode": {"enum": ["total", "per_hand_x2", "single_implement", "bodyweight", "assisted"]},
+        "unit": {"enum": ["kg", "lb"]},
+        "per_hand": {"type": ["number", "null"], "minimum": 0},
+        "hevy_total": {"type": "number", "minimum": 0},
+        "hevy_kg": {"type": "number", "minimum": 0}
+      }
+    }
+  }
+}

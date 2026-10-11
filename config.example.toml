@@ -49,6 +49,11 @@ dumbbells = []                # per-hand dumbbell weights available; [] = not ch
 [caps]
 # db_bench_press = 30.0
 
+# Optional time caps in minutes, by session id. A session left out uses
+# [athlete] session_minutes; 0 means no cap.
+# [sessions.cap_minutes]
+# session-a = 45
+
 # Nutrition strategy, set by /goals with the athlete's approval. Left out,
 # or with enabled = false, nutrition is off: the check-in asks for one
 # morning weigh-in and /goals sets things up. Weights are in [athlete]

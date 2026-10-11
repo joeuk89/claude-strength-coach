@@ -1,0 +1,47 @@
+{
+  "title": "data/history/annotations.json: corrections and facts the log lacks (contract C17)",
+  "type": "object",
+  "required": ["schema_version", "annotations"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": 1},
+    "annotations": {"type": "array", "items": {"$ref": "#/$defs/annotation"}}
+  },
+  "$defs": {
+    "date": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+    "span": {
+      "type": "object",
+      "required": ["start", "end"],
+      "additionalProperties": false,
+      "properties": {"start": {"$ref": "#/$defs/date"}, "end": {"$ref": "#/$defs/date"}}
+    },
+    "annotation": {
+      "type": "object",
+      "required": ["id", "kind", "created_at", "source", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^a-\\d{4,}$"},
+        "kind": {"enum": ["discount", "repair", "load_mode", "unknown_convention", "confirm", "miss", "external",
+                          "trained_unlogged"]},
+        "created_at": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"},
+        "source": {"type": "string", "pattern": "\\S"},
+        "reason": {"type": ["string", "null"], "pattern": "\\S"},
+        "withdraws": {"type": "string", "pattern": "^a-\\d{4,}$"},
+        "workout_id": {"type": "string", "pattern": "\\S"},
+        "exercise_id": {"type": "string", "pattern": "^[a-z0-9_]+$"},
+        "set_index": {"type": ["integer", "null"], "minimum": 0},
+        "field": {"enum": ["reps", "rpe", "weight_kg", "type"]},
+        "value": {"type": ["number", "string", "null"]},
+        "span": {"$ref": "#/$defs/span"},
+        "load_mode": {"enum": ["total", "per_hand_x2", "single_implement", "bodyweight", "assisted", "band",
+                               "duration", "distance"]},
+        "date": {"$ref": "#/$defs/date"},
+        "session_id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+        "tag": {"enum": ["time", "sleep", "ill", "family", "skipped", "other", null]},
+        "external_id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+        "done": {"type": "boolean"},
+        "note": {"type": ["string", "null"]}
+      }
+    }
+  }
+}

@@ -79,7 +79,7 @@ class StrictnessTest(unittest.TestCase):
         self.assert_names(MINIMAL_CONFIG + 'week_start = "monday"\n', '"week_start"', "[athlete]")
 
     def test_unknown_table_and_top_level_key(self):
-        self.assert_names(MINIMAL_CONFIG + "[sessions]\n", "[sessions]")
+        self.assert_names(MINIMAL_CONFIG + "[session]\n", "[session]")
         self.assert_names("colour = 1\n" + MINIMAL_CONFIG, '"colour"')
 
     def test_type_errors_name_the_expected_type(self):
