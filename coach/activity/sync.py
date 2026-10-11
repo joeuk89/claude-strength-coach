@@ -32,7 +32,8 @@ def run(ctx, store, only=None, dry_run=False):
     for name, module in sources.items():
         previous = sync_map["sources"].get(name, {})
         try:
-            result, pending, dropped = _collect(ctx, store, module, dict(previous.get("state", {})), now)
+            result = module.fetch(ctx, dict(previous.get("state", {})))
+            row = _apply(ctx, store, module, result, now, dry_run)
         except Exception as exc:
             if not isinstance(exc, CoachError):
                 ctx.log(traceback.format_exc().rstrip())
@@ -40,26 +41,49 @@ def run(ctx, store, only=None, dry_run=False):
             ctx.warn(f"{name}: sync failed, so its records and sync state are unchanged: {message}")
             report.append({"source": name, "ok": False, "error": message})
             continue
-        for warning in result.warnings:
-            ctx.warn(f"{name}: {warning}")
-        for reason, count in sorted(dropped.items()):
-            ctx.warn(f"{name}: dropped {count} item(s): {reason}")
-        appended = voided = 0
-        for kind, lines in pending.items():
-            store.append(kind, lines, dry_run)
-            voided += sum(1 for line in lines if line["op"] == "void")
-            appended += sum(1 for line in lines if line["op"] == "upsert")
         sync_map["sources"][name] = {"last_sync_at": now, "state": result.sync_state}
-        report.append({"source": name, "ok": True, "appended": appended, "voided": voided,
-                       "dropped": dict(sorted(dropped.items())), "last_sync_at": now})
+        report.append({"source": name, "ok": True, **row, "last_sync_at": now})
     if any(row["ok"] for row in report):
         store.write_sync_map(sync_map, dry_run)
     return report
 
 
-def _collect(ctx, store, module, state, now):
-    result = module.fetch(ctx, state)
+def import_file(ctx, store, name, path, dry_run=False):
+    """`activity import`: one file through a source's `fetch_file`, recorded in the sync map like a sync."""
+    module = adapters.discover().get(name)
+    if module is None or not adapters.is_source(module) or not hasattr(module, "fetch_file"):
+        able = ", ".join(n for n, m in adapters.discover().items() if hasattr(m, "fetch_file")) or "none"
+        raise UsageError(f"activity source {name!r} cannot import a file; sources that can: {able}")
+    sync_map = store.sync_map()
+    previous = sync_map["sources"].get(name, {})
+    now = records.utc_text(ctx.now())
+    result = module.fetch_file(ctx, path, dict(previous.get("state", {})))
+    row = _apply(ctx, store, module, result, now, dry_run)
+    if row["appended"] or row["voided"] or result.sync_state != previous.get("state"):
+        sync_map["sources"][name] = {"last_sync_at": now, "state": result.sync_state}
+        store.write_sync_map(sync_map, dry_run)
+    return {"source": name, **row, "last_sync_at": sync_map["sources"].get(name, {}).get("last_sync_at")}
+
+
+def _apply(ctx, store, module, result, now, dry_run):
+    """Normalise a fetch result, append what changed, and return the report fields."""
+    pending, dropped, counts = _collect(store, module, result, ctx, now)
+    for warning in result.warnings:
+        ctx.warn(f"{module.NAME}: {warning}")
+    for reason, count in sorted(dropped.items()):
+        ctx.warn(f"{module.NAME}: dropped {count} item(s): {reason}")
+    appended = voided = 0
+    for kind, lines in pending.items():
+        store.append(kind, lines, dry_run)
+        voided += sum(1 for line in lines if line["op"] == "void")
+        appended += sum(1 for line in lines if line["op"] == "upsert")
+    return {**result.info, "records": dict(sorted(counts.items())), "appended": appended, "voided": voided,
+            "dropped": dict(sorted(dropped.items()))}
+
+
+def _collect(store, module, result, ctx, now):
     dropped = Counter()
+    counts = Counter()
     batch = {}
     for item in result.items:
         try:
@@ -73,9 +97,11 @@ def _collect(ctx, store, module, state, now):
                 batch[(kind, line["id"])] = line
     pending = {}
     for (kind, _), line in batch.items():
+        if line["op"] == "upsert":
+            counts[kind] += 1
         if store.change(kind, line):
             pending.setdefault(kind, []).append(line)
-    return result, pending, dropped
+    return pending, dropped, counts
 
 
 def _line(store, module, record, now):
