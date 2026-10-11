@@ -2619,7 +2619,8 @@ def normalise(item, ctx) -> list[dict]: ...
  "sources": {
    "hevy_conditioning": {"last_sync_at": "2026-10-11T18:00:00Z", "state": {"seen_workout_ids": ["..."]}},
    "apple_health": {"last_sync_at": "2026-10-11T18:00:00Z",
-                    "state": {"files": {"HealthAutoExport-2026-10-10.json": "sha256:..."}}}
+                    "state": {"files": {"Metrics/HealthAutoExport-2026-10-10.json": "sha256:...",
+                                        "Workouts/HealthAutoExport-2026-10-10.json": "sha256:..."}}}
  }}
 ```
 
@@ -2665,12 +2666,18 @@ def normalise(item, ctx) -> list[dict]: ...
 - **`apple_health` adapter** (R-42b). Reads Health Auto Export's Version 2
   JSON (vendor format pages: Export Format, Health Metrics, Workouts,
   Manual Export, Sync to iCloud Drive at help.healthyapps.dev).
-  - `activity sync` reads every `*.json` in `[sources.apple_health] path`
-    (`~` expanded; relative to the instance root) whose content hash is
-    not a value in the sync state, in file-name order and in place. Its
-    state is `{"files": {file name: "sha256:..."}}`; `info` is
-    `files_read`. `activity import` keys the file by its base name and
-    reports `file` and `already_seen`.
+  - Each Health Auto Export automation exports one data type (Health
+    Metrics or Workouts) into its own folder, `AutoExport/<automation
+    name>/`, so `path` names `AutoExport/` or any folder holding both
+    automation folders. `activity sync` reads every `*.json` under
+    `[sources.apple_health] path`, subfolders included (`~` expanded;
+    relative to the instance root; hidden folders skipped), whose
+    content hash is not a value in the sync state, in relative-path
+    order and in place. Its state is `{"files": {<relative path>:
+    "sha256:..."}}`, keyed by each file's path relative to `path`, so
+    two automations' same-named day files never share a key; `info` is
+    `files_read`, in the same relative paths. `activity import` keys the
+    file by its base name and reports `file` and `already_seen`.
   - Refused with the setting to change: a CSV file ("set Export Format to
     JSON") and a Version 1 file, told apart by a workout without `id` or
     `duration` ("set Export Version to Export Version 2"). In a folder
@@ -2706,13 +2713,16 @@ def normalise(item, ctx) -> list[dict]: ...
   - The anonymiser (`activity anonymise`) writes
     `<out>/health-auto-export.json` marked `"x-anonymised": true`. It
     keeps only `metrics` and `workouts`; drops `route` and `metadata`;
-    shifts every date by more whole weeks than the export spans, so no
-    shifted date equals an original; replaces every `id` with a salted
-    fake UUID (deterministic within a run) and every `source`/`device`
-    name part other than `Hevy` with `Device N`; and moves every number
-    by 0.5 to 3 % (integers stay integers). It refuses to write when any
-    original id, timestamp, date or source name survives. The salt is
-    random per run and never stored.
+    shifts every date by more whole weeks than the dates anywhere in the
+    file span, so no shifted date equals an original; replaces every
+    `id` with a salted fake UUID (deterministic within a run) and every
+    `source`/`device` name part other than `Hevy` with `Device N`; and
+    moves every number by 0.5 to 3 % (integers stay integers). It
+    refuses to write when any original id, timestamp or source name
+    survives, or any `yyyy-MM-dd` substring of the original file, so a
+    date in a format it does not shift (an ISO `T` timestamp, fractional
+    seconds, a date inside longer text) blocks the fixture instead of
+    leaking. The salt is random per run and never stored.
   - Fixtures: `tests/fixtures/apple_health/` (synthetic, `"x-synthetic":
     true`).
 

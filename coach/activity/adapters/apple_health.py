@@ -1,9 +1,10 @@
 """Apple Health through Health Auto Export's Version 2 JSON files (contract C31, C32).
 
-`activity sync` reads every new `*.json` file in `[sources.apple_health] path`
-(the iCloud Drive automation folder) in place; `activity import` reads one
-file, such as a 90-day manual export. Workouts become Activities and daily
-metrics become one wellness record per day. Lifting workouts, and workouts
+`activity sync` reads every new `*.json` file under `[sources.apple_health]
+path` (iCloud Drive's AutoExport folder, which holds one folder per
+automation) in place; `activity import` reads one file, such as a 90-day
+manual export. Workouts become Activities and daily metrics become one
+wellness record per day. Lifting workouts, and workouts
 an app in `drop_source_names` wrote, are dropped with a counted reason.
 """
 
@@ -112,12 +113,23 @@ def _folder(ctx):
     return folder
 
 
+def _folder_files(folder):
+    """Every file under folder, as (path, key relative to folder), skipping hidden folders; sorted by key."""
+    found = []
+    for parent, subfolders, names in os.walk(folder):
+        subfolders[:] = [name for name in subfolders if not name.startswith(".")]
+        for name in names:
+            path = Path(parent) / name
+            found.append((path, path.relative_to(folder).as_posix()))
+    return sorted(found, key=lambda pair: pair[1])
+
+
 def fetch(ctx, sync_state):
     folder = _folder(ctx)
     files = dict(sync_state.get("files", {}))
     seen = set(files.values())
     warnings, exports, read = [], [], []
-    for path in sorted(folder.iterdir(), key=lambda p: p.name):
+    for path, key in _folder_files(folder):
         if not path.is_file():
             continue
         if hae.is_placeholder(path.name):
@@ -136,8 +148,8 @@ def fetch(ctx, sync_state):
         except ValidationError as exc:
             warnings.append(exc.message)
             continue
-        files[path.name] = digest
-        read.append(path.name)
+        files[key] = digest
+        read.append(key)
     items, more = _items(ctx, exports)
     return FetchResult(items, {"files": files}, warnings + more, info={"files_read": read})
 

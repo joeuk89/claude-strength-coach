@@ -23,6 +23,7 @@ OUTPUT_NAME = "health-auto-export.json"
 PERTURB = 0.03
 _TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [+-]\d{4}$")
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_DATE_ANYWHERE = re.compile(r"\d{4}-\d{2}-\d{2}")
 _TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S %z"
 
 
@@ -107,17 +108,18 @@ def anonymise(path, out_dir, dry_run=False, seed=None):
     every number by up to 3 %. The salt is random per run and never stored.
     """
     data = read_export(path)
+    in_file = set(_DATE_ANYWHERE.findall(Path(path).read_text(encoding="utf-8")))
     seed = secrets.randbits(64) if seed is None else seed
     rng = random.Random(seed)
     salt = f"{seed:x}"
     kept = {section: data.get(section, []) for section in KEPT_SECTIONS}
     found = _originals(kept)
-    weeks = _shift_weeks(found["days"], rng)
+    weeks = _shift_weeks(found["days"] | in_file, rng)
     devices = {name: f"Device {n}" for n, name in enumerate(sorted(found["devices"]), start=1)}
     walker = _Anonymiser(rng, salt, weeks, devices)
     out = {"x-anonymised": True, "data": walker.walk(kept)}
     text = json.dumps(out, indent=2, ensure_ascii=False) + "\n"
-    _assert_clean(text, found)
+    _assert_clean(text, found, in_file)
     target = Path(out_dir) / OUTPUT_NAME
     if not dry_run:
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -152,11 +154,18 @@ def _originals(node, found=None, key=None):
 
 
 def _shift_weeks(days, rng):
-    """Enough whole weeks that no shifted date lands on an original one."""
-    if not days:
+    """Enough whole weeks that no shifted date lands on any date in the original file."""
+    parsed = sorted(filter(None, map(_valid_date, days)))
+    if not parsed:
         return rng.randint(1, 26)
-    parsed = sorted(date.fromisoformat(day) for day in days)
     return (parsed[-1] - parsed[0]).days // 7 + 1 + rng.randint(1, 26)
+
+
+def _valid_date(text):
+    try:
+        return date.fromisoformat(text)
+    except ValueError:
+        return None
 
 
 class _Anonymiser:
@@ -203,10 +212,10 @@ class _Anonymiser:
         return fake.upper() if value.upper() == value else fake
 
 
-def _assert_clean(text, found):
+def _assert_clean(text, found, in_file):
     leaks = [("id", value) for value in found["ids"]]
     leaks += [("timestamp", value) for value in found["stamps"]]
-    leaks += [("date", value) for value in found["days"]]
+    leaks += [("date", value) for value in found["days"] | in_file]
     leaks += [("source name", value) for value in found["devices"]]
     for kind, value in sorted(leaks):
         if value in text:

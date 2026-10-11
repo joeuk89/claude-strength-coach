@@ -3,7 +3,7 @@ import re
 import shutil
 import tempfile
 import unittest
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from coach import units
@@ -232,6 +232,29 @@ class FolderSyncTest(AppleHealthCase):
         day = self.ok("wellness", "list", "--from", "2026-09-28", "--to", "2026-09-28")["days"][0]
         self.assertEqual(day["steps"], 12000)
 
+    def test_reads_each_automation_folder_once_when_their_day_files_share_a_name(self):
+        day_file = "HealthAutoExport-2026-09-28.json"
+        (self.folder / "Metrics").mkdir()
+        shutil.move(self.folder / day_file, self.folder / "Metrics" / day_file)
+        (self.folder / "Workouts").mkdir()
+        run = json.loads(WEEK.read_text(encoding="utf-8"))["data"]["workouts"][0]
+        (self.folder / "Workouts" / day_file).write_text(json.dumps({"data": {"workouts": [run]}}), encoding="utf-8")
+        (self.folder / ".Trash").mkdir()
+        shutil.copy(WEEK, self.folder / ".Trash" / day_file)
+
+        row, _ = self.sync()
+        both = [f"Metrics/{day_file}", f"Workouts/{day_file}"]
+        self.assertEqual(row["files_read"], both)
+        self.assertEqual(row["records"], {"activity": 1, "wellness": 1})
+        files = json.loads((self.root / SYNC).read_text(encoding="utf-8"))["sources"]["apple_health"]["state"]["files"]
+        self.assertEqual(sorted(files), both)
+        self.assertEqual([line["id"] for line in self.apple_lines(ACTIVITIES)], [RUN_ID])
+
+        for _ in range(2):
+            row, _ = self.sync()
+            self.assertEqual(row["files_read"], [])
+            self.assertEqual(row["appended"], 0)
+
     def test_version_1_and_csv_files_in_the_folder_are_skipped_with_warnings(self):
         shutil.copy(V1, self.folder / "HealthAutoExport-old.json")
         (self.folder / "HealthAutoExport.csv").write_text("Date,Step Count (count)\n", encoding="utf-8")
@@ -313,6 +336,32 @@ class AnonymiseTest(AppleHealthCase):
         written = json.loads(Path(report["path"]).read_text(encoding="utf-8"))["data"]["workouts"]
         self.assertEqual(written[0]["id"], written[2]["id"])
         self.assertNotEqual(written[0]["id"], written[1]["id"])
+
+    def test_refuses_to_write_when_a_date_in_another_format_would_survive(self):
+        for stamp in ("2026-08-02T07:00:00Z", "2026-08-09 07:00:00.250 +0100", "ran on 2026-08-16"):
+            with self.subTest(stamp=stamp):
+                doc = json.loads(TO_ANONYMISE.read_text(encoding="utf-8"))
+                doc["data"]["workouts"][0]["startedAt"] = stamp
+                out = tempfile.TemporaryDirectory()
+                self.addCleanup(out.cleanup)
+                envelope = self.cli("activity", "anonymise", "--source", "apple_health",
+                                    "--file", str(self.write_export("odd-date.json", doc)), "--out", out.name,
+                                    expect=1)
+                self.assertIn("still holds an original date", envelope["error"]["message"])
+                self.assertEqual(list(Path(out.name).iterdir()), [])
+
+    def test_a_date_only_in_a_dropped_section_does_not_block_the_fixture(self):
+        doc = json.loads(TO_ANONYMISE.read_text(encoding="utf-8"))
+        sundays = [date(2026, 9, 20) - timedelta(weeks=weeks) for weeks in range(1, 31)]
+        doc["data"]["symptoms"] = [{"start": f"{day} 08:00:00 +0000", "name": "Headache"} for day in sundays]
+        doc["data"]["workouts"][0]["metadata"] = {"note": "logged 2030-12-30"}
+        out = tempfile.TemporaryDirectory()
+        self.addCleanup(out.cleanup)
+        for seed in range(20):
+            with self.subTest(seed=seed):
+                report = health_auto_export.anonymise(self.write_export("dropped.json", doc), Path(out.name),
+                                                      seed=seed)
+                self.assertTrue(report["written"])
 
     def test_dry_run_writes_nothing(self):
         _, out = self.anonymise("--dry-run")
