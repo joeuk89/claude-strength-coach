@@ -6,32 +6,54 @@ description: Use when a week (or a few days) must deviate from the standing prog
 # One-off week
 
 Plan a week (or short span) that deviates from the standing program,
-**without touching the program**. `routine/` files are never edited and
-live Hevy routines are never overwritten — the one-off content lives
-alongside, and normal weeks resume from the untouched program.
+**without touching the program**. `data/program.json` and `routine/` are
+never edited and the program's Hevy routines never carry a temp
+session — the one-off content is its own overlay (kind `deload` or
+`one_off`), its temp sessions live in temporary Hevy routines, and
+normal weeks resume from the untouched program.
 
 Two tiers — pick with the athlete from what they describe:
 
 - **Reshuffle** — the existing sessions still work; only the calendar
   changes (a coach session moved, a day dropped, two days swapped).
-  Output: a schedule of existing sessions on new days. No Hevy writes.
+  Output: the program's sessions on new days, each carrying the
+  prescription it already has.
 - **Temp sessions** — the prescriptions themselves change: a
   **deload**, or a **constrained week** (travel kit, no equipment,
   time-starved, run-down). Output: fully specified sessions, written
-  to Hevy (if used) in the standing "One-off weeks" folder.
+  to Hevy (if used) as temporary routines in the standing "One-off
+  weeks" folder.
 
 Mixed spans are fine (two days reshuffled, two constrained) — the
 record shows both.
 
-Requires `profile.md` and `routine/program.md` — with no program
-there's nothing to deviate from (`/new-program` first).
+Requires `profile.md` and `data/program.json` — with no program there's
+nothing to deviate from (`/new-program` first).
+
+**Loads come from `coach` output; quote them.** Never convert kg and
+lb, split a dumbbell total or round a load by hand: `units convert`,
+`units format` and `units round` do it, and the overlay's rendered
+tables are the only loads the brief shows.
+
+## 0. Check the workspace
+
+Run `python3 -m coach check` and report every `fail` result to the
+athlete, with its message, before doing anything else. If `routine/`
+exists but `data/program.json` does not, this workspace still keeps its
+program as hand-written pages: say it needs its one-time bootstrap
+migration onto `data/program.json` first, and stop. When a command
+fails, tell the athlete what its exit code means, as `CLAUDE.md` "The
+coach scripts" sets out.
 
 ## 1. Read the context
 
 `profile.md` (training week, equipment, time limits, recovery, Coach's
-notes), `routine/program.md` and its session files, the newest
-check-in, and `routine/hevy-map.json` if it exists. If the program
-rotates, confirm where the athlete is in the rotation — never assume.
+notes), `python3 -m coach program show`, `python3 -m coach state show`
+(rotation, block, any earlier one-off week), the newest check-in, and
+`python3 -m coach overlay current` (the overlay in force). Hevy users:
+run `python3 -m coach hevy pull` (skip it when `/check-in` just pulled).
+If the program rotates, confirm where the athlete is in the rotation —
+never assume.
 
 Establish: the **span** (default: one week), the **reason** (deload /
 travel / …), what's **fixed** (coach-led sessions, cardio commitments,
@@ -42,18 +64,21 @@ session, recovery state).
 
 **Reshuffle tier** — reorder using the program's own rules: recovery
 windows between adjacent sessions, no same-pattern back-to-back days,
-weekly balance including coach-led sessions and cardio.
+weekly balance including coach-led sessions and cardio. Each moved
+session keeps its lines from the overlay in force
+(`data/overlays/<id>.json`), re-dated.
 
-**Deload** — apply the deload policy in `routine/program.md`. If the
-program has none, propose a standard one (~2/3 the sets, ~10% off
-loads, everything at ~RPE 6; bodyweight work cut by sets and stopped
-further from failure, ladders resumed, not restarted) and offer to
-record it in `program.md` for next time. Base loads on **current
-working weights** — Hevy users: GET the mapped routines and read the
-live `weight_kg`; otherwise ask. Keep the program's priority protocols
-alive at reduced dose. Remind the athlete to tell any coach/PT it's a
-deload week, and deload whatever the profile says moves with the
-lifting (conditioning etc.).
+**Deload** — apply the program's deload rule (`blocks.deload_rule` in
+`program show`). If it says nothing more specific, propose a standard
+one (~2/3 the sets, ~10% off loads, everything at ~RPE 6; bodyweight
+work cut by sets and stopped further from failure, ladders resumed, not
+restarted). Base loads on **current working weights** — the overlay in
+force and the cached log, each logged Hevy value turned into the
+athlete's number with `python3 -m coach units convert --mode <load
+mode> --from-hevy-kg <value>`; otherwise ask. Keep the program's
+priority protocols alive at reduced dose. Remind the athlete to tell
+any coach/PT it's a deload week, and deload whatever the profile says
+moves with the lifting (conditioning etc.).
 
 **Illness** — a week back after illness follows the return rule in
 `CLAUDE.md` "Coaching principles": its illness conditions (when
@@ -66,16 +91,70 @@ time, what state), then sessions that keep the program's priority work
 alive at a maintainable dose. Maintenance, not progress: ~⅓–½ of
 normal volume holds strength and muscle for a couple of weeks — don't
 program PR attempts on hotel dumbbells. The failure mode to design
-against is no plan at all: sporadic maximal improvised sessions.
+against is no plan at all: sporadic maximal improvised sessions. Name
+the place's kit as an `[equipment.locations.*]` table in `config.toml`
+when it differs from home, so caps and loads use it.
 
 Every temp session must be concrete enough to train directly:
-exercises, sets × reps, load or RPE, rest. Dumbbell loads carry both
-numbers — per hand and the Hevy value (`25/hand (Hevy: 50)`), see
-`reference/hevy-api.md` → "Dumbbell loads". This matters most on a
-constrained week: unfamiliar dumbbells (a hotel rack, a different
-increment) are exactly when a doubled entry slips in unnoticed.
+exercises, sets × reps, load or RPE, rest. Unfamiliar dumbbells (a
+hotel rack, a different increment) are exactly when a doubled entry
+slips in unnoticed, so snap each load to the kit with `python3 -m coach
+units round --value <load> --increment <step>` and let the renderer
+print both numbers.
 
-## 3. Present the week's brief — and stop
+## 3. Build the overlay
+
+1. **Where it renders.** When `/check-in` invoked this skill, its new
+   record's "The week ahead" section takes it. Otherwise append to the
+   newest check-in record:
+
+   ```markdown
+   ## Week override — added YYYY-MM-DD
+
+   **Span:** <start> → <end> · **Reason:** <deload / travel / …> ·
+   **Tier:** reshuffle / temp sessions
+
+   | Day | Session |
+   | --- | --- |
+   ```
+
+   followed by the overlay's two region markers (`<!-- coach:begin
+   overlay <id> -->` and `<!-- coach:end overlay <id> -->`, each on its
+   own line) once `overlay build` gives the id, and then "Normal program
+   resumes <date>."
+2. **Write the draft** at `.coach/drafts/overlay-<span start>.json`, in
+   the athlete's units (`coach/schemas/overlay_draft.schema.json`):
+   `kind` `deload` for a deload or other light week, else `one_off`;
+   the `span`; the week `focus` (what the span is for — "deload — fewer
+   sets at RPE 6, recover for next block"). Reshuffled sessions keep
+   their program `session_id` and title. Each temp session gets a new
+   `session_id` (`deload-mon`, `travel-a`), `"temporary": true`, the
+   title its Hevy routine will carry ("Deload Mon — Lower") and, on a
+   constrained week, its `location`. Per exercise: `exercise_id`,
+   `hevy_template_id` (from `library show`), `load_mode`,
+   `rest_seconds`, `cues`, `focus`, `target_note`, `change`, and
+   `sets`, each load a number: per hand for per-hand modes, the added
+   load for bodyweight, else the total.
+3. `python3 -m coach overlay build --input <draft>` writes
+   `data/overlays/<id>.json` and gives the id.
+4. `python3 -m coach overlay validate <id>` — exit 1 lists each problem
+   by JSONPath. Fix the draft, put the id in it, and build again.
+5. `python3 -m coach overlay render <id> --into <check-in record>`
+   fills the region.
+6. **Hevy users:** `python3 -m coach routines diff --overlay <id>`. With
+   every session mapped to a routine, it lists each routine in the span
+   by its Hevy title. Temp sessions have no routine yet, so it exits 1
+   naming them — and then it lists nothing, not even the routines that
+   exist. Name them another way: "go" creates or reuses a routine for
+   each session the exit-1 message names, under the session's title;
+   every other session's routine keeps its own Hevy title (`state
+   show` maps it to the session, and `.coach/cache/hevy/routines.json`
+   holds the title).
+
+A tweak to the brief means: edit the draft, then build, validate and
+render again.
+
+## 4. Present the week's brief — and stop
 
 Talk the athlete through the span the way a coach would, narrative
 first:
@@ -85,14 +164,16 @@ first:
    dropped, and when the normal program resumes.
 2. **The schedule** — the Day / Session table for the span, with
    before/after where days moved.
-3. **Temp sessions in full** (temp tier) — the per-session
-   prescriptions, concrete enough to train directly.
+3. **Temp sessions in full** (temp tier) — the rendered tables from
+   `overlay render`, concrete enough to train directly.
 4. **The write line** — the brief's last line names exactly what "go"
-   will write: each temp routine by the Hevy title it will carry.
+   will write: each routine by the Hevy title it will carry, from
+   `routines diff`, or from the titles step 3.6 names when it exited 1.
 
    `Reply "go" to train this and write: Deload Mon — Lower, Deload Wed — Upper (Hevy).`
 
-   Nothing going to Hevy (a reshuffle, or no Hevy) → the line says so:
+   Nothing going to Hevy (a reshuffle whose routines already match, or
+   no Hevy) → the line says so:
    `Reply "go" to train this. Nothing goes to Hevy (reshuffle only).`
 
 Then **stop and wait for the athlete's reply. Never present and write
@@ -102,84 +183,58 @@ names** — don't ask again before writing to Hevy. Anything else is a
 tweak: revise and present the brief again, write line included.
 Iterate until the athlete would train it.
 
-## 4. Write to Hevy (temp tier, Hevy users)
+## 5. Write
 
 **Only enter this step after the athlete has replied "go" (or a clear
 yes) to the brief above** — if no brief with a write line has been
-presented and approved this session, go back to step 3. Write exactly
+presented and approved this session, go back to step 4. Write exactly
 the routines the write line named.
 
-- Note the current time in UTC before the first write — this pass's
-  timestamp. Write **every** temp routine in the span.
-- Find the standing **"One-off weeks"** folder in
-  `GET /v1/routine_folders`. Absent → create it
-  (`POST /v1/routine_folders`) and record its ID in `hevy-map.json`
-  under `temporary`.
-- **Reuse before create.** If `temporary.routines` lists IDs, `PUT`
-  this week's sessions over them (retitle to this week's names — e.g.
-  "Deload Mon — Lower"); create additional routines in the folder only
-  if this week needs more than exist, and add the new IDs to the map.
-  The API has no delete — reuse **is** the cleanup, and leftover
-  content in the folder between one-off weeks is harmless.
-- Fill each exercise's `notes` in the standard format (see
-  `reference/hevy-api.md`):
-  - the **week line** on the first exercise of every routine:
-    `Wk of <span start as D Mon>: <week focus>`, about 80 characters
-    at most, where the focus is what this week is for
-    (`Wk of 19 Oct: deload — fewer sets at RPE 6, recover for next block`);
-  - **Target** — the absolute sets × reps @ load @ RPE, never relative
-    wording like "10% off last week";
-  - **Focus** where set, and **Cues**.
-- Space writes a few seconds apart (rate limit). GET back after to
-  verify, and name in the close-out any routine whose `updated_at`
-  isn't after this pass's timestamp.
-- Update `temporary` in `hevy-map.json` in the same operation as any
-  folder/routine creation.
+1. `python3 -m coach overlay approve <id>` stamps the approval. It exits
+   3 on an unresolved `block` flag: tell the athlete why, settle it, and
+   present the brief again.
+2. **Hevy users.** An earlier one-off week in `state show` whose span
+   has ended: run `python3 -m coach routines retire --overlay <its
+   overlay_id>` first, which retitles its routines `(unused)`.
+3. `python3 -m coach routines create --overlay <id>` gives every temp
+   session a routine in the "One-off weeks" folder: it reuses a spare
+   temporary routine before it creates one, creates the folder when
+   there is none, and records every id in `data/state.json`. The API
+   has no delete — reuse **is** the cleanup.
+4. `python3 -m coach routines push --overlay <id>` writes the rest — a
+   reshuffled session's routine — and logs a verification for each
+   routine already right. The permission prompt shows what it will
+   write. A command that **exits 3** was refused by a guard: report its
+   reason to the athlete and never retry it by hand. Only when a
+   command keeps failing and the athlete agrees, use
+   `reference/hevy-api.md` → "Manual fallback".
+5. `python3 -m coach routines verify --overlay <id>` — the close-out
+   quotes its result for each routine.
 
-**No Hevy?** Skip this — the record below is the deliverable, and the
-athlete trains the temp sessions from it.
+**No Hevy?** Skip steps 2–5 — the rendered overlay is the deliverable,
+and the athlete trains the temp sessions from it.
 
-## 5. Record it
+## 6. Record it
 
-- Append to the newest check-in record:
-
-  ```markdown
-  ## Week override — added YYYY-MM-DD
-
-  **Span:** <start> → <end> · **Reason:** <deload / travel / …> ·
-  **Tier:** reshuffle / temp sessions
-
-  | Day | Session |
-  | --- | --- |
-
-  (Temp-session prescriptions in full underneath the table. End with:
-  "Normal program resumes <date>.")
-
-  **Written to Hevy:** 2026-10-19T18:05:00Z · Deload Mon — Lower, Deload Wed — Upper
-  ```
-
-  The `**Written to Hevy:**` line goes directly after the prescriptions
-  and records when this pass wrote to Hevy (ISO 8601 UTC) and which
-  routines it wrote; leave it out when nothing went to Hevy.
-
-  If `/check-in` invoked this skill, put the same content in the new
-  check-in's "The week ahead" section instead of an addendum; check-in's
-  week-focus line follows it and ends the section.
-- Update the one-off pointer in `routine/program.md`'s header — same
-  style as any one-off note: what's different, where the full shape
-  lives, when normal layout resumes. The next `/check-in` judges the
-  week against this override and clears the pointer once normal weeks
-  resume.
+- The overlay is in the record already (step 3). If `/check-in` invoked
+  this skill, check-in's week-focus line follows the region and ends
+  the section.
+- Set `one_off` in `data/state.json` to `{"overlay_id": "<id>", "span":
+  {"start": "<start>", "end": "<end>"}}`. The next `/check-in` judges
+  the week against this overlay, and the first programming pass after
+  the span ends retires its routines and clears `one_off`.
 - If this was a **deload or other light week**, reset the hard-week
-  count: in the block status line in `program.md`'s header the count
-  goes to zero (`Block <n> · 0 of <ceiling> hard weeks`), with the light
-  week shown as agreed. Keep the block number: the check-in that closes
+  count in the same edit: `block.hard_weeks_completed` to 0 and
+  `block.deload` to `{"status": "in_progress", "since": "<span
+  start>"}`. Keep the block's `started` date: the check-in that closes
   the light week starts the next block. The rules are in `CLAUDE.md`
   "Coaching principles" → Fatigue management.
+- Then run `python3 -m coach state show`, which refuses an invalid
+  state.
 
-## 6. Close out
+## 7. Close out
 
 Recap in plain words: what the span looks like, what was written to
-Hevy (if anything), when normal service resumes. If recovery drove
-this, note that the next check-in wants to hear how the week actually
-went.
+Hevy (quote `routines verify`), when normal service resumes. If
+recovery drove this, note that the next check-in wants to hear how the
+week actually went.
