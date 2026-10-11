@@ -46,6 +46,21 @@ dropped). They're the readiness signal the numbers can't show, so quote
 them in the analysis and let them shape the decisions. `GET
 /v1/body_measurements` is a fallback weight source only.
 
+**STALE check (Hevy).** GET the mapped routines for the coming week's
+sessions and judge each against its own baseline: the newest overlay
+in `check-ins/` with a table for its session. A routine is **STALE**
+when that overlay's `**Written to Hevy:**` line doesn't name it, or
+names it with a timestamp after the routine's `updated_at`: that pass
+didn't write it, so it still holds older notes. A mid-week reprogram's
+line names only the days it rewrote, so it never makes the other
+routines STALE. List each STALE routine with its last-written date
+(its `updated_at`). No `**Written to Hevy:**` line in `check-ins/` yet
+→ skip the check. On a normal week the list appears in program-week's
+coach's brief, which reuses these routines for its in-app edit check;
+the pass rewrites every routine in the span either way. Skip the check
+when the coming week is a deload or other one-off week —
+`/one-off-week` writes fresh temp routines for it.
+
 **Without Hevy:** ask the athlete to describe the week — which sessions
 happened, notable sets, anything skipped or changed.
 
@@ -164,8 +179,9 @@ What changed and why (or "stay the course"). Anything deferred.
 | --- | --- |
 | Mon | ... |
 One-off changes called out. On normal weeks `/program-week` expands
-this section with the per-exercise prescription tables — the weekly
-overlay. End with one line: the focus of the week.
+this section with the per-exercise prescription tables — the overlay —
+followed directly by its `**Written to Hevy:**` line. The section
+always ends with one line: the focus of the week.
 ```
 
 Deep records use the same skeleton titled `(deep)`, with **Training**
@@ -199,13 +215,15 @@ whether the goals/phase plan in `profile.md` is stale (if so, prompt
   `routine/program.md`.
 - On a normal (non-deload) week, once decisions are agreed, invoke the
   **program-week** skill — it computes per-exercise targets for the
-  coming week, writes them to Hevy (with approval), and fills this
-  record's "The week ahead" section. **Decisions agreed at this
-  check-in don't pre-approve the week** — program-week still presents
-  its coach's brief and waits for the athlete's approval before
-  writing anything. Structural routine changes agreed today ride along
-  in its write step; `/hevy-sync` stays for reconciliation outside the
-  pass.
+  coming week, writes them to Hevy, and fills this record's "The week
+  ahead" section. **Decisions agreed at this check-in don't pre-approve
+  the week** — program-week still presents its coach's brief and waits
+  for the athlete's reply before writing anything. One "go" to that
+  brief approves the week and every write its closing line names — the
+  Hevy routines and any structural `routine/` edits — so don't ask
+  again before writing. Structural routine changes agreed today ride
+  along in its write step; `/hevy-sync` stays for reconciliation outside
+  the pass.
 - On a deload-week check-in, invoke the **one-off-week** skill (deload
   mode) to build the deload week itself — its schedule and sessions
   fill this record's "The week ahead" section, and it handles the Hevy

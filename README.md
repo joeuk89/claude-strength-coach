@@ -100,8 +100,10 @@ in plain words. The commands are for the bigger moves.
 
 ## Ground rules the coach follows
 
-- Nothing is edited without your approval — routine changes show
-  before/after and rationale first.
+- Nothing goes to Hevy and no routine or profile change lands without
+  your approval — routine changes show before/after and rationale
+  first. One "go" approves a week and everything it writes; the
+  check-in records that follow from it are saved without asking again.
 - Routine changes agreed here get offered to Hevy so the app and plan
   don't drift silently.
 - Advice is evidence-based and cited when it depends on current research.

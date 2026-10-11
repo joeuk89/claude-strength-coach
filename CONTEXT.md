@@ -60,7 +60,8 @@ _Avoid_: rotation (one kind of schedule rule), split
 **Coach's brief**:
 The narrative presentation of a proposed training week, given to the
 athlete for approval before anything is written: week focus, what's
-changing and why, then per-session tables.
+changing and why, per-session tables, then one closing line naming
+exactly what approval will write.
 _Avoid_: summary, proposal, plan preview
 
 **Brief** (this week's brief):
@@ -76,9 +77,12 @@ different next week. Replaces an interview.
 _Avoid_: check-in form, intake, questionnaire
 
 **Approval gate**:
-The rule that presenting proposed content (a coach's brief, a recipe
-card) and writing it (to Hevy or repo files) never happen in the same
-turn — the athlete must reply first.
+The rule that content the athlete has not yet seen (a coach's brief, a
+recipe card) and every Hevy write wait for the athlete's reply:
+presenting and writing never happen in the same turn. On a programming
+pass one reply, "go", approves the coach's brief and every write its
+closing line names. Reversible writes to git-tracked records need no
+gate.
 _Avoid_: confirmation step, sign-off
 
 **Activity source**:
