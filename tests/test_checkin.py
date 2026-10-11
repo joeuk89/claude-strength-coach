@@ -309,10 +309,10 @@ class DeepTierTest(CheckinCase):
         self.assertEqual(card["window"]["start"], "2026-10-05")
         self.assertIsNone(card["days_since_last"])
 
-    def test_a_long_gap_warns_that_catch_up_is_pending(self):
+    def test_a_long_gap_runs_catch_up(self):
         envelope = self.coach("checkin", "prepare", env={"COACH_NOW": "2026-10-16T18:00:00Z"})
-        self.assertEqual(envelope["data"]["card"]["mode"], "weekly")
-        self.assertTrue(any("catch_up_pending" in w for w in envelope["warnings"]), envelope["warnings"])
+        self.assertEqual(envelope["data"]["card"]["mode"], "catch_up")
+        self.assertFalse(any("catch_up_pending" in w for w in envelope["warnings"]), envelope["warnings"])
 
 
 class NutritionPartTest(CheckinCase):
