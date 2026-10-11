@@ -1,5 +1,6 @@
-from coach import dates, program, structure
+from coach import dates, flags, program, structure
 from coach.commands import arg, command
+from coach.config_tables import coaching
 from coach.errors import UsageError, ValidationError
 from coach.library import Library
 
@@ -9,6 +10,10 @@ def _date(text, flag):
         return dates.parse_date(text)
     except ValueError as exc:
         raise UsageError(f"{flag}: {exc}") from None
+
+
+def _presented(report, ctx):
+    return dict(report, flags=flags.for_mode(report["flags"], coaching.mode(ctx.config)))
 
 
 @command(
@@ -22,7 +27,7 @@ def week(args, ctx):
             dates.week_span(ctx.today(), ctx.config.athlete.week_starts)
     except ValueError as exc:
         raise UsageError(f"--week: {exc}") from None
-    return structure.week(ctx.root, span, today=ctx.today(), now=ctx.now())
+    return _presented(structure.week(ctx.root, span, today=ctx.today(), now=ctx.now()), ctx)
 
 
 @command(
@@ -32,7 +37,7 @@ def week(args, ctx):
 )
 def adherence(args, ctx):
     until = _date(args.until, "--until") if args.until else None
-    return structure.adherence(ctx.root, until, today=ctx.today(), now=ctx.now())
+    return _presented(structure.adherence(ctx.root, until, today=ctx.today(), now=ctx.now()), ctx)
 
 
 @command(
@@ -50,7 +55,7 @@ def balance(args, ctx):
             raise ValidationError(f"{args.program} is not a valid program ({len(errors)} problem(s))",
                                   details=[error.to_json() for error in errors])
         candidate = program.normalised(candidate)
-    return structure.balance(ctx.root, candidate, today=ctx.today(), now=ctx.now())
+    return _presented(structure.balance(ctx.root, candidate, today=ctx.today(), now=ctx.now()), ctx)
 
 
 @command(

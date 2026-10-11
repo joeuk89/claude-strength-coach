@@ -19,6 +19,7 @@ from coach import constraints, dates, decisions, flags, history, jsonio, niggles
 from coach import program as program_module
 from coach import render, stats, structure, validity
 from coach import state as state_module
+from coach.config_tables import coaching
 from coach.errors import ValidationError
 from coach.library import Library
 from coach.plugins import PluginError
@@ -413,6 +414,9 @@ def _deep_tier(inst, block_state):
 
 
 def _restructure_required(inst):
+    # Run mode never presents the restructure, so no decision would ever clear it and every check-in would run deep.
+    if coaching.mode(inst.config) == coaching.RUN:
+        return False
     try:
         report = structure.adherence(inst.root, inst.today, today=inst.today, now=inst.now)
     except (ValidationError, PluginError):

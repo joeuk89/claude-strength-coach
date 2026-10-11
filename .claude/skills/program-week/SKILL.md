@@ -204,6 +204,12 @@ formula applied blindly is not coaching.
    optional ones included — and push back if the athlete asks; exercise
    swaps within a session are fine. An override goes in the next
    check-in's adherence decision line.
+
+   **Run mode.** With `mode = "run"` in `config.toml`'s `[coaching]`
+   table, the athlete wants their own program run as written: propose
+   no structural change, and make only the ones the athlete asks for.
+   Loads and checks work as in coach mode: `propose week` gives the
+   same lines in both.
 6. **Finalize.** `python3 -m coach propose finalize --proposal <id>`
    writes `data/overlays/<id>.json`. Exit 1 names each line changed
    without an override reason; exit 3 names each unresolved `block`

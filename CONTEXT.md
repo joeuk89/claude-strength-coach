@@ -19,6 +19,15 @@ becomes the program only by being adopted, which validates it, archives
 any old program and stages the files.
 _Avoid_: proposal (a week's proposed prescriptions), candidate program, import file
 
+**Run mode**:
+The coaching mode for an athlete who wants their own program run as
+written (`[coaching] mode = "run"`). Loads still progress and every
+safety check still runs, but flags that propose a change to the
+program's structure are shown as information, and the coach never
+proposes a restructure, a swap, a new session or a redesign unless the
+athlete asks. The default, **coach mode**, reviews structure as well.
+_Avoid_: execute mode, hands-off mode, autopilot
+
 **Session**:
 One training day's template inside a program: the exercises, sets, reps,
 intensity and rest it prescribes. A session is **core** when it carries

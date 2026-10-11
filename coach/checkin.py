@@ -21,6 +21,7 @@ from pathlib import Path
 from coach import checkin_catchup, checkin_parts, dates, flags, history, overlay, paths, program, render, routines
 from coach import state, stats, units
 from coach import config as config_module
+from coach.config_tables import coaching
 from coach.config_tables.sessions import cap_minutes
 from coach.errors import ValidationError
 from coach.hevy.cache import HevyCache
@@ -617,6 +618,7 @@ def _build(root, today, until=None, tier=None, now=None, live=True, parts=True, 
         elif part_reasons and tier != "weekly":
             card["tier_reasons"] = reasons + part_reasons
             card["mode"] = "deep"
+    card["flags"] = flags.for_mode(card["flags"], coaching.mode(inst.config))
 
     if card["mode"] == CATCH_UP:
         proposing = live if with_return is None else with_return

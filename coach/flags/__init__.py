@@ -10,7 +10,10 @@ import pkgutil
 import re
 from dataclasses import dataclass
 
+from coach.config_tables.coaching import COACH, MODES
+
 SEVERITIES = ("info", "warn", "block")
+RUN_PREFIX = "run mode: "
 _CODE = re.compile(r"^[a-z][a-z0-9_]*$")
 _REGISTRY = {}
 _discovered = False
@@ -69,3 +72,26 @@ def make(code, severity=None, *, session_id=None, exercise_id=None, message):
         raise ValueError(f"flag {code!r} takes severity {', '.join(entry.severities)}, not {severity!r}")
     return {"code": code, "severity": severity, "session_id": session_id, "exercise_id": exercise_id,
             "message": message, "resolved": False, "resolution": None}
+
+
+def for_mode(flags, mode):
+    """The flags as `mode` presents them: in run mode a structural flag below `block` shows at info, prefixed.
+
+    Returns new flag objects; stored flags keep their own severity (C44).
+    """
+    if mode not in MODES:
+        raise ValueError(f"coaching mode must be one of {', '.join(MODES)}, not {mode!r}")
+    if mode == COACH:
+        return list(flags)
+    known = registry()
+    shown = []
+    for flag in flags:
+        entry = known.get(flag["code"])
+        if entry is None or not entry.structural or flag["severity"] == "block":
+            shown.append(flag)
+            continue
+        message = flag["message"]
+        if not message.startswith(RUN_PREFIX):
+            message = RUN_PREFIX + message
+        shown.append(dict(flag, severity="info", message=message))
+    return shown
