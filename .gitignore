@@ -13,4 +13,5 @@ __pycache__/
 # excludes them (e.g. ~/.gitignore_global rules meant for work repos).
 !CLAUDE.md
 !.claude/
+!docs/agents/
 .claude/settings.local.json
