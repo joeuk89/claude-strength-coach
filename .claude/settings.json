@@ -41,7 +41,17 @@
       "Bash(python3 -m coach meals build:*)",
       "Bash(python3 -m coach meals render:*)",
       "Bash(python3 -m coach meals approve:*)",
-      "Bash(python3 -m coach status:*)"
+      "Bash(python3 -m coach status:*)",
+      "Bash(python3 -m coach history show:*)",
+      "Bash(python3 -m coach history annotations:*)",
+      "Bash(python3 -m coach history sync:*)",
+      "Bash(python3 -m coach history rebuild:*)",
+      "Bash(python3 -m coach history annotate:*)",
+      "Bash(python3 -m coach stats e1rm:*)",
+      "Bash(python3 -m coach stats adherence:*)",
+      "Bash(python3 -m coach stats dose:*)",
+      "Bash(python3 -m coach stats durations:*)",
+      "Bash(python3 -m coach stats audit:*)"
     ]
   },
   "hooks": {
