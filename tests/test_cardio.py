@@ -224,14 +224,15 @@ class ReconcileTest(CardioCase):
         logged = [{"id": "manual:r", "local_date": "2026-10-06", "kind": "run", "start": "2026-10-06T07:00:00Z",
                    "distance_meters": None, "duration_seconds": 1800}]
         statuses = sorted(i["status"] for i in cardio.match(planned, logged, 3, dates.parse_date("2026-10-11")))
-        self.assertEqual(statuses, ["done", "missed"])
+        self.assertEqual(statuses, ["ambiguous", "ambiguous", "ambiguous"])
 
-    def test_ties_go_to_the_earlier_activity(self):
+    def test_tied_activities_remain_ambiguous(self):
         planned = [{"id": "p", "date": "2026-10-08", "kind": "run", "title": "x", "quality": False, "target": None}]
         logged = [{"id": f"manual:{d}", "local_date": d, "kind": "run", "start": f"{d}T07:00:00Z",
                    "distance_meters": None, "duration_seconds": 1800} for d in ("2026-10-09", "2026-10-07")]
-        moved = [i for i in cardio.match(planned, logged, 3) if i["status"] == "moved"]
-        self.assertEqual(moved[0]["activity_id"], "manual:2026-10-07")
+        items = cardio.match(planned, logged, 3)
+        self.assertEqual([i["status"] for i in items], ["ambiguous"] * 3)
+        self.assertTrue(all(i["review_reason"] for i in items))
 
 
 class FlagsTest(CardioCase):

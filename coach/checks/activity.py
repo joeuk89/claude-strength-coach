@@ -1,7 +1,7 @@
 """Checks on the activity-source files (contract C13, C29, C31, C32)."""
 
 from coach import dates, jsonio, paths
-from coach.activity import actions, adapters, records
+from coach.activity import actions, adapters, associations, records
 from coach.activity.store import SYNC_SCHEMA, ActivityStore, wellness_path
 from coach.checks import Result, check
 from coach.errors import ValidationError
@@ -35,6 +35,10 @@ def activity_records_valid(ctx):
             where = paths.ACTIVITY_SYNC.as_posix()
             results += [Result("fail", f"{where}: {d['path']}: {d['message']}", where) for d in exc.details] \
                 or [Result("fail", exc.message, where)]
+    try:
+        associations.load(ctx.root)
+    except ValidationError as exc:
+        results.append(Result("fail", exc.message, paths.ACTIVITY_ASSOCIATIONS.as_posix()))
     return results
 
 

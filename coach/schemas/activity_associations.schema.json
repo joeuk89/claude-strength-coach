@@ -1,0 +1,11 @@
+{
+  "x-coach-paths": ["data/activity/associations.json"],
+  "title": "Explicit activity to planned-activity associations",
+  "type": "object",
+  "required": ["schema_version", "associations"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": 1},
+    "associations": {"type": "object", "additionalProperties": {"type": "string", "pattern": "^[a-z_]+:[A-Za-z0-9._:-]+$"}}
+  }
+}

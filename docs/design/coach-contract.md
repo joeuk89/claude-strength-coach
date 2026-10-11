@@ -758,6 +758,7 @@ none and `bodyweight`, `assisted`, `duration` or `distance`; band and
 | `data/status-days.json` | status days | committed | R-43 |
 | `data/log/workouts.jsonl` | manual lifting log for athletes without Hevy, append-only | committed | R-40c |
 | `data/activity/activities.jsonl`, `planned.jsonl`, `sync.json` | activity records, planned activities, sync map (C29) | committed | R-42a and adapters |
+| `data/activity/associations.json` | explicit activity-to-plan IDs (C49), schema `activity_associations` v1 | committed | R-43 |
 | `data/activity/wellness.jsonl` | wellness records, when `[activity] wellness_in_git = true` | committed | R-42a and adapters |
 | `.coach/activity/wellness.jsonl` | wellness records, when `wellness_in_git = false` (the default) | **gitignored** | R-42a and adapters |
 | `data/nutrition/readings.json` | nutrition readings series | committed | R-33a |
@@ -3394,12 +3395,13 @@ R-32 and is registered in `coach/flags/research.py`.
 |---|---|---|---|
 | `data/activity/activities.jsonl` | activity records, append-only | committed | R-42a, adapters |
 | `data/activity/planned.jsonl` | planned-activity records, append-only | committed | R-42a (manual), R-42d (Runna), R-46 (coach) |
+| `data/activity/associations.json` | explicit activity-to-plan IDs (C49), schema `activity_associations` v1 | committed | R-43 |
 | `data/activity/wellness.jsonl` | wellness records, when `[activity] wellness_in_git = true` | committed | R-42a, adapters |
 | `.coach/activity/wellness.jsonl` | wellness records, when `wellness_in_git = false` (the default) | **gitignored** | R-42a, adapters |
 | `data/activity/sync.json` | per-source sync map (C31) | committed | R-42a |
 
-- Every line is one record with `schema_version` (C7). Lines are only ever
-  appended, and each keeps the version it was written at: `migrate run`
+- In the JSONL files, every line is one record with `schema_version`
+  (C7). Lines are only ever appended, and each keeps the version it was written at: `migrate run`
   never touches these files. A version bump keeps a reader for every
   older line version; a line newer than the coach reads fails with "run
   /framework-sync". For each `id`, the last line wins. `op` is `upsert` or `void`;
@@ -6358,9 +6360,9 @@ coach.cardio.bouts(root, span, mode, overlay=None, today=None) -> list[Bout]
 #                    placed on their `weekday`, and at tier review|program the planned activities
 #                    no logged Activity matched; with `today`, only dates from today on.
 #                    No logged bouts: `evaluate` reads those itself (see Flags)
-coach.cardio.match(planned, logged, move_days, today=None) -> list[dict]   # the reconcile matcher; R-44b reuses it
+coach.cardio.match(planned, logged, move_days, today=None, associations=None, quality_rpe_min=7) -> list[dict]   # the reconcile matcher; R-44b reuses it
 #   planned: C30 planned records; logged: resolved Activities. With today None every
-#   unmatched plan is "missed".
+#   uncontested unmatched plan is "missed".
 coach.cardio.flag_bouts(root, config, span, today) -> list[Bout]   # what `cardio flags` judges
 coach.cardio.evaluate(ctx) -> {"flags": [...], "skipped": [...]}  # every C49 rule; the provider returns "flags"
 coach.cardio.evaluation_date(ctx) -> date   # the last night the `sleep_debt` flag judges
@@ -6374,22 +6376,55 @@ for both.
 **Reconcile** (`cardio reconcile --week W`, tiers `review` and
 `program`; at `count` it returns `{"tier": "count", "items": []}`):
 
-- Pass 1: same kind, same local date → `done`. Pass 2: same kind within
-  `reconcile_move_days`, nearest first, ties to the earlier activity →
-  `moved` (with `moved_days`). Unmatched planned before today → `missed`;
-  today or later → `upcoming`. Unmatched activities → `extra`.
+- Match explicit associations first, then same-kind candidates within
+  `reconcile_move_days`. Independently observed name (exact title or
+  quality/easy wording), target distance and target duration distinguish
+  candidates before date. Each available distinguishing measure must
+  agree on a mutually unique best candidate; distance and duration prefer
+  the smallest absolute difference. Quality inherited from a candidate
+  is never matching evidence. A unique candidate can match a shorter or
+  longer completion. With no distinguishing identity or measurable targets,
+  a unique nearest date can settle candidates whose plans have the same
+  quality. A tie remains ambiguous. For a moved candidate, contradictory
+  observed effort (logged RPE judged using C48's threshold, or explicit
+  name quality) needs corroborating exact name, distance or duration;
+  otherwise it stays ambiguous. RPE never defeats corroborated identity
+  and still determines delivered quality. Matches are one-to-one and
+  input-order independent.
+- A matched local date is `done`; a different date is `moved`, with
+  `moved_days`. Unmatched plans before today are `missed`, otherwise
+  `upcoming`; unmatched activities are `extra`. Tied or conflicting
+  candidates are `ambiguous`, with separate plan and activity rows,
+  `candidate_ids` and `review_reason`. These activities inherit no plan's
+  quality or estimated effort. Duplicate plans are not silently consumed.
+- Matching resolves the whole live store before selecting a week's rows:
+  a move across a week boundary has the same identity in either week.
+  Weekly totals still count only activities logged inside that week.
 - Each item: `{status, planned_id, activity_id, date, activity_date,
-  moved_days, kind, title, target: {...}, actual: {distance_meters,
-  duration_seconds}, delta: {distance_meters, duration_seconds},
-  quality}`. `date` is the plan's date (an `extra` item's own date);
-  `activity_date` is the matched or extra Activity's; `moved_days` is
-  the Activity's date minus the plan's, set only on `moved`; `delta` is
-  actual minus target where both exist. An `extra` item's `quality` is
-  the C48 rule's; a planned item's is the plan's. The output adds
-  `summary`, counts by status.
-- Planned activities from several sources are not merged (C30); each
-  matches on its own, so a duplicate plan shows one `done` and one
-  `missed`.
+  moved_days, kind, title, target, actual, delta, quality, match_basis,
+  candidate_ids, review_reason}`. `actual` and `delta` contain
+  `distance_meters` and `duration_seconds`; deltas are actual minus target
+  where both exist. Rendering converts the magnitude then applies the
+  sign, leaving actual-distance validation nonnegative. A matched or
+  unmatched activity's `quality` and `quality_basis` follow C48, including
+  logged RPE precedence; a plan-only row retains its intended quality.
+  `match_basis` identifies the independent evidence or explicit link;
+  weekly bout JSON also carries `planned_id` and `match_basis` beside
+  sRPE's estimation method. `summary` counts each status.
+- `cardio associate ACTIVITY_ID --planned-id PLANNED_ID [--dry-run]`
+  stores an explicit link; `--clear` removes it. Both IDs must be live,
+  of the same kind and within the move window. One plan cannot be
+  associated to multiple activities. Source IDs are stored separately in
+  `data/activity/associations.json` as
+  `{"schema_version": 1, "associations": {"manual:run-id": "manual:plan-id"}}`.
+  Missing file means no links; existing stores require no migration.
+  Same-ID corrections and reimports preserve links. Deduplicated source
+  aliases resolve to the same activity even if the winning source changes;
+  clearing any current alias clears the group's links. Conflicting hand
+  edits, voided records, changed kinds or dates outside the move window
+  yield a reviewable ambiguous result, never a fallback heuristic match.
+  Clearing a stored ID also works after its activity was voided. Derived
+  quality is recomputed from live records on every read.
 
 **Flags** (`cardio flags (--week W | --span A..B)`; also the `cardio`
 week-flag provider in `propose week`; registered in
@@ -6850,7 +6885,7 @@ rule (hooks run outside the permission layer); `status` gets one. R-15's
   | `check-ins/*.md` | `overlay_render_fresh`, `bare_hevy_values`, `research_citations` |
   | `profile.md` | `bare_hevy_values`, `research_citations` |
   | `data/hevy/writes.jsonl` | `schema_versions` |
-  | `data/activity/*.jsonl`, `data/activity/sync.json`, `.coach/activity/wellness.jsonl` | `activity_records_valid`, `activity_wellness_location` |
+  | `data/activity/*.jsonl`, `data/activity/sync.json`, `data/activity/associations.json`, `.coach/activity/wellness.jsonl` | `activity_records_valid`, `activity_wellness_location` |
   | `data/nutrition/readings.json` | `nutrition_readings` |
   | `data/nutrition/plans/*.json` | `meal_plans`, `meal_plan_render_fresh` |
   | `nutrition/plans/*.md` | `meal_plan_render_fresh` |
