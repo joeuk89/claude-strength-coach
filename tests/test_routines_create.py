@@ -8,6 +8,7 @@ import sys
 import unittest
 
 from coach import gate, jsonio, routines, state
+from coach.hevy.cache import HevyCache
 from coach.validate import validate
 from tests.support import REPO_ROOT
 from tests.test_gate import hook_input, output
@@ -37,6 +38,10 @@ class CreateCase(RoutinesCase):
         write_state(self.root, doc)
 
     def create(self, *extra, overlay_id=WEEKLY, expect=0, env=None):
+        if not extra and expect == 0:
+            preview = self.cli("routines", "create", "--overlay", overlay_id, "--dry-run", env=env)["data"]
+            if preview.get("plan_hash"):
+                extra = ("--expect-plan", preview["plan_hash"])
         return self.cli("routines", "create", "--overlay", overlay_id, *extra, expect=expect, env=env)
 
     @property
@@ -86,7 +91,7 @@ class CreateTest(CreateCase):
     def test_unapproved_exits_3_with_no_writes(self):
         self.forget_session_b(approve=False)
         state_before = state.path_for(self.root).read_bytes()
-        for extra in ((), ("--dry-run",)):
+        for extra in ((),):
             envelope = self.create(*extra, expect=3)
             self.assertEqual(envelope["error"]["code"], "refused")
             self.assertIn("not approved", envelope["error"]["message"])
@@ -147,7 +152,8 @@ class CreateTest(CreateCase):
             stored["exercises"][0]["sets"].pop()
             return stored
         self.fake._stored_routine = drop_a_set
-        envelope = self.create(expect=1)
+        preview = self.create("--dry-run")["data"]
+        envelope = self.create("--expect-plan", preview["plan_hash"], expect=1)
         new_id = self.fake.collection("routines")[-1]["id"]
         self.assertEqual(read_state(self.root)["hevy"]["routines"][new_id], {"session_id": "session-b"})
         self.assertFalse(audit_lines(self.root)[-1]["verified"])
@@ -171,6 +177,7 @@ class OneOffCreateTest(CreateCase):
             spare = copy.deepcopy(self.fake.collection("routines")[0])
             spare.update(id=routine_id, title=title, folder_id=None)
             self.fake.collection("routines").append(spare)
+            HevyCache(self.root).upsert_routine(spare)
         doc = read_state(self.root)
         doc["hevy"]["temporary_routines"] = [
             {"routine_id": T1, "overlay_id": None, "session_id": None},
@@ -232,6 +239,7 @@ class OneOffCreateTest(CreateCase):
 
     def test_a_spare_hevy_no_longer_has_is_skipped_and_dropped_from_state(self):
         self.fake.collection("routines")[:] = [r for r in self.fake.collection("routines") if r["id"] != T1]
+        self.cli("hevy", "pull", "--full")
         dry = self.create("--dry-run", overlay_id=ONE_OFF)["data"]
         self.assertEqual(dry["stale"], [T1])
         self.assertIn(f"Hevy no longer has temporary routine(s) {T1}", dry["summary"])
@@ -254,7 +262,9 @@ class OneOffCreateTest(CreateCase):
 
     def test_retire_finds_the_routines_through_state(self):
         self.create(overlay_id=ONE_OFF)
-        data = self.cli("routines", "retire", "--overlay", ONE_OFF,
+        preview = self.cli("routines", "retire", "--overlay", ONE_OFF, "--dry-run",
+                           env=dict(ENV, COACH_NOW="2026-10-19T08:00:00Z"))["data"]
+        data = self.cli("routines", "retire", "--overlay", ONE_OFF, "--expect-plan", preview["plan_hash"],
                         env=dict(ENV, COACH_NOW="2026-10-19T08:00:00Z"))["data"]
         self.assertEqual([r["status"] for r in data["routines"]], ["retired"] * 3)
 
@@ -265,7 +275,8 @@ class CreateGateTest(CreateCase):
 
     def test_an_approved_create_asks_with_the_summary(self):
         self.forget_session_b()
-        decision = self.decide(CREATE)
+        preview = self.create("--dry-run")["data"]
+        decision = self.decide(CREATE + " --expect-plan " + preview["plan_hash"])
         self.assertEqual(decision["permissionDecision"], "ask")
         reason = decision["permissionDecisionReason"]
         for text in ("routines create", "Session B", WEEKLY, "new routine"):
@@ -297,7 +308,8 @@ class CreateHookProcessTest(CreateCase):
 
     def test_ask_with_the_summary_when_approved_and_deny_when_not(self):
         self.forget_session_b()
-        decision = self.pipe(CREATE)
+        preview = self.create("--dry-run")["data"]
+        decision = self.pipe(CREATE + " --expect-plan " + preview["plan_hash"])
         self.assertEqual(decision["permissionDecision"], "ask")
         self.assertIn("Session B (Thu 15 Oct): new routine in folder 1", decision["permissionDecisionReason"])
         self.forget_session_b(approve=False)

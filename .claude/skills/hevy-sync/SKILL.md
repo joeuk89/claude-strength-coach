@@ -108,8 +108,10 @@ span that differs, so write once, after every discrepancy is settled.
   `/program-week`, as when no approved overlay covers the span.
 - A new exercise needs a library entry with a Hevy template: `python3
   -m coach library search <name>`, or `python3 -m coach library seed`
-  after the next pull if it was added in the app. No match: ask what
-  it's called in their app (it may be a custom one).
+  after the next pull if it was added in the app. `routines preflight
+  --overlay <id>` lists every unresolved template. No or ambiguous
+  match: settle the identity, then `library set-template <exercise-id>
+  <cached-template-id>` and rebuild the overlay before approval.
 - After writing, `python3 -m coach routines verify --overlay <id>`
   confirms the change landed; quote it.
 - Only when a command keeps failing and the athlete agrees, use

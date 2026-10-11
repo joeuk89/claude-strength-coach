@@ -107,9 +107,25 @@ class Library:
     @classmethod
     def load(cls, root):
         path = Path(root) / paths.EXERCISES
-        if not path.exists():
-            return cls(None, path)
-        return cls(jsonio.read_doc(path, "exercise_library"), path)
+        from coach.hevy.cache import HevyCache
+
+        lib = cls(jsonio.read_doc(path, "exercise_library") if path.exists() else None, path)
+        lib.resolve_templates(HevyCache(root).exercise_templates())
+        return lib
+
+    def resolve_templates(self, templates):
+        resolutions = {}
+        claimed = self.template_owners()
+        for entry in self._entries.values():
+            resolution = template_resolution(entry, templates, claimed)
+            resolutions[entry["id"]] = resolution
+            if resolution["status"] == "matched":
+                entry["hevy_template_id"] = resolution["template_id"]
+                entry["hevy_template_ids"] = [resolution["template_id"]]
+        return resolutions
+
+    def template_owners(self):
+        return {tid: entry["id"] for entry in self._entries.values() for tid in entry["hevy_template_ids"]}
 
     def _merge(self):
         errors = []
@@ -468,6 +484,10 @@ def seed(lib, routines, templates):
     """
     by_id = {item.get("id"): item for item in templates or []}
     doc = copy.deepcopy(lib.instance)
+    for entry in lib.entries():
+        resolution = template_resolution(entry, templates or [], lib.template_owners())
+        if resolution["status"] in ("mapped", "matched") and not doc["exercises"].get(entry["id"], {}).get("hevy_template_id"):
+            doc["exercises"].setdefault(entry["id"], {})["hevy_template_id"] = resolution["template_id"]
     proposals, guessed = [], []
     for template_id, routine_title, in_routines in routine_exercises(routines):
         current = Library(doc, lib.path)
@@ -486,7 +506,13 @@ def seed(lib, routines, templates):
             guessed.append(f"{new_id}: pattern and muscles were guessed from Hevy's template for {title!r}; "
                            f"check them with python3 -m coach library show {new_id}")
         else:
-            proposal["action"] = _record(exercises, current.get(proposal["matched_id"]), template_id, proposal)
+            entry = current.get(proposal["matched_id"])
+            resolution = template_resolution(entry, templates or [], current.template_owners())
+            if proposal["matched_by"] != "template_id" and resolution["status"] == "ambiguous":
+                proposal.update(action="unresolved", candidates=resolution["candidates"])
+                proposals.append(proposal)
+                continue
+            proposal["action"] = _record(exercises, entry, template_id, proposal)
         proposals.append(proposal)
     Library(doc, lib.path)
     return proposals, doc, guessed
@@ -511,3 +537,19 @@ def _record(exercises, entry, template_id, proposal):
     if created:
         return "created"
     return "unchanged" if own == before else "updated"
+
+
+def template_resolution(entry, templates, claimed=None):
+    explicit = entry.get("hevy_template_id")
+    known = entry.get("hevy_template_ids") or []
+    if explicit or len(known) == 1:
+        return {"status": "mapped", "template_id": explicit or known[0], "candidates": []}
+    keys = {match_key(title) for title in entry["hevy_titles"]}
+    claimed = claimed or {}
+    candidates = {item["id"]: item for item in templates if item.get("id") and
+                  claimed.get(item["id"]) in (None, entry["id"]) and
+                  (item["id"] in known or match_key(item.get("title") or "") in keys)}
+    rows = [{"id": tid, "title": item.get("title", tid)} for tid, item in sorted(candidates.items())]
+    status = "ambiguous" if len(rows) > 1 or len(known) > 1 else "matched" if rows else "missing"
+    return {"status": status, "template_id": rows[0]["id"] if status == "matched" else None,
+            "candidates": rows}

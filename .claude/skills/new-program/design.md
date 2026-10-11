@@ -43,12 +43,13 @@ and `config.toml` (units, equipment and its increments).
      over: take each `hevy.routines` entry from `python3 -m coach state
      show` whose `session_id` the new program keeps, and write it as
      `"<routine id>": "<session id>"`. Leave sessions that are new out;
-     step 5 gives them routines. A kept session left out gets a second
-     routine and its old one goes stale.
-5. **Hevy:** adopt lists the sessions without a routine in
-   `without_routine`; the opening week's programming pass creates them.
-   `/program-week` names each new routine in its write line, and after
-   the athlete's "go" runs `python3 -m coach routines create --overlay
-   <id>` behind the approval gate, which makes each routine in the
-   program folder and records its id in `data/state.json`. Without Hevy
-   (`[hevy] enabled = false`) skip this step.
+     step 5 gives them routines.
+5. **Hevy:** adopt lists `without_routine` and `orphan_routines`.
+   Show the managed routines now unmapped and offer leave, explicit
+   reuse, or retirement. Adoption changes the local program only;
+   external housekeeping belongs in the opening `/program-week` brief.
+   Its build.md preflight resolves templates from the complete cache,
+   including a starter's first exercise, and previews the exact new or
+   reused routines (`python3 -m coach routines create --overlay <id>
+   --dry-run`) and retirements before asking for approval. Without
+   Hevy (`[hevy] enabled = false`) skip this step.

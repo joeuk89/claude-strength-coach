@@ -26,12 +26,18 @@ first, tables second. Every mode uses the same brief.
    keep-or-replace recommendation ("You swapped leg press for hack squat
    in Lower A: keep it; I'll add it to the program"). A kept edit is a
    structural change and lands in `data/program.json`; a replaced one is
-   overwritten.
+   overwritten. List managed orphan routines and the athlete's choice
+   for each: leave, reuse for a named session, or retire. Preview any
+   ended one-off retirement with `--routine <id>` for each leftover;
+   exclude routines the create preview reuses. Retain its `plan_hash`
+   for write.md. Reuse itself replaces the old content; it needs no
+   preceding retirement.
 6. **The write line:** the brief's last line names exactly what "go"
    will write: each Hevy routine in the span by its Hevy title from
    `routines diff` (every one, changed or not), or from the titles
    build.md names when it exited 1 (every routine, plus any "go"
-   creates or reuses), then each structural file:
+   creates or reuses), each retirement by title and id, any new folder,
+   then each structural file:
 
    `Reply "go" to train this and write: <routines> (Hevy) · <structural files>.`
 

@@ -170,6 +170,10 @@ class AdoptedStarterTest(Case):
 
     def adopted(self, starter_id):
         root = instance(self)
+        from coach.hevy.cache import HevyCache
+        templates = [{"id": f"STARTER-{index}", "title": entry["hevy_titles"][0]}
+                     for index, entry in enumerate(Library().entries()) if entry["hevy_titles"]]
+        HevyCache(root).write_collection("exercise_templates", templates, NOW)
         found = self.ok(root, "starters", "draft", starter_id)
         self.assertEqual(found["problems"], [])
         adopted = self.ok(root, "program", "adopt", "--input", str(root / found["path"]))

@@ -79,7 +79,9 @@ redesign), offer the three paths in one message and recommend one from
     keeps them; propose a swap from `python3 -m coach library show <id>`
     (its `substitutes`) and agree it with the athlete.
   - `without_routine` — sessions with no Hevy routine yet; the opening
-    week's programming pass creates them (design.md step 5).
+    week's programming pass creates or explicitly reuses them (design.md step 5).
+  - `orphan_routines` — previously managed routines now unmapped;
+    offer leave, reuse or retirement in the separate Hevy write brief.
 - Later edits to `data/program.json` (a swap, a fix): edit it, then
   `python3 -m coach program validate` and `python3 -m coach program
   render`. The pages are rendered — never edit them by hand.

@@ -382,6 +382,10 @@ class RetireTest(RoutinesCase):
         overlay.path_for(self.root, WEEKLY).unlink()
 
     def retire(self, *extra, expect=0, now="2026-10-19T08:00:00Z"):
+        if not extra and expect == 0:
+            preview = self.cli("routines", "retire", "--overlay", ONE_OFF, "--dry-run",
+                               env=dict(ENV, COACH_NOW=now))["data"]
+            extra = ("--expect-plan", preview["plan_hash"])
         return self.cli("routines", "retire", "--overlay", ONE_OFF, *extra, expect=expect,
                         env=dict(ENV, COACH_NOW=now))
 
