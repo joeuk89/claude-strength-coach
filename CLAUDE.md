@@ -108,7 +108,7 @@ and its sources.
   - **Reset:** a deload or other light week, a return week (see return after a layoff below), or any week with under 50 % of planned sessions trained sets the count back to zero (rn:deloads.2).
     The check-in that closes such a week ends the block, and the next block starts at zero.
     `/program-week` leaves the count alone when it plans a light week: the count resets, and the block number moves on, only when the check-in closes that week.
-    A week at 50–75 %, a one-off week for travel or limited kit, or a minimum week neither counts nor resets (rn:deloads.2).
+    A week at 50–75 % neither counts nor resets (rn:deloads.2). A one-off week for travel or limited kit, a minimum week, or a planned no-training break week neither counts nor resets either (rn:deloads.13).
   - **Ceiling:** propose a light week when the count reaches the program's ceiling: default 6 completed hard weeks, settable from 4 to 8 in the program's `blocks.hard_weeks_ceiling` (rn:deloads.3).
     At the ceiling it is proposed whatever else is true; if the athlete declines, record the reason and propose it again at the next check-in.
   - **Fatigue triggers:** poor readiness the athlete reports; RPE drift
@@ -121,7 +121,7 @@ and its sources.
     `light week: skipped (<n> hard weeks)` (rn:deloads.4).
   - These rules are coaching heuristics, not research cut-offs.
     They are the 75 % and 50 % lines (rn:deloads.2), the trained-as-prescribed rule (rn:deloads.11) and the ceiling counted in completed hard weeks (rn:deloads.3).
-    They also include the four fatigue triggers with the two-trigger rule (rn:autoregulation.4, rn:deloads.5) and the three-week skip rule (rn:deloads.4).
+    They also include the four fatigue triggers with the two-trigger rule (rn:autoregulation.4, rn:deloads.5), the three-week skip rule (rn:deloads.4) and the weeks that pause the count (rn:deloads.13).
     `/check-in` keeps the count in `block` in `data/state.json` and shows it in each record's status line.
 - **Minimum and maintenance dose** — when time is short, cut sets, not
   effort.

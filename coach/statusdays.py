@@ -3,7 +3,9 @@
 `data/status-days.json` keeps every row. A wrong row is withdrawn, never
 deleted, and ids are never reused. An `ill` row in the gap before a
 session counts exactly like an `ill` miss annotation for the illness
-return rule; travel only explains a gap.
+return rule; travel only explains a gap. A row marked `no_training` is a
+planned break the athlete agreed: the sessions on its days are not planned
+work, so nothing asks to program, tag or count them.
 """
 
 import re
@@ -17,6 +19,7 @@ from coach.validate import validate as validate_schema
 
 SCHEMA = "status_days"
 KINDS = ("ill", "injured", "travel")
+BREAK_KINDS = ("injured", "travel")
 _ID = re.compile(r"^s-(\d+)$")
 _OPEN_END = date.max
 
@@ -54,10 +57,13 @@ def save(root, doc, dry_run):
 
 
 def problems(doc):
-    """What the schema cannot say: unique ids, real dates, start on or before end, one open-ended row per kind."""
+    """What the schema cannot say: unique ids, real dates, start on or before end, one open-ended row per kind,
+    and no planned break on an `ill` row."""
     errors, seen, open_kinds = [], set(), {}
     for index, row in enumerate(doc["days"]):
         path = f"$.days[{index}]"
+        if row["no_training"] and row["kind"] not in BREAK_KINDS:
+            errors.append(Error(f"{path}.no_training", f"a {row['kind']} row cannot be a planned break"))
         if row["id"] in seen:
             errors.append(Error(f"{path}.id", f"{row['id']} appears twice"))
         seen.add(row["id"])
@@ -102,6 +108,22 @@ def ill_in(root, span):
     return any(row["kind"] == "ill" for row in active(root, span))
 
 
+def breaks(root, span):
+    """Live `no_training` rows overlapping the span, oldest first: planned breaks the athlete agreed."""
+    return [row for row in active(root, span) if row["no_training"]]
+
+
+def break_days(root, span):
+    """{day: row id} for each day in the span a planned break covers; the oldest covering row names it."""
+    found = {}
+    for row in breaks(root, span):
+        covered = span_of(row)
+        for day in span.days():
+            if covered.contains(day):
+                found.setdefault(day, row["id"])
+    return found
+
+
 def next_id(doc):
     numbers = [int(m.group(1)) for row in doc["days"] for m in [_ID.match(row["id"])] if m]
     return f"s-{max(numbers, default=0) + 1:04d}"
@@ -114,16 +136,20 @@ def _find(doc, row_id):
     return row
 
 
-def add(doc, kind, start, end, note, source, created_at):
+def add(doc, kind, start, end, note, source, created_at, no_training=False):
     if kind not in KINDS:
         raise ValidationError(f"kind must be one of {', '.join(KINDS)}, found {kind!r}")
+    if no_training and kind not in BREAK_KINDS:
+        raise ValidationError(f"--no-training marks a planned break, so it goes on a {' or '.join(BREAK_KINDS)} "
+                              f"row; illness keeps its own return rule")
     if end is not None and end < start:
         raise ValidationError(f"--to {end} is before --from {start}")
     if not note.strip():
         raise ValidationError("--note must not be empty")
     row = {"id": next_id(doc), "kind": kind,
            "span": {"start": start.isoformat(), "end": end.isoformat() if end else None},
-           "note": note.strip(), "created_at": created_at, "source": source.strip() or "coach", "withdrawn": None}
+           "note": note.strip(), "no_training": bool(no_training), "created_at": created_at,
+           "source": source.strip() or "coach", "withdrawn": None}
     if end is None:
         ongoing = next((r for r in doc["days"] if is_live(r) and r["kind"] == kind and r["span"]["end"] is None), None)
         if ongoing is not None:

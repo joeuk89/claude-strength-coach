@@ -124,7 +124,8 @@ planned over the **trailing four ordinary weeks**:
   sessions count, as the replies confirmed them; optional sessions are
   left out; a shortened session counts as trained.
 - An **ordinary week** is any week except a deload or other light week,
-  a one-off week (illness, travel, limited kit), a minimum week, or a
+  a one-off week (illness, travel, limited kit), a minimum week, a
+  planned break week (`status-days add --no-training`), or a
   week inside a layoff of 11+ days. Skip those and reach further back,
   at most 12 weeks. Fewer than four ordinary weeks in that span: no trigger yet.
 

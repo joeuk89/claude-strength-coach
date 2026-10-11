@@ -134,7 +134,8 @@ _Avoid_: training goal (the profile's words), phase (reserved for bulk/cut/maint
 
 **Ordinary week**:
 A week adherence is judged on: not a deload or other light week, not a
-one-off or minimum week, and not inside a layoff of 11+ days. Adherence
+one-off, minimum or planned break week, and not inside a layoff of 11+
+days. Adherence
 looks at the last four, reaching back at most 12 weeks.
 _Avoid_: regular week, counted week
 
@@ -157,7 +158,8 @@ A program week in which at least three quarters of the planned core and
 coach-led sessions were trained as prescribed: most of the prescribed
 working sets logged, at about the target effort. It adds one to the
 block's count; a light week, a return week or a week under half trained
-ends the block.
+ends the block. A one-off, minimum or planned break week neither adds to
+nor ends it.
 _Avoid_: hard week (alone), training week, core-complete week (a different count)
 
 **Light week**:
@@ -530,6 +532,14 @@ assumed; until one is agreed the event carries a pending decision. A
 heavy lower session inside the window is flagged for review, never
 changed automatically.
 _Avoid_: taper (when no window was agreed), taper rule
+
+**Planned break**:
+A travel or injured status day marked `no_training`: the athlete agreed
+not to train on those days. Its sessions are not planned work, so they
+need no programming and no miss tag. A week whose every planned session
+falls on it is a **planned break week**. Travel alone is not a planned
+break, and the days off still count for the return week.
+_Avoid_: holiday, rest week, deload (a deload is trained), layoff (a gap nobody planned)
 
 **Cardio tier**:
 Who owns the run plan: `count` (no plan; logged cardio is only counted),

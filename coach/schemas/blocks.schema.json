@@ -4,7 +4,7 @@
   "required": ["schema_version", "blocks"],
   "additionalProperties": false,
   "properties": {
-    "schema_version": {"const": 1},
+    "schema_version": {"const": 2},
     "blocks": {
       "type": "array",
       "items": {
@@ -26,15 +26,16 @@
   "$defs": {
     "week": {
       "type": "object",
-      "required": ["week", "class", "planned", "trained", "as_prescribed", "signals", "triggers", "count_after",
-                   "outcome", "deep", "closed_at"],
+      "required": ["week", "class", "planned", "trained", "as_prescribed", "on_break", "signals", "triggers",
+                   "count_after", "outcome", "deep", "closed_at"],
       "additionalProperties": false,
       "properties": {
         "week": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
-        "class": {"enum": ["hard", "partial", "low", "light", "return", "one_off", "minimum"]},
+        "class": {"enum": ["hard", "partial", "low", "light", "return", "one_off", "minimum", "break"]},
         "planned": {"type": "integer", "minimum": 0},
         "trained": {"type": "integer", "minimum": 0},
         "as_prescribed": {"type": "integer", "minimum": 0},
+        "on_break": {"type": "integer", "minimum": 0},
         "signals": {
           "type": "object",
           "required": ["readiness", "sleep", "sleep_source", "rpe_drift", "niggle"],

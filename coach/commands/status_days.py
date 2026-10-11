@@ -1,4 +1,4 @@
-"""`status-days` commands: days ill, injured or travelling (contract C50)."""
+"""`status-days` commands: days ill, injured or travelling, and planned breaks (contract C50)."""
 
 from coach import dates, paths, statusdays
 from coach.activity.records import utc_text
@@ -30,18 +30,22 @@ def list_days(args, ctx):
 
 @command(
     "status-days add",
-    help="Record days ill, injured or travelling; leave out --to while it is still going on",
+    help="Record days ill, injured or travelling; leave out --to while it is still going on; --no-training marks "
+         "a planned break",
     args=(arg("--kind", required=True, choices=statusdays.KINDS),
           arg("--from", dest="start", required=True, metavar="D", help="first day"),
           arg("--to", dest="end", metavar="D", help="last day (default: ongoing until status-days end)"),
           arg("--note", required=True, metavar="TEXT", help="one line, e.g. \"head cold\""),
-          arg("--source", default="coach", metavar="TEXT", help='where it came from, e.g. "check-in 2026-10-11"')),
+          arg("--source", default="coach", metavar="TEXT", help='where it came from, e.g. "check-in 2026-10-11"'),
+          arg("--no-training", action="store_true",
+              help="the athlete agreed not to train on these days (travel or injured only); travel alone is not "
+                   "a break")),
     writes=True,
 )
 def add(args, ctx):
     end = _date(args.end, "--to") if args.end else None
     doc, row = statusdays.add(statusdays.load(ctx.root), args.kind, _date(args.start, "--from"), end, args.note,
-                              args.source, utc_text(ctx.now()))
+                              args.source, utc_text(ctx.now()), no_training=args.no_training)
     statusdays.save(ctx.root, doc, args.dry_run)
     return _written(row, args.dry_run)
 
