@@ -2,7 +2,7 @@
 
 Nutrition is on only with `enabled = true`. A table that sets only
 [nutrition.bank] configures the recipe bank and leaves nutrition off.
-[nutrition.template] is the standing week R-33c's meal plans start from.
+[nutrition.template] is the standing week that meal plans start from (contract C34).
 """
 
 import re

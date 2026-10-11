@@ -415,8 +415,8 @@ it). The recipe bank works with nutrition disabled: with no
 `[nutrition.bank]` table, `coach.recipes.bank_settings(config)` returns
 the defaults below. `min_protein_per_100kcal` keeps its four defaults
 for any slot left out and accepts other configured slots;
-`slot_notes` keys are slots. Until R-33c adds `[nutrition.template]
-slots`, the slots are `breakfast`, `lunch`, `dinner`, `snack`.
+`slot_notes` keys are slots. The slots come from `[nutrition.template]
+slots`, which defaults to `breakfast`, `lunch`, `dinner`, `snack`.
 
 ```toml
 [nutrition]                     # R-33a

@@ -21,6 +21,15 @@ class SkillWiringTest(unittest.TestCase):
         for gone in ("Ask once:", "ask for today's kcal and protein targets", "## 4. Coverage for the window"):
             self.assertFalse(gone in self.TEXT, gone)
 
+    def test_skill_sets_up_a_missing_template_itself(self):
+        for needle in ("Set up the standing template", "coach config validate", "--only nutrition_template"):
+            self.assertTrue(needle in self.TEXT, needle)
+        self.assertFalse("through `/goals`" in self.TEXT)
+
+    def test_issue_body_skips_the_shell(self):
+        self.assertIn("--body-file", self.TEXT)
+        self.assertNotIn('--body "', self.TEXT)
+
 
 class GlossaryTest(unittest.TestCase):
     def test_terms_are_defined_with_avoid_lines(self):

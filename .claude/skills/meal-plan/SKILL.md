@@ -13,8 +13,8 @@ arithmetic (day totals, flags, the pool, the shopping list), and the
 athlete says "go".
 
 **Division of labour:** `/goals` owns the strategy and its numbers
-(`[nutrition]`; `python3 -m coach nutrition status` returns them) and the
-standing template. The nutrition app, if the athlete uses one, owns the
+(`[nutrition]`; `python3 -m coach nutrition status` returns them). This
+skill owns the standing template (`[nutrition.template]`). The nutrition app, if the athlete uses one, owns the
 calorie target; without one, `kcal_target` does. `/recipes` owns the
 recipe bank. This skill picks food from the bank to those numbers and
 never computes a calorie target. If the targets look wrong, send the
@@ -22,9 +22,8 @@ athlete to `/goals`; if the bank needs work, `/recipes`.
 
 Requires nutrition to be set up: if `nutrition status` says `enabled:
 false`, run `/setup` or `/goals` first. If `meals template` exits 5 for
-want of `[nutrition.template]`, set the template up with the athlete
-through `/goals` (it is config, written with their approval) before
-planning.
+want of `[nutrition.template]`, run **Set up the standing template**
+below once before planning.
 
 ## The files
 
@@ -38,6 +37,23 @@ planning.
 **No bank?** If `nutrition/menu/` doesn't exist, invoke the `/recipes`
 skill now: run its interview and seeding flow, then come back here and
 continue. Never plan from an empty bank.
+
+## Set up the standing template (first run only)
+
+1. Draft `[nutrition.template]` and its `[[nutrition.template.standing]]`
+   rows from `profile.md` → Food & eating (written by `/recipes`'
+   interview: staples, office days, who covers which meals, plan style)
+   and the bank's card slugs, using the example in
+   `config.example.toml` for the shape.
+2. Show the athlete the exact TOML and what each standing row means in
+   plain words. Write it to `config.toml` only on their approval.
+3. Run `python3 -m coach config validate`, then `python3 -m coach check
+   --only nutrition_template`. Fix anything either names, with the
+   athlete, before planning.
+
+This is the only time the skill asks more than the exceptions line and
+the approval; later changes to the typical week are edits to this
+table, made the same way.
 
 ## 1. Read the standing week
 
@@ -139,8 +155,10 @@ reply means a revised draft, a new dry run and a new presentation.
 2. `python3 -m coach meals approve <id>`
 3. `python3 -m coach meals render <id>`
 4. Only when `shopping_issue = true`: `python3 -m coach meals shopping
-   <id> --format issue`, then `gh issue create --title "<title>" --body
-   "<body>"` with the returned title and body. Otherwise give the
+   <id> --format issue`. Write the returned `body` to
+   `.coach/shopping-<id>.md` with the Write tool, then run
+   `gh issue create --title "<title>" --body-file .coach/shopping-<id>.md`,
+   so the shell never expands the body's text. Otherwise give the
    athlete `meals shopping <id>` (markdown) inline if they want the
    list in the chat.
 
