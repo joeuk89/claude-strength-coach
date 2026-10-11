@@ -1,0 +1,40 @@
+{
+  "about": "Synthetic setup decisions and corrections; prose edits are performed by the coach, not a renderer.",
+  "now": "2026-10-11T18:00:00Z",
+  "athlete": "I trained for 20 years, then took 12 years off. I can train any day, but want four sessions. No Hevy. I was born in 1968.",
+  "current_level_confirmation": "Yes, start me with beginner-style re-entry. Keep my training history in the notes.",
+  "config": {
+    "athlete": {
+      "birth_year": 1968,
+      "experience": "beginner",
+      "desired_sessions": 4,
+      "available_days": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+    },
+    "hevy": {"enabled": false}
+  },
+  "profile": {
+    "Goal": "Return to consistent strength training.",
+    "Training week": "Flexible weekdays; settle the training days around recovery.",
+    "Equipment": "Training at home.",
+    "Injuries / limitations": "None currently.",
+    "Coach's notes": "Previously trained for 20 years; 12 years off. Current beginner-style re-entry explicitly confirmed; old loads are historical."
+  },
+  "correction": {
+    "athlete": "Actually it is a commercial gym, and I now want two sessions on Monday and Thursday. My back has a lasting limitation with floor deadlifts; I forgot to mention it.",
+    "config": {
+      "athlete": {"desired_sessions": 2, "available_days": ["mon", "thu"]},
+      "equipment": {"available": ["barbell", "dumbbell", "cable", "machine", "bodyweight"]}
+    },
+    "profile": {
+      "Training week": "A fixed, spaced training week; other days are rest days.",
+      "Equipment": "Training at the commercial gym.",
+      "Injuries / limitations": "A lasting back limitation affects lifting from the floor; recorded in niggles."
+    },
+    "commands": [
+      ["config", "validate"],
+      ["niggles", "list"],
+      ["niggles", "add", "--area", "lower back", "--status", "chronic", "--pattern", "hinge", "--constraint", "rpe_cap=7", "--constrain-while", "chronic", "--notes", "Long-standing limitation with floor deadlifts."],
+      ["library", "set-avoid", "bb_deadlift", "--reason", "Back limitation with lifting from the floor."]
+    ]
+  }
+}

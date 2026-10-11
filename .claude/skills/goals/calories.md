@@ -23,3 +23,9 @@ trend**: when a 2–3-week trend misses the target rate, `/check-in` moves
 the target by ~100–150 kcal/day in the direction the trend needs. A new
 estimate comes only with a new phase. State the protein numbers and how
 to track both.
+
+**Age input:** reuse `[athlete] birth_year` through `python3 -m coach config
+show`. Its `age` is approximate because the birthday is unknown. When this
+calculator needs `--age`, confirm the actual current age from that estimate
+(or ask if unknown); pass the confirmed value under the calculator's existing
+bounds. A missing birth year never supplies zero or an assumed adult age.

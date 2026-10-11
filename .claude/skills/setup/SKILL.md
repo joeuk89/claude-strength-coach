@@ -22,9 +22,8 @@ its one-time bootstrap migration onto `data/program.json` first, and
 stop. When a command fails, tell the athlete what its exit code means,
 as `CLAUDE.md` "The coach scripts" sets out.
 
-Then look at what exists — `config.toml`, `profile.md`,
-`data/program.json`, an approved overlay (`python3 -m coach overlay
-current`) — and continue from the first step that isn't done.
+Check `config.toml`, `profile.md`, `data/program.json` and `python3 -m coach
+overlay current`; continue from the first unresolved step.
 
 ## 1. Three questions, then `config.toml`
 
@@ -44,7 +43,7 @@ it on track. Then ask, in one message:
 - **Nutrition coaching:** yes, no, or later?
 
 With the reply, write `config.toml` as [config.md](config.md) says:
-`python3 -m coach config suggest`, then the athlete, equipment and Hevy
+`python3 -m coach config suggest --unit <kg|lb>`, then the athlete, equipment and Hevy
 keys copied from `config.example.toml`. Nutrition: on a yes or a later,
 leave `[nutrition]` out (step 6 sets up a yes after week one); on a no,
 add a `[nutrition]` table holding only `enabled = false`. For a no or a
@@ -60,16 +59,17 @@ the key comes from, where it goes, and the checks that prove it works.
 
 ## 3. Profile: six questions
 
-Skip when `profile.md` exists (offer a refresh instead). Ask these six,
-named in one list, in at most two messages: 1 to 3, then 4 to 6.
+Read the existing profile, config and records first. Reuse known answers;
+ask only unresolved points (including unconfirmed defaults), in at most two messages.
+Use these six groups: 1 to 3, then 4 to 6.
 
-1. **Name.** Units are known from step 1.
+1. **Name and optional birth year.** Units are known from step 1.
 2. **Goal:** what they want from training, in their own words.
-3. **Training experience and known working weights:** how long they've
-   trained consistently, and any working weights they know for their
-   main lifts (weight and reps).
-4. **The training week:** which days, about how many minutes per
-   session, any coach-led sessions (PT, team training) and their days,
+3. **Training history and current level:** past training, recent consistency,
+   time off, and known current working weights (weight and reps). Confirm
+   today's programming level; history alone does not set it.
+4. **The training week:** desired weekly sessions, available weekdays,
+   minutes per session, any coach-led sessions (PT, team training) and their days,
    any classes, any runs.
 5. **Equipment, per place they train:** the main place and what it has,
    and each other place with what differs; plus whatever
@@ -78,15 +78,16 @@ named in one list, in at most two messages: 1 to 3, then 4 to 6.
    now or keeps coming back, and any exercise they cannot or will not
    do.
 
-Don't ask bodyweight, height, age, sleep or recovery here: the first
-`/check-in` asks.
+Defer bodyweight and recovery to `/check-in`; [profile-facts.md](profile-facts.md) handles age.
 
 ## 4. Profile facts into config and data, then `profile.md`
 
-Map answers 3 to 6 onto `config.toml` and `coach` commands as
+Map the answers onto `config.toml` and `coach` commands as
 [profile-facts.md](profile-facts.md) says, run `python3 -m coach config
-validate` until it exits 0, then write `profile.md` from its skeleton.
-Show it in step 5's message, so a correction rides along.
+validate` until it exits 0, then create or revise `profile.md`, keeping existing
+notes. Use its skeleton only for a new profile.
+Show it in step 5's message. Apply corrections and later disclosures with
+[profile-facts.md](profile-facts.md) before proceeding or completing setup.
 
 ## 5. Program, then week one
 

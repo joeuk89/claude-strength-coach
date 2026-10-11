@@ -55,9 +55,11 @@ redesign), offer the three paths in one message and recommend one from
   ceiling within the allowed range and a deload rule) and any missed-day
   rules.
 - **Every path ends in a program draft** at `.coach/drafts/program.json`
-  (schema `coach/schemas/program_draft.schema.json`: the program under
+  (schema `coach/schemas/program_draft.schema.json`, v2: the program under
   `program`, plus `source`, `hevy_routines` and a `report`). Show the
-  athlete the draft, run `python3 -m coach program adopt --input
+  athlete the draft. On resume with a v1 draft, update only its top-level
+  `schema_version` to 2; preserve its source, program and report. Run
+  `python3 -m coach program adopt --input
   .coach/drafts/program.json --dry-run` and, once they agree, the same
   without `--dry-run`. Adopt validates the draft (exit 1 names each
   problem by JSONPath), writes `data/program.json` and `data/state.json`

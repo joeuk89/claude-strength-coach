@@ -360,6 +360,9 @@ def _draft_errors(draft, config, library, root):
     current = jsonio.current_version(schema)
     if isinstance(version, int) and not isinstance(version, bool) and version != current:
         hint = "run /framework-sync" if version > current else "write the draft again"
+        if version == 1 and current == 2:
+            hint = ("set only the draft's top-level schema_version to 2, keeping its source and program; "
+                    "then rerun program adopt --input FILE --dry-run")
         return [Error("$.schema_version", f"schema_version {version} is not the current {current}; {hint}")]
     errors = validate_schema(draft, schema)
     if errors:

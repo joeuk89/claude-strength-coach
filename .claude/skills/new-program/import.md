@@ -2,8 +2,37 @@
 
 For athletes arriving with routines in Hevy (or on paper).
 
-1. **Fetch:** run `python3 -m coach hevy pull` — or take the paper
-   plan, and write the draft as in Path B (design.md).
+First reuse an explicit run/coach choice, or ask once: **run it as written,
+or coach it?** Record `[coaching] mode` as `"run"` or `"coach"`; a default
+value alone is not confirmation. Both routes preserve supplied structure
+until the athlete agrees an edit. Run mode still applies every safety check.
+
+## Paper/manual route (no Hevy required)
+
+1. Read the supplied program. Transcribe its sessions, exercise order,
+   working and warm-up set groups, rep targets, rest, supersets, cues and
+   progression rules into a draft. Use `python3 -m coach library search
+   "<exercise name>"` to resolve ids and confirm uncertain load modes.
+2. Ask only for missing or ambiguous details: available days and desired
+   count, rotation, loads, progression or light-week policy. Map the supplied
+   progression to a supported scheme; if no scheme represents it, explain
+   the gap and agree a representation before adoption. A missing load can
+   use agreed calibration; retain an explicit supplied load once confirmed.
+3. Write `.coach/drafts/program.json` using `coach/schemas/program_draft.schema.json`:
+   `source` is `"manual_import"`, `hevy_routines` is `{}`, `hevy_folder` is null,
+   `report` is `[]`, and `detected` is
+   `{"percentage_based": false, "evidence": [], "suggested_schemes": []}`.
+   Fill `created_at`, `schema_version`, `position` and the complete `program`
+   according to the schema. Show the transcription beside the supplied
+   exercise/scheme structure, and identify all agreed additions or changes.
+4. Run `python3 -m coach program adopt --input .coach/drafts/program.json
+   --dry-run`; settle errors and load-mode questions before the adoption
+   approval. Then use step 7 below. Resume from this draft, reusing settled
+   answers. With Hevy disabled, use training sheets for the first week.
+
+## Hevy route
+
+1. **Fetch:** run `python3 -m coach hevy pull`.
 2. **Interview:** which routines are active? How do they rotate across a
    week (or longer cycle)? Any coach-/PT-led sessions alongside them?
    Rest days? What progression rule do they follow, if any?
