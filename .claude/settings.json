@@ -17,6 +17,7 @@
       "Bash(python3 -m coach library search:*)",
       "Bash(python3 -m coach library validate:*)",
       "Bash(python3 -m coach library seed:*)",
+      "Bash(python3 -m coach library create:*)",
       "Bash(python3 -m coach library confirm:*)",
       "Bash(python3 -m coach library set-mode:*)",
       "Bash(python3 -m coach hevy status:*)",

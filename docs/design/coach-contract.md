@@ -618,6 +618,18 @@ merges them; with no instance file the catalogue stands alone.
   `Library.effective_load_mode(id)` returns null until the athlete
   confirms; `load_mode_default` and `load_mode_proposed` never stand in
   for it.
+- **Local creation.** `library create ID --input FILE` (W, `--dry-run`)
+  accepts one existing instance-entry object, requires every custom field
+  above and a non-null confirmed `load_mode`, and creates only a new
+  `custom_` id. The schema and merged-library checks run before the atomic
+  write. Catalogue collisions and conflicting custom ids fail without
+  changes; an identical retry succeeds with `unchanged: true` and
+  `written: false`. Output includes the proposed merged `exercise`, `path`,
+  `unchanged` and `written`; dry-run writes nothing. No required facts or
+  Hevy ids are guessed. Local creation does not establish Hevy readiness:
+  a real template mapping is a separate requirement when Hevy is enabled.
+  The search, review and approval workflow is in
+  `reference/custom-exercises.md`.
 - **Match key.** Names are compared lower-cased, punctuation dropped,
   `db`, `bb` and `kb` spelled out, words sorted, so "Bench Press
   (Dumbbell)" and "dumbbell bench press" are the same name.
