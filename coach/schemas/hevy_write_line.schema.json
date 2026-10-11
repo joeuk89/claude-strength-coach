@@ -1,0 +1,20 @@
+{
+  "title": "One write line in data/hevy/writes.jsonl (contract C9); status is null when no response arrived",
+  "type": "object",
+  "required": ["schema_version", "at", "kind", "method", "path", "status", "routine_id", "overlay_id",
+               "overlay_hash", "request_body", "request_sha256"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": 1},
+    "at": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"},
+    "kind": {"const": "write"},
+    "method": {"enum": ["PUT", "POST", "DELETE", "PATCH"]},
+    "path": {"type": "string", "pattern": "^/v1/"},
+    "status": {"type": ["integer", "null"]},
+    "routine_id": {"type": ["string", "null"]},
+    "overlay_id": {"type": ["string", "null"]},
+    "overlay_hash": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
+    "request_body": {"type": ["object", "array", "null"]},
+    "request_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}
