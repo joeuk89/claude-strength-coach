@@ -161,7 +161,13 @@ concrete: did the athlete hit the prescribed load × reps @ RPE?
   the reply confirmed them (that's the "n of ~m" in the record header;
   note cardio separately); which days slipped, with their miss tags.
 - Notable sets: PRs, rep-range top-outs due a load increase, anything way
-  off prescription (RPE 9.5s against a prescribed 7).
+  off prescription.
+- RPE drift: check only **compound lifts** (multi-joint squat, hinge,
+  lunge, press and pull patterns) and sets carrying a **recovery cap**.
+  An exercise drifts when logged RPE is 1 or more over the target on 2
+  or more working sets. Drift on isolation work gets one summary line in
+  the record ("isolation RPE ran about 1 high on curls and raises") and
+  never drives a decision.
 - Priority work: if `routine/program.md` names priority lifts or
   protocols, did they happen as written? Watch for this athlete's known
   drift patterns (Coach's notes).
@@ -182,8 +188,11 @@ concrete: did the athlete hit the prescribed load × reps @ RPE?
   See `reference/hevy-api.md` → "Dumbbell loads".
 - Exercise drift vs. the plan — structural drift means `/hevy-sync` is
   due; offer it (Hevy users only).
-- Intensity honesty (logged vs. prescribed RPE), session durations vs. the
-  time limits in `profile.md`, junk volume.
+- Intensity honesty: the RPE drift check across the whole window, same
+  scope — compound lifts and recovery-capped sets, 1 or more over the
+  target on 2 or more working sets. Isolation drift stays one summary
+  line, not a decision.
+- Session durations vs. the time limits in `profile.md`, junk volume.
 - Weekly balance: does the program's balance picture still match what's
   actually being trained?
 
