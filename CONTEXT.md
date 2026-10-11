@@ -32,7 +32,9 @@ _Avoid_: execute mode, hands-off mode, autopilot
 One training day's template inside a program: the exercises, sets, reps,
 intensity and rest it prescribes. A session is **core** when it carries
 work nothing else covers and must land for the week to count, or
-**optional** when it is bonus volume and skipping it is not a miss.
+**optional** when it is bonus volume and skipping it is not a miss. A
+**standby** session sits in the program unscheduled until a minimum week
+calls on it.
 _Avoid_: routine, workout, day
 
 **Workout**:
@@ -140,6 +142,25 @@ Sets from a missed session added to a later session in the same week,
 for that week only. The next week is built from the program again, so a
 fold never carries forward.
 _Avoid_: make-up sets, carry-over
+
+**Priority lift**:
+A lift the program protects above the rest, with a KPI (best e1RM, top
+load, top reps or ladder rung, optionally a target and a date) and a
+floor dose. Its exposures are counted each week against plan.
+_Avoid_: main lift (looser), key lift, focus lift
+
+**Floor dose**:
+The least a priority lift gets in a disrupted week: by default two hard
+working sets at the prescribed load and reps. When the session carrying
+the lift is missed, the floor is folded into the next session that week.
+_Avoid_: minimum sets, maintenance sets
+
+**Minimum week**:
+The program's fallback week for when the full week cannot happen: at
+most two standby sessions, each within its time cap, carrying every
+priority lift's floor dose and at least a third of each muscle's dose
+target. Its overlay is an ordinary weekly overlay.
+_Avoid_: minimum-viable week (the roadmap's phrase), fallback week, deload
 
 **Progression scheme**:
 The named rule that turns an exercise's recent exposures into its next

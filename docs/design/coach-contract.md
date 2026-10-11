@@ -1442,10 +1442,12 @@ version bump (below).
 }
 ```
 
-- Every key shown is required except session `location` and
-  `dose_targets` (C40). A session without `location` reads as
-  `location: null`, and a program without `dose_targets` reads as `{}`;
-  `coach.program.load(root)` fills both, so readers always see the keys.
+- Every key shown is required except session `location`,
+  `dose_targets`, `priority` and `minimum_week` (C40). A session without
+  `location` reads as `location: null`, a program without `dose_targets`
+  reads as `{}`, without `priority` as `[]` and without `minimum_week` as
+  null; `coach.program.load(root)` fills them, so readers always see the
+  keys.
 - `kind`: `lifting`, `conditioning`. `tier`: `core`, `optional`. `status`:
   `active`, `parked`, `standby`. A session needs at least one exercise.
 - Session ids are unique and never `program` (its page would overwrite
@@ -1609,12 +1611,14 @@ skip when there is no `data/program.json` (`state_schema`: no
 to v2 (`temporary_routines` entries). R-23a took program to v2 and state
 to v3 (C23). R-30a took program to v3 (`dose_targets`, C40). R-22 took
 program to v4 and overlay (and its draft) to v3 (C37). R-44a took
-program to v5 (`interference`, C51). Every later
+program to v5 (`interference`, C51). R-30b took program to v6
+(`priority`, `minimum_week`, C40) and overlay (and its draft) to v4 (a
+fold's `rule_id` may be a priority floor rule's id, C40). Every later
 bump takes the next free version when it merges and adds one step to the
 R-17a migration chain, so the chain stays linear.
 Program bumps: R-22 (executable `missed_day_rules`, C37), R-30b (`priority`, `minimum_week`, C40), R-44a
 (`interference`, C51), R-44b (session `scheme`, C51). State bump: R-31
-took state to v4 (`block`, C42). Overlay: R-24 takes it to v2 (C21) and R-22 to v3 (C37). A
+took state to v4 (`block`, C42). Overlay: R-24 takes it to v2 (C21), R-22 to v3 (C37) and R-30b to v4 (C40). A
 brief or section that names a version number means the next free one.
 
 ## C17. History cache (R-20 writes; R-21a, R-23a, R-24, R-25, R-30a, R-31, R-43 read)
@@ -4422,6 +4426,79 @@ null`:
   `.coach/plans/<week start>-minimum.json` (C6), a C23 `SchedulePlan` for
   `propose week --plan`. The overlay stays kind `weekly`; adherence is
   judged against it like any other overlay.
+
+**Built with R-30b** (details the text above leaves open):
+
+- Program v6 schema: `priority` items are `{exercise_id, kpi: {kind,
+  target?, by?}, floor?: {sets?, rpe?}}`; `program.load` fills `target`
+  and `by` with null and the floor with `{"sets": 2, "rpe": null}`.
+  `minimum_week` is null or `{sessions, schedule: {rule, params}}`.
+  `program validate` also reports a lift listed twice, a `rung` KPI on a
+  lift no session ladders (`assistance_ladder`), a minimum-week session
+  listed twice or unknown, and the minimum week's schedule rule and
+  params as it does `$.schedule`, at `$.minimum_week.schedule`. The two
+  limits `structure balance --variant minimum` checks (two sessions, a
+  third of each target) are not schema rules, so a program can hold a
+  minimum week that fails them and the check names why.
+- **Synthetic rule id.** One rule covers every priority lift the missed
+  session carried, in `priority` order: `priority:<id>`, or
+  `priority:<id>+<id>` for two or more. The rule also carries
+  `"text": null`, as program rules do. "Carried" means a line in the
+  missed session of the overlay in force (the program session when no
+  overlay holds it). R-22's overlay schema allowed only `^[a-z0-9-]+$`
+  for `fold.rule_id`, so overlay v4 widens it to that or
+  `^priority:[a-z0-9_]+(\+[a-z0-9_]+)*$`. The step changes no line, but
+  the version is in the approval hash, so approved overlays lose their
+  approval and the report lists them (as C21).
+- **Order in `missed plan`** (and so `missed apply`): the floor rule is
+  tried first. When it applies, it is the miss's rule and the program's
+  rules are not tried, as C37's first-match rule reads with the floor
+  rule at the head of the list. When it is unmatched, `data.flags` gets
+  one `priority_exposures_missed` per lift and the program's rules are
+  tried as before; the flag is dropped again when the program's rule
+  shifts the missed session itself, since the lift moves with it.
+- `structure priority [--since D]` (default: 28 days before today)
+  returns `since`, `until`, `flags` and per lift `exercise_id`, `name`,
+  `sessions` (program sessions holding it), `floor`, `kpi` and `weeks`.
+  `kpi` is `{kind, target, by, now, trend, met}`: `now` is the C18 best
+  e1RM point in the window (`e1rm`), the heaviest working load or most
+  reps at the newest valid exposure (`top_load`, `top_reps`), or the
+  slot's `assistance_ladder` state `{value, name, date, session_id}`
+  (`rung`, with no trend). `trend` is `{from, to, delta}` over the first
+  and last point in the window, null with fewer than two. `met` is null
+  without a target; for an `assisted` lift's `top_load`, lower is met.
+- `weeks` rows, one per week from the week holding `since` to the week
+  holding today: `planned` (core sessions holding the lift as their own
+  line, not a fold and not a moved session), `trained` (workouts with a
+  working set of it), `missed` (planned, dated before today, C18 status
+  `missed`), `replaced` (a fold of the lift from that miss, or the
+  session moved from it, was trained), `pending` (that make-up is still
+  upcoming) and `unreplaced`. Each week with `unreplaced` raises one
+  `priority_exposures_missed`, naming the misses.
+- `structure balance --variant minimum` returns `variant`,
+  `reference_week` (the week holding tomorrow), `sessions`, `schedule`,
+  `targets`, `positions` (per position of the minimum week's schedule:
+  `sessions` with `minutes`, `cap_minutes`, `within_cap`; `muscles` with
+  `target`, `third`, `planned`, `met`; `priority` with `floor_sets`,
+  `sets`, `session_id`, `met`), `passed`, `reasons` and `flags` (empty).
+  Coach-led sessions are not counted: the minimum week stands on its own
+  sessions. Session minutes are R-24's estimate
+  (`coach.validity.estimate_minutes`). A floor is met by one session
+  holding at least `floor.sets` hard working sets of the lift. On a
+  failure it exits 1 with each reason as a detail at `$.minimum_week`
+  and the report kept in `data` (C3).
+- `structure minimum [--week W] [--write]` (default: the week holding
+  tomorrow) returns `week`, `span`, `plan`, `path`, `written` and
+  `balance` (`passed`, `reasons`); it plans the minimum week's schedule
+  over its sessions only, refuses (exit 1) when the program has no
+  minimum week or it plans no session that week, and writes only with
+  `--write` (not with `--dry-run`). The plan is `{variant: "minimum",
+  rule, week, span, sessions: [{date, session_id, title}], rotation:
+  null, flags: []}`.
+- `routine/program.md` gains `## Priority lifts` and `## Minimum week`
+  sections only when the program has them, so existing pages stay fresh.
+- A session dated today is not yet missed for `priority_exposures_missed`,
+  though C18 adherence already counts it.
 
 ## C41. Structure accounting and `coach structure` (R-30a; R-21a, R-25, R-31, R-40b read)
 
