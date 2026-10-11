@@ -9,7 +9,8 @@ Turn the nutrition targets on file into real food: plan the athlete's
 meals and snacks for a chosen window (default: the week ahead) and build
 a shopping list for **exactly** what the plan needs. Plan only the
 **gaps** — meals already covered (meal kit, canteen, eating out, family
-dinners) are declared up front and treated as fixed blocks.
+dinners) and the athlete's standing protein anchors are declared up
+front and treated as fixed blocks.
 
 **Division of labour:** `/goals` decides the strategy and records it in
 `profile.md` (Nutrition & goals). MacroFactor, if the athlete uses it,
@@ -64,8 +65,11 @@ bank), say so and offer a `/recipes` sweep before planning.
   still calibrating (a new account, or a fresh phase on-ramp) and shows
   no target yet, fall back to the profile's Nutrition & goals numbers
   and say you've done so.
-- **Without MacroFactor:** use the calorie/protein targets in
-  `profile.md`.
+- **Without MacroFactor:** use the calorie target and protein numbers
+  in `profile.md`.
+- **Protein:** plan every day to at least the **protein floor** and
+  toward the **target** (both in Nutrition & goals). For MacroFactor
+  users the app's protein target is the floor.
 - Sanity-check either against Nutrition & goals. A big mismatch (wrong
   phase, stale targets) means the strategy needs attention — flag it
   and point at `/goals` before planning to a number you don't trust.
@@ -78,6 +82,13 @@ training / double / rest days from the routine (don't assume — weeks
 have one-off changes), and ask about anything unusual: travel, meals
 out, guests.
 
+**Protein anchors are fixed blocks.** Read the anchors table in
+Nutrition & goals and place each anchor in its slot on every day it
+applies, before planning anything else. Like a covered meal, an anchor
+is counted in the day's macros and never swapped or dropped;
+unlike one, it is shopped for (step 6) unless it's on the staples list.
+Don't re-ask about anchors — changing them is `/goals`' job.
+
 **Ask once: "Anything in the house to use up?"** Leftovers, short-dated
 meat, wilting veg, a half-finished pack. Note each item and the amount
 the athlete gives. Ask it once per run and don't ask for a full stock
@@ -87,7 +98,7 @@ list: these named items are the only stock the plan accounts for.
 estimate their per-serving macros with the athlete and record the
 assumption in the plan — the day's totals lean on them. Ask which are
 the **low-protein nights** (e.g. a veg-curry dinner) so any protein
-top-up lands on the right day. Protein is the hard anchor; a covered
+top-up lands on the right day. Protein is the hard constraint; a covered
 block's calories are an estimate, so treat the daily kcal as approximate
 when much of the day is family-cooked.
 
@@ -130,8 +141,10 @@ Also:
   selection toward recipes that finish them. A tiebreaker with teeth,
   not a straitjacket: macro fit and what the athlete wants to eat still
   win.
-- **Protein is the anchor.** Spread it across the day (~4 feeds is a
-  good default; ~0.4 g/kg per meal is a heuristic, not dogma).
+- **Protein comes first.** The anchors cover part of the floor; spread
+  the rest across the day's meals (~4 feeds including the anchors is a
+  good default; ~0.4 g/kg of the reference mass in Nutrition & goals per
+  meal is a heuristic, not dogma).
 - **Train-day awareness:** bigger fuelling on double days, leaner rest
   days; calorie cycling if the profile opts in (carbs/kcal toward
   higher-output days, protein flat). Timing notes only where they
@@ -147,7 +160,8 @@ Also:
 
 ## 6. Shopping list — arithmetic, never assumption
 
-Derive from the pool's **non-covered** entries: per-serving ingredient
+Derive from the pool's **non-covered** entries and the anchors (each
+anchor × the days it applies): per-serving ingredient
 quantities × counts, with variation deltas applied, aggregated across
 the window. **Then subtract the use-up items:** the amounts the athlete
 named in step 4 come off the totals before anything lands in Buy.
@@ -176,8 +190,9 @@ Write `nutrition/YYYY-MM-DD.md`:
 ```markdown
 # Meal plan — <window start> → <window end>
 
-**Targets used:** ~X kcal · ~Y g protein (source: MacroFactor dashboard /
+**Targets used:** ~X kcal · protein floor Y g, target Z g (source: MacroFactor dashboard /
 profile) · plan style: loose/strict
+**Anchors:** <anchor> (<slot>, <days>) · …
 
 ## This week's pool
 | Meal | Count | Per serving |
@@ -195,7 +210,8 @@ in the plan and the macros but not the shopping list.)
 (Every slot the plan touches gets a column, dinner included. Covered
 entries — family dinners, meal-kit boxes, eat-out — sit in their slot's
 cell marked *(covered)*: counted in the day's macros, absent from the
-shopping list. A linked top-up recipe on a low-protein night goes in the
+shopping list. Anchors sit in their slot's cell marked *(anchor)*. A
+linked top-up recipe on a low-protein night goes in the
 Dinner cell alongside the covered block. Strict: assignments are fixed.
 Loose: suggested — swap within a slot except 🔒 day-locked entries.
 Recipes always linked by full name.)

@@ -116,7 +116,10 @@ watching for recurrence; it's created when the first one appears.)
 
 ## Nutrition & goals
 
-(Filled by /goals — phase sequence, targets, trend rate, app config.)
+(Filled by /goals — phase sequence, trend rate, calories (the app's, or
+a no-app starting estimate), protein reference mass and basis, protein
+floor / target / stretch, a Protein anchors table, an Active override
+block, sleep-gate status, app config, revision date.)
 
 - **Apps:** Hevy: yes-Pro / yes-free / no · MacroFactor: yes / no
 
