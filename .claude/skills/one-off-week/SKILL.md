@@ -102,7 +102,9 @@ program or design the week instead. `python3 -m coach structure
 minimum --week <label> --write` writes its plan, and `python3 -m coach
 propose week --week <label> --plan <the path it printed>` proposes the
 week from it as a weekly overlay. Review and finalize as for a deload,
-then go to step 3 with that id.
+then go to step 3 with that id: its draft and `overlay build` items are
+already done, so start at "Where it renders", then carry on from its
+validate item.
 
 **Constrained week** — a short design conversation (what kit, what
 time, what state), then sessions that keep the program's priority work
