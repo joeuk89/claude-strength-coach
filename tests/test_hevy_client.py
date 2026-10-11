@@ -7,7 +7,7 @@ from pathlib import Path
 from coach import jsonio
 from coach.errors import ConfigError, NetworkError, ValidationError
 from coach.hevy import envfile
-from coach.hevy.client import HevyClient
+from coach.hevy.client import HevyClient, created_routine
 from coach.validate import validate
 from tests.support import FIXTURES
 from tests.support.fake_hevy import FakeClock, FakeHevy
@@ -139,8 +139,13 @@ class WriteTest(ClientCase):
         self.client.post("/v1/routine_folders", {"routine_folder": {"title": "One-off weeks"}})
         lines = self.audit_lines()
         self.assertEqual(len(lines), 3)
-        self.assertEqual(lines[1]["routine_id"], None)
         self.assertTrue(created["routine"]["id"])
+        self.assertEqual([l["routine_id"] for l in lines], [R1, created["routine"]["id"], None])
+
+    def test_a_post_answer_that_wraps_the_routine_in_a_list_still_names_it(self):
+        self.assertEqual(created_routine({"routine": [{"id": "r-9", "title": "x"}]})["id"], "r-9")
+        self.assertIsNone(created_routine({"routine": []}))
+        self.assertIsNone(created_routine({"text": "ok"}))
 
     def test_eight_writes_are_spaced_by_the_bucket(self):
         for n in range(8):

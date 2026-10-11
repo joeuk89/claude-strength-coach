@@ -42,6 +42,14 @@ def timestamp(moment):
     return moment.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def created_routine(body):
+    """The routine in Hevy's answer to POST /v1/routines, which may wrap it in a one-item list; else None."""
+    routine = body.get("routine") if isinstance(body, dict) else None
+    if isinstance(routine, list) and len(routine) == 1:
+        routine = routine[0]
+    return routine if isinstance(routine, dict) and routine.get("id") else None
+
+
 def _hevy_says(body):
     if isinstance(body, dict) and isinstance(body.get("error"), str):
         return body["error"]
@@ -105,6 +113,8 @@ class HevyClient:
         }
         try:
             result = self._send(method, path, body=body, line=line)
+            if method == "POST" and path == "/v1/routines" and line["routine_id"] is None:
+                line["routine_id"] = (created_routine(result) or {}).get("id")
         finally:
             self._append(line)
         return result if isinstance(result, dict) else {"text": result}

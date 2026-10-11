@@ -312,6 +312,10 @@ class PushTest(RoutinesCase):
 
     def test_a_session_without_a_routine_exits_1_before_any_request(self):
         self.edit_overlay(lambda doc: doc["sessions"][1].update(hevy_routine_id=None))
+        state_path = self.root / "data" / "state.json"
+        state_doc = json.loads(state_path.read_text(encoding="utf-8"))
+        del state_doc["hevy"]["routines"][R2]
+        jsonio.write_doc(state_path, state_doc, dry_run=False)
         envelope = self.routines_cmd("push", expect=1)
         self.assertIn("session-b", envelope["error"]["message"])
         self.assertEqual(self.fake.requests, [])

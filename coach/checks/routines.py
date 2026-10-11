@@ -16,14 +16,16 @@ def overlay_hevy_drift(ctx):
         if cache.read("routines") is None:
             return [Result("skip", "There is no Hevy routine cache yet; run python3 -m coach hevy pull.")]
         doc = routines.current_overlay(ctx.root, ctx.today())
+        ids = routines.session_routines(ctx.root, doc) if doc else None
     except ValidationError as exc:
         return [Result("skip", f"cannot compare: {exc.message}")]
     if doc is None:
         return [Result("skip", "No overlay is in force or coming up.")]
     where = overlay.path_for(ctx.root, doc["id"]).relative_to(ctx.root).as_posix()
-    results = [Result("warn", f"{s['title']} on {s['date']} in overlay {doc['id']} has no Hevy routine.", where)
-               for s in routines.unmapped_sessions(doc)]
-    for routine_id, session, _ in routines.plan(doc, ctx.today()):
+    results = [Result("warn", f"{s['title']} on {s['date']} in overlay {doc['id']} has no Hevy routine; run "
+                              f"python3 -m coach routines create --overlay {doc['id']}.", where)
+               for s in routines.unmapped_sessions(doc, ids)]
+    for routine_id, session, _ in routines.plan(doc, ctx.today(), ids):
         cached = cache.routine(routine_id)
         if cached is None:
             results.append(Result("warn", f"{session['title']} ({routine_id}) is not in the Hevy cache; "
