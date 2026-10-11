@@ -3,6 +3,12 @@
 .agent/
 .DS_Store
 
+# Coach scripts: the local cache is root-anchored so test fixtures under
+# tests/fixtures/instances/*/.coach/ stay tracked.
+/.coach/
+__pycache__/
+*.pyc
+
 # The Claude files ARE this system — override any global gitignore that
 # excludes them (e.g. ~/.gitignore_global rules meant for work repos).
 !CLAUDE.md
