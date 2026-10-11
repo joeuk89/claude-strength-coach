@@ -14,4 +14,4 @@ CITES = ("rn:deloads.8",)
 def apply(ctx, proposal):
     if ctx.scheme_deload is not None:
         return ctx.scheme_deload(ctx, proposal)
-    return base.standard_deload(proposal, **base.STANDARD_DELOAD)
+    return base.standard_deload(proposal, **base.STANDARD_DELOAD, load_direction=ctx.exercise.load_direction)

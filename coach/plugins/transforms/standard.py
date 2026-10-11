@@ -6,7 +6,8 @@ API = 1
 KIND = "transform"
 NAME = "standard"
 SUMMARY = ("Keeps two thirds of each line's working sets (at least one), takes 10 % off the loads and puts every "
-           "set at RPE 6; bodyweight work is cut by sets and taken further from failure.")
+           "set at RPE 6; bodyweight work is cut by sets and taken further from failure, and assisted work keeps "
+           "its assistance.")
 PARAMS = {
     "schema": {
         "type": "object", "additionalProperties": False,
@@ -23,4 +24,5 @@ CITES = ("rn:deloads.8", "rn:deloads.9")
 
 
 def apply(ctx, proposal):
-    return base.standard_deload(proposal, ctx.params["set_factor"], ctx.params["load_factor"], ctx.params["rpe"])
+    return base.standard_deload(proposal, ctx.params["set_factor"], ctx.params["load_factor"], ctx.params["rpe"],
+                               ctx.exercise.load_direction)

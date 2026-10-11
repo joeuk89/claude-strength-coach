@@ -2092,7 +2092,11 @@ coach.validity.estimate_minutes(root, session) -> int
 - **Valid line**: `days_off` falls in band `0-10`, or the line's
   `provenance.decay.band` equals `band_for(days_off)` and its working
   load is at most the derived-from load × `load_factor` (plus one
-  increment for rounding). Anything else is `stale_prescription`. An
+  increment for rounding). For an `assisted` line, where more assistance
+  is a lighter lift, the band cuts no assistance: its least working
+  assistance is at least the derived-from exposure's least assistance
+  minus one increment, and the message says the assistance is below the
+  pre-layoff assistance. Anything else is `stale_prescription`. An
   exercise with no exposure (first time, start load) is never stale.
   A decayed line of an exercise that has exposures is stale when its
   `derived_from` is null, names a workout the history doesn't hold, or
@@ -2102,7 +2106,7 @@ coach.validity.estimate_minutes(root, session) -> int
   set_delta)` working sets, `n` being the derived-from exposure's
   working sets, and every working set at or under `rpe_cap` when the
   band has one. Loads compared are the coaching number (C18), the top
-  working load on each side.
+  working load on each side (the least assistance for `assisted`).
 - A line with a `no_data` flag (C10) gets no R-24 flag but
   `load_mode_mismatch`.
 - Illness (R-02, rn:detraining-return.4, a heuristic for mild illness
@@ -2240,7 +2244,9 @@ class Proposal:
 ```
 
 `base.default_decay` applies C22's band: load × `load_factor`, one set
-fewer per exercise (never below one), RPE capped for `43+`. A scheme
+fewer per exercise (never below one), RPE capped for `43+`. Assistance
+is never cut: an `assisted` line (`load_direction` −1) keeps at least
+the derived-from exposure's least assistance instead. A scheme
 overrides `decay` only when load is the wrong lever (a ladder steps back
 rungs; a wave lowers its training max).
 
@@ -2267,7 +2273,7 @@ picks one for a run):
 
 | Transform | Owner | Params | Effect |
 |---|---|---|---|
-| `standard` | R-23a | `set_factor` 0.67, `load_factor` 0.9, `rpe` 6 | bodyweight work cut by sets and taken further from failure |
+| `standard` | R-23a | `set_factor` 0.67, `load_factor` 0.9, `rpe` 6 | bodyweight work cut by sets and taken further from failure; assisted work keeps its assistance |
 | `scheme` | R-23a | — | calls the scheme's `deload`, else `standard` |
 | `light` | R-31 | `set_factor` 0.67, `load_factor` 1.0, `rpe_cap` 8 | two thirds of the sets (at least one), loads held, no set above RPE 8 |
 | `return` | R-31 | `set_delta` −1, `rpe_cap` 8 | one set fewer, load held at the derived-from exposure, no set above RPE 8; a line with `ctx.days_off` over 10 is returned unchanged (the core already decayed it) |
@@ -2359,7 +2365,13 @@ and `plugins test` runs them. Loaded with
 - `base.default_decay` cuts each working load from the lower of the
   proposal and the derived-from load, so a return week never carries a
   progression; it keeps `max(1, min(proposal sets, derived-from sets) +
-  set_delta)` working sets.
+  set_delta)` working sets. The load cut goes through
+  `base.lightened(sets, factor, source, load_direction=1)`, which the
+  `standard`, `light` and `return` transforms use too: for `assisted`
+  it raises each working set to at least the derived-from least
+  assistance and applies no factor.
+  `base.standard_deload(proposal, set_factor, load_factor, rpe,
+  load_direction=1)` takes the line's direction the same way.
 - **Rounding** (step 3 of C24): a load equal to one the slot already
   knows (the derived-from load, a load of the last approved line, the
   start load) stays as it is. Otherwise a per-hand dumbbell load snaps to

@@ -30,7 +30,6 @@ CITES = ("rn:deloads.8",)
 def apply(ctx, proposal):
     if ctx.days_off > base.return_band(0).upper:
         return proposal
-    source = proposal.derived_from
     sets = base.keep_working(proposal.sets, base.return_set_count(proposal, ctx.params["set_delta"]))
-    sets = base.scaled(sets, 1.0, source.top_load if source else None)
+    sets = base.lightened(sets, 1.0, proposal.derived_from, ctx.exercise.load_direction)
     return replace(proposal, sets=base.rpe_capped(sets, ctx.params["rpe_cap"]), round_down=True)
