@@ -1,6 +1,6 @@
 ---
 name: one-off-week
-description: Use when a week (or a few days) must deviate from the standing program — a deload week, travel, illness recovery, limited equipment, a compressed schedule — and the athlete needs a concrete plan for it. Triggers include "/one-off-week", "deload week", "plan my deload", "I'm traveling next week", "next week is disrupted", "plan me a fallback week", or /check-in hitting a deload week.
+description: Use when a week (or a few days) must deviate from the standing program — a deload week, travel, illness recovery, limited equipment, a compressed schedule — and the athlete needs a concrete plan for it. Triggers include "/one-off-week", "deload week", "plan my deload", "I'm traveling next week", "next week is disrupted", "plan me a fallback week", or /check-in agreeing a light week.
 ---
 
 # One-off week
@@ -54,6 +54,12 @@ live `weight_kg`; otherwise ask. Keep the program's priority protocols
 alive at reduced dose. Remind the athlete to tell any coach/PT it's a
 deload week, and deload whatever the profile says moves with the
 lifting (conditioning etc.).
+
+**Illness** — a week back after illness follows the return rule in
+`CLAUDE.md` "Coaching principles": its illness conditions (when
+training may restart, the first session's cap, when the athlete checks
+with a qualified professional first) and, after a long gap, its
+matching band.
 
 **Constrained week** — a short design conversation (what kit, what
 time, what state), then sessions that keep the program's priority work
@@ -164,9 +170,11 @@ athlete trains the temp sessions from it.
   lives, when normal layout resumes. The next `/check-in` judges the
   week against this override and clears the pointer once normal weeks
   resume.
-- If this was the program's **penciled deload**, agree the next pencil
-  (per the program's deload cadence) and update that line in
-  `program.md` too.
+- If this was a **deload or other light week**, reset the hard-week
+  count: in the block status line in `program.md`'s header the count
+  goes to zero and the next block starts (`Block <n+1> · 0 of <ceiling>
+  hard weeks`), with the light week shown as agreed. The rules are in
+  `CLAUDE.md` "Coaching principles" → Fatigue management.
 
 ## 6. Close out
 

@@ -43,6 +43,14 @@ Standalone, state it in the brief's week focus ("Week B, going by
 Tuesday's PT log — say if not"). If the sources disagree, state the
 first one and name the disagreement.
 
+**Days off.** Count the days from the last lifting workout of any kind
+— solo, or coach-led as the log, the newest check-in or the athlete
+says — to the first session of the span. Do this on every run,
+standalone included; with no workout logged yet, skip it. Over 10 days
+makes this a **return week**: step 2 applies the return rule in
+`CLAUDE.md` "Coaching principles", matching band and all. An `ill` miss tag or illness in the gap adds that rule's
+illness conditions; standalone, ask whether illness caused the gap.
+
 **Brand-new program?** An empty `check-ins/` is normal — there's no
 overlay or decisions to read. With no logged workouts yet, working
 weights come from the starting loads agreed during program design (or
@@ -112,9 +120,20 @@ Work through every session in the span, every exercise in each:
 - **Focus** — one per-exercise emphasis where warranted, drawn from
   check-in findings ("slow the eccentric", "depth fades when tired").
   Most exercises most weeks won't have one — that's fine.
+- **Return week** — when step 1 found a return week, the matching
+  return band sets this week's loads, set counts and any RPE
+  cap instead of the progression scheme, measured from the pre-layoff
+  working loads; with illness, the first session back carries the
+  illness cap. Name the band in the week focus. The next pass
+  progresses from what the return week logged.
 - **Structural changes** — swaps or additions agreed at the check-in,
   or proposed now with rationale. These are plan changes: mark them
-  separately, they land in `routine/` too.
+  separately, they land in `routine/` too. Under 80 % adherence (as
+  `/check-in` step 4 defines it), propose no new recurring session —
+  no new session or weekly slot, conditioning and optional ones
+  included — and push back if the athlete asks; exercise swaps within a
+  session are fine. An override goes in the next check-in's adherence
+  decision line.
 
 Active niggles constrain everything: no added load on an aggravated
 pattern.

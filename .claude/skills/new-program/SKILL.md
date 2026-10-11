@@ -12,7 +12,8 @@ conversation lands on. Never assume a shape.
 
 **Output contract (both paths):**
 - `routine/program.md` — the program's shared rules (warm-up, RPE scale,
-  progression scheme, deload policy), an **index of every session file**,
+  progression scheme, deload policy as a hard-week ceiling plus the
+  fatigue triggers), an **index of every session file**,
   how the sessions rotate across the calendar, and — if the program
   rotates — a "currently in …" line check-ins can update.
 - Session files in `routine/` — every session concrete enough to train
@@ -41,6 +42,12 @@ If `routine/` already has a program, this is a redesign. Before writing
 anything, move the current program files to `routine/archive/YYYY-MM-DD/`
 (with the athlete's approval) so history survives. Carry forward what the
 last block taught (check the latest deep check-in).
+
+Under 80 % adherence (as `/check-in` step 4 defines it), the redesign
+adds no new recurring session — no new session or weekly slot,
+conditioning and optional ones included — and you push back if the
+athlete asks for one; exercise swaps are fine. A redesign the adherence
+trigger started builds the smaller schedule the check-in agreed.
 
 ## Path A — Import (they already have a program)
 
@@ -74,7 +81,9 @@ equipment, training week, time per session, injuries, recovery, cardio).
    choice depends on evidence; cite sources.
 3. **Draft the program:** `program.md` rules first (progression scheme —
    double progression is a sensible default; RPE targets; deload policy —
-   every 4–8 weeks or triggered early; warm-up protocol), then each
+   a hard-week ceiling and the fatigue triggers from `CLAUDE.md`
+   "Coaching principles", the ceiling set for this athlete within the
+   allowed range; warm-up protocol), then each
    session. Respect every profile constraint (equipment load caps, session
    time limits, recovery windows around coach-led sessions and cardio).
 4. **Walk the athlete through it** — the reasoning, not just the tables.

@@ -40,7 +40,7 @@ and check-ins lean on scale-weight trend to correct course.
     that affects the timeline.
 - **Scope check:** even a yes/no entry point ("should the bulk still
   start?") runs the full flow if profile fields are TBD or stale. If the
-  plan on file is current and the athlete is only confirming a penciled
+  plan on file is current and the athlete is only confirming a planned
   phase change, a light confirm-and-record pass is enough.
 
 ## 2. The athlete states the goal
