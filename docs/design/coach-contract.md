@@ -4521,9 +4521,10 @@ Exercise swaps are not affected.
 - Check `program_balance` (warn) runs the static balance on
   `data/program.json`.
 - R-30a's flags are registered in `coach/flags/structure.py` (C20).
-  R-40b, which builds `coach.flags.for_mode` (C44), routes the `structure`
-  reports' flags through it; until then they carry their registered
-  severities.
+  The `structure week`, `structure adherence` and `structure balance`
+  commands route their flags through `coach.flags.for_mode` (C44); the
+  `coach.structure` functions and the `program_balance` check keep the
+  registered severities.
 
 **Built with R-30a** (details the sections above leave open):
 
@@ -4701,8 +4702,10 @@ Rules (R-02's prose, scripted; the prose stays the human copy):
   `return`.
 - The next check-in is deep (`deep_review.due`) when six weeks have passed
   since the last deep close, a light week is being proposed, R-30a's
-  structural flags are raised, a catch-up check-in deferred a due deep
-  review, or on the first close; never because of the light week itself.
+  structural flags are raised (coach mode only: in run mode, C44, no
+  `adherence_trigger` decision is ever recorded to clear them), a
+  catch-up check-in deferred a due deep review, or on the first close;
+  never because of the light week itself.
 
 Status line format:
 
@@ -4828,6 +4831,30 @@ mode = "coach"            # "coach" | "run"
   downgrade happens. It never touches `block` flags. Presenters (R-21a
   card, R-25 brief, R-30a `structure` reports) call it; stored overlays
   keep the original severity.
+
+**Built with R-40b** (details the sections above leave open):
+
+- The table is declared in `coach/config_tables/coaching.py`, which also
+  exports `mode(config)` and the constants `COACH`, `RUN` and `MODES`.
+  Any other value exits 5 naming `[coaching]` and `mode`.
+- `for_mode` returns new flag objects and never changes its input. In run
+  mode a flag whose registered code is structural and whose severity is
+  not `block` comes back at `info` with "run mode: " prefixed once (a
+  message already starting with it is not prefixed again); every other
+  flag, an unregistered code included, is returned as it is. A mode other
+  than `coach` or `run` raises `ValueError`.
+- Callers: `checkin prepare` and the record's Week in review region apply
+  it to the card's flags, after the card parts and before the catch-up
+  card is built; the brief and the dashboard apply it to the week's
+  overlay flags before keeping `block` and `warn` (so a structural flag
+  drops out of Watch and the open-flag count); the three `structure`
+  report commands apply it to their `flags` (C41).
+- The brief's and the dashboard's header line add `run mode` after the
+  phase in run mode.
+- In run mode `block close` and `block status` leave
+  `restructure_required` out of `deep_review.reasons` (C43).
+- `propose week`, the plugins, the validator and `block close`'s
+  light-week rules do not read the mode.
 
 `config suggest --unit kg|lb [--gym commercial|home]` returns
 `data.values` (`[athlete]` and `[equipment]` keys with suggested values)
