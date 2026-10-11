@@ -8,7 +8,9 @@ athlete approves, and config changes go through /goals (ADR-0002).
 """
 
 import copy
+import json
 from datetime import date, timedelta
+from pathlib import Path
 
 from coach import config as config_module
 from coach import dates, jsonio, paths, units
@@ -252,6 +254,23 @@ def _flags(nutrition, series, override, today):
     return flags
 
 
+def current_plan(root, today):
+    """The rendered path of the meal plan whose span holds `today` (the latest-starting one), or None."""
+    directory = Path(root) / paths.MEAL_PLANS_DATA_DIR
+    covering = []
+    for path in sorted(directory.glob("*.json")) if directory.is_dir() else []:
+        try:
+            span = json.loads(path.read_text(encoding="utf-8"))["span"]
+            start, end = dates.parse_date(span["start"]), dates.parse_date(span["end"])
+        except (ValueError, KeyError, TypeError):
+            continue
+        if start <= today <= end:
+            covering.append((start, path.stem))
+    if not covering:
+        return None
+    return (paths.MEAL_PLANS_DIR / f"{max(covering)[1]}.md").as_posix()
+
+
 def status(root, today):
     loaded = config_module.load(root)
     if not enabled(loaded):
@@ -279,6 +298,7 @@ def status(root, today):
         "trend": _trend(series, "trend_weight" if has_app else "scale_weight", weight_unit,
                         nutrition["target_rate_per_week"]),
         "flags": _flags(nutrition, series, override, today),
+        "plan": current_plan(root, today),
     }
     data["brief_line"] = brief_line(data)
     data["questions"] = questions(data)
@@ -306,8 +326,11 @@ def brief_line(status):
         override_text = f"{override['what']}, from {override['start']}"
     else:
         override_text = f"{override['what']}, until {override['expires']}"
-    return (f"Food: protein floor {_num(status['protein']['floor_g'])} g, {last_week} · anchors: {anchors} · "
+    line = (f"Food: protein floor {_num(status['protein']['floor_g'])} g, {last_week} · anchors: {anchors} · "
             f"override: {override_text}")
+    if status.get("plan"):
+        line += f" · plan: {status['plan']}"
+    return line
 
 
 def questions(status):

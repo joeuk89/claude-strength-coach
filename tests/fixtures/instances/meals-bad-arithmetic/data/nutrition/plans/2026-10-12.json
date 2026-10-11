@@ -1,0 +1,864 @@
+{
+  "schema_version": 1,
+  "id": "2026-10-12",
+  "span": {
+    "start": "2026-10-12",
+    "end": "2026-10-18"
+  },
+  "created_at": "2026-10-11T18:00:00Z",
+  "style": "loose",
+  "targets": {
+    "kcal": 2400,
+    "kcal_source": "reading 2026-10-11",
+    "protein_floor_g": 110
+  },
+  "input": {
+    "exceptions": [
+      {
+        "date": "2026-10-14",
+        "slot": "dinner",
+        "entry": {
+          "cover": "out",
+          "kcal": 1100,
+          "protein_g": 45
+        },
+        "note": "birthday"
+      },
+      {
+        "date": "2026-10-18",
+        "slot": "lunch",
+        "entry": {
+          "cover": "roast at a friend's",
+          "kcal": 800,
+          "protein_g": 45
+        }
+      }
+    ],
+    "assignments": [
+      {
+        "date": "2026-10-12",
+        "slot": "lunch",
+        "entry": {
+          "recipe": "turkey-chilli"
+        }
+      },
+      {
+        "date": "2026-10-13",
+        "slot": "lunch",
+        "entry": {
+          "recipe": "chicken-rice-bowl",
+          "variations": [
+            "light"
+          ],
+          "lock": "post-run, must be quick"
+        }
+      },
+      {
+        "date": "2026-10-14",
+        "slot": "lunch",
+        "entry": {
+          "recipe": "turkey-chilli"
+        }
+      },
+      {
+        "date": "2026-10-15",
+        "slot": "lunch",
+        "entry": {
+          "recipe": "chicken-rice-bowl",
+          "variations": [
+            "light"
+          ]
+        }
+      },
+      {
+        "date": "2026-10-16",
+        "slot": "lunch",
+        "entry": {
+          "recipe": "turkey-chilli"
+        }
+      },
+      {
+        "date": "2026-10-17",
+        "slot": "lunch",
+        "entry": {
+          "recipe": "turkey-chilli"
+        }
+      },
+      {
+        "date": "2026-10-16",
+        "slot": "dinner",
+        "entry": {
+          "recipe": "spinach-omelette"
+        }
+      },
+      {
+        "date": "2026-10-17",
+        "slot": "dinner",
+        "entry": {
+          "recipe": "spinach-omelette"
+        }
+      },
+      {
+        "date": "2026-10-18",
+        "slot": "dinner",
+        "entry": {
+          "recipe": "spinach-omelette"
+        }
+      }
+    ],
+    "use_up": [
+      {
+        "item": "spinach",
+        "qty": 100,
+        "unit": "g"
+      }
+    ],
+    "notes": "Batch the chilli on Sunday."
+  },
+  "days": [
+    {
+      "date": "2026-10-12",
+      "office": false,
+      "items": [
+        {
+          "slot": "breakfast",
+          "source": "template",
+          "recipe": "overnight-oats",
+          "title": "Overnight oats",
+          "variations": [],
+          "covered_by": null,
+          "cover": null,
+          "name": null,
+          "skip": false,
+          "lock": null,
+          "note": null,
+          "kcal": 440,
+          "protein_g": 30
+        },
+        {
+          "slot": "lunch",
+          "source": "assignment",
+          "recipe": "turkey-chilli",
+          "title": "Turkey chilli",
+          "variations": [],
+          "covered_by": null,
+          "cover": null,
+          "name": null,
+          "skip": false,
+          "lock": null,
+          "note": null,
+          "kcal": 620,
+          "protein_g": 48
+        },
+        {
+          "slot": "dinner",
+          "source": "template",
+          "recipe": null,
+          "title": null,
+          "variations": [],
+          "covered_by": null,
+          "cover": "family",
+          "name": null,
+          "skip": false,
+          "lock": null,
+          "note": null,
+          "kcal": 900,
+          "protein_g": 40
+        },
+        {
+          "slot": "snack",
+          "source": "anchor",
+          "recipe": null,
+          "title": null,
+          "variations": [],
+          "covered_by": null,
+          "cover": null,
+          "name": "Whey shake",
+          "skip": false,
+          "lock": null,
+          "note": null,
+          "kcal": 150,
+          "protein_g": 30
+        }
+      ],
+      "totals": {
+        "kcal": 2210,
+        "protein_g": 148
+      }
+    },
+    {
+      "date": "2026-10-13",
+      "office": true,
+      "items": [
+        {
+          "slot": "breakfast",
+          "source": "template",
+          "recipe": "overnight-oats",
+          "title": "Overnight oats",
+          "variations": [],
+          "covered_by": null,
+          "cover": null,
+          "name": null,
+          "skip": false,
+          "lock": null,
+          "note": null,
+          "kcal": 440,
+          "protein_g": 30
+        },
+        {
+          "slot": "lunch",
+          "source": "assignment",
+          "recipe": "chicken-rice-bowl",
+          "title": "Chicken + rice bowl",
+          "variations": [
+            "light"
+          ],
+          "covered_by": null,
+          "cover": null,
+          "name": null,
+          "skip": false,
+          "lock": "post-run, must be quick",
+          "note": null,
+          "kcal": 505,
+          "protein_g": 50
+        },
+        {
+          "slot": "dinner",
+          "source": "template",
+          "recipe": null,
+          "title": null,
+          "variations": [],
+          "covered_by": null,
+          "cover": "family",
+          "name": null,
+          "skip": false,
+          "lock": null,
+          "note": null,
+          "kcal": 900,
+          "protein_g": 40
+        },
+        {
+          "slot": "snack",
+          "source": "anchor",
+          "recipe": null,
+          "title": null,
+          "variations": [],
+          "covered_by": null,
+          "cover": null,
+          "name": "Whey shake",
+          "skip": false,
+          "lock": null,
+          "note": null,
+          "kcal": 150,
+          "protein_g": 30
+        }
+      ],
+      "totals": {
+        "kcal": 1995,
+        "protein_g": 150
+      }
+    },
+    {
+      "date": "2026-10-14",
+      "office": false,
+      "items": [
+        {
+          "slot": "breakfast",
+          "source": "template",
+          "recipe": "overnight-oats",
+          "title": "Overnight oats",
+          "variations": [],
+          "covered_by": null,
+          "cover": null,
+          "name": null,
+          "skip": false,
+          "lock": null,
+          "note": null,
+          "kcal": 440,
+          "protein_g": 30
+        },
+        {
+          "slot": "lunch",
+          "source": "assignment",
+          "recipe": "turkey-chilli",
+          "title": "Turkey chilli",
+          "variations": [],
+          "covered_by": null,
+          "cover": null,
+          "name": null,
+          "skip": false,
+          "lock": null,
+          "note": null,
+          "kcal": 620,
+          "protein_g": 48
+        },
+        {
+          "slot": "dinner",
+          "source": "exception",
+          "recipe": null,
+          "title": null,
+          "variations": [],
+          "covered_by": null,
+          "cover": "out",
+          "name": null,
+          "skip": false,
+          "lock": null,
+          "note": "birthday",
+          "kcal": 1100,
+          "protein_g": 45
+        },
+        {
+          "slot": "snack",
+          "source": "anchor",
+          "recipe": null,
+          "title": null,
+          "variations": [],
+          "covered_by": null,
+          "cover": null,
+          "name": "Whey shake",
+          "skip": false,
+          "lock": null,
+          "note": null,
+          "kcal": 150,
+          "protein_g": 30
+        }
+      ],
+      "totals": {
+        "kcal": 2310,
+        "protein_g": 153
+      }
+    },
+    {
+      "date": "2026-10-15",
+      "office": true,
+      "items": [
+        {
+          "slot": "breakfast",
+          "source": "template",
+          "recipe": "overnight-oats",
+          "title": "Overnight oats",
+          "variations": [],
+          "covered_by": null,
+          "cover": null,
+          "name": null,
+          "skip": false,
+          "lock": null,
+          "note": null,
+          "kcal": 440,
+          "protein_g": 30
+        },
+        {
+          "slot": "lunch",
+          "source": "assignment",
+          "recipe": "chicken-rice-bowl",
+          "title": "Chicken + rice bowl",
+          "variations": [
+            "light"
+          ],
+          "covered_by": null,
+          "cover": null,
+          "name": null,
+          "skip": false,
+          "lock": null,
+          "note": null,
+          "kcal": 505,
+          "protein_g": 50
+        },
+        {
+          "slot": "dinner",
+          "source": "template",
+          "recipe": null,
+          "title": null,
+          "variations": [],
+          "covered_by": null,
+          "cover": "family",
+          "name": null,
+          "skip": false,
+          "lock": null,
+          "note": null,
+          "kcal": 900,
+          "protein_g": 40
+        },
+        {
+          "slot": "snack",
+          "source": "anchor",
+          "recipe": null,
+          "title": null,
+          "variations": [],
+          "covered_by": null,
+          "cover": null,
+          "name": "Whey shake",
+          "skip": false,
+          "lock": null,
+          "note": null,
+          "kcal": 150,
+          "protein_g": 30
+        }
+      ],
+      "totals": {
+        "kcal": 1995,
+        "protein_g": 150
+      }
+    },
+    {
+      "date": "2026-10-16",
+      "office": false,
+      "items": [
+        {
+          "slot": "breakfast",
+          "source": "template",
+          "recipe": "overnight-oats",
+          "title": "Overnight oats",
+          "variations": [],
+          "covered_by": null,
+          "cover": null,
+          "name": null,
+          "skip": false,
+          "lock": null,
+          "note": null,
+          "kcal": 440,
+          "protein_g": 30
+        },
+        {
+          "slot": "lunch",
+          "source": "assignment",
+          "recipe": "turkey-chilli",
+          "title": "Turkey chilli",
+          "variations": [],
+          "covered_by": null,
+          "cover": null,
+          "name": null,
+          "skip": false,
+          "lock": null,
+          "note": null,
+          "kcal": 620,
+          "protein_g": 48
+        },
+        {
+          "slot": "dinner",
+          "source": "assignment",
+          "recipe": "spinach-omelette",
+          "title": "Spinach omelette",
+          "variations": [],
+          "covered_by": null,
+          "cover": null,
+          "name": null,
+          "skip": false,
+          "lock": null,
+          "note": null,
+          "kcal": 330,
+          "protein_g": 26
+        },
+        {
+          "slot": "snack",
+          "source": "anchor",
+          "recipe": null,
+          "title": null,
+          "variations": [],
+          "covered_by": null,
+          "cover": null,
+          "name": "Whey shake",
+          "skip": false,
+          "lock": null,
+          "note": null,
+          "kcal": 150,
+          "protein_g": 30
+        }
+      ],
+      "totals": {
+        "kcal": 1540,
+        "protein_g": 134
+      }
+    },
+    {
+      "date": "2026-10-17",
+      "office": false,
+      "items": [
+        {
+          "slot": "breakfast",
+          "source": "template",
+          "recipe": "overnight-oats",
+          "title": "Overnight oats",
+          "variations": [],
+          "covered_by": null,
+          "cover": null,
+          "name": null,
+          "skip": false,
+          "lock": null,
+          "note": null,
+          "kcal": 440,
+          "protein_g": 30
+        },
+        {
+          "slot": "lunch",
+          "source": "assignment",
+          "recipe": "turkey-chilli",
+          "title": "Turkey chilli",
+          "variations": [],
+          "covered_by": null,
+          "cover": null,
+          "name": null,
+          "skip": false,
+          "lock": null,
+          "note": null,
+          "kcal": 620,
+          "protein_g": 48
+        },
+        {
+          "slot": "dinner",
+          "source": "assignment",
+          "recipe": "spinach-omelette",
+          "title": "Spinach omelette",
+          "variations": [],
+          "covered_by": null,
+          "cover": null,
+          "name": null,
+          "skip": false,
+          "lock": null,
+          "note": null,
+          "kcal": 330,
+          "protein_g": 26
+        },
+        {
+          "slot": "snack",
+          "source": "anchor",
+          "recipe": null,
+          "title": null,
+          "variations": [],
+          "covered_by": null,
+          "cover": null,
+          "name": "Whey shake",
+          "skip": false,
+          "lock": null,
+          "note": null,
+          "kcal": 150,
+          "protein_g": 30
+        }
+      ],
+      "totals": {
+        "kcal": 1540,
+        "protein_g": 134
+      }
+    },
+    {
+      "date": "2026-10-18",
+      "office": false,
+      "items": [
+        {
+          "slot": "breakfast",
+          "source": "template",
+          "recipe": "overnight-oats",
+          "title": "Overnight oats",
+          "variations": [],
+          "covered_by": null,
+          "cover": null,
+          "name": null,
+          "skip": false,
+          "lock": null,
+          "note": null,
+          "kcal": 440,
+          "protein_g": 30
+        },
+        {
+          "slot": "lunch",
+          "source": "exception",
+          "recipe": null,
+          "title": null,
+          "variations": [],
+          "covered_by": null,
+          "cover": "roast at a friend's",
+          "name": null,
+          "skip": false,
+          "lock": null,
+          "note": null,
+          "kcal": 800,
+          "protein_g": 45
+        },
+        {
+          "slot": "dinner",
+          "source": "assignment",
+          "recipe": "spinach-omelette",
+          "title": "Spinach omelette",
+          "variations": [],
+          "covered_by": null,
+          "cover": null,
+          "name": null,
+          "skip": false,
+          "lock": null,
+          "note": null,
+          "kcal": 330,
+          "protein_g": 26
+        },
+        {
+          "slot": "snack",
+          "source": "anchor",
+          "recipe": null,
+          "title": null,
+          "variations": [],
+          "covered_by": null,
+          "cover": null,
+          "name": "Whey shake",
+          "skip": false,
+          "lock": null,
+          "note": null,
+          "kcal": 150,
+          "protein_g": 30
+        }
+      ],
+      "totals": {
+        "kcal": 1720,
+        "protein_g": 131
+      }
+    }
+  ],
+  "pool": [
+    {
+      "recipe": "chicken-rice-bowl",
+      "title": "Chicken + rice bowl",
+      "variations": [
+        "light"
+      ],
+      "count": 2,
+      "covered_by": null,
+      "servings": 1,
+      "batches": 2,
+      "kcal": 505,
+      "protein_g": 50
+    },
+    {
+      "recipe": "overnight-oats",
+      "title": "Overnight oats",
+      "variations": [],
+      "count": 7,
+      "covered_by": null,
+      "servings": 1,
+      "batches": 7,
+      "kcal": 440,
+      "protein_g": 30
+    },
+    {
+      "recipe": "spinach-omelette",
+      "title": "Spinach omelette",
+      "variations": [],
+      "count": 3,
+      "covered_by": null,
+      "servings": 1,
+      "batches": 3,
+      "kcal": 330,
+      "protein_g": 26
+    },
+    {
+      "recipe": "turkey-chilli",
+      "title": "Turkey chilli",
+      "variations": [],
+      "count": 4,
+      "covered_by": null,
+      "servings": 4,
+      "batches": 1,
+      "kcal": 620,
+      "protein_g": 48
+    }
+  ],
+  "shopping": {
+    "buy": [
+      {
+        "aisle": "produce",
+        "item": "cherry tomatoes",
+        "qty": 12,
+        "unit": "each",
+        "for": [
+          "chicken-rice-bowl"
+        ]
+      },
+      {
+        "aisle": "produce",
+        "item": "mixed salad leaves",
+        "qty": 160,
+        "unit": "g",
+        "for": [
+          "chicken-rice-bowl"
+        ]
+      },
+      {
+        "aisle": "produce",
+        "item": "onion",
+        "qty": 1,
+        "unit": "each",
+        "for": [
+          "turkey-chilli"
+        ]
+      },
+      {
+        "aisle": "produce",
+        "item": "spinach",
+        "qty": 140,
+        "unit": "g",
+        "for": [
+          "spinach-omelette"
+        ]
+      },
+      {
+        "aisle": "meat-fish",
+        "item": "chicken breast, cooked",
+        "qty": 340,
+        "unit": "g",
+        "for": [
+          "chicken-rice-bowl"
+        ]
+      },
+      {
+        "aisle": "meat-fish",
+        "item": "turkey mince, 5% fat",
+        "qty": 500,
+        "unit": "g",
+        "for": [
+          "turkey-chilli"
+        ]
+      },
+      {
+        "aisle": "dairy-eggs",
+        "item": "0% greek yoghurt",
+        "qty": 1050,
+        "unit": "g",
+        "for": [
+          "overnight-oats"
+        ]
+      },
+      {
+        "aisle": "dairy-eggs",
+        "item": "cheddar",
+        "qty": 60,
+        "unit": "g",
+        "for": [
+          "spinach-omelette"
+        ]
+      },
+      {
+        "aisle": "dairy-eggs",
+        "item": "semi-skimmed milk",
+        "qty": 1400,
+        "unit": "ml",
+        "for": [
+          "overnight-oats"
+        ]
+      },
+      {
+        "aisle": "tins-jars-dry",
+        "item": "basmati rice",
+        "qty": 300,
+        "unit": "g",
+        "for": [
+          "turkey-chilli"
+        ]
+      },
+      {
+        "aisle": "tins-jars-dry",
+        "item": "chopped tomatoes, tin",
+        "qty": 2,
+        "unit": "each",
+        "for": [
+          "turkey-chilli"
+        ]
+      },
+      {
+        "aisle": "tins-jars-dry",
+        "item": "honey",
+        "qty": 7,
+        "unit": "tsp",
+        "for": [
+          "overnight-oats"
+        ]
+      },
+      {
+        "aisle": "tins-jars-dry",
+        "item": "kidney beans, tin",
+        "qty": 1,
+        "unit": "each",
+        "for": [
+          "turkey-chilli"
+        ]
+      },
+      {
+        "aisle": "tins-jars-dry",
+        "item": "microwave basmati rice pouch",
+        "qty": 1,
+        "unit": "each",
+        "for": [
+          "chicken-rice-bowl"
+        ]
+      }
+    ],
+    "check": [
+      {
+        "item": "eggs",
+        "qty": 9,
+        "unit": "each"
+      },
+      {
+        "item": "rolled oats",
+        "qty": 420,
+        "unit": "g"
+      },
+      {
+        "item": "olive oil",
+        "qty": 1,
+        "unit": "tbsp"
+      }
+    ],
+    "used_up": [
+      {
+        "item": "spinach",
+        "qty": 100,
+        "unit": "g"
+      }
+    ]
+  },
+  "flags": [
+    {
+      "code": "kcal_off_target",
+      "severity": "warn",
+      "date": "2026-10-13",
+      "slot": null,
+      "message": "Tue 13 Oct: 1995 kcal is 17% under the 2400 kcal target (tolerance 15%).",
+      "resolved": false,
+      "resolution": null
+    },
+    {
+      "code": "kcal_off_target",
+      "severity": "warn",
+      "date": "2026-10-15",
+      "slot": null,
+      "message": "Thu 15 Oct: 1995 kcal is 17% under the 2400 kcal target (tolerance 15%).",
+      "resolved": false,
+      "resolution": null
+    },
+    {
+      "code": "kcal_off_target",
+      "severity": "warn",
+      "date": "2026-10-16",
+      "slot": null,
+      "message": "Fri 16 Oct: 1540 kcal is 36% under the 2400 kcal target (tolerance 15%).",
+      "resolved": false,
+      "resolution": null
+    },
+    {
+      "code": "kcal_off_target",
+      "severity": "warn",
+      "date": "2026-10-17",
+      "slot": null,
+      "message": "Sat 17 Oct: 1540 kcal is 36% under the 2400 kcal target (tolerance 15%).",
+      "resolved": false,
+      "resolution": null
+    },
+    {
+      "code": "kcal_off_target",
+      "severity": "warn",
+      "date": "2026-10-18",
+      "slot": null,
+      "message": "Sun 18 Oct: 1720 kcal is 28% under the 2400 kcal target (tolerance 15%).",
+      "resolved": false,
+      "resolution": null
+    }
+  ],
+  "approval": null
+}

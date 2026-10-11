@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Meal plan draft: a week's exceptions to the standing template, handed to meals build (contract C34)",
+  "type": "object",
+  "required": ["span"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"type": "integer", "const": 1},
+    "span": {"$ref": "#/$defs/span"},
+    "exceptions": {"type": "array", "items": {"$ref": "#/$defs/exception"}},
+    "assignments": {"type": "array", "items": {"$ref": "#/$defs/assignment"}},
+    "use_up": {"type": "array", "items": {"$ref": "#/$defs/use_up"}},
+    "notes": {"type": ["string", "null"]}
+  },
+  "$defs": {
+    "date": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+    "slot": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+    "span": {
+      "type": "object",
+      "required": ["start", "end"],
+      "additionalProperties": false,
+      "properties": {"start": {"$ref": "#/$defs/date"}, "end": {"$ref": "#/$defs/date"}}
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "recipe": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+        "variations": {"type": "array", "items": {"type": "string"}},
+        "covered_by": {"type": ["string", "null"]},
+        "lock": {"type": ["string", "null"]},
+        "cover": {"type": "string"},
+        "kcal": {"type": "number", "minimum": 0},
+        "protein_g": {"type": "number", "minimum": 0},
+        "skip": {"type": "boolean"}
+      }
+    },
+    "exception": {
+      "type": "object",
+      "required": ["date"],
+      "additionalProperties": false,
+      "properties": {
+        "date": {"$ref": "#/$defs/date"},
+        "slot": {"$ref": "#/$defs/slot"},
+        "entry": {"$ref": "#/$defs/entry"},
+        "office": {"type": "boolean"},
+        "note": {"type": ["string", "null"]}
+      }
+    },
+    "assignment": {
+      "type": "object",
+      "required": ["date", "slot", "entry"],
+      "additionalProperties": false,
+      "properties": {
+        "date": {"$ref": "#/$defs/date"},
+        "slot": {"$ref": "#/$defs/slot"},
+        "entry": {"$ref": "#/$defs/entry"},
+        "note": {"type": ["string", "null"]}
+      }
+    },
+    "use_up": {
+      "type": "object",
+      "required": ["item", "qty", "unit"],
+      "additionalProperties": false,
+      "properties": {
+        "item": {"type": "string"},
+        "qty": {"type": "number", "minimum": 0},
+        "unit": {"enum": ["g", "ml", "each", "tsp", "tbsp"]}
+      }
+    }
+  }
+}
