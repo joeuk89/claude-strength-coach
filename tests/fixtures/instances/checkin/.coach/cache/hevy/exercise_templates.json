@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "fetched_at": "2026-10-11T12:00:00Z",
+  "source": "hevy",
+  "data": [
+    {
+      "id": "F0000001",
+      "title": "Squat (Barbell)",
+      "type": "weight_reps",
+      "primary_muscle_group": "quadriceps",
+      "secondary_muscle_groups": [
+        "glutes",
+        "hamstrings"
+      ],
+      "equipment": "barbell",
+      "is_custom": false,
+      "thumbnail_url": null
+    },
+    {
+      "id": "F0000002",
+      "title": "Bench Press (Dumbbell)",
+      "type": "weight_reps",
+      "primary_muscle_group": "chest",
+      "secondary_muscle_groups": [
+        "triceps",
+        "shoulders"
+      ],
+      "equipment": "dumbbell",
+      "is_custom": false,
+      "thumbnail_url": null
+    },
+    {
+      "id": "F0000003",
+      "title": "Single Arm Row (Dumbbell)",
+      "type": "weight_reps",
+      "primary_muscle_group": "upper_back",
+      "secondary_muscle_groups": [
+        "lats",
+        "biceps"
+      ],
+      "equipment": "dumbbell",
+      "is_custom": false,
+      "thumbnail_url": null
+    },
+    {
+      "id": "F0000004",
+      "title": "Pull Up",
+      "type": "bodyweight_reps",
+      "primary_muscle_group": "lats",
+      "secondary_muscle_groups": [
+        "biceps",
+        "upper_back"
+      ],
+      "equipment": "none",
+      "is_custom": false,
+      "thumbnail_url": null
+    }
+  ]
+}
