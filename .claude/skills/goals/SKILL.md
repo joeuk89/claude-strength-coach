@@ -71,6 +71,12 @@ triggers the next phase** (a date, a weight, a look, a strength
 milestone). Conditional triggers are fine — record the condition, and the
 check-in that observes it fire records the phase change.
 
+**A goal or trigger that uses waist, body fat or progress photos is
+measured at deep check-ins only** — when the last reading is 4 or more
+weeks old, never weekly. Say so when agreeing it, so the athlete knows
+when it will be checked. Photos stay with the athlete; the coach records
+only their one-line read.
+
 ## 4. Output the nutrition setup
 
 **MacroFactor users:** give exact setup steps — goal type
@@ -100,7 +106,9 @@ side.
 
 Update the **Nutrition & goals** section of `profile.md` (phase, goal,
 trend rate, targets, app config summary, revision date) — with the
-athlete's confirmation, like any profile edit. **If the phase is written
+athlete's confirmation, like any profile edit. A goal or trigger that
+uses waist, body fat or photos is recorded with "(measured at deep
+check-ins)" beside it. **If the phase is written
 in more than one place, sync them all in the same edit** (e.g. a phase
 word in `routine/program.md`'s header). Bump `profile.md`'s
 `_Last reviewed_` date. Check-ins take it from here: they track the trend

@@ -131,6 +131,20 @@ Check-in for <window> (<weekly|deep> — <reason>).
 **Deep tier:** the same message. Any deep-only asks follow the last field,
 numbered on.
 
+**Body composition** (waist, body fat, progress photos) is a deep-only
+ask, never a weekly one. Ask it only when both hold:
+
+- the goals or a phase trigger in `profile.md` use waist, body fat or
+  photos, or the phase is a cut or recomp; and
+- no deep record has a reading yet, or the last reading is 4 or more
+  weeks old (the newest deep record's **Body composition** line says).
+
+Ask for waist, a body-fat reading if they have one, and their own
+one-line read of their progress photos. **Photos stay with the athlete
+and never go into the repo** — record only their read. A reading the
+reply leaves out is recorded once as "not supplied" and not asked again
+before the next deep check-in.
+
 **Rotation position.** If the program rotates, infer where the coming
 week lands and state it for confirmation — never ask it as its own
 question. Sources, in order: the coach-led session's log, the
@@ -218,6 +232,10 @@ check-ins against the target trend rate in `profile.md`.
 If `profile.md` shows nutrition setup still TBD, just record the scale
 weight and prompt `/goals` to get set up.
 
+**Deep tier, body composition:** when the reply carries a reading, read
+it against the goal or phase trigger that uses it and against the last
+reading. A trigger that fires sends the athlete to `/goals`.
+
 If a dated plan in `nutrition/` covers (part of) this window, the Meal
 plan field said how it went — note learnings for the next `/meal-plan`
 run (recipe-bank changes belong in `/recipes`, not here).
@@ -263,7 +281,18 @@ Deep records use the same skeleton titled `(deep)`, with **Training**
 expanded to the full analysis (e1RM trends per lift, drift, balance,
 intensity honesty) and a **Block planning** section: deload timing,
 whether the goals/phase plan in `profile.md` is stale (if so, prompt
-`/goals`), and what the next block should emphasize.
+`/goals`), and what the next block should emphasize. When body
+composition applies (step 3), Block planning ends with one line that
+says when the next reading is due — the next check-in reads it:
+
+```markdown
+**Body composition:** waist <reading or "not supplied"> · body fat <reading or "not supplied"> · photos: "<athlete's one-line read>" · **Last reading:** <date> · **Next reading due:** first deep check-in on or after <last reading + 4 weeks>
+```
+
+A reading taken today makes today the **Last reading** date. Nothing
+supplied, or not asked because it wasn't due, carries the previous
+**Last reading** date forward; with no reading ever, write "none" and
+make the next deep check-in the due one.
 
 ## 7. Act on it
 
