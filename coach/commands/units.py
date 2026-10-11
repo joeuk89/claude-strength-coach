@@ -22,11 +22,12 @@ def _load(value, mode, unit):
 @command(
     "units format",
     help="Build a load object and the text every page prints for it",
-    args=(_MODE, arg("--value", type=float, help="per hand for per-hand modes, else the total"), _UNIT),
+    args=(_MODE, arg("--value", type=float, help="per hand for per-hand modes, else the total"), _UNIT,
+          arg("--no-hevy", action="store_true", help="leave the Hevy value out, as pages do with Hevy off")),
 )
 def units_format(args, ctx):
     load = _load(args.value, args.mode, _unit(args, ctx))
-    return {"text": units.format_load(load) if load else None, "load": load}
+    return {"text": units.format_load(load, show_hevy=not args.no_hevy) if load else None, "load": load}
 
 
 @command(
