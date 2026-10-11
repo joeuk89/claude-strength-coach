@@ -305,6 +305,29 @@ or the athlete. Its record says whether it is intervals, tempo,
 threshold, hills or a race.
 _Avoid_: planned session (a session is a program template), planned run
 
+**Quality activity**:
+An activity hard enough to count against the weekly quality cap and to
+need an easy day either side: any conditioning; otherwise a session RPE
+of 7 or more when the athlete gave one; otherwise what its matched
+planned activity says; otherwise a name saying intervals, tempo,
+threshold, hills, fartlek, track or race. The rule that decided is
+reported with it.
+_Avoid_: hard run, hard session, workout (reserved for logged lifting)
+
+**Status day**:
+A day the athlete was ill, injured or travelling, recorded as a dated
+row that is withdrawn, never deleted, when wrong. An ill status day in
+the gap before a session brings in the illness return rule, exactly as
+an `ill` miss tag does; travel only explains the gap.
+_Avoid_: sick day, day off (a rest day is not a status day), miss tag
+
+**Cardio tier**:
+Who owns the run plan: `count` (no plan; logged cardio is only counted),
+`review` (an outside plan or the athlete's, reconciled against what was
+logged) or `program` (the coach writes the planned activities). How much
+the data says comes from the activity sources, not the tier.
+_Avoid_: cardio mode, cardio level
+
 **Research note**:
 A dated, cited answer to one coaching question, with a confidence and a
 review-by date (`review_by`), that the coach consults before deciding in

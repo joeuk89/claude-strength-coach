@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "niggles": [
+    {
+      "id": "n-0001",
+      "area": "left knee",
+      "first_noted": "2026-10-11",
+      "last_noted": "2026-10-11",
+      "mentions": 1,
+      "status": "watching",
+      "notes": null,
+      "applies_to": {
+        "patterns": [],
+        "exercises": [],
+        "activity_kinds": [
+          "run"
+        ]
+      },
+      "constraints": [],
+      "constrain_while": [
+        "aggravated",
+        "watching"
+      ],
+      "history": [
+        {
+          "date": "2026-10-11",
+          "status": "watching",
+          "note": "sore after long runs"
+        }
+      ]
+    }
+  ]
+}

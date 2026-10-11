@@ -17,7 +17,7 @@ from pathlib import Path
 from coach import config as config_module
 from coach import constraints as constraints_module
 from coach import dates, decisions, flags, followups, history, jsonio, niggles, overlay, paths, patterns, plugins
-from coach import program, research
+from coach import cardio, program, research, weekflags
 from coach import state as state_module
 from coach import stats, units, validity
 from coach.checks.instance import cap_for
@@ -780,6 +780,7 @@ def propose_week(root, config, today, now, span, kind="weekly", transform_name=N
     }
     doc = overlay.build(draft, config, root=root, now=now)
     doc["flags"] = validity.merge_flags(doc, validity.check_overlay(root, doc))
+    doc["flags"] += _week_flags(root, config, today, span, doc)
     draft = dict(draft, id=doc["id"], flags=doc["flags"])
     meta = {
         "id": doc["id"], "kind": kind, "span": span.to_json(), "transform": transform[0].name if transform else None,
@@ -798,6 +799,12 @@ def propose_week(root, config, today, now, span, kind="weekly", transform_name=N
         "lines_digest": jsonio.canonical_hash(lines), "settled": settled, "rotation": found.rotation,
         "written": not dry_run,
     }
+
+
+def _week_flags(root, config, today, span, doc):
+    """Step 5a: every week-flag provider's flags for the draft's span (C24, C49)."""
+    bouts = tuple(cardio.bouts(root, span, "proposal", overlay=doc, today=today))
+    return weekflags.run(weekflags.WeekFlagContext(root, today, span, "proposal", config, doc, bouts))
 
 
 def _write_state(root, doc, program_doc):

@@ -1288,6 +1288,7 @@ Unless stated, each is a copy of `valid/` plus what is listed.
 | `hevy-fresh/` | R-12 | `valid/`'s `config.toml` and a cache `meta.json` with the last pull at 2026-10-11T12:00:00Z (6 hours before `COACH_NOW`) |
 | `hevy-stale/` | R-12 | the same with the last pull at 2026-10-09T12:00:00Z (54 hours) |
 | `cardio/` | R-43 | see C50 |
+| `cardio-invalid/` | R-43 | not a copy of `valid/`: its config with `[cardio] spike_ratio = 1.0` and `sleep_debt_nights = 8`, and a `data/status-days.json` with a row ending before it starts and two open-ended `injured` rows |
 | `activity-bad-record/` | R-42a | not a copy of `valid/`: the valid config and an `activities.jsonl` whose line 2 has an unknown field `heart_zone` |
 | `activity-wellness-misplaced/` | R-42a | not a copy of `valid/`: the valid config (`wellness_in_git` left false) and the wellness file at `data/activity/wellness.jsonl` |
 | `research-bad/` | R-32a | not a copy of `valid/`: the valid config; `fixture-dose` with a hand-edited claims table; `fixture-broken` with two claims numbered 1; `fixture-old` expired 2026-10-01 (area `sleep`); `reference/fixture-guide.md` citing a missing claim |
@@ -3769,8 +3770,8 @@ def contribute(ctx: CardContext) -> Contribution | None
   from nutrition data here.
 - Expected parts from later items: R-27 (`niggles` field from `niggles
   list`; due follow-ups as facts; `niggle_escalate`), R-30a and R-31
-  (`tier_reasons`), R-42a and R-43 (`runs`, `sleep` stated from activity
-  sources).
+  (`tier_reasons`), R-43 (part `cardio`: `runs`, `sleep` stated from
+  activity sources, and the week-flag providers' flags; C49).
 
 **Record skeleton.** `checkin skeleton --date D [--tier T] [--overlay ID]`
 writes `check-ins/D.md` when absent (exit 1 when present, unless
@@ -5034,9 +5035,10 @@ weekly_run_distance = 0        # caps; 0 = no cap
 weekly_run_minutes = 0
 single_run_distance = 0
 single_run_minutes = 0
-weekly_quality = 2             # quality activities per week, runs and conditioning together
+weekly_quality = 2             # quality activities per week, runs and conditioning together; 0 = no cap
 spike_ratio = 1.10             # run_volume_spike above this × the longest run in the lookback
 spike_lookback_days = 30
+spike_min_history_days = 14    # a run is judged only once the store's first activity is this far before it
 sleep_short_hours = 7.0        # a night below this is short
 sleep_debt_nights = 4          # short nights of the last 7 that raise sleep_debt
 sleep_min_nights = 4           # nights with data needed to judge
@@ -5078,23 +5080,39 @@ external_session_rpe = 6
 
 - The combined figure is information only. No flag reads it, and no ratio
   of it is ever computed.
-- `coach.cardio.week(root, week) -> dict`, mirrored by `cardio week`:
+- Check `cardio_config` (fail, naming the key): caps 0 or more,
+  `spike_ratio` above 1, `spike_lookback_days` at least 1,
+  `spike_min_history_days` 0 to `spike_lookback_days`,
+  `sleep_short_hours` above 0 and at most 24, `sleep_debt_nights` and
+  `sleep_min_nights` 1 to 7, `reconcile_move_days` and
+  `external_session_minutes` 0 or more, `quality_rpe_min` and
+  `external_session_rpe` 0 to 10. Unknown keys and an unknown `tier` or
+  `distance_unit` stay load errors (exit 5).
+- `coach.cardio.week(root, week) -> dict`, mirrored by `cardio week`
+  (`week` is a label, a date or any `Span`; a span that is not one week
+  has `"week": null`; the card part passes its window):
 
 ```json
-{"week": "2026-W41", "tier": "review", "distance_unit": "km",
+{"week": "2026-W41", "span": {"start": "2026-10-05", "end": "2026-10-11"}, "tier": "review",
+ "distance_unit": "km", "activity_source": true,
  "lifting": {"workouts": 2, "hard_sets": 26, "minutes": 115},
  "external": {"done": 0},
  "run": {"count": 2, "distance": 18.5, "minutes": 110, "quality": 1},
  "conditioning": {"count": 1, "minutes": 20},
  "other": {"ride": {"count": 1, "minutes": 45}},
  "srpe": {"total": 1810, "by_method": {"athlete": 3, "lifting_sets": 2, "kind_default": 1}},
- "bouts": [{"ref": "manual:2026-10-06-run-1", "date": "2026-10-06", "kind": "run",
+ "bouts": [{"ref": "manual:2026-10-06-run-1", "date": "2026-10-06", "kind": "run", "session_id": null,
             "minutes": 40, "distance": 7, "quality": true, "quality_basis": "rpe",
             "srpe": {"rpe": 8, "load": 320, "method": "athlete"}}]}
 ```
 
-  `hard_sets` is the week's total of C18 hard sets (not a per-muscle sum).
-  `minutes` for lifting come from C18 durations.
+  `hard_sets` is the week's total of C18 hard sets (not a per-muscle sum)
+  over exercises the library resolved, as C18 counts them. `minutes` for
+  lifting come from C18 durations. Lifting and coach-led bouts have
+  `quality: false` and `quality_basis: null`; workouts of a conditioning
+  session (C17) are not lifting, they arrive as Activities. `srpe.rpe`
+  for `lifting_sets` is the mean of the RPEs given, to 2 decimals;
+  loads are rounded to 1 decimal.
 
 ## C49. Bouts, reconcile and cardio flags (R-43; R-21a, R-25, R-31, R-44a, R-44b read)
 
@@ -5115,12 +5133,25 @@ class Bout:
     quality: bool
     quality_basis: str | None
 
-coach.cardio.bouts(root, span, mode, overlay=None) -> list[Bout]
+coach.cardio.bouts(root, span, mode, overlay=None, today=None) -> list[Bout]
 #   mode "logged":   C17 workouts, C30 activities, C17 `external` annotations marked done
-#   mode "proposal": the overlay's sessions, planned activities (tier review|program),
-#                    external sessions placed by the schedule rule
-coach.cardio.match(planned, logged, move_days) -> list[dict]   # the reconcile matcher; R-44b reuses it
+#   mode "proposal": the overlay's sessions (kind "conditioning" for a conditioning session, else
+#                    "lifting"; ref "<overlay id>/<session id>", minutes None), external sessions
+#                    placed on their `weekday`, and at tier review|program the planned activities
+#                    no logged Activity matched; with `today`, only dates from today on.
+#                    No logged bouts: `evaluate` reads those itself (see Flags)
+coach.cardio.match(planned, logged, move_days, today=None) -> list[dict]   # the reconcile matcher; R-44b reuses it
+#   planned: C30 planned records; logged: resolved Activities. With today None every
+#   unmatched plan is "missed".
+coach.cardio.flag_bouts(root, config, span, today) -> list[Bout]   # what `cardio flags` judges
+coach.cardio.evaluate(ctx) -> {"flags": [...], "skipped": [...]}  # every C49 rule; the provider returns "flags"
+coach.cardio.evaluation_date(ctx) -> date   # the last night the `sleep_debt` flag judges
 ```
+
+`Bout.to_json()` gives the dataclass as JSON (dates `YYYY-MM-DD`,
+timestamps C7). A logged coach-led bout's `ref` is its annotation id
+and its `session_id` the external id; a placed one uses the external id
+for both.
 
 **Reconcile** (`cardio reconcile --week W`, tiers `review` and
 `program`; at `count` it returns `{"tier": "count", "items": []}`):
@@ -5129,9 +5160,15 @@ coach.cardio.match(planned, logged, move_days) -> list[dict]   # the reconcile m
   `reconcile_move_days`, nearest first, ties to the earlier activity →
   `moved` (with `moved_days`). Unmatched planned before today → `missed`;
   today or later → `upcoming`. Unmatched activities → `extra`.
-- Each item: `{status, planned_id, activity_id, date, kind, title,
-  target: {...}, actual: {distance_meters, duration_seconds},
-  delta: {distance_meters, duration_seconds}, quality}`.
+- Each item: `{status, planned_id, activity_id, date, activity_date,
+  moved_days, kind, title, target: {...}, actual: {distance_meters,
+  duration_seconds}, delta: {distance_meters, duration_seconds},
+  quality}`. `date` is the plan's date (an `extra` item's own date);
+  `activity_date` is the matched or extra Activity's; `moved_days` is
+  the Activity's date minus the plan's, set only on `moved`; `delta` is
+  actual minus target where both exist. An `extra` item's `quality` is
+  the C48 rule's; a planned item's is the plan's. The output adds
+  `summary`, counts by status.
 - Planned activities from several sources are not merged (C30); each
   matches on its own, so a duplicate plan shows one `done` and one
   `missed`.
@@ -5143,18 +5180,30 @@ week-flag provider in `propose week`; registered in
 | Code | Rule |
 |---|---|
 | `cap_breach` | Logged week, and planned week at `review`/`program`: run distance or minutes above the weekly cap; any single run above the single-run cap; quality activities above `weekly_quality`. One flag per cap broken, naming value, cap and unit. A planned record with only a duration target is checked on minutes only. |
-| `run_volume_spike` | A run whose distance (else minutes) exceeds `spike_ratio` × the longest logged run in the `spike_lookback_days` before its date. Warn logged, info planned. No reference run, or store history shorter than the lookback: listed in `data.skipped`, not flagged. |
+| `run_volume_spike` | A run whose distance (else minutes) exceeds `spike_ratio` × the longest logged run in the `spike_lookback_days` before its date. Warn logged, info planned. No reference run, or store history shorter than the lookback (the store's first logged Activity, any kind, is fewer than `spike_min_history_days` before the run): listed in `data.skipped` with the reason, not flagged. |
 | `quality_stack` | Two quality bouts on the same or consecutive local dates, logged or planned. Lifting is not part of it; lifting against runs is `collision` (C51). |
-| `sleep_debt` | Over the 7 nights ending on the evaluation date (C30 wellness, resolved): at least `sleep_min_nights` with a value and at least `sleep_debt_nights` below `sleep_short_hours`. Evaluation date: the week's last day for `--week`, today for proposals. |
+| `sleep_debt` | Over the 7 nights ending on the evaluation date (C30 wellness, resolved): at least `sleep_min_nights` with a value and at least `sleep_debt_nights` below `sleep_short_hours`. Evaluation date: the span's last day for `--week` and `--span`, or today when the span ends later; today for proposals. |
 | `status_active` | A status day overlaps the span or today. Warn `ill`/`injured` (`injured` adds "check with a qualified professional"), info `travel`. |
 | `niggle_link` | An active niggle's `applies_to.activity_kinds` holds the kind of a logged or planned activity in the span. The message gives the count and distance of those activities. |
 
+In proposal mode, `evaluate` also reads the logged activities in the
+span's C7 week dated before the span starts, so a midweek draft is judged
+with the week's runs so far. They count toward that week's
+`cap_breach` totals (run distance, run minutes, quality activities) and
+as `quality_stack` neighbours. The single-run caps judge only the span's
+bouts, and a pair of two earlier activities is not flagged again.
+
 `coach.cardio.sleep_debt(root, span) -> bool | None` is the one reader of
-the sleep rule: it judges the 7 nights ending on `span.end` of whatever
-span the caller passes (R-31 passes the configured week from
-`coach.dates`), returns None when `[activity]` is off or fewer than
-`sleep_min_nights` nights have data, and the `sleep_debt` flag is raised
-exactly when it returns True. R-31 calls it for its poor-sleep trigger.
+the sleep rule for other items: it judges the 7 nights ending on
+`span.end` of whatever span the caller passes (R-31 passes the configured
+week from `coach.dates`), and returns None when `[activity]` is off or
+fewer than `sleep_min_nights` nights have data. The `sleep_debt` flag
+judges the nights ending on the evaluation date
+(`coach.cardio.evaluation_date(ctx)`) instead. For a span ending on or
+before today the two agree: the flag is raised exactly when
+`sleep_debt(root, span)` returns True. For a span ending later they can
+differ, because `sleep_debt` does not clamp to today. R-31 calls it for
+its poor-sleep trigger.
 
 **Week-flag providers.** `coach/weekflags/<name>.py`, discovered with
 `pkgutil.iter_modules`:
@@ -5169,8 +5218,15 @@ def flags(ctx: WeekFlagContext) -> list[dict]     # coach.flags.make(...) result
 `propose week` runs every provider at C24 step 5a and appends their flags
 to the overlay. `cardio flags` runs them over the span with logged bouts
 dated up to today and, at `review`/`program`, planned bouts dated today or
-later. A provider that raises fails the command (exit 9); it is never
-skipped silently.
+later that no logged Activity matched. A provider that raises fails the
+command (exit 9); it is never skipped silently. `cardio flags` returns
+`{span, tier, today, sleep_judged_to, flags, skipped, bouts}`; `skipped`
+lists the runs `run_volume_spike` could not judge (`{ref, date, source,
+reason}`). With `[activity] enabled = false` only `status_active` can
+fire. R-43's card part `cardio` (C36) owns the `runs` and `sleep`
+fields: the window's runs from `week`, plans `reconcile` found missed,
+the last seven nights when `sleep_min_nights` have data (else the
+builtin ask), and every provider's flags over the window.
 
 **Render.** `cardio render --week W [--into FILE]` prints the weekly
 numbers, the reconcile table (when the tier has one) and the flags, as
@@ -5196,12 +5252,16 @@ absent. No freshness check: the block is a snapshot.
   `status-days end`. `withdrawn`: null or `{"at": ts, "reason": "..."}`.
 - Ids `s-NNNN`, never reused. Rows are never deleted; a wrong one is
   withdrawn.
-- `status-days add --kind K --from D [--to D] --note TEXT [--source TEXT]`,
-  `status-days end ID --date D`, `status-days withdraw ID --reason TEXT`,
-  `status-days list [--active]`.
-- `coach.statusdays.active(root, span) -> list[dict]` and
+- `status-days add --kind K --from D [--to D] --note TEXT [--source TEXT]`
+  (`--source` defaults to `coach`; a second ongoing row of one kind is
+  refused, exit 1), `status-days end ID --date D`, `status-days withdraw
+  ID --reason TEXT`, `status-days list [--active]` (`--active`: rows not
+  withdrawn).
+- `coach.statusdays.active(root, span) -> list[dict]` (rows not
+  withdrawn whose days overlap the span; an ongoing row runs on) and
   `coach.statusdays.ill_in(root, span) -> bool` are the only readers
-  other items call.
+  other items call. The file is a migration-runner document (C16,
+  `coach/migrations/status_days/`).
 - Return rule: an `ill` status day overlapping the gap before a session
   counts exactly like an `ill` miss annotation for C22 and
   `return_after_illness`. Travel only explains the gap. Days off stay days
@@ -5209,18 +5269,20 @@ absent. No freshness check: the block is a snapshot.
 - Check `status_days_valid`: schema, unique ids, `start ≤ end`, at most one
   open-ended row per kind.
 
-**Fixture instance `cardio/`** (R-43): a copy of `valid/` (keeping R-20's
-logged workouts) with its activity, wellness and planned records removed,
-plus:
+**Fixture instance `cardio/`** (R-43): a copy of `valid/` with its
+activity, wellness and planned records and its sync map removed, plus
+R-20's four logged workouts as `data/history/2026-09.json` and
+`2026-10.json`, resolved by `history sync` from the synthetic set (no
+Hevy cache), and:
 
 - config: `[activity] enabled = true`; `[cardio] tier = "review"`,
   `weekly_run_distance = 18`, other caps default.
 - activities (manual): 2026-09-21 run 10 km 60 min RPE 5; 2026-10-05 ride
   45 min; 2026-10-06 run "Intervals" 7 km 40 min RPE 8; 2026-10-07
   conditioning 20 min; 2026-10-09 run 11.5 km 70 min RPE 4.
-- planned (manual): 2026-10-06 "Intervals" quality; 2026-10-08 "Long run"
-  11 km; 2026-10-10 "Easy 5 km"; 2026-10-14 "Easy 5 km"; 2026-10-16
-  "Tempo" quality.
+- planned (manual): 2026-10-06 "Intervals" quality, 7 km; 2026-10-08
+  "Long run" 11 km; 2026-10-10 "Easy 5 km" 5 km; 2026-10-14 "Easy 5 km"
+  5 km; 2026-10-16 "Tempo" quality, 40 min.
 - wellness (manual, daily asleep hours) 2026-10-05 to 2026-10-11: 6.5, 6.8,
   7.2, 6.0, 6.9, 7.5, 7.1.
 - status days: `s-0001` ill 2026-10-01 to 2026-10-02; `s-0002` travel

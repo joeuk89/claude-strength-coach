@@ -385,7 +385,7 @@ class CardPartsTest(CheckinCase):
                 return Contribution(fields={"runs": Field(prefill="Logged: 2 runs, 10 km.", ask="Any others?")},
                                     facts=["A fact from a part."])
         """)
-        with self.paths():
+        with self.paths(builtin=False):
             card = self.card()
             text = self.text()
         runs = self.field(card, "runs")
@@ -396,7 +396,7 @@ class CardPartsTest(CheckinCase):
     def test_two_parts_owning_one_field_is_an_error(self):
         first = self.part("runs_a", "FIELDS = ('runs',)\ndef contribute(ctx):\n    return None\n")
         second = self.part("runs_b", "FIELDS = ('runs',)\ndef contribute(ctx):\n    return None\n")
-        with self.paths():
+        with self.paths(builtin=False):
             envelope = self.prepare(expect=1)
         message = envelope["error"]["message"]
         self.assertIn(first, message)
@@ -417,7 +417,7 @@ class CardPartsTest(CheckinCase):
 
     def test_a_contribution_of_none_keeps_the_builtin(self):
         self.part("quiet", "FIELDS = ('sleep',)\ndef contribute(ctx):\n    return None\n")
-        with self.paths():
+        with self.paths(builtin=False):
             card = self.card()
         self.assertIn("average hours a night", self.field(card, "sleep")["ask"])
 
@@ -443,7 +443,7 @@ class CardPartsTest(CheckinCase):
             def contribute(ctx):
                 return Contribution(fields={"sleep": Field(ask="?")})
         """)
-        with self.paths():
+        with self.paths(builtin=False):
             envelope = self.prepare(expect=1)
         self.assertIn("sleep", envelope["error"]["message"])
 
