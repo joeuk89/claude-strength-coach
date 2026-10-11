@@ -44,8 +44,8 @@ drops to `estimated`, per the card format). If the improvement changes
 the dish's identity, that's a new card — bench the old one.
 
 **Sourcing sweep.** "Build me a bank" / "find me better lunches" —
-derive the brief from the profile (phase, targets, dislikes, cooking
-appetite, slots that need depth), search per
+derive the brief from the profile (phase, targets, dislikes,
+allergies/intolerances, cooking appetite, slots that need depth), search per
 `reference/recipe-sources.md`, and present a **shortlist table** of
 ~5–8 candidates: name, source, per-serving kcal/protein, prep effort,
 and one line on why it fits the brief. The athlete picks; only picked

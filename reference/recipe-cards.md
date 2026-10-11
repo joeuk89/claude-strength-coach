@@ -182,7 +182,9 @@ Notes that are not recipes (standing coverage such as "dinners covered by
 family, top up protein on light nights", or a slot's priority such as
 "breakfast must be fast or it gets skipped") go in
 `[nutrition.bank.slot_notes]` in `config.toml`. The index prints each one
-under its slot.
+under its slot. `reference/record-formats.md` → "profile.md: Food &
+eating" says how to derive them; they explain the standing week but
+never create coverage in a meal plan.
 
 ## Commands
 

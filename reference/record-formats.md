@@ -131,3 +131,114 @@ The numbers (phase, trend rate, protein, anchors, any override) are in `config.t
 
 _Revised: YYYY-MM-DD_
 ```
+
+## profile.md: Food & eating
+
+`/recipes` collects this section for first-bank setup or a requested
+refresh; `/meal-plan` reads it for standing-template setup. Reuse facts
+already in profile prose, config or the conversation, even with older
+labels. In one first message ask for every missing field below; after a
+partial reply ask only what is still needed. Explain the two plan styles
+in that question. A complete section has an answer for each field:
+"none" is an answer; missing, "not supplied" or "to decide" is unresolved.
+Confirm a complete section is current, then seed recipes without another
+interview. A specific recipe request needs only relevant missing facts.
+
+Show the proposed section before writing; write only after the athlete
+confirms it. Retain known answers and mark deferred fields "not supplied"
+rather than guessing, including allergies. If unresolved facts affect
+safe recipe selection or a planning decision, resolve those before
+proceeding. An unchanged complete section needs no rewrite.
+
+```markdown
+## Food & eating
+
+- **Likes:** <foods, meals and cuisines enjoyed>
+- **Dislikes:** <foods to avoid, or none>
+- **Allergies/intolerances:** <restrictions, or none reported>
+- **Household staples:** <ingredient names always stocked, or none>
+- **Cooking appetite:** <assemble-only, batch-cook or cook most days; time/effort limits>
+- **Shopping pattern:** <when/how groceries arrive and usual top-ups>
+- **Office-day pattern:** <usual weekdays at the office, or none; variable days still to confirm>
+- **Meal responsibility/standing coverage:** <who decides each meal, its slot and days; meals self-managed>
+- **Plan style:** <loose: a weekly recipe pool with suggested days | strict: a dated menu | no preference>
+
+_Revised: YYYY-MM-DD_
+```
+
+A synthetic complete example:
+
+```markdown
+## Food & eating
+
+- **Likes:** Rice bowls and eggs.
+- **Dislikes:** Mushrooms.
+- **Allergies/intolerances:** Peanuts.
+- **Household staples:** Eggs, rice, olive oil.
+- **Cooking appetite:** Batch-cook Sunday; assemble weekday lunches.
+- **Shopping pattern:** Weekly online shop with fresh-food top-ups.
+- **Office-day pattern:** Tuesday and Thursday; other weekdays at home.
+- **Meal responsibility/standing coverage:** Partner decides dinner Monday to Thursday; other meals self-managed.
+- **Plan style:** Loose — weekly recipe pool with suggested days.
+
+_Revised: 2026-10-11_
+```
+
+### After the standing template exists
+
+Household staples, Office-day pattern, Meal responsibility/standing
+coverage and Plan style are the **planning fields**. Until `/meal-plan`
+writes `[nutrition.template]`, no script reads them, so they stay prose
+here. The approval that writes the template also replaces those four
+lines with one pointer line, so each fact lives in one place (ADR-0001):
+
+```markdown
+- **Standing week:** staples, office days, standing coverage and plan style are in `config.toml` → `[nutrition.template]`.
+```
+
+The pointer answers all four planning fields for completeness. From then
+on a change to one of them is a `/meal-plan` template edit, never a
+profile edit, and slot notes derive from the template.
+
+### Standing-template and slot-note consumers
+
+| Food & eating field | Consumer |
+|---|---|
+| Likes; Dislikes; Allergies/intolerances | `/recipes` selection and sourcing filters; retain restrictions in every draft. |
+| Household staples | `[nutrition.template] staples`, using the bank's ingredient names. Staples are stock, not daily protein anchors. |
+| Cooking appetite; Shopping pattern | Recipe effort, batch choices and shopping timing; derive relevant per-slot priorities for `[nutrition.bank.slot_notes]`. |
+| Office-day pattern | `[nutrition.template] office_days`. Ask about a variable pattern before selecting standing weekdays; an explicit none gives `[]`. |
+| Meal responsibility/standing coverage | `[[nutrition.template.standing]]`: `slot`, `days` and `cover` when someone else decides. Self-managed slots stay open unless an approved bank recipe or pool fills them. |
+| Plan style | `[nutrition.template] plan_style`: `loose` or `strict`; no preference leaves it unset, so the default applies. |
+
+The example maps to this TOML; the slot notes come from Cooking appetite,
+Office-day pattern and Meal responsibility/standing coverage:
+
+```toml
+[nutrition.template]
+office_days = ["tue", "thu"]
+staples = ["eggs", "rice", "olive oil"]
+plan_style = "loose"
+
+[[nutrition.template.standing]]
+days = ["mon", "tue", "wed", "thu"]
+slot = "dinner"
+cover = "partner"
+kcal = 700        # estimate, shown to the athlete for approval
+protein_g = 35    # estimate, shown to the athlete for approval
+
+[nutrition.bank.slot_notes]
+lunch = "Assemble weekday lunches; portable on Tuesday and Thursday"
+dinner = "Partner decides Monday to Thursday"
+```
+
+Cover rows also need `kcal` and `protein_g`: use known values or show
+clearly labelled estimates for approval, never as the athlete's answers.
+Resolve only missing planning details (such as a cover's days or an
+agreed recipe/pool); do not repeat the food interview. Show exact TOML
+and each row's meaning, then wait for approval before writing config.
+
+Slot notes are prose under configured slot names. They explain
+priorities and coverage in the index; only standing rows create plan
+coverage. Show slot-note changes for approval, preserve unrelated
+existing notes and run `python3 -m coach recipes render` afterward.

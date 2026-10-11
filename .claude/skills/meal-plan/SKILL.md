@@ -35,21 +35,22 @@ the draft and build again. Your draft is
 
 ## Set up the standing template (first run only)
 
-1. Draft `[nutrition.template]` and its `[[nutrition.template.standing]]`
-   rows from `profile.md` → Food & eating (written by `/recipes`'
-   interview: staples, office days, who covers which meals, plan style)
-   and the bank's card slugs, using the example in
-   `config.example.toml` for the shape. Review anchor recipe links with
-   the athlete using [draft.md](draft.md) → Anchor shopping coverage.
-2. Show the athlete the exact TOML and what each standing row means in
-   plain words. Write it to `config.toml` only on their approval.
+1. Map `profile.md` → Food & eating to TOML with `reference/record-formats.md`
+   → "profile.md: Food & eating"; ask only unresolved planning details,
+   together. Draft `[nutrition.template]` and its standing rows from it
+   and the bank's card slugs (shape: `config.example.toml`). Review anchor
+   recipe links using [draft.md](draft.md) → Anchor shopping coverage.
+2. Show the exact TOML, what each standing row means in plain words, and
+   the Food & eating edit that swaps its four planning fields for the
+   config pointer line. Write both only on the athlete's approval.
 3. Run `python3 -m coach config validate`, then `python3 -m coach check
    --only nutrition_template`. Fix anything either names, with the
    athlete, before planning.
 
 This is the only time the skill asks more than the exceptions line and
-the approval; later changes to the typical week are edits to this
-table, made the same way.
+the approval. Later changes to the typical week are edits to this
+table, made the same way; a `[nutrition.bank.slot_notes]` note that
+names the changed fact is updated in the same approval.
 
 ## 1. Read the standing week
 
