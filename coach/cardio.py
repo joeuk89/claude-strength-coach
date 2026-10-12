@@ -23,6 +23,7 @@ PLAN_TIERS = ("review", "program")
 LIFTING = "lifting"
 EXTERNAL = "external"
 NOT_ACTIVITIES = (LIFTING, EXTERNAL)
+CONDITIONING_MODALITIES = ("conditioning", "mixed")
 # Coaching heuristics, CR-10 scale: the RPE a bout is taken at when nothing better is known.
 KIND_RPE = {"lifting": 6, "run": 4, "ride": 4, "swim": 4, "row": 5, "walk": 2, "hike": 3, "conditioning": 7,
             "sport": 6, "mobility": 1, "other": 4}
@@ -48,15 +49,18 @@ class Bout:
     distance_meters: Optional[float]
     quality: bool
     quality_basis: Optional[str]
+    modality: Optional[str] = None
+    estimated_minutes: bool = False
 
     def is_activity(self):
-        return self.kind not in NOT_ACTIVITIES
+        """True for an Activity, and for a coach-led session recorded as conditioning or mixed."""
+        return self.kind not in NOT_ACTIVITIES or self.modality in CONDITIONING_MODALITIES
 
     def to_json(self):
         return {"date": self.date.isoformat(), "start": _stamp(self.start), "end": _stamp(self.end),
                 "kind": self.kind, "source": self.source, "ref": self.ref, "session_id": self.session_id,
                 "minutes": self.minutes, "distance_meters": self.distance_meters, "quality": self.quality,
-                "quality_basis": self.quality_basis}
+                "quality_basis": self.quality_basis, "modality": self.modality}
 
 
 def _stamp(moment):
@@ -242,14 +246,27 @@ class _Week:
         return found
 
     def external_entries(self):
+        """(Bout, srpe) for each coach-led session done: what the athlete recorded, and the
+        `external_session_minutes` and `external_session_rpe` defaults only for what they did not."""
         found = []
-        minutes, rpe = self.settings["external_session_minutes"], self.settings["external_session_rpe"]
-        for note in history.annotations(self.root, "external"):
+        for note in history.external_occurrences(self.root):
             day = dates.parse_date(note["date"])
-            if note["done"] and self.span.contains(day):
-                bout = Bout(day, None, None, EXTERNAL, "logged", note["id"], note["external_id"], minutes, None,
-                            False, None)
-                found.append((bout, _srpe(rpe, minutes, "external_default")))
+            if history.external_status(note) != history.DONE or not self.span.contains(day):
+                continue
+            recorded_minutes, recorded_rpe = note.get("duration_minutes"), note.get("rpe")
+            minutes = self.settings["external_session_minutes"] if recorded_minutes is None else recorded_minutes
+            rpe = self.settings["external_session_rpe"] if recorded_rpe is None else recorded_rpe
+            modality = note.get("modality")
+            quality, basis = False, None
+            if modality in CONDITIONING_MODALITIES:
+                quality, basis = quality_of({"kind": "conditioning", "rpe": recorded_rpe}, None,
+                                            self.settings["quality_rpe_min"])
+            start = dates.parse_timestamp(note["start"]) if note.get("start") else None
+            bout = Bout(day, start, None, EXTERNAL, "logged", note["id"], note["external_id"],
+                        units.json_number(minutes), None, quality, basis, modality, recorded_minutes is None)
+            srpe = _srpe(rpe, minutes, "external_default" if recorded_rpe is None else "athlete")
+            srpe["minutes_method"] = "external_default" if recorded_minutes is None else "athlete"
+            found.append((bout, srpe))
         return found
 
     def upcoming_planned(self):
@@ -325,12 +342,15 @@ def _proposal_bouts(week_data, overlay):
                           session.get("duration_minutes"), None, kind == "conditioning",
                           "kind" if kind == "conditioning" else None))
     minutes = week_data.settings["external_session_minutes"]
+    cancelled = {(note["date"], note["external_id"]) for note in history.external_occurrences(week_data.root)
+                 if history.external_status(note) == history.CANCELLED}
     for external in program_doc["external_sessions"] if program_doc else []:
         for day in week_data.span.days():
             placed = external.get("weekday") == WEEKDAYS[day.weekday()]
-            if placed and (week_data.today is None or day >= week_data.today):
+            if (placed and (week_data.today is None or day >= week_data.today)
+                    and (day.isoformat(), external["id"]) not in cancelled):
                 found.append(Bout(day, None, None, EXTERNAL, "planned", external["id"], external["id"], minutes,
-                                  None, False, None))
+                                  None, False, None, None, True))
     return found + week_data.upcoming_planned()
 
 
@@ -354,7 +374,8 @@ def week(root, week_value):
                if s["type"] in history.WORKING_SET_TYPES]
     hard_sets = sum(1 for s in working if s["rpe"] is None or s["rpe"] > stats.EASY_RPE)
     lifting_minutes = [w["duration_minutes"] for w in workouts if w["duration_minutes"] is not None]
-    acts = [b for b, _ in entries if b.is_activity()]
+    acts = [b for b, _ in entries if b.is_activity() and b.kind != EXTERNAL]
+    external = [b for b, _ in entries if b.kind == EXTERNAL]
     runs = [b for b in acts if b.kind == "run"]
     conditioning = [b for b in acts if b.kind == "conditioning"]
     other = {}
@@ -371,7 +392,8 @@ def week(root, week_value):
         "activity_source": activity_on(config),
         "lifting": {"workouts": len(workouts), "working_sets": len(working), "hard_sets": hard_sets,
                     "minutes": _number(sum(lifting_minutes))},
-        "external": {"done": sum(1 for b, _ in entries if b.kind == EXTERNAL)},
+        "external": {"done": len(external),
+                     "conditioning": sum(1 for b in external if b.modality in CONDITIONING_MODALITIES)},
         "run": {"count": len(runs), "distance": _distance(sum(b.distance_meters or 0 for b in runs), unit),
                 "minutes": _number(sum(b.minutes or 0 for b in runs)), "quality": sum(1 for b in runs if b.quality)},
         "conditioning": {"count": len(conditioning), "minutes": _number(sum(b.minutes or 0 for b in conditioning))},
@@ -388,7 +410,7 @@ def week(root, week_value):
 def _bout_row(bout, srpe, unit):
     return {"ref": bout.ref, "date": bout.date.isoformat(), "kind": bout.kind, "session_id": bout.session_id,
             "minutes": bout.minutes, "distance": _distance(bout.distance_meters, unit), "quality": bout.quality,
-            "quality_basis": bout.quality_basis, "srpe": srpe}
+            "quality_basis": bout.quality_basis, "modality": bout.modality, "srpe": srpe}
 
 
 def reconcile(root, week_value, today):
@@ -629,7 +651,8 @@ def _stack_flags(bouts, earlier=()):
 
 def _bout_text(bout):
     planned = "planned " if bout.source == "planned" else ""
-    return f"{bout.date.isoformat()} ({planned}{bout.kind}, by {bout.quality_basis})"
+    kind = f"coach-led {bout.modality}" if bout.kind == EXTERNAL and bout.modality else bout.kind
+    return f"{bout.date.isoformat()} ({planned}{kind}, by {bout.quality_basis})"
 
 
 def _count_text(count, kind):

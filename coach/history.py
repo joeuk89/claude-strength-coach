@@ -10,12 +10,14 @@ history is read, never written into a month file.
 import copy
 import re
 from dataclasses import dataclass
+from functools import cached_property
 from datetime import datetime, timezone
 from pathlib import Path
 
 from coach import config as config_module
-from coach import dates, history_sources, jsonio, overlay, paths, program, state, units
-from coach.errors import ValidationError
+from coach import dates, history_sources, jsonio, overlay, paths, program, state, timing, units
+from coach.activity.records import utc_text
+from coach.errors import CoachError, ValidationError
 from coach.history_sources import SourceWorkout
 from coach.library import Library
 from coach.validate import validate
@@ -38,6 +40,10 @@ KIND_FIELDS = {
     "trained_unlogged": ("date", "session_id"),
 }
 REPAIR_FIELDS = ("reps", "rpe", "weight_kg", "type")
+MODALITIES = ("lifting", "conditioning", "mixed")
+EXTERNAL_DETAIL = ("start", "duration_minutes", "rpe", "modality")
+EXTERNAL_ONLY = EXTERNAL_DETAIL + ("cancellation",)
+DONE, NOT_DONE, CANCELLED = "done", "not_done", "cancelled"
 _MONTH_FILE = re.compile(r"^\d{4}-\d{2}\.json$")
 _ANNOTATION_ID = re.compile(r"^a-(\d+)$")
 
@@ -80,11 +86,15 @@ def annotations_path(root):
     return Path(root) / paths.ANNOTATIONS
 
 
+def annotations_version():
+    return jsonio.current_version(jsonio.load_schema(ANNOTATIONS_SCHEMA))
+
+
 def read_annotations(root):
     """The annotations document, or an empty one when the file does not exist."""
     path = annotations_path(root)
     if not path.is_file():
-        return {"schema_version": 1, "annotations": []}
+        return {"schema_version": annotations_version(), "annotations": []}
     return jsonio.read_doc(path, ANNOTATIONS_SCHEMA)
 
 
@@ -119,6 +129,32 @@ def annotations(root, kind=None, as_of=None):
     return [a for a in found if kind is None or a["kind"] == kind]
 
 
+def external_status(annotation):
+    """`cancelled` for a trainer cancellation, else `done` or `not_done` as its `done` says."""
+    if annotation.get("cancellation"):
+        return CANCELLED
+    return DONE if annotation["done"] else NOT_DONE
+
+
+def external_occurrences(root, as_of=None):
+    """The newest `external` annotation in force for each date and coach-led session, by date.
+
+    A later annotation for the same date and session replaces the earlier one, so a repeated update stays one
+    occurrence.
+    """
+    newest = {}
+    for note in annotations(root, "external", as_of):
+        newest[(note["date"], note["external_id"])] = note
+    return [newest[key] for key in sorted(newest)]
+
+
+def lifting_occurrence(note, lifting_ids):
+    """True for a coach-led session that trained lifting: its recorded modality, else its program estimate."""
+    if note.get("modality"):
+        return note["modality"] in ("lifting", "mixed")
+    return note["external_id"] in lifting_ids
+
+
 def next_annotation_id(doc):
     numbers = [int(m.group(1)) for a in doc["annotations"] for m in [_ANNOTATION_ID.match(a["id"])] if m]
     return f"a-{max(numbers, default=0) + 1:04d}"
@@ -138,10 +174,14 @@ def add_annotations(root, items, now, dry_run=False, batch=True):
         annotation = {"id": next_annotation_id(doc), "kind": fields.pop("kind", None), **fields,
                       "created_at": created_at}
         where = f"$[{position}]" if batch else "$"
+        start_problem = _store_start(annotation, checker.zone)
+        if start_problem:
+            details.append({"path": f"{where}.start", "message": start_problem})
         tag = annotation.get("tag")
         if tag is not None and tag not in MISS_TAGS:
             raise ValidationError(f"tag {tag!r} is not a miss tag; use one of {', '.join(MISS_TAGS)}")
-        errors = validate({"schema_version": 1, "annotations": [annotation]}, jsonio.load_schema(ANNOTATIONS_SCHEMA))
+        errors = validate({"schema_version": annotations_version(), "annotations": [annotation]},
+                          jsonio.load_schema(ANNOTATIONS_SCHEMA))
         details += [{"path": where + e.path.replace("$.annotations[0]", ""), "message": e.message} for e in errors]
         if not errors:
             details += [{"path": where, "message": m} for m in checker.problems(annotation, doc["annotations"])]
@@ -152,6 +192,19 @@ def add_annotations(root, items, now, dry_run=False, batch=True):
                               details=details)
     jsonio.write_doc(annotations_path(root), doc, dry_run)
     return added
+
+
+def _store_start(annotation, zone):
+    """Turn a coach-led session's start as given (HH:MM, or local or offset ISO text) into a C7 timestamp on its
+    date; the problem as text when it cannot be."""
+    start, day = annotation.get("start"), annotation.get("date")
+    if annotation.get("kind") != "external" or not isinstance(start, str) or not isinstance(day, str):
+        return None
+    try:
+        annotation["start"] = utc_text(timing.parse_start(start, day, zone))
+    except ValueError as exc:
+        return f"start: {exc}"
+    return None
 
 
 def _in_span(span, day):
@@ -702,7 +755,8 @@ def coach_led_lifting(root):
 def last_lifting_date(root, before, include_unsynced=False, now=None):
     """The newest date before `before` with a lifting workout or a coach-led lifting session marked done, or None.
 
-    The newest `external` annotation for a date and session decides whether it was done.
+    The newest `external` annotation for a date and session decides whether it was done; a recorded modality
+    decides whether it was lifting, and a conditioning-only session is not.
     """
     library = Library.load(root)
     before = str(before)
@@ -710,9 +764,8 @@ def last_lifting_date(root, before, include_unsynced=False, now=None):
              if w["date"] < before and not w["conditioning"]
              and any(_is_lifting(e, library) for e in w["exercises"])]
     lifting = coach_led_lifting(root)
-    newest = {(a["date"], a["external_id"]): a["done"] for a in annotations(root, "external")
-              if a["external_id"] in lifting}
-    dated += [day for (day, _), done in newest.items() if done and day < before]
+    dated += [note["date"] for note in external_occurrences(root) if external_status(note) == DONE
+              and note["date"] < before and lifting_occurrence(note, lifting)]
     return dates.parse_date(max(dated)) if dated else None
 
 
@@ -737,6 +790,22 @@ def _value_problem(field, value):
     return None
 
 
+def _external_problems(annotation, zone):
+    found = []
+    detail = [name for name in EXTERNAL_DETAIL if name in annotation]
+    if annotation.get("cancellation") and annotation.get("done") is not False:
+        found.append("a session the trainer cancelled did not happen, so it needs done false")
+    elif detail and annotation.get("done") is not True:
+        found.append(f"{', '.join(detail)} describe a session that happened; this one is not marked done")
+    start = annotation.get("start")
+    if isinstance(start, str) and isinstance(annotation.get("date"), str):
+        try:
+            timing.parse_start(start, annotation["date"], zone)
+        except ValueError as exc:
+            found.append(f"start: {exc}")
+    return found
+
+
 class Checker:
     """Checks annotations against the instance: references exist, values fit (C17 `annotations_valid`)."""
 
@@ -747,6 +816,14 @@ class Checker:
         self.overlays = overlay.list(root)
         self.library = Library.load(root)
         self.sessions = _known_sessions(self.program, self.overlays)
+
+    @cached_property
+    def zone(self):
+        try:
+            name = config_module.load(self.root).athlete.timezone
+        except CoachError:
+            return None
+        return dates.zone(name) if name else None
 
     def problems(self, annotation, existing=()):
         """Plain-sentence problems with one annotation; `existing` are the annotations already on file."""
@@ -790,6 +867,12 @@ class Checker:
             found.append("its span ends before it starts")
         if "session_id" in annotation and self.sessions and annotation["session_id"] not in self.sessions:
             found.append(f"session {annotation['session_id']} is not in the program or any overlay")
+        if kind == "external":
+            found += _external_problems(annotation, self.zone)
+        else:
+            stray = [name for name in EXTERNAL_ONLY if name in annotation]
+            if stray:
+                found.append(f"{', '.join(stray)} belong only to an external annotation")
         if "external_id" in annotation and self.program is not None:
             externals = {s["id"] for s in self.program["external_sessions"]}
             if annotation["external_id"] not in externals:

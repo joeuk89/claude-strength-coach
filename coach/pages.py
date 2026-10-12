@@ -355,7 +355,8 @@ class _View:
         if first > end:
             return []
         rows = stats.adherence(self.root, span=(first, end), today=self.today, as_of=self.as_of)["sessions"]
-        not_done = [a for a in history.annotations(self.root, "external", self.as_of) if a["done"] is False]
+        not_done = [a for a in history.external_occurrences(self.root, self.as_of)
+                    if history.external_status(a) == history.NOT_DONE]
         found, day = [], dates.week_span(first, self.week_starts).start
         while day <= end:
             span = dates.week_span(day, self.week_starts)

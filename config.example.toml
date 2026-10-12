@@ -244,5 +244,6 @@ reconcile_move_days = 3       # a logged activity this many days from its plan s
                               # (a heuristic)
 quality_rpe_min = 7           # a session RPE at or above this makes an activity a quality one
                               # (a heuristic, rn:running-load.6)
-external_session_minutes = 60 # a coach-led session counts as this long at this session RPE
+external_session_minutes = 60 # a coach-led session counts as this long at this session RPE when the athlete
+                              # recorded neither (each recorded value replaces its default)
 external_session_rpe = 6      # (heuristics, rn:running-load.7)

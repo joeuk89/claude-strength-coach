@@ -115,8 +115,16 @@ def _from_flags(args):
         annotation["tag"] = args.tag
     if args.external:
         annotation["external_id"] = args.external
-    if args.done is not None:
+    if args.trainer_cancelled is not None:
+        if args.done:
+            raise UsageError("--trainer-cancelled: a cancelled session did not happen, so leave out --done")
+        annotation.update(done=False, cancellation={"by": "trainer", "reason": args.trainer_cancelled})
+    elif args.done is not None:
         annotation["done"] = args.done
+    for name, value in (("start", args.start_time), ("duration_minutes", args.minutes), ("rpe", args.rpe),
+                        ("modality", args.modality)):
+        if value is not None:
+            annotation[name] = value
     if kind in ("external", "trained_unlogged") or args.note:
         annotation["note"] = args.note
     return [{k: v for k, v in annotation.items() if not (k == "span" and None in v.values())}]
@@ -154,6 +162,12 @@ def _from_file(path):
         arg("--external", metavar="ID", help="coach-led session id (external)"),
         arg("--done", dest="done", action="store_const", const=True, default=None, help="external: it happened"),
         arg("--not-done", dest="done", action="store_const", const=False, help="external: it did not happen"),
+        arg("--trainer-cancelled", metavar="REASON",
+            help="external: the trainer cancelled it, so it was not planned and is no miss"),
+        arg("--start-time", metavar="T", help="external: when it started, HH:MM or an ISO time"),
+        arg("--minutes", type=float, metavar="N", help="external: how long it lasted"),
+        arg("--rpe", type=float, metavar="N", help="external: the athlete's session RPE (0-10)"),
+        arg("--modality", choices=history.MODALITIES, help="external: what it trained"),
         arg("--note", metavar="TEXT", help="one line on what happened (external, trained_unlogged)"),
         arg("--reason", metavar="TEXT", help="why"),
         arg("--source", default="coach", metavar="TEXT", help="where it came from, e.g. check-in 2026-10-11"),

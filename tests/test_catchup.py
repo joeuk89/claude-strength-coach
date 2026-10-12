@@ -330,7 +330,7 @@ class CatchUpFoodTest(HistoryCase):
     def test_macrofactor_food_comes_from_nutrition_status_alongside_the_three_questions(self):
         data = self.prepared()
         card = data["card"]
-        self.assertEqual((card["mode"], card["days_since_last"], card["schema_version"]), ("catch_up", 14, 7))
+        self.assertEqual((card["mode"], card["days_since_last"], card["schema_version"]), ("catch_up", 14, 8))
         questions = card["catch_up"]["questions"]
         self.assertEqual([q["id"] for q in questions], ["gap", "now", "nutrition", "next_week"])
         self.assertEqual([q["n"] for q in questions], [1, 2, 3, 4])

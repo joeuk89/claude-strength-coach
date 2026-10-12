@@ -115,7 +115,7 @@ class DueCommandTest(CheckinCase):
 class CardSessionsTest(CheckinCase):
     def test_window_mode_and_sessions(self):
         card = self.card()
-        self.assertEqual(card["schema_version"], 7)
+        self.assertEqual(card["schema_version"], 8)
         self.assertEqual(card["window"], {"start": "2026-10-05", "end": "2026-10-11"})
         self.assertEqual((card["mode"], card["days_since_last"], card["unsynced"]), ("weekly", 7, 0))
         sessions = card["sessions"]
@@ -129,7 +129,8 @@ class CardSessionsTest(CheckinCase):
         self.assertEqual((sessions["planned_core"], sessions["trained_core"], sessions["optional_trained"]),
                          (3, 2, 0))
         self.assertEqual(sessions["external"],
-                         [{"date": "2026-10-06", "external_id": "pt-tue", "title": "PT", "done": None, "note": None}])
+                         [{"date": "2026-10-06", "external_id": "pt-tue", "title": "PT", "done": None, "status": None,
+                           "cancellation": None, "note": None}])
 
     def test_until_ends_the_window_early(self):
         card = self.card("--until", "2026-10-08")
@@ -187,7 +188,8 @@ class CardSessionsTest(CheckinCase):
         self.assertIn(TAGS, sessions_field)
         coach_led = text[text.index("\n2. "):text.index("\n3. ")]
         self.assertIn("Coach-led", coach_led)
-        self.assertIn("What did PT on Tue 6 Oct cover?", coach_led)
+        self.assertIn("What did PT on Tue 6 Oct cover (lifting, conditioning or both), how long and how hard (session "
+                      "RPE 0-10)? Say if the trainer cancelled it.", coach_led)
 
     def test_no_external_sessions_means_no_coach_led_field(self):
         self.edit_json("data/program.json", lambda doc: doc.update(external_sessions=[]))

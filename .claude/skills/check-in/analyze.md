@@ -121,8 +121,8 @@ correction or a niggle report (act.md): a second close replaces its entry.
 planned over the **trailing four ordinary weeks**:
 
 - Judge each week against the overlay in force that week. Coach-led
-  sessions count, as the replies confirmed them; optional sessions are
-  left out; a shortened session counts as trained.
+  sessions count as the replies confirmed them, a trainer-cancelled one
+  not at all; optional sessions are left out; a shortened one is trained.
 - An **ordinary week** is any week except a light, constrained one-off
   (temporary sessions), minimum, planned break, layoff (11+ days) or illness
   week (training missed while ill); a reshuffle stays ordinary. Each `skipped`

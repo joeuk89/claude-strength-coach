@@ -33,7 +33,7 @@ from coach.library import Library
 DEEP_AFTER_DAYS = 42
 E1RM_ROW_LIMIT = 8          # a heuristic: as many lifts as a message reads at a glance
 WORD_CEILINGS = {"weekly": 600, "deep": 1000, "catch-up": 600}    # heuristics, prose words outside regions
-CARD_VERSION = 7
+CARD_VERSION = 8
 TIERS = ("weekly", "deep", "catch-up")
 CARD_TIERS = ("weekly", "deep")
 CHECK_IN = "check-in"
@@ -431,7 +431,7 @@ def _sessions(inst, window, adherence, workouts):
 
 def _external(inst, window):
     """Coach-led weekday sessions in the window; one with no annotation on a planned-break day (C50) is left out."""
-    notes = history.annotations(inst.root, "external")
+    notes = history.external_occurrences(inst.root)
     off = statusdays.break_days(inst.root, window)
     found = []
     for external in inst.program["external_sessions"] if inst.program else []:
@@ -440,12 +440,15 @@ def _external(inst, window):
         for day in window.days():
             if WEEKDAYS[day.weekday()] != external["weekday"] or not inst.schedules_on(day):
                 continue
-            matching = [a for a in notes if a["date"] == day.isoformat() and a["external_id"] == external["id"]]
-            note = matching[-1] if matching else None
+            note = next((a for a in notes if a["date"] == day.isoformat() and a["external_id"] == external["id"]),
+                        None)
             if note is None and day in off:
                 continue
             found.append({"date": day.isoformat(), "external_id": external["id"], "title": external["title"],
-                          "done": note["done"] if note else None, "note": note.get("note") if note else None})
+                          "done": note["done"] if note else None,
+                          "status": history.external_status(note) if note else None,
+                          "cancellation": note.get("cancellation") if note else None,
+                          "note": note.get("note") if note else None})
     return sorted(found, key=lambda e: (e["date"], e["external_id"]))
 
 
@@ -841,15 +844,18 @@ def _coach_led_field(inst, card):
     stated, asked = [], []
     for item in external:
         when = f"{item['title']} on {render.day_label(item['date'])}"
-        if item["done"] is True:
+        if item["status"] == history.DONE:
             stated.append(f"{when}: done" + (f", {item['note']}" if item["note"] else "") + ".")
-        elif item["done"] is False:
+        elif item["status"] == history.CANCELLED:
+            stated.append(f"{when}: cancelled by the trainer ({item['cancellation']['reason']}), so not a miss.")
+        elif item["status"] == history.NOT_DONE:
             stated.append(f"{when}: did not happen.")
         else:
             logged = extra.get(item["date"])
             if logged:
                 stated.append(f"{when}: logged as {logged['title']}.")
-            asked.append(f"What did {when} cover?")
+            asked.append(f"What did {when} cover (lifting, conditioning or both), how long and how hard (session RPE "
+                         "0-10)? Say if the trainer cancelled it.")
     rotation = checkin_catchup.rotation_text(inst, _as_date(card["date"]))
     if rotation:
         stated.append(rotation)
@@ -1012,9 +1018,11 @@ def _region(card, record_date, unit):
     if sessions["external"]:
         items = []
         for item in sessions["external"]:
-            state_text = {True: "done", False: "not done", None: "not recorded"}[item["done"]]
+            state_text = {history.DONE: "done", history.NOT_DONE: "not done", None: "not recorded",
+                          history.CANCELLED: "cancelled by the trainer"}[item["status"]]
+            detail = item["cancellation"]["reason"] if item["cancellation"] else item["note"]
             items.append(f"{render.day_label(item['date'])} {item['title']} {state_text}"
-                         + (f" ({item['note']})" if item["note"] else ""))
+                         + (f" ({detail})" if detail else ""))
         lines += ["", "**Coach-led:** " + " · ".join(items)]
     if card["exercises"]:
         lines += ["", _row(["Day", "Exercise", "Prescribed", "Logged", "Result"]), "| --- | --- | --- | --- | --- |"]

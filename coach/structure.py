@@ -265,9 +265,10 @@ def _planned_pairs(inst, span):
 
 def _external_rows(inst, span):
     """Coach-led sessions in a span: placed on their weekday, or on the dates their annotations name when they
-    have none. One with no annotation on a planned-break day (C50) is `on_break`, not upcoming or unconfirmed.
+    have none. One with no annotation on a planned-break day (C50) is `on_break`, not upcoming or unconfirmed; one
+    the trainer cancelled is `cancelled`, which is not a planned session.
     """
-    notes = [a for a in history.annotations(inst.root, "external") if span.contains(dates.parse_date(a["date"]))]
+    notes = [a for a in history.external_occurrences(inst.root) if span.contains(dates.parse_date(a["date"]))]
     off = statusdays.break_days(inst.root, span)
     rows = []
     for external in inst.program["external_sessions"]:
@@ -287,7 +288,7 @@ def _external_rows(inst, span):
                 used.add(index)
                 note = own[index]
             if note is not None:
-                status = "done" if note["done"] else "not_done"
+                status = history.external_status(note)
             elif day in off:
                 status = stats.ON_BREAK
             else:
@@ -297,6 +298,8 @@ def _external_rows(inst, span):
                    "estimated_sets": {m: float(v) for m, v in sorted(external["estimated_sets"].items())}}
             if status == stats.ON_BREAK:
                 row["break_id"] = off[day]
+            if status == history.CANCELLED:
+                row["cancellation"] = dict(note["cancellation"])
             rows.append(row)
     return sorted(rows, key=lambda r: (r["date"], r["external_id"]))
 
@@ -305,8 +308,8 @@ def _activity_dates(inst, until):
     """Dates any training happened, up to `until`: workouts, trained-unlogged sessions, coach-led sessions done."""
     found = {w["date"] for w in inst.workouts()}
     found |= {a["date"] for a in history.annotations(inst.root, "trained_unlogged")}
-    newest = {(a["date"], a["external_id"]): a["done"] for a in history.annotations(inst.root, "external")}
-    found |= {day for (day, _), done in newest.items() if done}
+    found |= {a["date"] for a in history.external_occurrences(inst.root)
+              if history.external_status(a) == history.DONE}
     return sorted(dates.parse_date(d) for d in found if d <= until.isoformat())
 
 
@@ -340,7 +343,8 @@ def _break_week(inst, span, off=None):
         return False
     planned = [dates.parse_date(session["date"]) for _, session in _planned_pairs(inst, span)
                if inst.tier(session["session_id"]) == "core"]
-    planned += [dates.parse_date(row["date"]) for row in _external_rows(inst, span)]
+    planned += [dates.parse_date(row["date"]) for row in _external_rows(inst, span)
+                if row["status"] != history.CANCELLED]
     return all(day in off for day in planned)
 
 
@@ -533,6 +537,8 @@ def _report(inst, span, rows, extra, sessions_by_key, workouts, on_break=()):
                                "break_id": external["break_id"]})
             continue
         sessions.append(external)
+        if external["status"] == history.CANCELLED:
+            continue
         if external["status"] in ("done", "not_done"):
             counted_planned += 1
             counted_trained += external["status"] == "done"
