@@ -3,8 +3,8 @@ schema_version = 1
 id = "deloads"
 topic = "Deloads"
 question = "When should a lifter take a lighter week, and what should it contain?"
-written = 2026-10-11
-review_by = 2027-10-11
+written = 2026-10-12
+review_by = 2027-10-12
 confidence = "low"
 applies_to = ["deload", "autoregulation"]
 tags = ["fatigue", "adherence"]
@@ -88,7 +88,7 @@ status = "current"
 
 [[claims]]
 n = 9
-text = "The standard deload keeps two thirds of the working sets, takes 10 % off loads as a target before rounding to the kit, and puts every set at RPE 6."
+text = "The standard deload keeps two thirds of the working sets, takes 10 % off loads as a target before rounding to the kit, and caps every set at RPE 6, a ceiling the lighter load may sit well under."
 basis = "heuristic"
 sources = ["rogerson-2024"]
 status = "current"
@@ -123,7 +123,7 @@ status = "current"
 -->
 <!-- coach:begin research deloads -->
 
-**Template note** · written 2026-10-11 · review by 2027-10-11 · confidence low · areas deload, autoregulation · tags fatigue, adherence
+**Template note** · written 2026-10-12 · review by 2027-10-12 · confidence low · areas deload, autoregulation · tags fatigue, adherence
 
 | # | Claim | Basis | Sources | Status |
 | --- | --- | --- | --- | --- |
@@ -135,7 +135,7 @@ status = "current"
 | 6 | When adherence over the trailing four ordinary weeks is under 70 %, the check-in presents a smaller schedule with the same weekly hard sets per muscle. | heuristic | none | current |
 | 7 | When adherence over the trailing four ordinary weeks is under 80 %, no new recurring session is proposed. | heuristic | none | current |
 | 8 | A deload lowers training stress by cutting sets, taking sets further from failure and usually lowering loads, while keeping the same exercises and training days. | consensus | bell-2023, rogerson-2024 | current |
-| 9 | The standard deload keeps two thirds of the working sets, takes 10 % off loads as a target before rounding to the kit, and puts every set at RPE 6. | heuristic | rogerson-2024 | current |
+| 9 | The standard deload keeps two thirds of the working sets, takes 10 % off loads as a target before rounding to the kit, and caps every set at RPE 6, a ceiling the lighter load may sit well under. | heuristic | rogerson-2024 | current |
 | 10 | A light week for poor readiness or sleep keeps two thirds of the working sets and the loads, with no set above RPE 8. | heuristic | none | current |
 | 11 | A trained session counts as trained as prescribed when at least two thirds of its prescribed working sets were logged and its mean logged RPE was no more than 1.5 below target; a coach-led session counts when it happened. | heuristic | none | current |
 | 12 | A deep check-in runs when the last deep check-in is 42 days old or more, which matches the default ceiling of 6 completed hard weeks (rn:deloads.3). | heuristic | none | current |
@@ -214,6 +214,9 @@ rogerson-2024 report, but no study compares them with other sizes.
 rogerson-2024 reports varied load reductions, not a rounding rule, so
 the 10 % is a target: each line takes the nearest load the kit makes no
 heavier than its working load, and the proposal reports the actual cut.
+The RPE 6 and RPE 8 are ceilings, not targets: a 10 % cut usually leaves
+the set easier than RPE 6, so the feasibility check (rn:autoregulation.6)
+flags such a set only when it is too hard for its ceiling.
 
 **Claim 12.** No source sets how often a lifter's training should be
 reviewed in depth. 42 days is six calendar weeks, the same number as

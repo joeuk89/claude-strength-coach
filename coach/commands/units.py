@@ -1,4 +1,4 @@
-from coach import units
+from coach import stats, units
 from coach.commands import arg, command
 from coach.errors import UsageError, ValidationError
 
@@ -71,3 +71,42 @@ def units_round(args, ctx):
     except ValueError as exc:
         raise ValidationError(str(exc)) from None
     return {"value": rounded, "increment": units.json_number(args.increment), "direction": args.direction}
+
+
+@command(
+    "units load-for",
+    help="The load an e1RM gives for reps at an RPE: the unrounded model load, and with --increment the load a "
+         "grid of that step makes",
+    args=(
+        arg("--e1rm", type=float, required=True, help="the e1RM, in the exercise's coaching number"),
+        arg("--reps", type=int, required=True),
+        arg("--rpe", type=float, help="the target RPE (1–10); without it the reps are taken to failure"),
+        arg("--increment", type=float, help="an equipment grid step: also report the heaviest load on it no heavier "
+                                            "than the model load"),
+    ),
+)
+def units_load_for(args, ctx):
+    if args.e1rm <= 0 or args.reps < 1:
+        raise ValidationError("--e1rm must be above 0 and --reps at least 1")
+    if args.rpe is not None and not 1 <= args.rpe <= 10:
+        raise ValidationError("--rpe must be from 1 to 10")
+    if args.increment is not None and args.increment <= 0:
+        raise ValidationError("--increment must be above 0")
+    n = stats.reps_to_failure(args.reps, args.rpe)
+    model = {"e1rm": units.json_number(args.e1rm), "reps": args.reps,
+             "rpe": units.json_number(args.rpe) if args.rpe is not None else None,
+             "reps_to_failure": units.json_number(n), "load": None,
+             "calculation": "Epley inverse, e1RM ÷ (1 + reps to failure ÷ 30), to 2 decimals and not rounded to "
+                            "any equipment", "reason": None}
+    if n > stats.MAX_REPS_TO_FAILURE:
+        model["reason"] = (f"{units.json_number(n)} reps to failure is past the model's {stats.MAX_REPS_TO_FAILURE}, "
+                           "so it gives no load")
+        return {"model": model, "equipment": None}
+    model["load"] = units.json_number(round(stats.load_for(args.e1rm, args.reps, args.rpe), 2))
+    equipment = None
+    if args.increment is not None:
+        equipment = {"increment": units.json_number(args.increment), "direction": "down",
+                     "load": units.round_to_increment(model["load"], args.increment, "down"),
+                     "rounding": "the heaviest load on this grid no heavier than the model load, so the set is "
+                                 "no harder than its RPE"}
+    return {"model": model, "equipment": equipment}

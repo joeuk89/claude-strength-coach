@@ -18,7 +18,7 @@ Run `python3 -m coach history sync`, then the proposal for the mode:
   illness; write.md records the week after "go". A deload applies the program's deload
   rule (`blocks.deload_rule` in `program show`) to every program session in the span;
   the standard rule keeps two thirds of each line's working sets, takes 10 % off the
-  current working loads (a target before the kit rounds it) and puts every set at RPE 6
+  current working loads (a target before the kit rounds it) and caps every set at RPE 6
   (rn:deloads.9); these numbers are a coaching heuristic. It cuts bodyweight work by
   sets and takes it further from failure. Its sessions are temporary (`"temporary":
   true`, titled "Deload — <session title>") and keep their program session ids. Keep the

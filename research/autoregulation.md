@@ -3,8 +3,8 @@ schema_version = 1
 id = "autoregulation"
 topic = "Autoregulation with RPE and reps in reserve"
 question = "Can RPE and reps-in-reserve ratings set and adjust training loads, and when does a rising RPE mean fatigue?"
-written = 2026-10-11
-review_by = 2028-04-11
+written = 2026-10-12
+review_by = 2028-04-12
 confidence = "moderate"
 applies_to = ["autoregulation"]
 tags = ["rpe", "rir"]
@@ -107,7 +107,7 @@ confidence = "low"
 
 [[claims]]
 n = 6
-text = "A prescribed load whose implied RPE at the recent e1RM is above 10.5 is unearned, and an RPE target more than 1 from the implied RPE is infeasible; Epley underestimated the deadlift 1RM in untrained lifters, so both flags can misfire on hinge lifts."
+text = "A prescribed load whose implied RPE at the recent e1RM is above 10.5 at the fewest reps its line allows is unearned, and an RPE target is infeasible when no allowed whole rep target implies an RPE within 1 of it, a recovery RPE ceiling only when it is more than 1 too hard; an e1RM from sets logged without RPE is a lower bound that shows neither, and Epley underestimated the deadlift 1RM in untrained lifters, so both flags can misfire on hinge lifts."
 basis = "heuristic"
 sources = ["lesuer-1997", "halperin-2022"]
 status = "current"
@@ -123,7 +123,7 @@ confidence = "low"
 -->
 <!-- coach:begin research autoregulation -->
 
-**Template note** · written 2026-10-11 · review by 2028-04-11 · confidence moderate · areas autoregulation · tags rpe, rir
+**Template note** · written 2026-10-12 · review by 2028-04-12 · confidence moderate · areas autoregulation · tags rpe, rir
 
 | # | Claim | Basis | Sources | Status |
 | --- | --- | --- | --- | --- |
@@ -132,7 +132,7 @@ confidence = "low"
 | 3 | Reps-in-reserve ratings are expected to grow more accurate as a lifter gains experience with the scale, so a novice's RPE targets carry more error. | heuristic (low confidence) | zourdos-2016, helms-2016, halperin-2022 | retired 2026-10-11, see rn:autoregulation.7 |
 | 4 | A compound lift drifts when logged RPE is 1 or more over target on 2 or more working sets of one exposure, and drift in two sessions running is a fatigue signal. | heuristic (low confidence) | larsen-2021 | current |
 | 5 | An e1RM is computed only from a set of 12 or fewer reps to failure (reps, plus 10 minus RPE when one is logged): linear 1RM equations are advised up to 10 reps, but 12 matches the accuracy limit in claim 2 and keeps an e1RM for 10-rep lines at RPE 8. | heuristic (low confidence) | reynolds-2006, halperin-2022 | current |
-| 6 | A prescribed load whose implied RPE at the recent e1RM is above 10.5 is unearned, and an RPE target more than 1 from the implied RPE is infeasible; Epley underestimated the deadlift 1RM in untrained lifters, so both flags can misfire on hinge lifts. | heuristic (low confidence) | lesuer-1997, halperin-2022 | current |
+| 6 | A prescribed load whose implied RPE at the recent e1RM is above 10.5 at the fewest reps its line allows is unearned, and an RPE target is infeasible when no allowed whole rep target implies an RPE within 1 of it, a recovery RPE ceiling only when it is more than 1 too hard; an e1RM from sets logged without RPE is a lower bound that shows neither, and Epley underestimated the deadlift 1RM in untrained lifters, so both flags can misfire on hinge lifts. | heuristic (low confidence) | lesuer-1997, halperin-2022 | current |
 | 7 | Reps-in-reserve ratings do not clearly grow more accurate with training experience but do grow more accurate near failure, so a lifter new to RPE practises rating sets near failure before relying on RPE targets. | heuristic (low confidence) | halperin-2022, zourdos-2016, helms-2016 | current |
 
 | Source | Citation | Type | Year |
@@ -239,6 +239,12 @@ e1RM came from longer sets than the prescription. `unearned_load` or
   progression veto, while the other
   prescription guards remain active. These are model-use policies, not
   physiological thresholds established by Reynolds or Halperin.
+- Claim 6 judges a rep range by its best-fitting whole rep target and
+  a recovery RPE (deload, light, return or capped work) as a ceiling. A
+  set logged without RPE gives an e1RM that counts every rep as taken to
+  failure, so the estimate is a lower bound: it cannot show a load beyond
+  failure, and the load-step guard judges the step instead. The 10.5 and
+  ±1 thresholds are unchanged heuristics.
 - Before lowering a deadlift or other hinge load for `unearned_load` or
   `rpe_infeasible`, check the athlete's recent logged sets of that lift:
   the flag may come from Epley's low estimate rather than the load.

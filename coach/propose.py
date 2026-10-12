@@ -582,6 +582,18 @@ def propose_line(run, session, day, exercise, ctx_extra):
     cut = _load_cut(cut_from, proposal, scheme_sets, sets, kit_changes, rounding) if proposal.load_cut else None
     if cut is not None:
         kit_changes.pop(cut["target"], None)
+    estimate = evidence["estimate"]
+    if (proposal.model_hold and source is not None and decay is None and transform is None and cut is None
+            and mode in validity.FEASIBILITY_MODES and estimate is not None):
+        held = _model_hold(proposal, sets, estimate, limited)
+        if held is not None:
+            (sets, constraint_words, kit_changes), over, verdict = held
+            clauses.append(
+                f"but {_load_text(over.load, mode, run.unit)} × "
+                f"{validity.reps_words(verdict.reps, validity.rep_targets(over.reps, over.rep_range))} implies "
+                f"{validity.implied_words(verdict.implied)} at {validity.estimate_words(estimate)}, so "
+                f"{_load_text(base.top_load(sets), mode, run.unit)}, the heaviest load logged on "
+                f"{source.date.isoformat()} that the e1RM model accepts, holds")
     if first_after_illness:
         adjusted.append(f"an RPE {validity.ILLNESS_RPE_CAP} cap on the first session after illness")
     if constraint_words:
@@ -855,6 +867,36 @@ def _rounded(sets, clipped, round_down, cut_from, rounding):
 def _kit_words(kit_changes, mode, unit):
     return [f"the kit makes {_load_text(after, mode, unit)}, not {_load_text(before, mode, unit)}"
             for before, after in kit_changes.items()]
+
+
+def _beyond_failure(estimate, sets):
+    """(set, verdict) for the first working set the e1RM model puts beyond failure, or None."""
+    for s in base.working(sets):
+        targets = validity.rep_targets(s.reps, s.rep_range)
+        if s.load is not None and targets:
+            verdict = validity.judge_set(estimate, s.load, targets)
+            if verdict.unearned:
+                return s, verdict
+    return None
+
+
+def _model_hold(proposal, sets, estimate, limited):
+    """When the final `sets` are beyond failure at `estimate`, the heaviest lighter load the derived-from exposure
+    logged that the model accepts, put through `limited`: (limited result, set over, its verdict), else None.
+
+    The program's reps, ranges and RPE stay; only the load is held.
+    """
+    over = _beyond_failure(estimate, sets)
+    if over is None:
+        return None
+    top = base.top_load(sets)
+    logged = sorted({s.load for s in base.working(proposal.derived_from.sets)
+                     if s.load is not None and s.load < top - 1e-9}, reverse=True)
+    for load in logged:
+        found = limited(base.with_load(proposal.sets, load), True, False, None)
+        if _beyond_failure(estimate, found[0]) is None:
+            return (found, *over)
+    return None
 
 
 def _cut_from(proposal):

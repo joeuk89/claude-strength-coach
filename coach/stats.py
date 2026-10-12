@@ -59,6 +59,11 @@ def e1rm(load, reps, rpe=None):
     return load if n <= 1 else load * (1 + n / 30)
 
 
+def is_lower_bound(point):
+    """True for an e1RM from a set logged without RPE: its reps count as taken to failure, so it is a lower bound."""
+    return point.get("method") == "epley"
+
+
 def load_for(e1rm_value, reps, rpe=None):
     """The load that gives `reps` at `rpe` for an e1RM: the inverse of `e1rm`."""
     n = reps_to_failure(reps, rpe)
@@ -277,10 +282,14 @@ def capacity_evidence(data, exercise_id, before, window_days):
                 "message": f"e1RM unavailable: the {latest['date']} exposure was more than "
                            f"{MAX_REPS_TO_FAILURE} reps from failure, so older e1RMs no longer limit the load. "
                            "Load-step, equipment and return checks still apply."}
+    message = f"e1RM unavailable: no comparable e1RM in the last {window_days} days."
+    if best:
+        message = f"e1RM {units.json_number(best['e1rm'])} from {best['date']}."
+        if is_lower_bound(best):
+            message += (" Its set was logged without RPE, so the e1RM counts every rep as taken to failure: a lower "
+                        "bound that cannot show a load beyond failure.")
     return {"estimate": best, "reason": None if best else "no_comparable_estimate",
-            "date": best["date"] if best else None,
-            "message": (f"e1RM {units.json_number(best['e1rm'])} from {best['date']}." if best
-                        else f"e1RM unavailable: no comparable e1RM in the last {window_days} days.")}
+            "date": best["date"] if best else None, "message": message}
 
 
 def _half(increment):
