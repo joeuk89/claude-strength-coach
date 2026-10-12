@@ -60,10 +60,11 @@ def _covered(inst, window):
 
 def planned(inst, window, overlay_rows, workouts, today):
     """Every planned session in the window: the card's C18 rows where an overlay is in force, else the
-    schedule rule's plan, each matched to a workout of its session in the same week."""
+    schedule rule's plan from the program's adoption (C41), each matched to a workout of its session in the
+    same week."""
     covered = _covered(inst, window)
     rows = [dict(row, planned_from="overlay") for row in overlay_rows]
-    open_days = [day for day in window.days() if day not in covered]
+    open_days = {day for day in window.days() if day not in covered and inst.schedules_on(day)}
     plan = schedule_plan(inst, window, today) if open_days else None
     if plan is None:
         return sorted(rows, key=lambda r: (r["date"], r["session_id"])), covered
@@ -74,7 +75,7 @@ def planned(inst, window, overlay_rows, workouts, today):
     def week_of(day):
         return dates.week_span(_day(day), week_starts).start
 
-    scheduled = [(day, sid) for day, sid in plan.sessions if day not in covered]
+    scheduled = [(day, sid) for day, sid in plan.sessions if day in open_days]
     candidates = [w for w in workouts if _day(w["date"]) in open_days]
     pairs = [(abs((_day(w["date"]) - day).days), w["date"], index, w["workout_id"])
              for index, (day, sid) in enumerate(scheduled) for w in candidates

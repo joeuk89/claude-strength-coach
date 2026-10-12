@@ -17,6 +17,7 @@ import re
 from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
+from functools import cached_property
 from pathlib import Path
 
 from coach import checkin_catchup, checkin_parts, dates, flags, history, overlay, paths, program, render, routines
@@ -300,6 +301,13 @@ class _Instance:
         return cls(root, config_module.load(root), history.load_optional(program, root),
                    history.load_optional(state, root), Library.load(root), overlay.list(root))
 
+    @cached_property
+    def adopted(self):
+        return state.adopted(self.root, self.state, self.overlays)
+
+    def schedules_on(self, day):
+        return state.plans_on(self.adopted, day)
+
     def program_session(self, session_id):
         sessions = self.program["sessions"] if self.program else []
         return next((s for s in sessions if s["id"] == session_id), None)
@@ -355,7 +363,7 @@ def _external(inst, window):
         if not external.get("weekday"):
             continue
         for day in window.days():
-            if WEEKDAYS[day.weekday()] != external["weekday"]:
+            if WEEKDAYS[day.weekday()] != external["weekday"] or not inst.schedules_on(day):
                 continue
             matching = [a for a in notes if a["date"] == day.isoformat() and a["external_id"] == external["id"]]
             note = matching[-1] if matching else None

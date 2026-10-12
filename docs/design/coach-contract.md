@@ -1652,7 +1652,9 @@ version bump (below).
   carries over. `coach.state.adopted` reads a null as the newest
   `data/archive/programs/<date>/` (a replace archives the old program
   that day), else the earliest of `block.started` and the first
-  overlay's start, else unknown.
+  overlay's start, else unknown. `block close` and `block init` write
+  that reading into a null field, the earliest of it before and after
+  the new block, so a new block never moves the adoption forward.
 - `rotation.position` is null when the schedule has no rotation
   (`fixed_weekdays`); `confirmed_at` is a date or null.
 - `block` has the C42 shape (R-31, v4).
@@ -4411,8 +4413,8 @@ as it was):
 - `summary`: one row per week in the window (C7 weeks; `week` is the
   label, `start` the week's first day; the first and last rows may cover
   part of a week). Planned sessions come from the overlay in force (the
-  card's C18 rows), else from `schedule plan` for those days, each
-  matched to a workout of its session (its `session_id`, or the routine
+  card's C18 rows), else from `schedule plan` for those days on or
+  after the program's adoption (C41), each matched to a workout of its session (its `session_id`, or the routine
   `state.hevy.routines` maps to it) in the same week, a
   `trained_unlogged` annotation, or a `miss` annotation for its tag.
   `planned_from` is `overlay` when an overlay is in force on every day of
@@ -5201,7 +5203,9 @@ coach.structure.ordinary_weeks(root, until, n=4, reach=12) -> list[str]
   plans nothing, and a `miss` annotation on it is not counted. A session
   for the same id that moves nothing is a separate planned session.
   `coach.overlay.planned` applies the overlay rules for both
-  `structure` and `stats adherence --span` (so the check-in card).
+  `structure` and `stats adherence --span` (so the check-in card), and
+  `coach.state.plans_on` the adoption bound for `structure`, the card's
+  coach-led sessions and the catch-up card's schedule rows (C36).
 - A **program week** is a week wholly on or after the adoption date, or
   an earlier week that still plans a session. Adherence,
   `ordinary_weeks` and the priority rows scan the program weeks among
@@ -5764,7 +5768,7 @@ writes `data/program.json` directly.
    `--dry-run` too); with it, copy both files to
    `data/archive/programs/<today>/` (`<today>-2`, `-3` when that exists).
 3. Write `data/program.json` and `data/state.json` (`program_adopted`
-   today; block started today, zero hard weeks, deload not due, or the
+   today; block started today, zero hard weeks, light week not due, or the
    old state's block kept under `--replace`; rotation position from
    `--position`, else the draft's `position`, else the schedule rule's
    first position, confirmed today for the week holding tomorrow, or

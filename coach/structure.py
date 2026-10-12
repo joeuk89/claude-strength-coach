@@ -14,6 +14,7 @@ balance report shows, not a claim that each needs its own exercise.
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
+from functools import cached_property
 from pathlib import Path
 
 from coach import config as config_module
@@ -36,7 +37,6 @@ REACH_WEEKS = 12
 UNDERSHOOT_WEEKS = 3
 OVERRIDE_DAYS = 28
 LAYOFF_AFTER_DAYS = validity.RETURN_BANDS[0].upper
-_UNSET = object()
 FLOOR_PREFIX = "priority:"
 PRIORITY_DAYS = 28
 MINIMUM_MAX_SESSIONS = 2
@@ -154,7 +154,6 @@ class _Instance:
     overlays: list = None
     decisions: dict = None
     _workouts: list = field(default=None, repr=False)
-    _adopted: object = field(default=_UNSET, repr=False)
 
     @classmethod
     def load(cls, root, today=None, now=None, program_doc=None, require_program=True):
@@ -179,15 +178,13 @@ class _Instance:
             self._workouts = history.workouts(self.root, now=self.now)
         return self._workouts
 
-    @property
+    @cached_property
     def adopted(self):
         """The first day the current program plans sessions from its schedule rule and coach-led sessions."""
-        if self._adopted is _UNSET:
-            self._adopted = state.adopted(self.root, self.state, self.overlays)
-        return self._adopted
+        return state.adopted(self.root, self.state, self.overlays)
 
     def schedules_on(self, day):
-        return self.adopted is not None and day >= self.adopted
+        return state.plans_on(self.adopted, day)
 
     def made_on(self, decision):
         zone = self.config.athlete.timezone

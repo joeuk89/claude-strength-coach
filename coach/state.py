@@ -62,6 +62,11 @@ def adopted(root, doc, overlays):
     return dates.parse_date(min(starts)) if starts else None
 
 
+def plans_on(adopted, day):
+    """True when the program's schedule rule and coach-led sessions plan `day`: on or after its adoption (C41)."""
+    return adopted is not None and day >= adopted
+
+
 def problems(doc, program_doc=None):
     """Every problem with a state document; with `program_doc`, also ids that point at nothing in it."""
     if isinstance(doc, dict):

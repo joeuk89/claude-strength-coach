@@ -17,4 +17,5 @@ def migrate(doc):
 
 def notes(before, after):
     return ["data/state.json: program_adopted is unknown, so the schedule rule plans sessions from the newest "
-            "program archive, else the block start or the first overlay; the next program adopt records it"]
+            "program archive, else the block start or the first overlay; the next program adopt or block close "
+            "records it"]
