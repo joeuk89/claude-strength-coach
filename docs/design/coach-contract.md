@@ -2584,7 +2584,7 @@ CITES = ()                           # template research claim refs, e.g. ("rn:d
 def propose(ctx: SchemeContext) -> Proposal                          # schemes
 def decay(ctx: SchemeContext, proposal: Proposal, days_off: int) -> Proposal   # schemes; may return base.default_decay(...)
 def deload(ctx: SchemeContext, proposal: Proposal) -> Proposal       # schemes, optional (used by the `scheme` transform)
-def override_state(params: dict, state: dict, sets: tuple[SetSpec, ...]) -> dict  # schemes, optional (used by finalize)
+def override_state(params: dict, state: dict, sets: tuple[SetSpec, ...], load_mode: str) -> dict  # schemes, optional (finalize)
 def plan(ctx: ScheduleContext) -> SchedulePlan                       # schedules
 def apply(ctx: SchemeContext, proposal: Proposal) -> Proposal        # transforms
 ```
@@ -2716,9 +2716,9 @@ and `plugins test` runs them. Loaded with
   A deload run writes no pending state: a deload never advances a
   scheme. When the slot's latest line in the overlay carries an
   `override` and its scheme defines `override_state`, finalize stores
-  `override_state(params, state, working sets)` as pending instead, so
-  an approved override can move the scheme's state (only
-  `assistance_ladder` defines it).
+  `override_state(params, state, working sets, the slot's load mode)`
+  as pending instead, so an approved override can move the scheme's
+  state (only `assistance_ladder` defines it).
 
 **Built with R-23a** (additions to the shapes above):
 
@@ -2917,9 +2917,11 @@ and `plugins test` runs them. Loaded with
   so a climb never reaches a return week, with the band's set cut and
   RPE cap and no load cut. `override_state` moves `rung` to the rung
   whose load every overridden working set carries (exactly one rung,
-  loads compared numerically), keeping `through`; an override off the
-  rungs or with mixed loads leaves the state as proposed. `LOAD_MODES`
-  is `bodyweight`, `assisted` and `band`.
+  loads compared numerically, a null rung as 0 on a `bodyweight` line
+  as the proposal prescribes it), keeping `through`; an override off
+  the rungs, with mixed loads or with no load (a `band` line) leaves
+  the state as proposed. `LOAD_MODES` is `bodyweight`, `assisted` and
+  `band`.
 - `maintenance` repeats the newest valid exposure's top load with the
   fewest reps logged at that load, at the program's working set count
   and RPE targets; with none, the start load. State is empty.
@@ -2993,7 +2995,8 @@ id follows C10. `data.lines_digest` (R-21b) is the C7 canonical hash of
   three first, the updated state against the program included (C16), so
   a refusal or `--dry-run` writes nothing. It writes the state, then the
   decisions, then the overlay, so an interrupted first write leaves no
-  overlay to approve; running it again is safe. If a run over an earlier
+  overlay to approve, though the state may already hold the run's
+  rotation; running it again is safe and repairs both. If a run over an earlier
   unapproved overlay fails at the overlay write, that earlier overlay
   stays approvable against the new pending state, so finalize again
   before approving.

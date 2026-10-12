@@ -1306,7 +1306,8 @@ def _override_state(program_doc, plugin, slot, data, line):
     if errors:
         raise ValidationError(f"Scheme {plugin.name} params fail its PARAMS schema",
                               details=[e.to_json() for e in errors])
-    found = hook(params, dict(data), tuple(base.working([base.SetSpec.from_dict(s) for s in line["sets"]])))
+    found = hook(params, dict(data), tuple(base.working([base.SetSpec.from_dict(s) for s in line["sets"]])),
+                 exercise["load_mode"])
     errors = plugins.state_errors(plugin, found)
     if errors:
         raise ValidationError(f"Scheme {plugin.name} returned an override state that fails its STATE schema",

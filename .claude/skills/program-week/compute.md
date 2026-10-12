@@ -92,12 +92,11 @@ and the rotation position, and settle its flags:
   session stayed: agree whether to ease or move it, then resolve the
   flag (step 4).
 - `incomplete_exposure` (fewer sets logged than prescribed, none short):
-  no miss counts. If the misses already counted reach the line's
+  no miss counts. If the counted misses already reach
   `misses_before_reset`, the line resets anyway and needs no question.
-  Otherwise the load holds: ask whether the missing sets were skipped or
-  failed. A failed set is a miss: when it reaches `misses_before_reset`,
-  override the line to the reset load (step 3); below it the load holds
-  and nothing records the miss, so name it at the next check-in.
+  Else the load holds: ask whether the missing sets were skipped or
+  failed. A failed set is a miss: at the limit, override the line to the
+  reset load (step 3); below it, name the miss at the next check-in.
 - `no_data` (set the first load with the athlete), `stalled`,
   `constraint_applied`, `override_standing`, `scheme_reset`,
   `rotation_unconfirmed` (state the position for confirmation, as
@@ -113,9 +112,8 @@ default) when the change should hold in later weeks — a niggle, an
 agreed hold — so the scheme stops proposing it away. A per-exercise
 **focus** drawn from check-in findings ("slow the eccentric") may go
 into the draft line, with an `override` reason saying why; any line
-changed without a reason is refused. An override onto another rung of
-an assistance ladder moves the ladder to that rung once the week is
-approved.
+changed without a reason is refused. An approved override onto an
+assistance ladder's rung moves the ladder to that rung.
 
 Niggle limits are already in the proposal: `propose week` applies each
 active niggle's constraints to every matching line and names the niggle

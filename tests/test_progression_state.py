@@ -5,9 +5,10 @@ import json
 import unittest
 from dataclasses import replace
 from datetime import date
+from pathlib import Path
 from unittest import mock
 
-from coach import propose, units
+from coach import jsonio, propose, units
 from coach.errors import ValidationError
 from coach.plugins import base
 from tests.support.history import W, R_B, read_json
@@ -18,6 +19,8 @@ from tests.test_propose import FIRST_ID, SQUAT, ProposeCase, codes, coaching, ed
 THREE_EIGHTS = ({"count": 3, "type": "normal", "reps": 8, "rpe": 8},)
 RUNGS = [{"name": "30 kg assist", "load": 30}, {"name": "25 kg assist", "load": 25},
          {"name": "20 kg assist", "load": 20}]
+BODYWEIGHT_RUNGS = {"rungs": [{"name": "Bodyweight", "load": None}, {"name": "+5 kg", "load": 5},
+                              {"name": "+10 kg", "load": 10}]}
 
 
 def prescribed(day, reps, sets=THREE_EIGHTS, load=100, workout_id=None, logged=None):
@@ -214,9 +217,9 @@ class LinearResetStateTest(unittest.TestCase):
 class LadderOverrideStateTest(unittest.TestCase):
     PARAMS = {"rungs": RUNGS}
 
-    def override_state(self, state, loads):
+    def override_state(self, state, loads, params=PARAMS, load_mode="assisted"):
         sets = tuple(base.SetSpec(reps=8, rpe=8, load=load) for load in loads)
-        return scheme("assistance_ladder").module.override_state(self.PARAMS, state, sets)
+        return scheme("assistance_ladder").module.override_state(params, state, sets, load_mode)
 
     def test_an_override_onto_a_rung_moves_the_ladder_there(self):
         self.assertEqual(self.override_state({"rung": 0, "through": "2026-10-08"}, (25, 25, 25)),
@@ -228,10 +231,20 @@ class LadderOverrideStateTest(unittest.TestCase):
                 self.assertEqual(self.override_state({"rung": 0, "through": None}, loads),
                                  {"rung": 0, "through": None})
 
+    def test_an_override_to_bodyweight_moves_a_bodyweight_ladder_to_its_null_rung(self):
+        self.assertEqual(self.override_state({"rung": 2, "through": "2026-10-08"}, (0, 0, 0), BODYWEIGHT_RUNGS,
+                                             "bodyweight"), {"rung": 0, "through": "2026-10-08"})
+
+    def test_a_null_rung_matches_no_load_on_an_assisted_ladder(self):
+        rungs = {"rungs": [{"name": "Band", "load": None}, *RUNGS]}
+        self.assertEqual(self.override_state({"rung": 1, "through": None}, (0, 0, 0), rungs),
+                         {"rung": 1, "through": None})
+
     def test_an_override_state_that_fails_the_state_schema_is_refused(self):
         plugin = scheme("assistance_ladder")
         program_doc = {"sessions": [{"id": "session-a", "exercises": [
-            {"exercise_id": "pull_up", "scheme": {"name": "assistance_ladder", "params": self.PARAMS}}]}]}
+            {"exercise_id": "pull_up", "load_mode": "assisted",
+             "scheme": {"name": "assistance_ladder", "params": self.PARAMS}}]}]}
         line = {"override": {"reason": "synthetic"}, "sets": [{"type": "normal", "reps": 8, "rpe": 8, "load": 25}]}
         with mock.patch.object(plugin.module, "override_state", return_value={"rung": -1, "through": None}):
             with self.assertRaises(ValidationError) as caught:
@@ -241,7 +254,8 @@ class LadderOverrideStateTest(unittest.TestCase):
     def test_override_params_that_fail_the_params_schema_are_refused(self):
         plugin = scheme("assistance_ladder")
         program_doc = {"sessions": [{"id": "session-a", "exercises": [
-            {"exercise_id": "pull_up", "scheme": {"name": "assistance_ladder", "params": {"rungs": "none"}}}]}]}
+            {"exercise_id": "pull_up", "load_mode": "assisted",
+             "scheme": {"name": "assistance_ladder", "params": {"rungs": "none"}}}]}]}
         line = {"override": {"reason": "synthetic"}, "sets": [{"type": "normal", "reps": 8, "rpe": 8, "load": 25}]}
         with self.assertRaises(ValidationError) as caught:
             propose._override_state(program_doc, plugin, "session-a/pull_up", {"rung": 0, "through": None}, line)
@@ -376,6 +390,46 @@ class LadderOverridePipelineTest(ProposeCase):
         self.assertEqual({coaching(s["load"]) for s in working(line)}, {25})
 
 
+class BodyweightLadderOverridePipelineTest(ProposeCase):
+    """The pull-up as a bodyweight ladder stored at its top rung, +10 kg, every logged exposure consumed."""
+
+    def setUp(self):
+        super().setUp()
+        self.edit_json("data/exercises.json", lambda doc: doc["exercises"]["pull_up"].update(
+            load_mode="bodyweight", load_mode_proposed="bodyweight"))
+        self.edit_program(lambda doc: self.slot(doc, "session-b", "pull_up").update(
+            load_mode="bodyweight", start_load=10, scheme={"name": "assistance_ladder", "params": BODYWEIGHT_RUNGS}))
+        for path in (self.root / "data" / "history").glob("????-??.json"):
+            self.edit_json(path.relative_to(self.root).as_posix(), lambda doc: [
+                self.weighted(exercise) for workout in doc["workouts"] for exercise in workout["exercises"]
+                if exercise["exercise_id"] == "pull_up"])
+        self.edit_json("data/state.json", lambda doc: doc["scheme_state"].update({"session-b/pull_up": {
+            "scheme": "assistance_ladder", "data": {"rung": 2, "through": "2026-10-08"}, "pending": None}}))
+
+    @staticmethod
+    def weighted(exercise):
+        exercise["load_mode"] = "bodyweight"
+        for s in exercise["sets"]:
+            s.update(weight_kg=10.0, load=units.make_load(10, "bodyweight", "kg"), reps=8, rpe=9)
+
+    def pull_up(self, doc):
+        return next(line for session in doc["sessions"] for line in session["exercises"]
+                    if line["exercise_id"] == "pull_up")
+
+    def test_an_approved_override_back_to_bodyweight_holds_the_ladder_on_its_first_rung(self):
+        line = self.pull_up(self.propose()["overlay"])
+        self.assertEqual({coaching(s["load"]) for s in working(line)}, {10})
+        self.coach("propose", "override", "--proposal", FIRST_ID, "--session", "session-b", "--exercise", "pull_up",
+                   "--load", "0", "--reason", "synthetic: elbow niggle, back to bodyweight")
+        self.coach("propose", "finalize", "--proposal", FIRST_ID)
+        state = read_json(self.root / "data" / "state.json")["scheme_state"]["session-b/pull_up"]
+        self.assertEqual(state["pending"], {"overlay_id": FIRST_ID, "data": {"rung": 0, "through": "2026-10-08"}})
+        self.coach("overlay", "approve", FIRST_ID)
+        again = self.pull_up(self.propose("--dry-run")["overlay"])
+        self.assertEqual({coaching(s["load"]) for s in working(again)}, {0})
+        self.assertEqual(again["target_note"], "Rung 1 of 3: Bodyweight")
+
+
 class FinalizeAtomicTest(ProposeCase):
     def setUp(self):
         super().setUp()
@@ -397,6 +451,24 @@ class FinalizeAtomicTest(ProposeCase):
         refused = self.coach("overlay", "approve", FIRST_ID, expect=1)
         self.assertFalse(refused["ok"])
         self.assertFalse(self.overlay_path.exists())
+
+    def test_a_write_failing_before_the_overlay_leaves_none_to_approve_and_a_retry_repairs_it(self):
+        write_doc = jsonio.write_doc
+        for failed in ("data/state.json", "data/decisions.json"):
+            def failing(path, doc, dry_run, failed=failed):
+                if Path(path) == self.root / failed:
+                    raise OSError("synthetic: disk full")
+                return write_doc(path, doc, dry_run)
+
+            with self.subTest(failed=failed):
+                with mock.patch.object(jsonio, "write_doc", side_effect=failing):
+                    self.coach("propose", "finalize", "--proposal", FIRST_ID, expect=9)
+                self.assertFalse(self.overlay_path.exists())
+                self.assertFalse(self.coach("overlay", "approve", FIRST_ID, expect=1)["ok"])
+        self.coach("propose", "finalize", "--proposal", FIRST_ID)
+        self.coach("overlay", "approve", FIRST_ID)
+        decisions = read_json(self.root / "data" / "decisions.json")["decisions"]
+        self.assertEqual([d["overlay_id"] for d in decisions], [FIRST_ID])
 
     def test_a_normal_finalize_writes_coherent_records_and_is_safe_to_retry(self):
         first = self.coach("propose", "finalize", "--proposal", FIRST_ID)["data"]
