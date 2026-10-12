@@ -3,8 +3,8 @@ schema_version = 1
 id = "progression-training-age"
 topic = "Progression by training age"
 question = "How fast can load rise for beginner, intermediate and advanced lifters, and which progression scheme suits each?"
-written = 2026-10-11
-review_by = 2027-10-11
+written = 2026-10-12
+review_by = 2027-10-12
 confidence = "low"
 applies_to = ["progression", "autoregulation"]
 tags = ["training-age"]
@@ -124,7 +124,7 @@ status = "current"
 -->
 <!-- coach:begin research progression-training-age -->
 
-**Template note** · written 2026-10-11 · review by 2027-10-11 · confidence low · areas progression, autoregulation · tags training-age
+**Template note** · written 2026-10-12 · review by 2027-10-12 · confidence low · areas progression, autoregulation · tags training-age
 
 | # | Claim | Basis | Sources | Status |
 | --- | --- | --- | --- | --- |

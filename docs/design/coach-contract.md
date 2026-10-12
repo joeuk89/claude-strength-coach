@@ -2892,10 +2892,10 @@ constrained mode) stay coach-built through `overlay build`.
   A spec mixing reps and seconds, or a timed group with a range or a
   load, exits 2; seconds on any other line, reps on a `duration` line
   or any `--sets` on a `distance` line exit 1. Both refuse before
-  anything is written. It re-runs
-  the R-24 check and stores the merged flags in the draft, so a block an
-  override creates can be resolved there. A standing override's decision
-  is appended when the command runs.
+  anything is written. It re-runs the R-24 check and stores the merged
+  flags in the draft, so a block an override creates can be resolved
+  there. A standing override's decision is appended when the command
+  runs.
 - `propose finalize` also appends a one-week override decision
   (`standing: false`, `until` the overlay's span end) for each line whose
   `override` no decision yet records.

@@ -17,8 +17,8 @@ register("rpe_drift", owner=OWNER, severities=("warn",),
          summary="Compound or recovery-capped exercise: logged RPE at least 1 over target on two or more working "
                  "sets of the last exposure.")
 register("range_effort_mismatch", owner=OWNER, severities=("warn",),
-         summary="Double progression held a load whose derived-from exposure fell below the program's rep range or 2 or more "
-                 "RPE over its target; review the load or the range with the athlete.")
+         summary="Double progression held a load whose derived-from exposure fell below the program's rep range "
+                 "or 2 or more RPE over its target; review the load or the range with the athlete.")
 register("return_week", owner=OWNER, severities=("info",),
          summary="Decay applied; names the band and days off.")
 register("return_after_illness", owner=OWNER, severities=("warn",),

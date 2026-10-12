@@ -186,6 +186,7 @@ class ExtraSlotCase(ProposeCase):
     def setUp(self):
         super().setUp()
         self.edit_program(lambda doc: doc["sessions"][1]["exercises"].append(dict(self.extra_slot)))
+        self.coach("library", "set-mode", self.extra_slot["exercise_id"], self.extra_slot["load_mode"])
 
     def override(self, exercise, spec, expect=0):
         envelope = self.coach("propose", "override", "--proposal", FIRST_ID, "--session", "session-b",
