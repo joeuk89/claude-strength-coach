@@ -9,11 +9,18 @@ from coach.status import Section, provider
 LIGHT_WEEK_ATTENTION = ("proposed", "agreed")
 
 
-def _position_words(root, position):
-    """The stored position, said as the last session trained when the schedule is a sequence."""
+def _position_words(root, position, stored_week, this_week):
+    """The stored position. A sequence's is said against the week it was stored for, never as the next
+    session, because sessions trained since then have moved the rotation on."""
     program_doc = history.load_optional(program, root)
     following = summaries.session_after(program_doc["schedule"] if program_doc else None, position)
-    return f"{position} last trained, {following} next" if following else position
+    if following is None:
+        return position
+    if stored_week is None:
+        return f"{position} last trained; {following} follows it in the sequence"
+    if stored_week == this_week:
+        return f"{position} last trained before this week ({stored_week}), so this week starts with {following}"
+    return f"{position} last trained before the week of {stored_week}"
 
 
 @provider(id="program", owner="R-26b", order=40)
@@ -24,10 +31,11 @@ def program_status(ctx):
         doc = state_module.load(ctx.root)
     except ValidationError:
         return Section("program", ["data/state.json cannot be read; see the checks above."], {}, "attention")
-    rotation, block = pages.header_facts(ctx.root, ctx.now())["rotation"], doc["block"]
+    facts, block = pages.header_facts(ctx.root, ctx.now()), doc["block"]
+    rotation = facts["rotation"]
     lines, attention = [], False
     if rotation["position"] is not None:
-        position = _position_words(ctx.root, rotation["position"])
+        position = _position_words(ctx.root, rotation["position"], doc["rotation"].get("week"), facts["week_start"])
         if rotation["confirmed"]:
             confirmed_at = doc["rotation"]["confirmed_at"]
             when = f" on {confirmed_at}" if confirmed_at else ""

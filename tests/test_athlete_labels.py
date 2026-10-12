@@ -139,6 +139,26 @@ class SummaryTest(NoHevyCase):
         self.assertIn("assistance ladder (10 rungs: 50 kg assistance → 45 kg assistance → … → 5 kg assistance)",
                       rows[1])
 
+    def test_scheme_settings_read_in_a_meaningful_order(self):
+        names = summaries.Names(unit="kg")
+        self.assertEqual(summaries.scheme_text({"name": "rpe_anchored", "params": {
+            "top_reps": 3, "top_rpe": 8, "backoff_sets": 3, "backoff_reps": 5, "backoff_rpe": None,
+            "backoff_pct": 0.85}}, names, "total"),
+            "rpe anchored (top set of 3 reps; top set at RPE 8; 3 back-off sets; back-offs of 5 reps; "
+            "back-offs at 85 % of the top set)")
+        wave = summaries.scheme_text({"name": "wave_531", "params": {
+            "training_max": 180, "training_max_pct": 0.9, "increment_upper": None, "increment_lower": 5,
+            "region": "lower", "amrap": True}}, names, "total")
+        self.assertTrue(wave.startswith("wave 531 (starting training max 180 kg;"), wave)
+        self.assertIn("the last wave set each week is a + set", wave)
+
+    def test_set_changes_and_assisted_increments_read_the_right_way(self):
+        names = summaries.Names(unit="kg")
+        self.assertEqual(summaries.rule_text({"name": "return", "params": {"set_delta": -1, "rpe_cap": 8}}, names),
+                         "return (1 working set fewer; RPE cap 8)")
+        self.assertEqual(summaries.scheme_text({"name": "linear", "params": {"increment": 5}}, names, "assisted"),
+                         "linear (take 5 kg off the assistance after each exposure that hits all its reps)")
+
     def test_equal_rep_range_ends_read_as_one_count_everywhere(self):
         self.assertIn("| 3×6 |", self.pages()["routine/session-b.md"])
         doc = overlay.load(self.root, WEEKLY)
@@ -220,10 +240,43 @@ class RotationTest(NoHevyCase):
         self.assertIn("next week starts with Session A, after Session B as the last session trained (confirmed)",
                       text)
 
-    def test_status_line_says_last_trained(self):
-        code, envelope, _ = run_cli(["--root", str(self.root), "status"], env={"COACH_NOW": "2026-10-11T18:00:00Z"})
+    def status_rotation(self, now):
+        code, envelope, _ = run_cli(["--root", str(self.root), "status"], env={"COACH_NOW": now})
         self.assertEqual(code, 0, envelope)
-        self.assertIn("Rotation: session-b last trained, session-a next, confirmed", json.dumps(envelope))
+        section = next(item for item in envelope["data"]["sections"] if item["id"] == "program")
+        return next(line for line in section["lines"] if line.startswith("Rotation:"))
+
+    def set_stored_week(self, week):
+        path = self.root / "data/state.json"
+        state = read_json(path)
+        state["rotation"]["week"] = week
+        write_json(path, state)
+
+    def test_status_line_names_the_session_the_week_starts_with(self):
+        self.assertEqual(self.status_rotation("2026-10-11T18:00:00Z"),
+                         "Rotation: session-b last trained before this week (2026-10-12), so this week starts "
+                         "with session-a, confirmed on 2026-10-11.")
+
+    def test_status_line_mid_week_does_not_call_the_stored_session_last_trained(self):
+        with (self.root / "data/log/workouts.jsonl").open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(workout("2026-10-12", "session-a", [("bb_back_squat", "total", SQUAT_SETS),
+                                                                         ("db_bench_press", "per_hand_x2",
+                                                                          BENCH_SETS)])) + "\n")
+        self.coach("history", "sync", now="2026-10-14T18:00:00Z")
+        line = self.status_rotation("2026-10-14T18:00:00Z")
+        self.assertIn("session-b last trained before this week (2026-10-12), so this week starts with session-a", line)
+        self.assertNotIn("session-a next", line)
+
+    def test_status_line_with_a_lagging_stored_week(self):
+        self.set_stored_week("2026-10-05")
+        self.assertEqual(self.status_rotation("2026-10-14T18:00:00Z"),
+                         "Rotation: session-b last trained before the week of 2026-10-05, confirmed on 2026-10-11.")
+
+    def test_status_line_without_a_stored_week(self):
+        self.set_stored_week(None)
+        self.assertEqual(self.status_rotation("2026-10-11T18:00:00Z"),
+                         "Rotation: session-b last trained; session-a follows it in the sequence, confirmed on "
+                         "2026-10-11.")
 
 
 class MarkdownSafetyTest(NoHevyCase):

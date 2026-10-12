@@ -114,12 +114,20 @@ def _scheme_words(scheme_name, load_mode):
         return names.load(value, load_mode)
 
     when = _INCREMENT_WHEN.get(scheme_name)
+
+    def increment(names, value):
+        if load_mode == "assisted":
+            return f"take {load(names, value)} off the assistance" + (f" {when}" if when else " a step")
+        return f"add {load(names, value)} {when}" if when else f"increment {load(names, value)}"
+
     return {
-        "increment": lambda n, v: f"add {load(n, v)} {when}" if when else f"increment {load(n, v)}",
+        "increment": increment,
         "misses_before_reset": lambda n, v: f"reset after {_plural(v, 'miss', 'misses')} in a row",
         "reset_factor": lambda n, v: f"a reset drops the load to {_percent(v)}",
         "rungs": lambda n, v: _rungs(v, n),
+        "minutes": lambda n, v: _generic("minutes", v, n),
         "reps": lambda n, v: (_generic("reps", v, n) if isinstance(v, dict) else _plural(v, "rep")),
+        "reps_cap": lambda n, v: _generic("reps_cap", v, n),
         "sets": lambda n, v: _plural(v, "set"),
         "rpe": lambda n, v: f"RPE {_number(v)}",
         "training_max": lambda n, v: f"starting training max {load(n, v)}",
@@ -127,24 +135,26 @@ def _scheme_words(scheme_name, load_mode):
         "increment_upper": lambda n, v: f"upper-body training max raise {load(n, v)} a wave",
         "increment_lower": lambda n, v: f"lower-body training max raise {load(n, v)} a wave",
         "region": lambda n, v: f"{v}-body increments",
-        "amrap": lambda n, v: "last wave set a + set" if v else "no + set",
+        "amrap": lambda n, v: "the last wave set each week is a + set" if v else "no + set",
         "top_reps": lambda n, v: f"top set of {_plural(v, 'rep')}",
         "top_rpe": lambda n, v: f"top set at RPE {_number(v)}",
         "backoff_sets": lambda n, v: _plural(v, "back-off set"),
         "backoff_reps": lambda n, v: f"back-offs of {_plural(v, 'rep')}",
-        "backoff_rpe": lambda n, v: f"back-offs at RPE {_number(v)}",
         "backoff_pct": lambda n, v: f"back-offs at {_percent(v)} of the top set",
+        "backoff_rpe": lambda n, v: f"back-offs at RPE {_number(v)}",
         "set_factor": lambda n, v: f"{_percent(v)} of the sets",
         "load_factor": lambda n, v: f"{_percent(v)} of the load",
+        "set_delta": lambda n, v: (f"{_plural(-v, 'working set')} fewer" if v < 0
+                                   else _plural(v, 'more working set')),
         "rpe_cap": lambda n, v: f"RPE cap {_number(v)}",
-        "set_delta": lambda n, v: f"{_number(v)} working set{'' if abs(v) == 1 else 's'}",
         "rpe_target": lambda n, v: f"RPE target {_number(v)}",
     }
 
 
 def _named(name, params, names, words):
     parts = []
-    for key in sorted(params or {}):
+    known = [key for key in words if key in (params or {})]
+    for key in known + sorted(set(params or {}) - set(known)):
         value = params[key]
         if value is None or value == {} or value == []:
             continue

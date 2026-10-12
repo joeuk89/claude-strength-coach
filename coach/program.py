@@ -799,10 +799,10 @@ def _priority_lines(doc, library, names):
     if minimum:
         rule = summaries.schedule_text(minimum["schedule"]["rule"], minimum["schedule"]["params"], names)
         lines += ["", "## Minimum week", "",
-                  f"Sessions: {', '.join(f'`{session_id}`' for session_id in minimum['sessions'])}. "
+                  f"Sessions: {', '.join(names.session(session_id) for session_id in minimum['sessions'])}. "
                   f"Schedule rule: {rule}."]
         if minimum.get("external_sessions"):
-            retained = ', '.join(f'`{external_id}`' for external_id in minimum['external_sessions'])
+            retained = ', '.join(names.session(external_id) for external_id in minimum['external_sessions'])
             lines.append(f"Retained coach-led sessions: {retained}.")
     return lines
 
