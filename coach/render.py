@@ -225,11 +225,11 @@ def splice_region(text, kind, region_id, region, heading=WEEK_AHEAD_HEADING):
         if found_id == region_id:
             return text[:start] + region + text[end:]
     position = len(text)
-    heading = re.search(rf"^{re.escape(heading)}\b.*$", text, flags=re.MULTILINE)
-    if heading:
-        following = re.search(r"^## ", text[heading.end():], flags=re.MULTILINE)
+    match = re.search(rf"^{re.escape(heading)}\b.*$", text, flags=re.MULTILINE)
+    if match:
+        following = re.search(r"^## ", text[match.end():], flags=re.MULTILINE)
         if following:
-            position = heading.end() + following.start()
+            position = match.end() + following.start()
     before, after = text[:position], text[position:]
     if before and not before.endswith("\n"):
         before += "\n"

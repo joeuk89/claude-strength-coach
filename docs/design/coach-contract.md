@@ -395,7 +395,7 @@ Tables later items add, each in its own PR:
 
 ```toml
 [checkin]                   # R-21a
-cadence_days = 7            # days between check-ins; the due date is the last record's date + this
+cadence_days = 7            # days between check-ins; the due date is the newest review's date + this (C36)
 ```
 
 **Nutrition keys** (R-33a, R-33b, R-33c). Nutrition is enabled only by
@@ -4302,7 +4302,7 @@ and `render_card` would capture R-33b's `card` regions.
   the first-review anchor, else the end day.
 - **Mode**: `catch_up` when `days_since > catch_up_after_days()`, the
   first return band's upper edge (C22).
-  Otherwise `deep` when there is no record, the last deep record is
+  Otherwise `deep` when there is no review, the last deep review is
   `DEEP_AFTER_DAYS` (42, rn:deloads.12) or more days old, a card part
   adds a reason, or `--tier deep`; else `weekly`. `--tier weekly` or `--tier deep` overrides a catch-up. A
   catch-up never runs deep; it sets `deep_deferred: true` (a record-based
@@ -4324,8 +4324,9 @@ and `render_card` would capture R-33b's `card` regions.
   the first actual review is still deep. The 42-day clock starts at that review.
 - `checkin prepare --deep-reason CODE` (repeatable) carries the block preview's
   `deep_review.reasons` into the card using `block.DEEP_REASON_WORDS`.
-  It supplies a deep reason without overriding catch-up or `--tier weekly`;
-  `--tier deep` explicitly selects deep. The record-derived codes
+  It supplies a deep reason without overriding catch-up or `--tier weekly`,
+  so the check-in skill passes the codes without `--tier`;
+  `--tier deep` explicitly selects deep (an athlete's request). The record-derived codes
   (`block.RECORD_DEEP_REASONS`) add no words when the card's own record
   reasons already apply. Only an explicit deep request with
   no record, block or card-part reason displays "asked for".
@@ -4802,7 +4803,7 @@ from R-33a's `nutrition status` when present (null when absent or
 disabled). `checkin` comes from C36 `due()` on `as_of`'s date: `last`,
 `due_date`, `days_since` and `mode` as `due()` gives them, and `tier`, the
 next check-in's tier: `deep` when `deep_reasons` holds on the due date
-(today when there is no record), else `weekly`.
+(today when the due date is unknown), else `weekly`.
 
 `as_of` bounds history (workouts started and annotations created at or
 before it); "today" inside a render is `as_of`'s local date. Program,

@@ -631,6 +631,13 @@ class CheckInSkillTest(unittest.TestCase):
         step = " ".join(step_text("check-in", "record.md").split())
         self.assertIn("python3 -m coach checkin skeleton", step)
 
+    def test_block_deep_reasons_reach_the_card_without_forcing_the_tier(self):
+        step = " ".join(step_text("check-in", "sunday-message.md").split())
+        self.assertIn("one `--deep-reason <code>` for each `deep_review.reasons` code and no `--tier`", step)
+        self.assertIn("Pass `--tier deep` only when the athlete asks for a deep review", step)
+        record = " ".join(step_text("check-in", "record.md").split())
+        self.assertIn("pass `--tier` with the tier of the card you sent", record)
+
     def test_deep_tier_reads_misses(self):
         self.assertIn("python3 -m coach checkin misses", self.text)
 

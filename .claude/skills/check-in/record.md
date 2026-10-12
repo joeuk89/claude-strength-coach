@@ -1,9 +1,10 @@
 # Write the record
 
 Run `python3 -m coach history sync`, then `python3 -m coach checkin
-skeleton --date <today>`. It writes `check-ins/<today>.md`, titled with
-the card's tier (pass `--tier deep` when the block preview required
-deep), holding:
+skeleton --date <today> --tier <tier>`, and pass `--tier` with the tier
+of the card you sent (`weekly`, `deep`, or `catch-up` for mode
+`catch_up`): the skeleton can't see the block's deep reasons. It writes
+`check-ins/<today>.md`, titled with that tier, holding:
 
 - **Week in review:** a rendered region: the window, sessions n of m
   core, the `Missed:` line with each miss's tag, the sessions, results

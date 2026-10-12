@@ -741,14 +741,14 @@ def _build(root, today, until=None, tier=None, now=None, live=True, parts=True, 
 
 
 def prepare(root, today, until=None, tier=None, now=None, *, deep_review_reasons=()):
-    """The card for the window from the day after the last record to `until` (default today)."""
+    """The card for the window from the day after the newest review to `until` (default today)."""
     if tier is not None and tier not in CARD_TIERS:
         raise ValueError(f"tier must be one of {', '.join(CARD_TIERS)}")
     return _build(root, today, until, tier, now, deep_review_reasons=deep_review_reasons)
 
 
 def tag_gap(root, today, tag, now=None, dry_run=False):
-    """Tag every untagged missed core session in the window since the last record with one miss tag (C36)."""
+    """Tag every untagged missed core session since the newest review with one miss tag (C36)."""
     card = _build(root, today, tier=CATCH_UP, now=now, parts=False, with_return=False)
     return checkin_catchup.tag_gap(root, card, tag, now, dry_run)
 

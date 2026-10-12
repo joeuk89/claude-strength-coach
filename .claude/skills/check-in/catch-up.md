@@ -2,7 +2,7 @@
 
 When `data.card.mode` is `catch_up`, this is a catch-up check-in: send
 `data.text` as the whole message. It has no per-session fields: one
-summary row per week since the last record, the return week
+summary row per week since the newest review, the return week
 (`card.catch_up.return_week`: band, days off, load and set change, RPE
 cap, each session's lines and flags), three numbered questions (the
 gap, now, next week), then the write line and "Reply ok to accept all of

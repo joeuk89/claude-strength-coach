@@ -30,9 +30,9 @@ class ReviewContextTest(HistoryCase):
         return self.coach("check", "--only", check_id, expect=expect)["data"]["results"]
 
     def test_program_start_record_does_not_complete_a_review_and_first_due_is_consistent(self):
-        for setup in (False, True):
-            with self.subTest(setup=setup):
-                if setup:
+        for program_start in (False, True):
+            with self.subTest(program_start=program_start):
+                if program_start:
                     self.record("2026-10-11", "# Program start — 2026-10-11")
                 first = self.status("2026-10-11")
                 self.assertEqual(first["level"], "info")
@@ -47,16 +47,16 @@ class ReviewContextTest(HistoryCase):
                 self.assertEqual({row["status"] for row in self.checks("checkin_records")}, {"pass"})
                 dashboard = pages.render_dashboard(self.root, dates.parse_timestamp("2026-10-11T18:00:00Z"))
                 self.assertIn("Last check-in: none yet", dashboard)
-                if setup:
+                if program_start:
                     self.assertIn("[Program start](check-ins/2026-10-11.md)", dashboard)
                     self.assertEqual(checkin.records(self.root)[0].kind, checkin.PROGRAM_START)
 
-    def test_configured_cadence_changes_first_due_with_and_without_setup(self):
+    def test_configured_cadence_changes_first_due_with_and_without_a_program_start_record(self):
         with (self.root / "config.toml").open("a", encoding="utf-8") as handle:
             handle.write("\n[checkin]\ncadence_days = 14\n")
-        for setup in (False, True):
-            with self.subTest(setup=setup):
-                if setup:
+        for program_start in (False, True):
+            with self.subTest(program_start=program_start):
+                if program_start:
                     self.record("2026-10-11", "# Program start — 2026-10-11")
                 status = self.status("2026-10-18")
                 self.assertEqual(status["level"], "info")
@@ -149,6 +149,14 @@ class ReviewContextTest(HistoryCase):
                 self.assertEqual(command, card["misses"])
                 self.assertEqual(command["since"], since)
 
+    def test_misses_since_spans_the_program_when_only_weekly_reviews_came_before(self):
+        self.record("2026-10-18", "# Check-in — 2026-10-18 (weekly)")
+        card = self.coach("checkin", "prepare", "--until", "2026-10-25", "--tier", "deep")["data"]["card"]
+        command = self.coach("checkin", "misses", "--until", "2026-10-25")["data"]
+        self.assertEqual(card["window"]["start"], "2026-10-19")
+        self.assertEqual(card["misses"]["since"], "2026-10-12")
+        self.assertEqual(command, card["misses"])
+
     def test_an_unrecognised_record_keeps_its_week_review_region_as_archive(self):
         for day in ("2026-10-18", "2026-10-25"):
             self.coach("checkin", "skeleton", "--date", day, "--tier", "deep")
@@ -235,6 +243,20 @@ class ReviewContextTest(HistoryCase):
                           "--deep-reason", "light_week_proposed")["data"]["card"]
         self.assertEqual((card["mode"], card["deep_deferred"]), ("catch_up", True))
         self.assertIn("deep review deferred (a light week is being proposed)", card["tier_reasons"])
+
+    def test_block_reasons_in_a_catch_up_week_keep_the_card_and_record_catch_up(self):
+        self.record("2026-08-30", "# Check-in — 2026-08-30 (deep)")
+        self.record("2026-10-04", "# Check-in — 2026-10-04 (weekly)")
+        reasons = block.status(self.root, today=date(2026, 10, 18))["deep_review"]["reasons"]
+        self.assertIn("six_weeks", reasons)
+        args = [part for reason in reasons for part in ("--deep-reason", reason)]
+        card = self.coach("checkin", "prepare", "--until", "2026-10-18", *args)["data"]["card"]
+        self.assertEqual((card["mode"], card["deep_deferred"]), ("catch_up", True))
+        tier = checkin.TIER_OF_MODE.get(card["mode"], card["mode"])
+        self.coach("checkin", "skeleton", "--date", "2026-10-18", "--tier", tier)
+        found = checkin.reviews(self.root)
+        self.assertEqual(found[-1].tier, "catch-up")
+        self.assertEqual(checkin.mode_for(found, date(2026, 10, 25))[0], "deep")
 
     def test_record_derived_block_reasons_do_not_repeat_the_card_reasons(self):
         args = ("--deep-reason", "first_close", "--deep-reason", "light_week_proposed")
