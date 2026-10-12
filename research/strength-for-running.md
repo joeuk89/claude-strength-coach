@@ -112,7 +112,7 @@ runner needs additional sets, jumps or a specific weekly schedule.
   limitations with the athlete; keep routine changes in the usual approval
   flow. Apply existing interference checks alongside this evidence.
 - Keep running in the review tier: the athlete or outside plan owns its
-  progression. This note neither creates running workouts nor activates
+  progression. This note neither creates planned activities nor activates
   coach-planned running; that program-tier work remains deferred.
 
 ## Open questions

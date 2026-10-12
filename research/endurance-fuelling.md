@@ -119,15 +119,15 @@ No new numeric advice is adopted from it.
 
 ## Applying it
 
-- With nutrition coaching enabled, review only missing context: expected
-  duration and intensity, current meals/fuelling, practical access, gut
-  tolerance and the outside plan's advice. Reuse what is already known.
+- `reference/runner-review.md` sets when fuelling questions apply, which
+  known context to reuse, and how calorie/protein targets and MacroFactor
+  ownership stay unchanged. The context that matters: expected duration and
+  intensity, current meals/fuelling, practical access, gut tolerance and the
+  outside plan's advice.
 - Discuss before/during/after considerations without calculating a default
   dose. Any later numeric proposal needs a directly supporting source,
   evidence population, event duration/context, confidence and athlete review;
   save athlete-specific research in a local note.
-- `reference/runner-review.md` sets when to skip fuelling questions and
-  how calorie/protein targets and MacroFactor ownership stay unchanged.
 - For medical nutrition concerns or an individualized clinical plan, refer
   to a qualified dietitian.
 

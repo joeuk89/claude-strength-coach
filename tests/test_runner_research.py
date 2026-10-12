@@ -48,6 +48,9 @@ class RunnerResearchTest(unittest.TestCase):
                       text.lower())
         self.assertNotIn("follow-up in the normal prose record", text)
         self.assertNotIn("quiet week", text.lower())
+        for note in ("strength-for-running", "endurance-fuelling"):
+            note_text = (REPO_ROOT / "research" / f"{note}.md").read_text(encoding="utf-8")
+            self.assertNotIn("workout", note_text.lower(), note)
 
 
 class NonRunnerCheckinTest(HistoryCase):
