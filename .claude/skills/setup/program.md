@@ -48,6 +48,14 @@ and ask to adopt. On a yes, settle the load modes as below first, then
 run `python3 -m coach program adopt --input .coach/drafts/program.json`
 without `--dry-run`. Never write `data/program.json` yourself.
 
+**Missed-day rules are optional; explain them once, before adopting.** A
+rule is a standing answer to "I missed Session B": fold some of its sets
+into the next session, move it to a named day, or skip it. Without one,
+each miss gets a decision when it happens: move it, reshuffle the week
+or drop it. Add a rule to the draft's `missed_day_rules` only when the
+athlete wants one, with every `shift` day inside `[athlete]
+available_days`.
+
 **Confirm the load-mode table once, before adopting.** Adopt's
 `unconfirmed` lists every exercise without a confirmed load mode. Show
 it as one table (exercise, load mode, and how the athlete sets the

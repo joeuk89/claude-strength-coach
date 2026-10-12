@@ -213,8 +213,9 @@ _Avoid_: weekly plan, week's targets, weekly overlay
 The program's standing answer to one missed session, agreed before the
 week starts: fold some of its exercises into a later session, shift the
 whole session to a free day, or skip it. It is applied as a mid-week
-overlay once the athlete says go; a miss no rule covers goes back to the
-coach to reprogram.
+overlay once the athlete says go. Rules are optional: for a miss no rule
+covers, the athlete chooses to move the session to a free day, reshuffle
+the week, or drop it.
 _Avoid_: make-up rule, catch-up plan
 
 **Fold**:
@@ -232,9 +233,10 @@ _Avoid_: main lift (looser), key lift, focus lift
 **Floor dose**:
 The least a priority lift gets in a disrupted week: by default two hard
 working sets at the prescribed load and reps. When the session carrying
-the lift is missed and the program's missed-day rule doesn't keep the
-lift in the week, the floor is folded into the next session that week. A
-program fold that carries the lift at fewer sets is topped up to the floor.
+the lift is missed and a program `skip` rule or the athlete's choice to
+drop it takes the lift out of the week, the floor is folded into the next
+session that week. A program fold that carries the lift at fewer sets is
+topped up to the floor. With no rule, the athlete still chooses a move or a drop.
 _Avoid_: minimum sets, maintenance sets
 
 **Minimum week**:

@@ -1482,7 +1482,14 @@ def _locate(draft, session_id, exercise_id):
     found = [(session, line) for session in draft["sessions"] if session["session_id"] == session_id
              for line in session["exercises"] if line["exercise_id"] == exercise_id]
     if not found:
-        raise ValidationError(f"The proposal has no line for {exercise_id} in session {session_id}")
+        message = f"The proposal has no line for {exercise_id} in session {session_id}"
+        span = draft.get("span") or {}
+        if span and not any(line["exercise_id"] == exercise_id
+                            for session in draft["sessions"] for line in session["exercises"]):
+            message += (f": no session left in its span ({span['start']} to {span['end']}) has it, so its next "
+                        "exposure is in a later week. Record the agreed change with python3 -m coach followups add, "
+                        "and override that line in the next week's proposal")
+        raise ValidationError(message)
     return found
 
 

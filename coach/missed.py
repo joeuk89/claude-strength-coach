@@ -1,8 +1,8 @@
 """Missed-day rules: match a missed session to the program's rule and apply it as a mid-week overlay (contract C37).
 
 Matching (`match`) and application (`apply_rule`) stay separate so a caller
-can apply a rule it builds itself (a priority lift's floor dose), after the
-program's rules as a fallback, alone or on top of a program fold.
+can apply a rule it builds itself (a priority lift's floor dose) after the
+program's rules: alongside a skip or a chosen drop, or on top of a program fold.
 `plan` is read-only; `apply` writes the miss, the overlay and the record
 lines once the athlete has said "go".
 A fold carries `DEFAULT_FOLD_SETS` working sets unless the rule says
@@ -16,7 +16,7 @@ from pathlib import Path
 from coach import checkin, dates, flags, history, jsonio, overlay, pages, paths, program, render, stats, structure
 from coach import units, validity
 from coach import config as config_module
-from coach.errors import RefusedError, ValidationError
+from coach.errors import RefusedError, UsageError, ValidationError
 from coach.library import Library
 from coach.validate import validate as validate_schema
 
@@ -26,8 +26,12 @@ SCOPE = "one_week"
 WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 RECORD_HEADING = "## Mid-week"
 RECORD_SOURCE = "missed apply"
-FALLBACK = "python3 -m coach propose week --kind midweek"
-FALLBACK_WORDS = f"reprogram the rest of the week with {FALLBACK} and a coach's brief"
+MOVE, DROP = "move", "drop"
+FREE, OCCUPIED, ELAPSED, UNAVAILABLE, OUTSIDE = "free", "occupied", "elapsed", "unavailable", "outside"
+DECIDE_WORDS = ("ask the athlete whether to move it to a free day (missed plan --move-to D) or drop it this week "
+                "(missed plan --drop)")
+NO_FREE_DAY_WORDS = ("ask the athlete whether to drop it this week (missed plan --drop) or reshuffle the rest of the "
+                     "week")
 
 
 class Unmatched(Exception):
@@ -214,26 +218,78 @@ def _folded_line(sessions, missed, exercise_id):
     return None
 
 
-def _shift(doc, missed, day, rule, config, today):
-    """(sessions after the miss with the missed session moved, flags) for a `shift` rule."""
-    day = _day(day)
+def weekday_list(weekdays):
+    """Weekday ids as words in calendar order: `Mon, Thu`."""
+    return ", ".join(_weekday_word(w) for w in WEEKDAYS if w in weekdays)
+
+
+def destination(doc, missed_day, candidate, config, today):
+    """(status, reason) for moving a session missed on `missed_day` to `candidate`; the reason is None when free.
+
+    Elapsed comes before occupied and occupied before unavailable, so the reason names what blocks the day first.
+    """
+    missed_day, candidate = _day(missed_day), _day(candidate)
+    label = render.day_label(candidate)
     end = dates.parse_date(doc["span"]["end"])
-    taken = {s["date"] for s in doc["sessions"]}
+    if candidate <= missed_day or candidate > end:
+        return OUTSIDE, (f"{label} is not after the miss and within the overlay's span "
+                         f"(to {render.day_label(end)})")
+    if candidate < today:
+        return ELAPSED, f"{label} has passed"
+    planned = [s["title"] for s in doc["sessions"] if s["date"] == candidate.isoformat()]
+    if planned:
+        return OCCUPIED, f"{label} already has {_and(planned)} planned"
     available = config.athlete.available_days
-    for weekday in rule["action"]["to_weekdays"]:
-        candidate = day + timedelta(days=(WEEKDAYS.index(weekday) - day.weekday()) % 7 or 7)
-        if (candidate < today or candidate > end or candidate.isoformat() in taken
-                or (available and weekday not in available)):
+    weekday = WEEKDAYS[candidate.weekday()]
+    if available and weekday not in available:
+        return UNAVAILABLE, (f"{_weekday_word(weekday)} is not one of the athlete's available days "
+                             f"([athlete] available_days: {weekday_list(available)})")
+    return FREE, None
+
+
+def destinations(doc, missed_day, config, today):
+    """Each day after the miss to the end of the span, with its status for a move and the reason when not free."""
+    missed_day = _day(missed_day)
+    end = dates.parse_date(doc["span"]["end"])
+    rows = []
+    day = missed_day + timedelta(days=1)
+    while day <= end:
+        status, reason = destination(doc, missed_day, day, config, today)
+        rows.append({"date": day.isoformat(), "status": status, "reason": reason})
+        day += timedelta(days=1)
+    return rows
+
+
+def _shift(doc, missed, day, rule, config, today):
+    """(sessions after the miss with the missed session moved, flags) for a `shift` rule.
+
+    A rule built for a chosen move names its date in `action.on`; a program rule names weekdays.
+    """
+    day = _day(day)
+    action = rule["action"]
+    if action.get("on"):
+        candidates = [_day(action["on"])]
+    else:
+        candidates = [day + timedelta(days=(WEEKDAYS.index(weekday) - day.weekday()) % 7 or 7)
+                      for weekday in action["to_weekdays"]]
+    reasons = []
+    for candidate in candidates:
+        status, reason = destination(doc, day, candidate, config, today)
+        if status != FREE:
+            reasons.append(reason)
             continue
         moved = dict(copy.deepcopy(missed), date=candidate.isoformat(), moved_from=missed["date"])
         later = copy.deepcopy(_later_sessions(doc, day)) + [moved]
         later.sort(key=lambda s: s["date"])
+        label = "Moved by choice" if action.get("on") else f"Rule {rule['id']}"
         flag = flags.make("missed_day_rule", session_id=missed["session_id"], message=(
-            f"Rule {rule['id']}: {missed['title']} moved from {render.day_label(missed['date'])} to "
+            f"{label}: {missed['title']} moved from {render.day_label(missed['date'])} to "
             f"{render.day_label(candidate)}, this week only."))
         return later, [flag]
-    days = ", ".join(_weekday_word(w) for w in rule["action"]["to_weekdays"])
-    raise Unmatched(f"none of {days} is free after the miss, from today to the end of the overlay's span")
+    if action.get("on"):
+        raise Unmatched(reasons[0])
+    days = ", ".join(_weekday_word(w) for w in action["to_weekdays"])
+    raise Unmatched(f"none of {days} is free after the miss: {'; '.join(reasons)}")
 
 
 def _draft_set(set_):
@@ -405,11 +461,56 @@ def _check_text(draft):
     return f"Prescription check: {'; '.join(parts)}."
 
 
-def plan(root, session_id, day, now=None):
-    """What the matching rule would do to the rest of the week; writes nothing."""
+def _decision_rule(session_id, decision, move_to):
+    """The one-off rule a chosen move or drop applies: a shift to that date, or a skip."""
+    if decision == MOVE:
+        to = _day(move_to)
+        action = {"kind": "shift", "to_weekdays": [WEEKDAYS[to.weekday()]], "on": to.isoformat()}
+    else:
+        action = {"kind": "skip"}
+    return {"id": decision, "session_id": session_id, "text": None, "when": {}, "action": action}
+
+
+def _decision_words(decision, title, rule):
+    if decision == MOVE:
+        return f"{title} moves to {render.day_label(rule['action']['on'])}, this week only."
+    return f"{title} is dropped this week: its lifts are not trained, and the rest of the week stays as planned."
+
+
+def _free_days(rows):
+    return [render.day_label(row["date"]) for row in rows if row["status"] == FREE]
+
+
+def _free_days_line(rows):
+    free = _free_days(rows)
+    if not free:
+        return "No day is free to move it to before the overlay's span ends."
+    return f"Free days to move it to: {_and(free)}."
+
+
+def _floor_on_drop_line(floor_rule, names):
+    if floor_rule is None:
+        return []
+    lifts = _and([f"{_sets_words(item['sets'])} of {names.exercise(item['exercise_id'])}"
+                  for item in floor_rule["action"]["exercises"]])
+    return [f"A drop still folds the priority floor {floor_rule['id']}: {lifts} into the next session, this week only."]
+
+
+def _decision(move_to, drop):
+    if move_to is not None and drop:
+        raise UsageError("choose one: --move-to D or --drop")
+    return MOVE if move_to is not None else DROP if drop else None
+
+
+def plan(root, session_id, day, now=None, move_to=None, drop=False):
+    """What the matching rule, or the athlete's chosen move or drop, would do to the rest of the week; writes nothing.
+
+    `destinations` lists each later day of the span as free, occupied, elapsed, unavailable or outside.
+    """
     root = Path(root)
     day = _day(day)
     now = now or datetime.now(timezone.utc)
+    decision = _decision(move_to, drop)
     config = config_module.load(root)
     program_doc = program.load(root)
     library = Library.load(root)
@@ -420,11 +521,14 @@ def plan(root, session_id, day, now=None):
     doc = picked[0]
     missed = _missed_session(doc, session_id, day)
     missed_text = f"Missed {render.day_label(day)} {missed['title']}"
+    rows = destinations(doc, day, config, _today(config, now))
     found = {"session_id": session_id, "date": day.isoformat(), "title": missed["title"], "overlay_id": doc["id"],
-             "matched": False, "rule": None, "floor_rule": None, "action": None, "description": None, "reason": None,
-             "summary": [], "write_line": None, "draft": None, "flags": []}
+             "decision": decision, "matched": False, "rule": None, "floor_rule": None, "action": None,
+             "description": None, "reason": None, "summary": [], "write_line": None, "draft": None, "flags": [],
+             "destinations": rows}
 
-    rule = match(root, session_id, day, doc, program_doc)
+    rule = _decision_rule(session_id, decision, move_to) if decision else match(root, session_id, day, doc,
+                                                                                 program_doc)
     draft, reason = None, None
     try:
         if rule is None:
@@ -433,36 +537,60 @@ def plan(root, session_id, day, now=None):
     except Unmatched as why:
         reason = why
 
-    floor_rule = _left_out(structure.priority_floor(root, session_id, day, doc, program_doc), rule, reason is None,
-                           missed)
-    floor_flags, added = [], None
+    floor_rule = None
+    if not (decision == MOVE and reason is not None):
+        floor_rule = _left_out(structure.priority_floor(root, session_id, day, doc, program_doc), rule,
+                               reason is None, missed)
+    floor_flags, added, floor_on_drop = [], None, None
     if floor_rule is not None:
         try:
             if draft is not None:
                 draft, added = _build(root, doc, session_id, day, [rule, floor_rule], now, config, library), floor_rule
+            elif reason is not None:
+                apply_rule(root, doc, session_id, day, floor_rule, now, config, library)
+                floor_on_drop = floor_rule
             else:
                 draft = apply_rule(root, doc, session_id, day, floor_rule, now, config, library)
-                rule, reason = floor_rule, None
+                if decision == DROP:
+                    added = floor_rule
+                else:
+                    rule = floor_rule
         except Unmatched as why:
             floor_flags = _floor_missed(floor_rule, missed, day, why, names)
 
     if rule is not None:
-        found.update(rule=rule, action=rule["action"]["kind"],
-                     description=describe(rule, program_doc=program_doc, library=library))
+        description = (_decision_words(decision, missed["title"], rule) if decision and rule["id"] == decision
+                       else describe(rule, program_doc=program_doc, library=library))
+        found.update(rule=rule, action=rule["action"]["kind"], description=description)
     if reason is not None:
         found["reason"] = str(reason)
-        found["flags"] = floor_flags + [flags.make("missed_rule_unmatched", session_id=session_id, message=(
-            f"No missed-day rule applies to {missed['title']} on {render.day_label(day)} ({reason}); "
-            f"{FALLBACK_WORDS}."))]
-        found["summary"] = [f"{missed_text}; no missed-day rule applies ({reason}).",
-                            f"Next: {FALLBACK_WORDS}."]
+        free = bool(_free_days(rows))
+        if decision == MOVE:
+            head = f"{missed['title']} cannot move to {render.day_label(move_to)} ({reason})"
+            then = "pick a free day, or drop it with --drop" if free else "drop it with --drop, or reshuffle the week"
+        else:
+            head = f"No missed-day rule applies to {missed['title']} on {render.day_label(day)} ({reason})"
+            then = DECIDE_WORDS if free else NO_FREE_DAY_WORDS
+        found["flags"] = floor_flags + [flags.make("missed_rule_unmatched", session_id=session_id,
+                                                   message=f"{head}; {then}.")]
+        lead = (f"{missed_text}; it cannot move to {render.day_label(move_to)} ({reason})." if decision == MOVE
+                else f"{missed_text}; no missed-day rule applies ({reason}).")
+        found["summary"] = [lead, _free_days_line(rows), *_floor_on_drop_line(floor_on_drop, names),
+                            f"Next: {then}."]
         return found
 
     found.update(matched=True, draft=draft, floor_rule=added, write_line=write_line(config, draft), flags=floor_flags)
     with_floor = f", with the priority floor {added['id']}" if added else ""
-    summary = [f"{missed_text}; rule {rule['id']} applies ({rule['action']['kind']}){with_floor}."]
+    if decision == MOVE:
+        lead = f"{missed_text}; moved by choice to {render.day_label(move_to)}{with_floor}."
+    elif decision == DROP and rule["id"] == DROP:
+        lead = f"{missed_text}; dropped by choice{with_floor}."
+    else:
+        lead = f"{missed_text}; rule {rule['id']} applies ({rule['action']['kind']}){with_floor}."
+    summary = [lead]
     if draft is None:
-        summary.append("Nothing else changes this week; only the miss is recorded.")
+        summary.append(f"{missed['title']}'s lifts are not trained this week; the rest of the week stays as planned."
+                       if decision == DROP else "Nothing else changes this week; only the miss is recorded.")
     else:
         summary.append(_change_text(draft, names, with_rpe=True, show_hevy=config.hevy.enabled) + ".")
         summary.append(f"Mid-week overlay {draft['id']}: {render.day_label(draft['span']['start'])} to "
@@ -470,6 +598,45 @@ def plan(root, session_id, day, now=None):
         summary.append(_check_text(draft))
     found["summary"] = summary
     return found
+
+
+def recovery(root, session_id, day, today, doc=None, program_doc=None, config=None, library=None):
+    """What the program's missed-day rule would do with a miss as of `today`, read only and without building.
+
+    {rule_id, kind, to, to_title, reason}: `to` is the day a shift moves it to or a fold adds its work to;
+    `reason` says why no rule applies (rule_id is then the manual or blocked rule, or None).
+    """
+    root = Path(root)
+    day = _day(day)
+    if doc is None:
+        picked = overlay.in_force(root, day)
+        if picked is None:
+            return None
+        doc = picked[0]
+    program_doc = program_doc or program.load(root)
+    config = config or config_module.load(root)
+    found = {"rule_id": None, "kind": None, "to": None, "to_title": None, "reason": None}
+    rule = match(root, session_id, day, doc, program_doc)
+    if rule is None:
+        return dict(found, reason="no rule names this session with its condition met")
+    found.update(rule_id=rule["id"], kind=rule["action"]["kind"])
+    missed = _missed_session(doc, session_id, day)
+    try:
+        if found["kind"] == "manual":
+            raise Unmatched(f"rule {rule['id']} is manual")
+        if found["kind"] == "shift":
+            sessions, _ = _shift(doc, missed, day, rule, config, today)
+            target = next(s for s in sessions if s.get("moved_from") == missed["date"]
+                          and s["session_id"] == session_id)
+        elif found["kind"] == "fold":
+            sessions, _ = _fold(doc, missed, day, rule, _Names(program_doc, library), today)
+            target = next(s for s in sessions for line in s["exercises"]
+                          if (line.get("fold") or {}).get("from_date") == missed["date"])
+        else:
+            return found
+    except Unmatched as why:
+        return dict(found, reason=str(why))
+    return dict(found, to=target["date"], to_title=target["title"])
 
 
 def missed_sessions(root, today, day=None, now=None):
@@ -498,10 +665,10 @@ def missed_sessions(root, today, day=None, now=None):
     return rows
 
 
-def _annotation(root, session_id, day, tag, now):
+def _annotation(root, session_id, day, tag, now, reason=None):
     doc = history.read_annotations(root)
     annotation = {"id": history.next_annotation_id(doc), "kind": "miss", "date": day.isoformat(),
-                  "session_id": session_id, "tag": tag, "source": RECORD_SOURCE, "reason": None,
+                  "session_id": session_id, "tag": tag, "source": RECORD_SOURCE, "reason": reason,
                   "created_at": now.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
     errors = validate_schema({"schema_version": 1, "annotations": [annotation]},
                              jsonio.load_schema(history.ANNOTATIONS_SCHEMA))
@@ -513,10 +680,18 @@ def _annotation(root, session_id, day, tag, now):
 
 
 def record_lines(found, tag, names, config):
-    rule, draft = found["rule"], found["draft"]
-    rule_words = f"Rules {rule['id']} and {found['floor_rule']['id']}" if found["floor_rule"] else f"Rule {rule['id']}"
+    rule, draft, decision = found["rule"], found["draft"], found.get("decision")
+    floor = found["floor_rule"]
+    if decision == MOVE:
+        rule_words = "Moved by choice"
+    elif decision == DROP:
+        rule_words = "Dropped by choice" + (f", with the priority floor {floor['id']}" if floor else "")
+    else:
+        rule_words = f"Rules {rule['id']} and {floor['id']}" if floor else f"Rule {rule['id']}"
+    unchanged = (f"{found['title']} is not trained this week" if decision == DROP else "nothing changes this week")
+    change = _change_text(draft, names, with_rpe=False, show_hevy=config.hevy.enabled)
     lines = [f"- Missed {render.day_label(found['date'])} {found['title']} ({tag or 'untagged'}).",
-             f"- {rule_words}: {_change_text(draft, names, with_rpe=False, show_hevy=config.hevy.enabled) or 'nothing changes this week'}."]
+             f"- {rule_words}: {change or unchanged}."]
     if draft is None:
         lines.append("- No overlay; nothing goes to Hevy.")
     elif config.hevy.enabled:
@@ -541,11 +716,23 @@ def with_record_lines(text, lines):
     return "\n".join(body[:end] + lines + body[end:]) + "\n"
 
 
-def apply(root, session_id, day, tag=None, dry_run=False, now=None):
-    """Write the miss, the mid-week overlay (unapproved) and three lines in the newest record."""
+def _annotation_reason(found):
+    if found.get("decision") == MOVE:
+        return f"moved to {found['rule']['action']['on']} by choice"
+    if found.get("decision") == DROP:
+        return "dropped this week by choice"
+    return None
+
+
+def apply(root, session_id, day, tag=None, dry_run=False, now=None, move_to=None, drop=False):
+    """Write the miss, the mid-week overlay (unapproved) and three lines in the newest record.
+
+    With `move_to` or `drop`, the athlete's choice for a miss replaces the program's rules.
+    """
     root = Path(root)
     day = _day(day)
     now = now or datetime.now(timezone.utc)
+    _decision(move_to, drop)
     if tag is not None and tag not in history.MISS_TAGS:
         raise ValidationError(f"tag {tag!r} is not a miss tag; use one of {', '.join(history.MISS_TAGS)}")
     recorded = next((a for a in history.annotations(root, "miss")
@@ -553,13 +740,12 @@ def apply(root, session_id, day, tag=None, dry_run=False, now=None):
     if recorded is not None:
         raise RefusedError(f"The miss of {session_id} on {day} is already recorded (annotation {recorded['id']}); "
                            f"nothing was written")
-    found = plan(root, session_id, day, now)
+    found = plan(root, session_id, day, now, move_to, drop)
     if not found["matched"]:
-        raise RefusedError(f"No missed-day rule applies to {found['title']} on {day} ({found['reason']}); "
-                           f"{FALLBACK_WORDS}")
+        raise RefusedError(f"{found['flags'][-1]['message'][:-1]}; nothing was written")
     config = config_module.load(root)
     names = _names_for(root)
-    annotations_doc, annotation = _annotation(root, session_id, day, tag, now)
+    annotations_doc, annotation = _annotation(root, session_id, day, tag, now, _annotation_reason(found))
     lines = record_lines(found, tag, names, config)
     found_records = checkin.records(root)
     record = found_records[-1].path.as_posix() if found_records else None
