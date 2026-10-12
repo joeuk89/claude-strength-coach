@@ -278,6 +278,8 @@ class PostToolUseTest(unittest.TestCase):
                               ("cable hammer curls 20 kg", False), ("barbell step-ups 40 kg", False),
                               ("lunges with a barbell 40 kg", False), ("lunges on the Smith machine 40 kg", False),
                               ("step-ups with a barbell 40 kg", False), ("hammer curls on the cable 20 kg", False),
+                              ("lunges in the Smith machine 40 kg", False), ("Lunges: barbell, 3x8 at 40 kg", False),
+                              ("Arnold press, 3x12 with a barbell warm-up first, 14 kg", True),
                               ("dumbbell lunges 16 kg", True), ("lunges 16 kg", True),
                               ("lunges with dumbbells 16 kg", True), ("lunges 40 kg (barbell)", True)):
             with self.subTest(text=text):

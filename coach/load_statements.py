@@ -186,6 +186,12 @@ class Mentions:
         rf"(?:\b(?:on|using|with)\s+(?:(?:the|an?)\s+)?(?:\d+(?:\.\d+)?\s*(?:kg|lb)s?\s*)?|\(\s*)"
         rf"({_EQUIPMENT_WORD})\b", re.IGNORECASE,
     )
+    _ATTACHED_EQUIPMENT = re.compile(
+        r"\s*(?:[:,(–—-]\s*)?"
+        r"(?:(?:on|in|at|using|with|holding|via)\s+(?:(?:the|an?)\s+)?(?:\d+(?:\.\d+)?\s*(?:kg|lb)s?\s+)?"
+        r"|(?:the|an?)\s+)?"
+        rf"({_EQUIPMENT_WORD})\b(?![\s-]+(?:days?|sessions?|weeks?|warm[\s-]?ups?)\b)", re.IGNORECASE,
+    )
     _EQUIPMENT_STEP = re.compile(rf"\b({_EQUIPMENT_WORD})\s+(?:step|increment)\b", re.IGNORECASE)
     _NOT_MOVEMENT_WORDS = {"dumbbell", "barbell", "kettlebell", "cable", "machine", "band", "bodyweight", "smith",
                            "bar", "trap", "back", "over", "one", "two", "low", "good", "exercise", "anti", "through"}
@@ -280,7 +286,8 @@ class Mentions:
     def _equipment(self, text, match, end, measurements, ambiguous):
         """(attached, describing): equipment written onto the mention, and all equipment describing it.
 
-        A modifier after the mention is written onto it only when it comes before the mention's first load.
+        A modifier after the mention is written onto it only when it follows the mention directly: after
+        `:`, `,`, `-`, `(` or one connector word such as `in`, `with` or `holding`, then an optional article.
         """
         named = self._named_equipment(match)
         if named:
@@ -288,8 +295,10 @@ class Mentions:
         before = self._BEFORE_EQUIPMENT.search(text[:match.start()])
         modifiers = [(before, 0, True)] if before else []
         after = text[match.end():end]
-        modifiers += [(m, match.end(), not any(f.unit or f.two_number for f in _figures(after[:m.start()])))
-                      for m in self._AFTER_EQUIPMENT.finditer(after) if m.group(1).lower() != "bodyweight"]
+        adjacent = self._ATTACHED_EQUIPMENT.match(after)
+        modifiers += [(m, match.end(), m is adjacent)
+                      for m in (adjacent, *self._AFTER_EQUIPMENT.finditer(after))
+                      if m and m.group(1).lower() != "bodyweight"]
         if ambiguous:
             modifiers += [(m, match.end(), False) for m in self._EQUIPMENT_STEP.finditer(after)]
         kept = [(self._kind(m.group(1)), attached) for m, offset, attached in modifiers

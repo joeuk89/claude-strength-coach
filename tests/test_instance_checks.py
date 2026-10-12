@@ -524,7 +524,13 @@ class BareHevyValuesTest(unittest.TestCase):
                          "lunges on the Smith machine 40 kg", "lunge on the smith machine 40 kg",
                          "step-ups with a barbell 40 kg", "step ups using a barbell 40 kg",
                          "walking lunges with a barbell 40 kg", "hammer curls on the cable 20 kg",
-                         "hammer curls with a rope 20 kg", "rope hammer curls 20 kg", "rope hammer curl 20 kg"):
+                         "hammer curls with a rope 20 kg", "rope hammer curls 20 kg", "rope hammer curl 20 kg",
+                         "hammer curls with ropes 20 kg", "lunges with an EZ bar 40 kg",
+                         "lunges in the Smith machine 40 kg", "lunge in the smith machine 40 kg",
+                         "reverse lunges in the Smith machine 40 kg", "Lunges: barbell, 3x8 at 40 kg",
+                         "Lunge: barbell, 3x8 at 40 kg", "Lunges: Smith machine, 3x8 @ 40 kg",
+                         "lunges, barbell, 40 kg", "lunges holding a barbell 40 kg",
+                         "step-ups holding a barbell 40 kg", "hammer curls at the cable stack 20 kg"):
                 with self.subTest(text=text):
                     self.assertEqual(self.flagged(tmp, text), [])
             for text, exercise in (("dumbbell lunges 16 kg", "db_lunge"), ("lunges 16 kg", "db_lunge"),
@@ -532,17 +538,24 @@ class BareHevyValuesTest(unittest.TestCase):
                                    ("barbell lunges 40 kg, then hammer curls 14 kg", "db_hammer_curl"),
                                    ("lunges (dumbbell) 16 kg", "db_lunge"), ("lunges with dumbbells 16 kg", "db_lunge"),
                                    ("lunges with a dumbbell 16 kg", "db_lunge"), ("lunges 40 kg (barbell)", "db_lunge"),
-                                   ("Pair the barbell with lunges 16 kg", "db_lunge")):
+                                   ("Pair the barbell with lunges 16 kg", "db_lunge"),
+                                   ("Keep the barbell after lunges 16 kg", "db_lunge"),
+                                   ("Rack the barbell before lunges 16 kg", "db_lunge"),
+                                   ("Grab the barbell from lunges 16 kg", "db_lunge"),
+                                   ("Lunges: warm up on the Smith machine, then work sets at 16 kg", "db_lunge"),
+                                   ("Lunges, warm-up sets on the Smith machine, top set 16 kg", "db_lunge")):
                 with self.subTest(text=text):
                     [(_, found)] = self.flagged(tmp, text)
                     self.assertEqual(found, exercise)
 
     def test_an_unmatched_equipment_word_does_not_hide_a_single_variant_load(self):
         with TempCopy() as tmp:
-            tmp.write("profile.md", "Arnold press 20 kg on the machine days")
-            code, results, _ = check(tmp.root, "bare_hevy_values")
-            self.assertEqual(code, 1, results)
-            self.assertIn("for db_arnold_press", failures(results, "bare_hevy_values")[0]["message"])
+            for text in ("Arnold press 20 kg on the machine days", "Arnold press on machine days 20 kg",
+                         "Arnold press, 3x12 with a barbell warm-up first, 14 kg",
+                         "Arnold press with a barbell warm-up, then 20 kg"):
+                with self.subTest(text=text):
+                    [(_, found)] = self.flagged(tmp, text)
+                    self.assertEqual(found, "db_arnold_press")
 
     def test_hevy_on_diagnostic_shows_both_numbers_first(self):
         with TempCopy() as tmp:

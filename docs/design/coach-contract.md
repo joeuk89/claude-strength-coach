@@ -1396,12 +1396,19 @@ library knows resolves through it (`DB row` is a single implement). A dumbbell w
 movement after it (`dumbbells up to 30 kg`) names no exercise.
 Equipment modifiers attached to the exercise (`cable lateral raise`,
 `lateral raise on the cable machine`) select the matching variant.
-Equipment written onto the movement, up to two words before it or after
-it but before its first load, that no variant uses makes the mention
-ambiguous, so it is not checked (`barbell lunges 40 kg`, `lunges with a
-barbell 40 kg`, `hammer curls (cable)`, `rope hammer curls`). A modifier
-after the load that matches no variant leaves the owner in place
-(`Arnold press 20 kg on the machine days`, `lunges 40 kg (barbell)`).
+Equipment written onto the movement that no variant uses makes the
+mention ambiguous, so it is not checked. Equipment is written onto it up
+to two words before it, unless a conjunction or `with`, `after`, `before`
+or `from` comes between (`barbell lunges 40 kg`, `rope hammer curls`), or
+directly after it, following only `:`, `,`, `-`, `(` or one connector
+word (`on`, `in`, `at`, `using`, `with`, `holding`, `via`) and an
+optional article (`lunges with a barbell 40 kg`, `Lunges: barbell, 3x8 at
+40 kg`, `hammer curls (cable)`). Any other modifier that matches no
+variant leaves the owner in place (`Arnold press 20 kg on the machine
+days`, `lunges 40 kg (barbell)`, `Pair the barbell with lunges 16 kg`,
+`Lunges: warm up on the Smith machine, then 16 kg`), as does equipment
+naming days, sessions, weeks or a warm-up (`Arnold press with a barbell
+warm-up, then 20 kg`).
 Equipment words belonging to another exercise or a bodyweight
 measurement do not change its mode. A mention the library cannot
 resolve to one mode is not checked. No library load modes are changed
