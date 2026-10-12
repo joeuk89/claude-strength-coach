@@ -178,14 +178,14 @@ def propose(ctx):
             sets=base.with_load(sets, new_load),
             rationale=(f"Double progression: {reached} on {when}, so {base.load_words(ctx, load)} goes to "
                        f"{base.load_words(ctx, new_load)} and the target is {target}"),
-            derived_from=source, state={},
+            derived_from=source, state={}, model_hold=True,
         )
     held = "the band" if ctx.exercise.load_mode == "band" else base.load_words(ctx, load)
     mismatch = _mismatch(ctx, source, program_sets, load)
     return base.Proposal(
         sets=base.with_load(sets, load),
         rationale=f"Double progression: {when} was {why}, so {held} holds and the target is {target}",
-        derived_from=source, state={}, flags=(mismatch,) if mismatch else (),
+        derived_from=source, state={}, flags=(mismatch,) if mismatch else (), model_hold=True,
     )
 
 

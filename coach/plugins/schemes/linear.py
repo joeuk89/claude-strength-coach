@@ -71,7 +71,7 @@ def propose(ctx):
     if not source.prescribed:
         return base.Proposal(sets=base.with_load(sets, load),
                              rationale="Linear: historical prescription unknown, so the last logged load holds",
-                             derived_from=source, state=state)
+                             derived_from=source, state=state, model_hold=True)
     if misses >= limit:
         factor = ctx.params["reset_factor"]
         new_load = load * factor
@@ -99,14 +99,14 @@ def propose(ctx):
             sets=base.with_load(sets, load),
             rationale=(f"Linear: prescribed reps missed on {source.date.isoformat()} (miss {misses} of {limit}), so "
                        f"{base.load_words(ctx, load)} holds"),
-            derived_from=source, state=state,
+            derived_from=source, state=state, model_hold=True,
         )
     new_load = load + ctx.exercise.load_direction * base.increment(ctx)
     return base.Proposal(
         sets=base.with_load(sets, new_load),
         rationale=(f"Linear: every prescribed rep was hit on {source.date.isoformat()}, so "
                    f"{base.load_words(ctx, load)} goes to {base.load_words(ctx, new_load)}"),
-        derived_from=source, state=state,
+        derived_from=source, state=state, model_hold=True,
     )
 
 
@@ -139,7 +139,7 @@ def _incomplete_hold(ctx, sets, source, misses, state):
     return base.Proposal(
         sets=base.with_load(sets, load),
         rationale=f"Linear: {logged} and none fell short, so {base.load_words(ctx, load)} holds{standing}",
-        derived_from=source, state=state, flags=(flag,),
+        derived_from=source, state=state, flags=(flag,), model_hold=True,
     )
 
 

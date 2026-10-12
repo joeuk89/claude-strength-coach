@@ -24,8 +24,17 @@ from `overlay build --input <draft>`.
      record it in the line's `provenance.decay` (`days_off`, `band`,
      `load_factor`, `set_delta`, `rpe_cap`) with `derived_from` set to
      the exposure it came from.
-   - `unearned_load` (block): the load is beyond failure for those reps
-     at the recent e1RM. Lower it.
+   - `unearned_load` (block): even the fewest reps the line allows are
+     beyond failure at the recent e1RM, or, with no e1RM from RPE-rated
+     sets, the load is over two increments above the last exposure.
+     Lower it; `python3 -m coach units load-for --e1rm <e1RM> --reps <n>
+     --rpe <target> --increment <step>` gives the model load and the
+     load on that step no heavier than it. The weekly proposal already
+     holds a linear or double-progression step the model rejects at the
+     heaviest load last logged that it accepts, and its rationale says
+     so. Each line's `feasibility` says whether the model judged it
+     (`checked`), only as a lower bound, or not at all (`unavailable`,
+     `not_judged`); the brief says which.
    - `load_cap`, `load_unrepresentable` (block): over a cap, or not a
      load the session's kit makes. Correct the load or equipment declaration;
      explicit ladder rungs need an agreed rung edit, never silent snapping.
@@ -40,7 +49,10 @@ from `overlay build --input <draft>`.
      load mode. Ask the athlete, then run the command the flag names.
      Only confirming the mode clears it; a `resolution` never does.
    - `rpe_infeasible`, `session_over_cap` (warn): name each in the
-     coach's brief, with the change you made or why it stands.
+     coach's brief, with the change you made or why it stands. A rep
+     range passes when any whole rep target in it fits the RPE; a deload,
+     light, return, post-illness or RPE-capped line's RPE is a ceiling,
+     flagged only when the load is too hard for it.
 
    Fix, then validate and check again until no `block` flag is left. A
    block you and the athlete decide to keep needs its flag's `resolved`

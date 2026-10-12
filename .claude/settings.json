@@ -6,6 +6,7 @@
       "Bash(python3 -m coach units format:*)",
       "Bash(python3 -m coach units convert:*)",
       "Bash(python3 -m coach units round:*)",
+      "Bash(python3 -m coach units load-for:*)",
       "Bash(python3 -m coach dates week:*)",
       "Bash(python3 -m coach dates span:*)",
       "Bash(python3 -m coach config show:*)",

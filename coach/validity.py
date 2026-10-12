@@ -12,7 +12,7 @@ from collections import namedtuple
 from datetime import timedelta
 
 from coach import config as config_module
-from coach import dates, flags, history, overlay, state, stats, units
+from coach import constraints, dates, flags, history, overlay, state, stats, units
 from coach.checks.instance import _capped_value as capped_value
 from coach.checks.instance import cap_for
 from coach.config_tables.sessions import cap_minutes
@@ -51,6 +51,9 @@ PACE_MIN_WORKOUTS = 2
 PACE_BOUNDS = (0.7, 1.5)
 
 UNCONFIRMED = "load_mode_unconfirmed"
+RPE_SCALE = (0, 10)
+
+Verdict = namedtuple("Verdict", "implied reps unearned off")
 
 _LINE_PATH = re.compile(r"^\$\.sessions\[(\d+)\]\.exercises\[(\d+)\]")
 
@@ -215,12 +218,64 @@ def _number(value):
     return units.json_number(round(value, 2))
 
 
-def _reps(set_):
-    if set_.get("reps") is not None:
-        return set_["reps"]
-    if set_.get("rep_range"):
-        return set_["rep_range"]["start"]
-    return None
+def rep_targets(reps, rep_range):
+    """Every whole rep target a set allows: its reps, else each number in its (start, end) range."""
+    if reps is not None:
+        return (reps,)
+    if rep_range:
+        return tuple(range(rep_range[0], rep_range[1] + 1))
+    return ()
+
+
+def _targets(set_):
+    found = set_.get("rep_range")
+    return rep_targets(set_.get("reps"), (found["start"], found["end"]) if found else None)
+
+
+def judge_set(estimate, load, targets, rpe=None, ceiling=False):
+    """The e1RM model's verdict on one working set (C22), shared by proposals and the prescription check.
+
+    `unearned` when even the fewest allowed reps imply more than UNEARNED_IMPLIED_RPE. `off` is "hard" or "easy" when
+    no allowed rep target implies an RPE within RPE_TOLERANCE of `rpe`; a `ceiling` is only ever too hard. A
+    lower-bound estimate shows neither unearned nor too hard. `implied` and `reps` name the closest rep target.
+    """
+    lower = stats.is_lower_bound(estimate)
+    fewest, most = min(targets), max(targets)
+    easiest = stats.implied_rpe(estimate["e1rm"], load, fewest)
+    if not lower and easiest > UNEARNED_IMPLIED_RPE:
+        return Verdict(easiest, fewest, True, None)
+    if rpe is None:
+        return Verdict(easiest, fewest, False, None)
+    if easiest > rpe + RPE_TOLERANCE:
+        return Verdict(easiest, fewest, False, None if lower else "hard")
+    hardest = stats.implied_rpe(estimate["e1rm"], load, most)
+    if hardest < rpe - RPE_TOLERANCE and not ceiling:
+        return Verdict(hardest, most, False, "easy")
+    return Verdict(easiest, fewest, False, None)
+
+
+def implied_words(value):
+    """An implied RPE as a message shows it: `RPE 7.75` on the scale, else the model result named as off the scale."""
+    value = round(value, 2)
+    low, high = RPE_SCALE
+    if value > high:
+        return f"a model result of {_number(value)} (past failure: above RPE {high})"
+    if value < low:
+        return f"a model result of {_number(value)} (far from failure: below RPE {low})"
+    return f"RPE {_number(value)}"
+
+
+def estimate_words(estimate):
+    """`the e1RM of 19.6 from 2026-10-12`, saying when it is only a lower bound."""
+    words = f"the e1RM of {_number(estimate['e1rm'])} from {estimate['date']}"
+    return f"{words}, a lower bound from sets logged without RPE" if stats.is_lower_bound(estimate) else words
+
+
+def reps_words(reps, targets):
+    """`8`, or `8 (the closest rep target in 8–10)` for a set with a range."""
+    if len(targets) == 1:
+        return f"{reps}"
+    return f"{reps} (the closest rep target in {targets[0]}–{targets[-1]})"
 
 
 def _loads(sets):
@@ -326,17 +381,36 @@ class _Checker:
         band = band_for(facts["days_off"]) if facts["days_off"] is not None else None
         derived, inferred = self.derived_from(session_date, line)
         evidence = self.history.evidence(line["exercise_id"], session_date)
-        self.lines.append({
+        ceiling = self.rpe_ceiling(session, session_date, line, illness)
+        row = {
             "session_id": session["session_id"], "date": session["date"], "exercise_id": line["exercise_id"],
             "days_off": facts["days_off"], "band": band.id if band else None, "derived_from": derived,
             "inferred": inferred, "model_evidence": evidence,
-        })
+            "feasibility": _feasibility("not_judged", ceiling, "No load check: the line has no data."),
+        }
+        self.lines.append(row)
         if (session["session_id"], line["exercise_id"]) in self.no_data:
             return
         working = [s for s in line["sets"] if overlay.is_working(s)]
         self.stale(session, line, working, facts, band, derived, illness)
         self.caps_and_kit(session, line)
-        self.feasibility(session, line, working, facts, evidence)
+        row["feasibility"] = self.feasibility(session, line, working, facts, evidence, ceiling)
+
+    def rpe_ceiling(self, session, session_date, line, illness):
+        """Why the line's RPE is a ceiling for recovery work rather than a target to reach, or None."""
+        if self.doc["kind"] == "deload":
+            return "a deload, light or return week"
+        if (line.get("provenance") or {}).get("decay"):
+            return "a return-band line"
+        if illness and session["date"] == illness[0]:
+            return "the first session after illness"
+        try:
+            active = constraints.active(self.root, session["session_id"], line["exercise_id"], session_date)
+        except ValidationError:
+            active = []
+        if any(c["kind"] == "rpe_cap" for c in active):
+            return "an RPE cap constraint"
+        return None
 
     def stale(self, session, line, working, facts, band, derived, illness):
         problems = []
@@ -459,35 +533,53 @@ class _Checker:
                 missing.append(f"{units.format_load(load)} ({problem})")
         return list(dict.fromkeys(missing))
 
-    def feasibility(self, session, line, working, facts, evidence):
-        sets = [(s, history.coaching_number(s["load"]), _reps(s)) for s in working if self.sound(line, s.get("load"))]
-        sets = [(s, load, reps) for s, load, reps in sets if load and reps]
+    def feasibility(self, session, line, working, facts, evidence, ceiling):
+        """Flag what the e1RM model, or without it the load-step guard, finds; return the line's feasibility row."""
+        sets = [(s, history.coaching_number(s["load"]), _targets(s)) for s in working
+                if self.sound(line, s.get("load"))]
+        sets = [(s, load, targets) for s, load, targets in sets if load and targets]
         if not sets:
-            return
+            return _feasibility("not_judged", ceiling, "No loaded working set to judge.")
+        if line["load_mode"] == "assisted":
+            return _feasibility("not_judged", ceiling, "The e1RM model does not judge assisted lines.")
         best = evidence["estimate"] if line["load_mode"] in FEASIBILITY_MODES else None
         if best is None:
-            self.unearned_without_e1rm(session, line, sets, facts)
-            return
-        unearned, infeasible = [], []
-        for s, load, reps in sets:
-            implied = stats.implied_rpe(best["e1rm"], load, reps)
-            if implied > UNEARNED_IMPLIED_RPE:
-                unearned.append((implied, s, load, reps))
-            elif s.get("rpe") is not None and abs(s["rpe"] - implied) > RPE_TOLERANCE:
-                infeasible.append((abs(s["rpe"] - implied), implied, s, load, reps))
-        basis = f"the e1RM of {_number(best['e1rm'])} from {best['date']}"
+            self.unearned_without_e1rm(session, line, sets, facts, "there is no e1RM to judge it by")
+            why = (evidence["message"] if line["load_mode"] in FEASIBILITY_MODES
+                   else f"The e1RM model does not judge a {line['load_mode']} line.")
+            return _feasibility("unavailable", ceiling, f"{why} No e1RM model check ran; only the load-step "
+                                                        "guard applies.")
+        if stats.is_lower_bound(best):
+            self.unearned_without_e1rm(session, line, sets, facts, (
+                f"the e1RM of {_number(best['e1rm'])} from {best['date']} comes from sets logged without RPE, so it "
+                "cannot show a load beyond failure"))
+        unearned, off = [], []
+        for s, load, targets in sets:
+            verdict = judge_set(best, load, targets, s.get("rpe"), ceiling is not None)
+            if verdict.unearned:
+                unearned.append((verdict, s, targets))
+            elif verdict.off:
+                off.append((verdict, s, targets))
+        basis = estimate_words(best)
         if unearned:
-            implied, s, load, reps = max(unearned, key=lambda item: item[0])
+            verdict, s, targets = max(unearned, key=lambda item: item[0].implied)
             self.flag("unearned_load", session, line,
-                      f"{self.where(session, line)}: {units.format_load(s['load'])} × {reps} implies RPE "
-                      f"{_number(implied)} against {basis}, beyond failure")
-        if infeasible:
-            _, implied, s, load, reps = max(infeasible, key=lambda item: item[0])
+                      f"{self.where(session, line)}: {units.format_load(s['load'])} × "
+                      f"{reps_words(verdict.reps, targets)} implies {implied_words(verdict.implied)} at {basis}")
+        if off:
+            verdict, s, targets = max(off, key=lambda item: abs(item[1]["rpe"] - item[0].implied))
+            kind = "RPE ceiling" if ceiling else "target RPE"
             self.flag("rpe_infeasible", session, line,
-                      f"{self.where(session, line)}: target RPE {units.json_number(s['rpe'])}, but "
-                      f"{units.format_load(s['load'])} × {reps} implies RPE {_number(implied)} at {basis}")
+                      f"{self.where(session, line)}: {kind} {units.json_number(s['rpe'])}, but "
+                      f"{units.format_load(s['load'])} × {reps_words(verdict.reps, targets)} implies "
+                      f"{implied_words(verdict.implied)} at {basis}")
+        if stats.is_lower_bound(best):
+            return _feasibility("lower_bound", ceiling, (
+                f"Judged against {basis}: it can show a load too light for its RPE but never beyond failure, so the "
+                "load-step guard applies too."))
+        return _feasibility("checked", ceiling, f"Judged against {basis}.")
 
-    def unearned_without_e1rm(self, session, line, sets, facts):
+    def unearned_without_e1rm(self, session, line, sets, facts, no_model):
         baseline = facts["baseline"]
         if line["load_mode"] == "assisted" or baseline is None:
             return
@@ -500,8 +592,7 @@ class _Checker:
             why = "" if e1rm_supported(line["exercise_id"]) else " (body mass dominates this movement)"
             self.flag("unearned_load", session, line,
                       f"{self.where(session, line)}: {_number(top)} is more than {NO_E1RM_INCREMENTS} increments "
-                      f"of {_number(step)} above {_number(before)} on {baseline['date']}, and there is no "
-                      f"e1RM to judge it by{why}")
+                      f"of {_number(step)} above {_number(before)} on {baseline['date']}, and {no_model}{why}")
 
     def check_duration(self, session):
         cap = cap_minutes(self.config, session["session_id"])
@@ -512,6 +603,14 @@ class _Checker:
             self.flag("session_over_cap", session, None,
                       f"{session['title']} on {session['date']}: estimated {minutes} min (a heuristic estimate) "
                       f"against a {cap} min cap")
+
+
+def _feasibility(status, ceiling, message):
+    """A prescription-check line's model verdict: `checked`, `lower_bound`, `unavailable` or `not_judged`, and
+    whether its RPE is a target or a recovery ceiling."""
+    if ceiling:
+        message += f" Its RPE is a ceiling ({ceiling}), so only a load too hard for it is flagged."
+    return {"status": status, "rpe": "ceiling" if ceiling else "target", "message": message}
 
 
 def unconfirmed_flags(root, doc):

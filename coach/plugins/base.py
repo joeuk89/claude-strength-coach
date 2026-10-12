@@ -185,6 +185,7 @@ class Proposal:
     focus: Optional[str] = None
     round_down: bool = False
     load_cut: bool = False
+    model_hold: bool = False
 
 
 @dataclass(frozen=True)

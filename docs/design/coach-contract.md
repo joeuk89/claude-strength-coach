@@ -180,7 +180,7 @@ Command inventory (owner in brackets). Read-only unless marked W
 
 | Command | Owner | |
 |---|---|---|
-| `units format --mode M --value V [--unit U] [--no-hevy]`, `units convert --mode M (--from-hevy-kg X \| --value V) [--unit U]`, `units round --value V --increment I [--direction nearest\|down\|up]` | R-10 (`--no-hevy`: R-40c) | |
+| `units format --mode M --value V [--unit U] [--no-hevy]`, `units convert --mode M (--from-hevy-kg X \| --value V) [--unit U]`, `units round --value V --increment I [--direction nearest\|down\|up]`, `units load-for --e1rm E --reps N [--rpe R] [--increment I]` | R-10 (`--no-hevy`: R-40c; `load-for`: C18) | |
 | `dates week [--date D] [--week-starts S]`, `dates span (--week W \| --start D --end D) [--week-starts S]` | R-10 | |
 | `config show [--location NAME]`, `config validate` | R-10 | |
 | `check [--only ids] [--list]` | R-10 (framework), each item adds checks | |
@@ -2111,6 +2111,7 @@ and are the **coaching number**: `per_hand` for `per_hand_x2` and
 coach.stats.e1rm(load, reps, rpe=None) -> float | None
 coach.stats.load_for(e1rm, reps, rpe) -> float          # inverse; R-23a schemes, R-24 feasibility
 coach.stats.implied_rpe(e1rm, load, reps) -> float       # R-24
+coach.stats.is_lower_bound(point) -> bool                # R-23a, R-24
 ```
 
 - Reps to failure `n = reps + (10 − rpe)` when RPE is logged, else
@@ -2122,6 +2123,16 @@ coach.stats.implied_rpe(e1rm, load, reps) -> float       # R-24
   with `n = max(1, 30 × (e1rm/load − 1))` when `load ≤ e1rm`, and
   `n = 30 × (e1rm/load − 1)` (negative: beyond failure) when `load > e1rm`.
   So a single at the e1RM implies RPE 10.
+- A point whose method is `epley` (its set logged without RPE) counts
+  every rep as taken to failure, so it is a **lower bound** on capacity:
+  `is_lower_bound(point)`. Feasibility (C22) never reads failure from it,
+  and `capacity_evidence` says so in its `message`.
+- `units load-for --e1rm E --reps N [--rpe R] [--increment I]` exposes
+  `load_for`: `data.model` holds the unrounded model load (2 decimals,
+  null with a `reason` past 12 reps to failure) and its inputs;
+  `data.equipment` is null, or with `--increment` the heaviest load on
+  that grid no heavier than the model load. E1RM 19.6, 8 reps, RPE 8
+  gives a model load of 14.7 and, on a 2-unit grid, 14.
 - Only `total`, `per_hand_x2`, `single_implement` lifts get a series.
   Bodyweight and assisted lifts get one only when a bodyweight reading
   exists within 14 days (`bodyweight + added`, `bodyweight − assist`): a
@@ -2377,13 +2388,13 @@ Reserved codes:
 | `convention_slip` | warn | R-20 | | Dumbbell exposure jumped exactly 2× or ½× at the same reps and RPE; excluded from e1RM and progression until annotated. |
 | `duration_over_cap` | info | R-20 | | A logged workout ran longer than its session cap. |
 | `stale_prescription` | block | R-24 | | Line derived from an exposure outside the validity window and not decayed to its band, or above the `ILLNESS_RPE_CAP` (7) cap on the first session after an illness. |
-| `unearned_load` | block | R-24 | | Load predicted beyond failure for the prescribed reps, or, with no e1RM, more than two increments above the last exposure. |
+| `unearned_load` | block | R-24 | | Load predicted beyond failure at every rep target the line allows, or, with no e1RM from RPE-rated sets, more than two increments above the last exposure. |
 | `load_cap` | block | R-24 | | Load above `[caps]` or `dumbbell_max`. |
 | `load_unrepresentable` | block | R-24 | | Load cannot be built from the available increments, dumbbells, kettlebells or plates. |
 | `load_geometry_unknown` | warn | R-24 | | Physical feasibility unknown: configure the known Smith, EZ-bar or trap-bar base mass. |
 | `load_mode_mismatch` | block | R-24 | | Line's load mode or load arithmetic disagrees with the library or C5. |
 | `load_mode_unconfirmed` | block | R-24 | | Line's exercise has no confirmed load mode in the library; only confirming it clears the flag. |
-| `rpe_infeasible` | warn | R-24 | | RPE target more than 1 away from the RPE implied by load, reps and current e1RM. |
+| `rpe_infeasible` | warn | R-24 | | RPE target more than 1 away from the implied RPE at every rep target the line allows, or a recovery RPE ceiling more than 1 below it. |
 | `session_over_cap` | warn | R-24 | | Estimated session duration above its cap. |
 | `hevy_template_unresolved` | block | R-14 | | A Hevy exercise template must be mapped before approval. |
 | `hevy_routine_unmapped` | info | R-14 | | A session needs an explicit create or reuse action in the write brief. |
@@ -2543,10 +2554,25 @@ coach.validity.estimate_minutes(root, session) -> int
   line exposes `model_evidence` with `estimate`, `reason`, `date` and a
   plain `message`. The existing no-e1RM load-step guard, equipment checks,
   return rules and progression rules still apply. Implied RPE above
-  10.5 is `unearned_load`; otherwise an RPE target more than 1 from the
-  implied RPE is `rpe_infeasible` (rn:autoregulation.6). Only working
+  10.5 at the fewest reps the set allows is `unearned_load`; otherwise
+  an RPE target is `rpe_infeasible` when no whole rep target in the set's
+  range (or its reps) implies an RPE within 1 of it (rn:autoregulation.6).
+  A recovery line's RPE is a **ceiling**, flagged only when the implied
+  RPE at the fewest reps is more than 1 above it: a `deload`-kind
+  overlay (deload, light and return weeks), a line with
+  `provenance.decay`, the first session after illness and a line under
+  an active C26 `rpe_cap` (rn:deloads.9). A lower-bound estimate (C18)
+  never shows a load beyond failure or too hard for its RPE; the
+  no-e1RM load-step guard below judges the line as well. Messages print
+  an implied RPE outside 0–10 as a model result past failure or far from
+  it, never as an RPE. `coach.validity.judge_set(estimate, load, targets,
+  rpe, ceiling)` is the one verdict the check and the proposal pipeline
+  (C24) share. Each returned line's `feasibility` is `{status, rpe,
+  message}`: `status` `checked`, `lower_bound`, `unavailable` (no model
+  check ran; the message says why and that only the load-step guard
+  applies) or `not_judged`, and `rpe` `target` or `ceiling`. Only working
   sets of `total`, `per_hand_x2` and `single_implement` lines are judged
-  this way; a rep range is judged at its start. With no e1RM point (and for
+  this way. With no e1RM point (and for
   `bodyweight` lines, whose added load has no e1RM, and for lifts with no
   e1RM at all, C5, whose message says body mass dominates), a top working load
   more than two increments (declared location equipment step, else
@@ -2803,7 +2829,10 @@ and `plugins test` runs them. Loaded with
   lower of the scheme's top load and the derived-from load (a `linear`
   reset: from the derived-from load). Decay, the `standard`, `light` and `return`
   transforms, a `linear` reset and `wave_531`'s deload and decay set it;
-  `round_down` still wins on a line that has both.
+  `round_down` still wins on a line that has both. `model_hold`
+  (default false; `linear` and `double_progression` set it on a step or
+  hold from an exposure) lets the pipeline hold the load the e1RM model
+  rejects (C24 step 3).
 - The `Exposure` a plugin sees is `coach.plugins.base.Exposure`: C17's
   fields with every load as the coaching number, plus `prescribed` (the
   working sets the overlay in force that day asked for; empty when unknown)
@@ -3075,6 +3104,13 @@ propose week  ──►  .coach/proposals/<id>.json (+ .proposed.json)  ──�
    same steps, so the transform applies once to the sets the line
    delivers. A scheme defining `final_note` then names the line's
    `target_note` from those final sets.
+   A `model_hold` proposal with no decay, transform or cut whose
+   rounded load C22's `judge_set` puts beyond failure at the line's
+   model evidence holds the heaviest lighter load the derived-from
+   exposure logged that the model accepts, keeping the program's reps,
+   ranges, RPE and sets; the rationale names the rejected load, its model
+   result and the held load. When no logged load passes, the scheme's
+   load stays and the check flags it. No flag is resolved for it.
 4. Core flags: `no_data`, `stalled`, `rpe_drift`, `convention_slip`,
    `return_week`, `return_after_illness`, `constraint_applied`,
    `override_standing`, `scheme_reset`, `rotation_unconfirmed`.

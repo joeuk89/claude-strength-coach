@@ -266,7 +266,14 @@ An RPE ceiling written into an exercise's prescription to protect
 recovery or a niggle: every working set stays at or under it. RPE drift
 on a capped set counts like drift on a compound lift, whatever the
 exercise.
-_Avoid_: RPE ceiling, cap (ambiguous with a load cap)
+_Avoid_: cap (ambiguous with a load cap); RPE ceiling names the wider idea
+
+**RPE ceiling**:
+A recovery line's RPE read as a limit, not a target to reach: on a light
+or return week, a line decayed to a return band, the first session after
+illness, or a line under a recovery cap. The e1RM model check never calls
+work under it too easy; it flags only a load too hard for it.
+_Avoid_: recovery cap (one source of it), target RPE
 
 **Niggle**:
 An ache or minor injury worth watching for recurrence, logged in
