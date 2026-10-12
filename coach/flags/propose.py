@@ -11,6 +11,9 @@ register("stalled", owner=OWNER, severities=("warn",),
          summary="No metric or matched-work effort gain over three comparable exposures; a coaching heuristic.")
 register("prescription_unknown", owner=OWNER, severities=("warn",),
          summary="Historical prescription unknown; no prescribed hit or miss inferred.")
+register("incomplete_exposure", owner=OWNER, severities=("warn",),
+         summary="Fewer working sets logged than prescribed and none fell short: progression holds and no miss is "
+                 "counted; a coaching heuristic.")
 register("linear_below_start", owner=OWNER, severities=("info",),
          summary="Linear reset fell below the starting load; review progression without automatic adjustment.")
 register("rpe_drift", owner=OWNER, severities=("warn",),

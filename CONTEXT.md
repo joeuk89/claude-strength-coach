@@ -81,6 +81,14 @@ The comparable e1RM that limits a prescription's load, or the reason none
 does: no comparable e1RM in the window, or newer over-cap work at or above
 the load behind it.
 
+**Incomplete exposure**:
+An exposure that logged fewer working sets than its prescription asked
+for, with no logged set short of its reps. The sets may have been
+skipped for time, so no miss is counted and the lift holds, unless the
+misses already counted call for a reset; a set that was attempted and
+fell short is a miss.
+_Avoid_: partial session, skipped set (as a miss)
+
 **Validity window**:
 How long an exercise's newest exposure keeps its prescription current:
 the exercise's usual gap between exposures plus a short grace period.
@@ -247,7 +255,8 @@ A coach's change to one exercise's proposed prescription that holds in
 later weeks until a set end date (four weeks by default, eight at most),
 so the progression scheme stops proposing it away; the scheme's own
 proposal is still shown beside it. A one-week override changes only the
-week it was made in.
+week it was made in, except that an approved override onto an
+assistance ladder's rung moves the ladder to that rung.
 _Avoid_: pinned line, manual hold, permanent override
 
 **Recovery cap**:

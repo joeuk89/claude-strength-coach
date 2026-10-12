@@ -71,9 +71,9 @@ def _hit(exposure, targets):
     return True
 
 
-def _rung_load(ctx, rung):
+def _rung_load(load_mode, rung):
     load = rung.get("load")
-    if load is None and ctx.exercise.load_mode == "bodyweight":
+    if load is None and load_mode == "bodyweight":
         return 0
     return load
 
@@ -84,7 +84,7 @@ def _note(ctx, index):
 
 
 def _at(ctx, sets, index):
-    return base.with_load(sets, _rung_load(ctx, ctx.params["rungs"][index]))
+    return base.with_load(sets, _rung_load(ctx.exercise.load_mode, ctx.params["rungs"][index]))
 
 
 def propose(ctx):
@@ -116,6 +116,18 @@ def propose(ctx):
         reason = f"no new exposure, so {name} holds"
     return base.Proposal(sets=_at(ctx, targets, rung), rationale=f"Assistance ladder: {reason}",
                          derived_from=source, state=state, target_note=_note(ctx, rung))
+
+
+def override_state(params, state, sets, load_mode):
+    """The state after an approved override: on the rung whose load every overridden working set carries, so the
+    coach's switch to that rung stands; an override off the rungs leaves the state as proposed."""
+    loads = {s.load for s in base.working(sets)}
+    if len(loads) != 1 or None in loads:
+        return dict(state)
+    [load] = loads
+    rung_loads = [_rung_load(load_mode, rung) for rung in params["rungs"]]
+    found = [i for i, rung_load in enumerate(rung_loads) if rung_load is not None and abs(rung_load - load) < 1e-9]
+    return dict(state, rung=found[0]) if len(found) == 1 else dict(state)
 
 
 def decay(ctx, proposal, days_off):

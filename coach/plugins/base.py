@@ -429,17 +429,26 @@ def usable_oldest_first(exposures, after=None):
 
 
 def missed(exposure):
-    """Whether prescribed sets or reps were missed, or None when the historical prescription is unknown."""
+    """True when a logged working set fell short of its prescribed reps, False when every prescribed set was logged
+    at them, and None when that is unknown: the historical prescription is unknown, or the exposure is `incomplete`
+    with no short set.
+
+    A set that was never logged is not a failed attempt: it may have been skipped for time.
+    """
     prescribed = working(exposure.prescribed)
     if not prescribed:
         return None
-    logged = [s for s in exposure.sets if s.working]
-    if len(logged) < len(prescribed):
-        return True
+    logged = working(exposure.sets)
     for wanted, got in zip(prescribed, logged):
         if wanted.target_reps is not None and (got.reps or 0) < wanted.target_reps:
             return True
-    return False
+    return None if len(logged) < len(prescribed) else False
+
+
+def incomplete(exposure):
+    """True when a known prescription asked for more working sets than were logged."""
+    prescribed = working(exposure.prescribed)
+    return bool(prescribed) and len(working(exposure.sets)) < len(prescribed)
 
 
 def prescription_sets(last_prescription):

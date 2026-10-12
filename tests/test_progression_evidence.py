@@ -188,4 +188,4 @@ class ProgressMetricTest(unittest.TestCase):
         result = run(context("linear", exposures=missed, start_load=70))
         self.assertEqual({s.load for s in result.sets}, {63})
         self.assertEqual([(f["code"], f["severity"]) for f in result.flags], [("linear_below_start", "info")])
-        self.assertEqual(result.state["misses"], 0)
+        self.assertEqual(result.state["misses"], 3)

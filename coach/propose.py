@@ -1046,11 +1046,15 @@ def _week_flags(root, config, today, span, doc):
     return weekflags.run(weekflags.WeekFlagContext(root, today, span, "proposal", config, doc, bouts))
 
 
-def _write_state(root, doc, program_doc):
+def _check_state(doc, program_doc):
     errors = state_module.problems(doc, program_doc)
     if errors:
         raise ValidationError(f"The updated {paths.STATE} is not valid ({len(errors)} problem(s))",
                               details=[e.to_json() for e in errors])
+
+
+def _write_state(root, doc, program_doc):
+    _check_state(doc, program_doc)
     jsonio.write_doc(state_module.path_for(root), doc, False)
 
 
@@ -1203,7 +1207,10 @@ def show(root, config, proposal_id, now):
 
 
 def finalize(root, config, proposal_id, now, today, dry_run):
-    """Write the overlay, one-week override decisions and pending scheme state, once every change is explained (C24)."""
+    """Write the overlay, one-week override decisions and pending scheme state, once every change is explained (C24).
+
+    Everything is built and checked before the first write, so a refusal or a dry run writes nothing.
+    """
     draft, proposed, meta = load_proposal(root, proposal_id)
     unexplained = unexplained_changes(draft, proposed)
     if unexplained:
@@ -1244,27 +1251,65 @@ def finalize(root, config, proposal_id, now, today, dry_run):
             recorded.add((proposal_id, *scope))
             appended.append(decision)
 
+    program_doc = program.load(root)
     state_doc = state_module.load(root)
+    registry = plugins.load(root)
+    last_lines = _last_lines(draft)
     pending = []
     for slot, entry in meta["scheme_state"].items():
         stored = state_doc["scheme_state"].get(slot)
         plugin_name = entry["scheme"]
+        plugin = registry.get("conditioning" if conditioning.is_state_key(slot) else "scheme", plugin_name)
         if stored is None or stored["scheme"] not in (None, plugin_name):
-            kind = "conditioning" if conditioning.is_state_key(slot) else "scheme"
-            plugin = plugins.load(root).get(kind, plugin_name)
             stored = {"scheme": plugin_name, "data": plugins.initial_state(plugin), "pending": None}
+        data = _override_state(program_doc, plugin, slot, entry["data"], last_lines.get(slot))
         state_doc["scheme_state"][slot] = dict(stored, scheme=plugin_name,
-                                               pending={"overlay_id": doc["id"], "data": entry["data"]})
+                                               pending={"overlay_id": doc["id"], "data": data})
         pending.append(slot)
     if meta.get("rotation"):
         rotation = dict(state_doc["rotation"])
         rotation.update(meta["rotation"])
         state_doc["rotation"] = rotation
+    _check_state(state_doc, program_doc)
 
     if not dry_run:
-        jsonio.write_doc(path, doc, False)
+        # The overlay goes last: pending state naming a missing overlay is dropped at the next settle, so a write
+        # that fails part-way leaves no new overlay to approve without its state.
+        jsonio.write_doc(state_module.path_for(root), state_doc, False)
         if appended:
             jsonio.write_doc(decisions.path_for(root), decision_doc, False)
-        _write_state(root, state_doc, program.load(root))
+        jsonio.write_doc(path, doc, False)
     return {"id": doc["id"], "path": _relative(root, path), "overlay": doc, "decisions": appended,
             "pending": pending, "rotation": state_doc["rotation"], "written": not dry_run}
+
+
+def _last_lines(draft):
+    """Each slot's line in the draft's latest session holding it, by `<session id>/<exercise id>`."""
+    found = {}
+    for session in sorted(draft["sessions"], key=lambda s: s["date"]):
+        for line in session["exercises"]:
+            found[f"{session['session_id']}/{line['exercise_id']}"] = line
+    return found
+
+
+def _override_state(program_doc, plugin, slot, data, line):
+    """The pending state of a slot whose line the coach overrode, through its scheme's `override_state` (C23)."""
+    hook = getattr(plugin.module, "override_state", None) if plugin is not None else None
+    if hook is None or line is None or not line.get("override"):
+        return data
+    session_id, exercise_id = slot.split("/", 1)
+    exercise = next((e for s in program_doc["sessions"] if s["id"] == session_id for e in s["exercises"]
+                     if e["exercise_id"] == exercise_id), None)
+    if exercise is None or exercise["scheme"]["name"] != plugin.name:
+        return data
+    params, errors = plugins.merged_params(plugin, exercise["scheme"]["params"])
+    if errors:
+        raise ValidationError(f"Scheme {plugin.name} params fail its PARAMS schema",
+                              details=[e.to_json() for e in errors])
+    found = hook(params, dict(data), tuple(base.working([base.SetSpec.from_dict(s) for s in line["sets"]])),
+                 exercise["load_mode"])
+    errors = plugins.state_errors(plugin, found)
+    if errors:
+        raise ValidationError(f"Scheme {plugin.name} returned an override state that fails its STATE schema",
+                              details=[e.to_json() for e in errors])
+    return found
