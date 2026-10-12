@@ -136,9 +136,9 @@ def _looked_over(read):
 def flares(inst, span):
     """Each niggle aggravated at some point in `span`, from its dated history (C27).
 
-    A row already aggravated when the week began counts from that entry; a later status never erases an aggravated
-    entry inside the week, and a flare dated before or after the week does not count. A report made after the week
-    counts only when it was dated to the day the flare happened.
+    A row whose status on the week's first day is aggravated counts from its newest earlier aggravated entry; a later
+    status never erases an aggravated entry inside the week, and a flare settled by the week's first day or dated
+    after the week does not count. A report made after the week counts only when dated to the day the flare happened.
     """
     if not niggles.exists(inst.root):
         return []
@@ -146,7 +146,9 @@ def flares(inst, span):
     found = []
     for row in niggles.load(inst.root, inst.library)["niggles"]:
         before = [entry for entry in row["history"] if entry["date"] < start]
-        persisting = before[-1]["date"] if before and before[-1]["status"] == "aggravated" else None
+        persisting = None
+        if before and before[-1]["status"] == "aggravated" and niggles.status_on(row, span.start) == "aggravated":
+            persisting = before[-1]["date"]
         inside = [entry["date"] for entry in row["history"]
                   if start <= entry["date"] <= end and entry["status"] == "aggravated"]
         if persisting or inside:

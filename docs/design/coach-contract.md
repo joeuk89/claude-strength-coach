@@ -2800,9 +2800,9 @@ function the `rpe_drift` flag uses. `drift_reading` gives the detail: each
 logged working set is paired by position with a prescribed working set;
 a set past the last prescribed one (`extra`), heavier than prescribed
 (less assistance for `assisted`; a missing load counts as 0 for
-`bodyweight` and `assisted`), with more reps than the top of its target,
-longer, with no target RPE, no load in a loaded mode, or no logged RPE is
-set aside. `compared` counts the rest, `over` their positions 1 or more
+`bodyweight` and `assisted`), with more reps than the top of its target
+(a rep-out set has no top), longer, with no target RPE, no load in a
+loaded mode, or no logged RPE is set aside. `compared` counts the rest, `over` their positions 1 or more
 RPE over target (the cap lowers every target), and `below` those logged
 lighter (more assistance for `assisted`), with fewer reps than the bottom
 of their target, or shorter. `drifted` is two or more over; `steady` is
@@ -6258,8 +6258,9 @@ Flags (registered in `coach/flags/block.py`; rows in C20):
 **Built with R-31** (details C42 and C43 leave open):
 
 - Signatures: `close(root, week_start, readiness=None, sleep=None,
-  deep=False, dry_run=False, *, sleep_reason=None, today=None, now=None)`, `status(root, *,
-  today, now)`, `classify(root, week_start, *, today, now)`;
+  deep=False, dry_run=False, *, sleep_reason=None, today=None,
+  now=None)`, `status(root, *, today, now)`,
+  `classify(root, week_start, *, today, now)`;
   `status_line_for(block_state, ceiling, ledger=None, decisions=None)` is
   the pure form `status_line(root)` and `program adopt` call.
   `coach.block.trained_as_prescribed(lines, workout)` is the gate and
@@ -6314,8 +6315,9 @@ Flags (registered in `coach/flags/block.py`; rows in C20):
   its session). Both drifting with no steady exposure before them is
   `calibration` (flag `drift_calibration`), not a trigger. Niggle
   (`fatigue.flares`): a row whose history has an `aggravated` entry
-  dated in the week, or whose newest entry before the week is
-  `aggravated`. An entry dated after the week never counts for it; a
+  dated in the week, or whose status on the week's first day (C27) is
+  still `aggravated`, so a report settling it on that day ends it
+  before the week. An entry dated after the week never counts for it; a
   check-in held after the week dates the athlete's report to when the
   flare happened (`niggles update --date`, C27). A later status never
   erases the entry. Sleep (`fatigue.sleep_reading`, reading

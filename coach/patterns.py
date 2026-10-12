@@ -69,6 +69,8 @@ class DriftReading:
 
 
 def _top_reps(item):
+    if _field(item, "rep_out"):
+        return None
     reps = _field(item, "reps")
     if reps is not None:
         return reps

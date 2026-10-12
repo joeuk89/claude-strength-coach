@@ -426,8 +426,11 @@ def runs_on_file(root, config, span, today):
 
 def sleep_judgement(store, settings, end):
     """(short nights, nights with data, debt: True | False | None) over the 7 nights ending on `end`."""
-    nights = dates.Span(end - timedelta(days=NIGHTS - 1), end)
-    hours = [day["asleep_hours"] for day in store.asleep_days(nights) if day["provenance"]["kind"] == "nightly"]
+    return _judge(store.asleep_days(dates.Span(end - timedelta(days=NIGHTS - 1), end)), settings)
+
+
+def _judge(days, settings):
+    hours = [day["asleep_hours"] for day in days if day["provenance"]["kind"] == "nightly"]
     short = sum(1 for value in hours if value < settings["sleep_short_hours"])
     if len(hours) < settings["sleep_min_nights"]:
         return short, len(hours), None
@@ -453,9 +456,9 @@ def sleep_evidence(root, span):
         return None
     settings = _settings(config)
     store = ActivityStore(root, config)
-    short, nights, debt = sleep_judgement(store, settings, span.end)
     window = dates.Span(span.end - timedelta(days=NIGHTS - 1), span.end)
     days = store.asleep_days(window)
+    short, nights, debt = _judge(days, settings)
     return {"debt": debt, "short_nights": short, "nights": nights, "window": window.to_json(),
             "short_hours": settings["sleep_short_hours"], "debt_nights": settings["sleep_debt_nights"],
             "min_nights": settings["sleep_min_nights"],

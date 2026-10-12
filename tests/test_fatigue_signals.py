@@ -59,6 +59,12 @@ class DriftReadingTest(unittest.TestCase):
                                          load_mode="per_hand_x2")
         self.assertEqual((reading.over, reading.set_aside), ((1,), ((2, "more_reps"),)))
 
+    def test_a_rep_out_set_has_no_rep_ceiling(self):
+        prescribed = [target(rpe=None, load=100), SetSpec(reps=5, rpe=9, load=100, rep_out=True)]
+        reading = patterns.drift_reading([logged(7, load=100), logged(10, load=100, reps=9)], prescribed,
+                                         load_mode="total")
+        self.assertEqual((reading.set_aside, reading.compared), (((1, "no_target"),), 1))
+
     def test_lighter_or_short_sets_can_show_drift_but_never_steadiness(self):
         lighter = patterns.drift_reading([logged(7, load=40)] * 3, [target()] * 3, load_mode="total")
         self.assertEqual((lighter.compared, lighter.below), (3, ((1, "lighter"), (2, "lighter"), (3, "lighter"))))
@@ -310,6 +316,16 @@ class NiggleHistoryTest(FatigueCase):
         self.assertIn("niggle", data["weeks"][-1]["triggers"])
         flare, = data["reviews"][-1]["fatigue"]["niggle"]
         self.assertEqual((flare["aggravated_on"], flare["status_now"]), (["2026-10-08"], "watching"))
+        self.train_week("2026-10-12")
+        data = self.close("2026-W42", now="2026-10-18T18:00:00Z")
+        self.assertNotIn("niggle", data["weeks"][-1]["triggers"])
+        self.assertEqual(data["reviews"][-1]["fatigue"]["niggle"], [])
+
+    def test_a_flare_settled_on_the_week_s_first_day_does_not_persist_into_it(self):
+        self.niggle(("2026-09-27", "aggravated"), ("2026-10-05", "watching"))
+        data = self.close()
+        self.assertNotIn("niggle", data["weeks"][-1]["triggers"])
+        self.assertEqual(data["reviews"][-1]["fatigue"]["niggle"], [])
 
     def test_a_report_date_is_not_in_the_future_or_before_the_newest_entry(self):
         self.niggle(("2026-10-05", "watching"))
