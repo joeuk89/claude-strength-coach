@@ -135,6 +135,8 @@
       "Bash(python3 -m coach activity status:*)",
       "Bash(python3 -m coach activity sync:*)",
       "Bash(python3 -m coach activity void:*)",
+      "Bash(python3 -m coach bodyweight list:*)",
+      "Bash(python3 -m coach bodyweight record:*)",
       "Bash(python3 -m coach library set-avoid:*)",
       "Bash(python3 -m coach migrate run:*)",
       "Bash(python3 -m coach nutrition import:*)",

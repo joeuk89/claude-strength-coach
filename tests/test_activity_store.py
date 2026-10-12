@@ -162,6 +162,25 @@ class DedupTest(StoreCase):
         self.assertEqual(len(store.lines("activity")), 4)
 
 
+class BodyMassTest(StoreCase):
+    def body_masses(self, *lines):
+        self.write(".coach/activity/wellness.jsonl", lines)
+        return [(m["date"], m["body_mass_kg"], m["provenance"]["id"]) for m in self.store().body_masses()]
+
+    def test_a_span_counts_once_on_its_end_date(self):
+        self.assertEqual(self.body_masses(wellness("manual:week", "2026-09-28", "2026-10-04", body_mass_kg=70.0)),
+                         [("2026-10-04", 70.0, "manual:week")])
+
+    def test_a_days_own_record_outranks_a_span_ending_that_day_whatever_the_source(self):
+        found = self.body_masses(
+            wellness("manual:week", "2026-09-28", "2026-10-04", body_mass_kg=70.0),
+            wellness("apple_health:day", "2026-10-04", body_mass_kg=71.0))
+        self.assertEqual(found, [("2026-10-04", 71.0, "apple_health:day")])
+
+    def test_records_without_a_body_mass_are_ignored(self):
+        self.assertEqual(self.body_masses(wellness("manual:sleep", "2026-10-04", asleep=7.0)), [])
+
+
 class WellnessLocationTest(StoreCase):
     def test_default_location_is_the_local_cache(self):
         self.assertEqual(self.store().path("wellness"), self.root / ".coach" / "activity" / "wellness.jsonl")

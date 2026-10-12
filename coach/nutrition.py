@@ -23,7 +23,6 @@ READING_FIELDS = ("trend_weight", "scale_weight", "expenditure_kcal", "target_kc
                   "avg_kcal", "avg_protein_g", "days_logged", "anchors_most_days", "note")
 NEEDS_ONE_OF = ("trend_weight", "scale_weight", "avg_protein_g")
 FULL_WEEK = 7
-TREND_MIN_DAYS = 14
 STALE_AFTER_DAYS = 14
 
 QUESTION_READINGS_APP = ("trend weight · expenditure · targets (kcal/protein) · 7-day average (kcal/protein) · "
@@ -141,24 +140,6 @@ def _override_state(override, today):
     if today < override["start"]:
         return "upcoming"
     return "active"
-
-
-def _trend(series, basis, weight_unit, target_rate):
-    points = [(dates.parse_date(r["date"]), r[basis]) for r in series
-              if r[basis] is not None and r["weight_unit"] == weight_unit]
-    trend = {"basis": basis, "rate_per_week": None, "span": None, "days": None,
-             "target_rate_per_week": target_rate}
-    if not points:
-        return trend
-    end_day, end_weight = points[-1]
-    earlier = [(day, weight) for day, weight in points if (end_day - day).days >= TREND_MIN_DAYS]
-    if not earlier:
-        return trend
-    start_day, start_weight = earlier[-1]
-    days = (end_day - start_day).days
-    trend.update(rate_per_week=round((end_weight - start_weight) / days * FULL_WEEK, 2),
-                 span={"start": start_day.isoformat(), "end": end_day.isoformat()}, days=days)
-    return trend
 
 
 def _num(value):
@@ -295,14 +276,15 @@ def current_plan(root, today):
 
 
 def status(root, today):
+    # Imported here because coach.bodyweight reads the readings series through this module.
+    from coach import bodyweight
+
     loaded = config_module.load(root)
     if not enabled(loaded):
         return {"enabled": False, "brief_line": None, "questions": []}
     nutrition = loaded["nutrition"]
     weight_unit = loaded["athlete"]["bodyweight_units"]
     series = readings(root)
-    has_app = nutrition["app"] != "none"
-
     override = override_view(nutrition, today)
 
     data = {
@@ -318,8 +300,8 @@ def status(root, today):
         "override": override,
         "template": "template" in nutrition,
         "latest_reading": copy.deepcopy(series[-1]) if series else None,
-        "trend": _trend(series, "trend_weight" if has_app else "scale_weight", weight_unit,
-                        nutrition["target_rate_per_week"]),
+        "trend": bodyweight.trend(bodyweight.observations(root, loaded, weight_unit, until=today.isoformat()),
+                                  bodyweight.preferred_basis(loaded), nutrition["target_rate_per_week"]),
         "flags": _flags(nutrition, series, override, today),
         "plan": current_plan(root, today),
     }

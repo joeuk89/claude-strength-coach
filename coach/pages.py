@@ -18,12 +18,12 @@ from functools import cached_property
 from pathlib import Path
 
 from coach import block as block_module
+from coach import bodyweight
 from coach import checkin, closeout, dates, history, overlay, page_parts, paths, program, render, sheets, state, stats, units
 from coach import config as config_module
 from coach import flags as flags_module
 from coach.config_tables import coaching
 from coach.errors import ConfigError, NetworkError, RefusedError, ValidationError
-from coach.hevy.cache import HevyCache
 from coach.library import Library
 from coach.page_parts import Item
 from coach.page_parts import nutrition as nutrition_part
@@ -361,20 +361,18 @@ class _View:
 
     @cached_property
     def body_weights(self):
-        """[(date, weight)] of Hevy body measurements in bodyweight units dated by `as_of`, oldest first."""
+        """(basis, fallback, [observation]): the C35 bodyweight series in bodyweight units dated by `as_of`."""
         unit = self.config.athlete.bodyweight_units
-        found = []
-        for reading in HevyCache(self.root).body_measurements() or []:
-            day = (reading.get("date") or "")[:10]
-            if reading.get("weight_kg") and day and day <= self.today.isoformat():
-                found.append((dates.parse_date(day), units.from_hevy_kg(reading["weight_kg"], "total", unit)))
-        return sorted(found)
+        found = bodyweight.observations(self.root, self.config, unit, until=self.today.isoformat())
+        basis, fallback = bodyweight.select(found, bodyweight.preferred_basis(self.config))
+        return basis, fallback, bodyweight.series(found, basis)
 
     def weekly_body_weights(self):
         """[(week start, mean weight)], oldest first."""
         by_week = {}
-        for day, weight in self.body_weights:
-            by_week.setdefault(dates.week_span(day, self.week_starts).start, []).append(weight)
+        for item in self.body_weights[2]:
+            by_week.setdefault(dates.week_span(dates.parse_date(item["date"]), self.week_starts).start,
+                               []).append(item["value"])
         return [(start, sum(values) / len(values)) for start, values in sorted(by_week.items())]
 
     def header_line(self):
@@ -592,10 +590,11 @@ def _progress_summary(view):
         found.append("No e1RM yet.")
     current, longest = view.streak
     found.append(f"Core-complete streak: {_weeks_text(current)} (longest {_weeks_text(longest)})")
-    if view.body_weights:
-        day, weight = view.body_weights[-1]
-        found.append(f"Bodyweight: {_num(weight)} {view.config.athlete.bodyweight_units} on {_long_date(day)}, "
-                     "scale (Hevy)")
+    basis, fallback, points = view.body_weights
+    if points:
+        latest = points[-1]
+        found.append(f"Bodyweight: {_num(latest['value'])} {view.config.athlete.bodyweight_units} on "
+                     f"{_long_date(latest['date'])}, {_basis_text(basis, fallback, points)}")
     return found
 
 
@@ -655,17 +654,32 @@ def _lifts_table(view):
     return rows + notes
 
 
+_SOURCE_NAMES = {"wellness": "recorded weigh-ins", "hevy": "Hevy", "nutrition": "nutrition readings"}
+
+
+def _basis_text(basis, fallback, points):
+    """`trend weight (nutrition readings)`: the basis and where its points came from, flagging a stand-in."""
+    names = [_SOURCE_NAMES[source] for source in bodyweight.SOURCES if any(p["source"] == source for p in points)]
+    text = f"{bodyweight.LABELS[basis]} ({', '.join(names)})"
+    if fallback:
+        other = bodyweight.LABELS[bodyweight.TREND if basis == bodyweight.SCALE else bodyweight.SCALE]
+        text += f", standing in for {other}, which covers under {bodyweight.TREND_MIN_DAYS} days"
+    return text
+
+
 def _bodyweight(view):
     replaced = view.slot("progress.bodyweight")
     if replaced:
         return [item.text.rstrip("\n") for item in replaced]
     found = view.weekly_body_weights()[-BODYWEIGHT_WEEKS_SHOWN:]
     if not found:
-        return ["No bodyweight source yet: weigh-ins logged in Hevy or a nutrition app show here."]
+        return ["No bodyweight recorded yet: weigh-ins given to the coach, logged in Hevy or read from a nutrition "
+                "app show here."]
     unit = view.config.athlete.bodyweight_units
     lines = [_row(["Week of", f"Mean ({unit})"]), "|---|---|"]
     lines += [_row([_long_date(start), _num(mean)]) for start, mean in found]
-    return lines + ["", "Source: scale (Hevy), weekly means of body measurements."]
+    basis, fallback, points = view.body_weights
+    return lines + ["", f"Basis: {_basis_text(basis, fallback, points)}; weekly means."]
 
 
 RENDERERS = {BRIEF: render_brief, DASHBOARD: render_dashboard, PROGRESS: render_progress}

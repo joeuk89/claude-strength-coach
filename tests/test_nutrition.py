@@ -223,7 +223,8 @@ class StatusTest(CliMixin, unittest.TestCase):
         with InstanceCopy() as root:
             self.run_ok(root, "nutrition", "record", "--date", "2026-10-18", "--trend-weight", "82.1",
                         "--avg-protein", "118", "--days-logged", "7", "--anchors", "yes")
-            trend = self.run_ok(root, "nutrition", "status")["trend"]
+            self.assertIsNone(self.run_ok(root, "nutrition", "status")["trend"]["span"])
+            trend = self.run_ok(root, "nutrition", "status", env={"COACH_NOW": "2026-10-18T18:00:00Z"})["trend"]
             self.assertEqual(trend["span"], {"start": "2026-10-04", "end": "2026-10-18"})
             self.assertEqual(trend["rate_per_week"], -0.2)
             self.assertEqual(trend["basis"], "trend_weight")

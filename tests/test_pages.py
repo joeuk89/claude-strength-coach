@@ -373,20 +373,28 @@ class ProgressTest(PagesCase):
         doc = read_json(measurements)
         doc["data"] = []
         write_json(measurements, doc)
+        (self.root / "data" / "nutrition" / "readings.json").unlink()
         self.render()
         text = self.page("progress.md")
         best = stats.e1rm_series(self.root)["best"]["bb_back_squat"]
         squat = next(line for line in text.splitlines() if line.startswith("| Back Squat (Barbell) |"))
         self.assertIn(f"| {pages._num(best['e1rm'])} | {pages._long_date(best['date'])} |", squat)
-        self.assertIn("no bodyweight source", text.lower())
+        self.assertIn("no bodyweight recorded yet", text.lower())
         self.assertEqual(headings(text), ["Lifts", "Core-complete weeks", "Bodyweight"])
 
     def test_bodyweight_from_the_hevy_cache_as_weekly_means(self):
+        (self.root / "data" / "nutrition" / "readings.json").unlink()
         self.render()
         lines = section(self.page("progress.md"), "Bodyweight")
         self.assertIn("| 28 Sep 2026 | 80 |", lines)
         self.assertIn("| 5 Oct 2026 | 80.4 |", lines)
-        self.assertIn("scale (Hevy)", lines[-1])
+        self.assertIn("scale weight (Hevy)", lines[-1])
+
+    def test_an_app_trend_outranks_the_hevy_scale_weights(self):
+        self.render()
+        lines = section(self.page("progress.md"), "Bodyweight")
+        self.assertIn("| 5 Oct 2026 | 82.4 |", lines)
+        self.assertEqual(lines[-1], "Basis: trend weight (nutrition readings); weekly means.")
 
 
 class StreakTest(PagesCase):

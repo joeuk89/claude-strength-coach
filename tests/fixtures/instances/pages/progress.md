@@ -17,4 +17,4 @@ No finished week with an overlay yet.
 
 ## Bodyweight
 
-No bodyweight source yet: weigh-ins logged in Hevy or a nutrition app show here.
+No bodyweight recorded yet: weigh-ins given to the coach, logged in Hevy or read from a nutrition app show here.

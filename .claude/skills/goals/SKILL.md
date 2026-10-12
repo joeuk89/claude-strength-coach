@@ -36,14 +36,14 @@ Read `profile.md`, `routine/program.md` and the newest file in
 status` for the numbers on file and the latest reading. Ask for anything
 the conversation hasn't covered:
 
-- A **fresh weigh-in** (morning, before food; in their preferred units
-  with the metric value alongside). Without one to hand, agree the
-  strategy now and confirm the numbers after the next morning weigh-in.
+- A **fresh weigh-in** (morning, before food; their units, metric
+  alongside). Keep it first: `python3 -m coach bodyweight record --date
+  <day> --weight X`, nutrition on or off; `nutrition targets` reads it.
+  None to hand: agree the strategy, confirm numbers after the next one.
 - MacroFactor's **trend weight**, **expenditure**, targets (kcal,
   protein) and **7-day average protein**, if they use it and a program
   is set up. On a first run the app may be empty: proceed on the scale
-  weigh-in alone. (For Hevy users, `body_measurements` is the only other
-  weight source and is usually stale — check the date.)
+  weigh-in alone; `bodyweight list` shows every weight on file and its date.
 - **Recent protein intake** without the app: a typical day's protein,
   estimated together from two or three recent days.
 - A **body-fat reading**, if they have one: number, method and date.

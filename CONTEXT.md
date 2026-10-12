@@ -298,8 +298,8 @@ _Avoid_: load type, dumbbell weight (ambiguous between per-hand and Hevy value)
 **Total-system e1RM**:
 The e1RM of a `bodyweight` or `assisted` lift: bodyweight plus the added
 load, or minus the assistance, so it estimates the mass the athlete
-moves, not the load they set. It needs a bodyweight reading (a Hevy body
-measurement or a nutrition reading) within 14 days of the workout, and
+moves, not the load they set. It needs a bodyweight observation within
+14 days of the workout, and
 every display labels it "total system mass". Dumbbell split squats,
 lunges and step-ups, whose dumbbells are a small share of the mass moved,
 get no e1RM at all.
@@ -596,6 +596,17 @@ weigh-ins; plus whether the protein anchors happened most days. One per
 check-in date, kept as a series in `data/nutrition/readings.json`. A
 reading copies the app's numbers; nothing in the repo computes them.
 _Avoid_: weigh-in (one scale reading), nutrition log (the app is the log), check-in numbers
+
+**Bodyweight observation**:
+One dated weight from any store that holds one: a weigh-in kept as a
+wellness body mass (`bodyweight record`, which needs neither nutrition
+nor activity on), a Hevy body measurement, or a nutrition reading's
+weight. Its **basis** is scale weight (a weigh-in, or a week's mean of
+them) or trend weight (the nutrition app's smoothed estimate): different
+quantities, so a rate is always taken within one basis. On one date and
+basis the wellness record wins, then Hevy, then the nutrition reading,
+so a copy of the same weigh-in counts once.
+_Avoid_: weight entry, weight log (the apps are the logs)
 
 **Sleep gate**:
 The check `/goals` runs before agreeing a deficit: a trailing 14-day

@@ -80,6 +80,7 @@ coach/                       # framework: synced to instances
   structure.py               # dose targets, structure accounting, priority, minimum week (R-30a, R-30b)
   block.py                   # block ledger, light weeks, status line                    (R-31)
   nutrition.py               # nutrition config, readings, status                        (R-33a)
+  bodyweight.py              # bodyweight observations: precedence, basis, trend         (R-33a)
   protein.py                 # protein reference mass, floor, target, stretch            (R-33a)
   calories.py                # no-app starting calorie estimate per phase                (R-33a)
   load_statements.py         # load figures, statements, exercise mentions, diagnostics  (R-16)
@@ -236,6 +237,8 @@ Phase 2 to 4 command inventory. No command here writes to Hevy.
 | `nutrition status`, `nutrition readings [--last N]` | R-33a | |
 | `nutrition targets [--bodyweight X] [--goal-weight X] [--body-fat PCT --body-fat-source credible\|rough] [--sex male\|female] [--height N [--height-unit cm\|in]] [--recent-intake G] [--app macrofactor\|none] [--age N] [--activity sedentary\|active\|vigorous] [--phase PHASE:RATE]...` | R-33a | |
 | `nutrition record`, `nutrition import --input FILE` | R-33a | W |
+| `bodyweight list [--last N]` | R-33a | |
+| `bodyweight record --weight X [--date D] [--replace]` | R-33a | W |
 | `recipes list`, `recipes show`, `recipes validate`, `recipes import --html FILE`, `recipes draft --input FILE` | R-33b | |
 | `recipes render [SLUG]`, `recipes convert (--parse \| --apply --input FILE)` | R-33b | W (`--parse` writes nothing; one command, so it carries `writes`) |
 | `meals template [--week D]`, `meals show ID`, `meals validate ID`, `meals shopping ID [--format markdown\|issue]` | R-33c | |
@@ -2102,12 +2105,13 @@ coach.stats.implied_rpe(e1rm, load, reps) -> float       # R-24
   exists within 14 days (`bodyweight + added`, `bodyweight − assist`): a
   total-system estimate. A lift the catalogue marks `e1rm: "unsupported"`
   (C5) gets no series in any load mode.
-- Bodyweight readings are Hevy body measurements and C35 nutrition
-  readings (`trend_weight`, else `scale_weight`, converted from
-  `weight_unit` to `[athlete] units`), read whether or not Hevy or
-  nutrition is enabled. The nearest reading within 14 days of the
-  exposure date counts; a tie goes to the earlier date, then to Hevy.
-  Under `as_of` (C38) no reading dated after its local date counts.
+- Bodyweight readings are C35 bodyweight observations in `[athlete]
+  units`, read whether or not Hevy, nutrition or activity is enabled.
+  The nearest observation within 14 days of the exposure date counts; a
+  tie goes to the earlier date, then by source (wellness, Hevy,
+  nutrition; a nutrition reading's `trend_weight` before its
+  `scale_weight`). `bodyweight.source` names the source. Under `as_of`
+  (C38) no observation dated after its local date counts.
 - Excluded: warm-ups, discounted sets, `unknown_convention` spans, open
   `convention_slip` candidates, conditioning-session workouts (C17).
 
@@ -3474,6 +3478,9 @@ R-32 and is registered in `coach/flags/research.py`.
   lines).
 - With `[activity] enabled = false`, the activity, wellness and planned
   commands exit 5 naming the key, and activity checks report `skip`.
+  `bodyweight record` (C35) still writes a manual wellness body mass to
+  the wellness file `wellness_in_git` picks, and C35 bodyweight readers
+  read that file either way.
 
 ## C30. Activity record schemas (R-42a owns; R-43, R-44b read)
 
@@ -4097,12 +4104,48 @@ dates unique:
   of the meal plan whose span holds today, the latest-starting one when
   several do, else null), `brief_line`, `questions`.
   Disabled: `{"enabled": false, "brief_line": null, "questions": []}`.
-- `trend`: `{basis, rate_per_week, span, days, target_rate_per_week}`.
-  `basis` is `trend_weight` with an app and `scale_weight` without one.
-  The rate runs from the newest weight back to the newest earlier
-  weight at least 14 days before it, in `weight_unit`, per 7 days,
-  rounded to 0.01; null (with `span` and `days`) when the readings cover
-  under 14 days. A number only: no flag judges it.
+- `trend`: `{basis, rate_per_week, span, days, target_rate_per_week,
+  preferred_basis, fallback, sources}`, from the bodyweight observations
+  below dated by today, in `weight_unit`. `preferred_basis` is
+  `trend_weight` with an app and `scale_weight` without one; `basis` and
+  `fallback` are the selection below, and `sources` the sources of the
+  selected series in precedence order. The rate runs from the newest
+  point of that one basis back to its newest point at least 14 days
+  before, per 7 days, rounded to 0.01; null (with `span` and `days`)
+  when the series covers under 14 days. A number only: no flag judges it.
+- **Bodyweight observations** (`coach/bodyweight.py`) are the one source
+  of dated bodyweight for every reader (C18 e1RM, `nutrition status`
+  and `targets`, `progress.md` and the dashboard, `bodyweight list`).
+  Candidates: each wellness body mass (C29/C30; one per date, that day's
+  records by C32 precedence, then span records on their end date, since
+  a span record is a period mean), each Hevy body measurement with a
+  `weight_kg`, and each nutrition reading's `trend_weight` and
+  `scale_weight`, each converted to the reader's unit. The basis is
+  `scale_weight` for wellness, Hevy and a reading's `scale_weight`, and
+  `trend_weight` for a reading's `trend_weight`. Per date and basis one
+  observation is kept: wellness, then Hevy, then nutrition; the others
+  are listed in its `duplicates` and add no weight. An observation is
+  `{date, basis, value, source, ref, duplicates}`, `ref` naming the
+  record (`wellness <id>`, `hevy D`, `reading D`). Observations dated
+  after the reader's as-of day are left out, and nothing is rewritten
+  when the app or units change: a reading keeps the basis of the field
+  it was stored in.
+  - Selection: with `preferred_basis` `trend_weight`, the trend series if
+    it supports a rate, else the scale series if it does (`fallback:
+    true`), else whichever has points, trend first; with `scale_weight`,
+    the scale series whenever it has points, else the trend series
+    (`fallback: true`). A rate or chart never joins the two bases.
+  - `bodyweight record --weight X [--date D] [--replace]` keeps one
+    weigh-in in `[athlete] bodyweight_units` as the manual wellness
+    record `manual:<date>-wellness` (`body_mass_kg`, the record's other
+    readings kept), whatever `[nutrition]` and `[activity]` say; it never
+    edits config. The same weight again changes nothing (`changed:
+    false`); a different one for a date that has one exits 1 unless
+    `--replace`. `nutrition record` and `nutrition import` still exit 5
+    while nutrition is off, naming `bodyweight record`.
+  - `bodyweight list [--last N]` → `{unit, observations, count, trend}`
+    in `bodyweight_units`, dated by today, `trend` as above with a null
+    target.
 - A flag is `{code, message, ...}` with the numbers it names.
   `protein_floor_raise` (`floor_g`, `proposed_floor_g`,
   `proposed_floor_since`, `dates`): the two most recent readings dated
@@ -4141,16 +4184,17 @@ dates unique:
 - `nutrition targets` (`coach/protein.py`, `coach/calories.py`) computes
   the protein numbers and the no-app calorie estimate `/goals` quotes; it
   reads, never writes, and runs with nutrition off.
-  Inputs: each flag, else bodyweight from the newest reading of the last
-  14 days with a weight in `bodyweight_units` (its `trend_weight`, else
-  its `scale_weight`), recent intake from the newest reading of the last
+  Inputs: each flag, else bodyweight from the newest bodyweight
+  observation of the last 14 days, in `bodyweight_units` (on its date by
+  source: wellness, Hevy, then the reading's `trend_weight`, else its
+  `scale_weight`), recent intake from the newest reading of the last
   14 days with `avg_protein_g`, and goal weight from `[nutrition]
   goal_weight`. `--height-unit` defaults to cm with kg bodyweight and in
   with lb. `--body-fat` and `--body-fat-source` come together. A bad
   value exits 1, including a height outside 1.0–2.5 m (a unit slip).
   Data: `inputs` (`bodyweight` and `goal_weight` as `{value, unit,
   from}`, `recent_intake_g` as `{value, from}`, `from` being `flag`,
-  `config` or `reading D`; `body_fat` `{pct, source}`; `sex`;
+  `config`, `reading D` or a bodyweight observation's `ref`; `body_fat` `{pct, source}`; `sex`;
   `height_m`; `age`; `activity`; `phases` as `{value: [[phase,
   rate]...], from}`, from `--phase` or `[nutrition] phase` and
   `target_rate_per_week`; each null when absent), `reference`,
@@ -4208,9 +4252,9 @@ dates unique:
     17, 18 and 6 (fat-free mass) for target and stretch; 8 and 7 for
     the floor. The floor is a minimum commitment, the target a coaching
     aim, and the stretch an optional higher aim, not a universal benefit cap.
-- Readers: R-20's C18 e1RM reads C35 weights as bodyweight readings;
-  R-25 reads C4 `phase` and may read C35 weights for
-  `progress.md`'s bodyweight trend; R-40a reads `[nutrition] enabled` and
+- Readers: R-20's C18 e1RM reads bodyweight observations as bodyweight
+  readings; R-25 reads C4 `phase` and the observations for
+  `progress.md`'s bodyweight section and the dashboard's bodyweight line; R-40a reads `[nutrition] enabled` and
   writes the table at setup.
 
 ## C36. Check-in records, the card, catch-up mode (R-21a, R-21b; R-25, R-26, R-30a, R-31, R-33a, R-42a, R-43 read)
@@ -4813,7 +4857,8 @@ these headings:
 count (unresolved `warn` and `block` flags on the week's overlays); the
 page's as-of time as "Updated <day> <HH:MM> (<zone>)", then part lines up
 to six), then the Sessions table, then a progress summary of at most
-five lines (three e1RM bests, streak, latest bodyweight), then links
+five lines (three e1RM bests, streak, latest bodyweight with the same
+basis and sources as `progress.md`), then links
 (`this-week.md`, `progress.md`, latest record, `routine/program.md`,
 `check-ins/`, and the template's README on GitHub for "how this works").
 The Sessions table header is within the first 12 lines. The three bests
@@ -4827,9 +4872,11 @@ would make every publish stale its own dashboard.
 the newest point dated at least 28 days before `as_of`); part sections
 (ladder state, priority lifts); core-complete streak (current, longest,
 and the last 12 weeks as ✔/✗, – for a week with no planned core
-session); bodyweight (part, else the Hevy body-measurement cache dated by
-`as_of` as weekly means labelled "scale (Hevy)"; the section says "no
-bodyweight source" when neither exists).
+session); bodyweight (part, else the C35 selected bodyweight series dated
+by `as_of`, as weekly means of the last 12 weeks, then "Basis: <trend
+weight | scale weight> (<sources>); weekly means.", a fallback adding
+", standing in for <other basis>, which covers under 14 days"; with no
+observation the section says "No bodyweight recorded yet").
 
 **Core-complete week**: every planned core session of the overlay in force
 trained (including `trained_unlogged`), and no external session with an

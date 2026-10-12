@@ -158,6 +158,23 @@ class ActivityStore:
                 days.append(resolved)
         return days
 
+    def body_masses(self):
+        """One body mass per date, oldest first: that day's records by precedence, then span records ending on it.
+
+        A span record is a period mean, so it counts once, on its last day, never once per day it covers.
+        """
+        daily, ending = {}, {}
+        for record in self.records("wellness"):
+            if record.get("body_mass_kg") is None:
+                continue
+            span = record["span"]
+            (daily if span["start"] == span["end"] else ending).setdefault(span["end"], []).append(record)
+        found = []
+        for day in sorted(set(daily) | set(ending)):
+            record = (self._by_precedence(daily.get(day, [])) + self._by_precedence(ending.get(day, [])))[0]
+            found.append({"date": day, "body_mass_kg": record["body_mass_kg"], "provenance": _provenance(record)})
+        return found
+
     def asleep_days(self, span):
         """One entry per date with hours asleep, from the highest-ranked record that has them."""
         found = []
