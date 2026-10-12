@@ -152,7 +152,7 @@ class LoggedNotesTest(CardSourcesCase):
     def test_workout_and_exercise_notes_reach_the_card_and_the_record_once(self):
         self.log(notes=WORKOUT_NOTE, bench_notes=BENCH_NOTE)
         data = self.card()
-        self.assertEqual(data["card"]["schema_version"], 5)
+        self.assertEqual(data["card"]["schema_version"], 6)
         notes = [{k: n[k] for k in ("date", "session_id", "exercise_id", "text")} for n in data["card"]["notes"]]
         self.assertEqual(notes, [
             {"date": "2026-10-12", "session_id": "session-a", "exercise_id": None, "text": WORKOUT_NOTE},

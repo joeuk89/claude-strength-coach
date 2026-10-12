@@ -33,7 +33,7 @@ from coach.library import Library
 DEEP_AFTER_DAYS = 42
 E1RM_ROW_LIMIT = 8          # a heuristic: as many lifts as a message reads at a glance
 WORD_CEILINGS = {"weekly": 600, "deep": 1000, "catch-up": 600}    # heuristics, prose words outside regions
-CARD_VERSION = 5
+CARD_VERSION = 6
 TIERS = ("weekly", "deep", "catch-up")
 CARD_TIERS = ("weekly", "deep")
 CHECK_IN = "check-in"
@@ -54,6 +54,7 @@ WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 SLEEP_ASK = ("One line: average hours a night, dates covered and source "
              "(manual diary, self-reported period mean or tracker), and how it felt.")
 SCALE_WEIGHT_ASK = "One morning scale weight."
+_SCALE_WEIGHT = checkin_parts.Field(ask=SCALE_WEIGHT_ASK, label="Bodyweight")
 NEXT_WEEK_ASK = "Anything different: travel, schedule, kit, illness?"
 
 _RECORD_NAME = re.compile(r"^(\d{4}-\d{2}-\d{2})\.md$")
@@ -736,8 +737,11 @@ def _build(root, today, until=None, tier=None, now=None, live=True, parts=True, 
 
     if card["mode"] == CATCH_UP:
         proposing = live if with_return is None else with_return
+        food = replaced.get("nutrition", _SCALE_WEIGHT)
+        if food is not None:
+            food = checkin_parts.Field(food.prefill, food.ask, food.label or LABELS["nutrition"])
         card["catch_up"] = checkin_catchup.build(inst, card, window, end, _as_date(today), now, proposing,
-                                                 list(workouts.values()))
+                                                 list(workouts.values()), food)
         return card
 
     if card["mode"] == "deep":
@@ -853,7 +857,7 @@ def _builtin_fields(inst, card):
         "coach_led": _coach_led_field(inst, card),
         "sleep": checkin_parts.Field(ask=SLEEP_ASK),
         "niggles": checkin_parts.Field(ask="Anything new?"),
-        "nutrition": checkin_parts.Field(ask=SCALE_WEIGHT_ASK, label="Bodyweight"),
+        "nutrition": _SCALE_WEIGHT,
         "next_week": checkin_parts.Field(prefill=rotation, ask=NEXT_WEEK_ASK),
         HEVY_EDITS: _hevy_edits_field(card),
     }
@@ -887,14 +891,6 @@ def _first_line(card):
         reason = f"{card['days_since_last']} days since the last check-in"
     head = f"Check-in for {render.day_label(span['start'])} – {render.day_label(span['end'])} ({card['mode']}"
     return head + (f" — {reason})." if reason else ").")
-
-
-def _field_lines(field):
-    body = " ".join(part for part in (field["prefill"], field["ask"]) if part)
-    lines = body.split("\n")
-    if len(lines) == 1:
-        return [f"{field['n']}. {field['label']}. {lines[0]}".rstrip()]
-    return [f"{field['n']}. {field['label']}."] + [f"   {line}" for line in lines]
 
 
 def _note_line(note):
@@ -946,7 +942,7 @@ def card_text(card, unit):
         lines += [""] + [f"- {fact}" for fact in card["facts"]]
     lines.append("")
     for field in card["fields"]:
-        lines += _field_lines(field)
+        lines += checkin_parts.field_lines(field)
     return "\n".join(lines) + "\n"
 
 

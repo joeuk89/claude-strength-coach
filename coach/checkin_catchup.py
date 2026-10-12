@@ -2,22 +2,22 @@
 
 After more than `checkin.catch_up_after_days()` days without a check-in
 the card stops asking about each session. It shows one summary row per
-week, asks three questions and carries the proposed return week, so one
-"ok" settles the check-in. The return brief is the coach's brief for the
-week back, whatever caused the gap: illness and layoffs from a proposal,
-travel and no kit from a coach-built one-off overlay.
+week, asks about the gap, now, food and next week, and carries the
+proposed return week, so one "ok" settles the check-in. The return brief
+is the coach's brief for the week back, whatever caused the gap: illness
+and layoffs from a proposal, travel and no kit from a coach-built one-off
+overlay.
 """
 
 from datetime import timedelta
 
-from coach import dates, history, overlay, propose, render, validity
+from coach import checkin_parts, dates, history, overlay, propose, render, validity
 from coach.errors import CoachError, UsageError
 from coach.library import Library
 
 REASONS = ("ill", "travel", "no_kit", "layoff")
 _REASON_TEXT = {"ill": ", through illness", "travel": ", travelling", "no_kit": ", without kit", "layoff": ""}
 QUESTION_LABELS = {"gap": "The gap", "now": "Now", "next_week": "Next week"}
-REPLY_OK = "Reply ok to accept all of this, or answer 1–3."
 _MISS_TAG_TEXT = " / ".join(history.MISS_TAGS)
 
 
@@ -145,13 +145,24 @@ def summary(inst, window, rows, covered, workouts, external):
     return found
 
 
-def questions(rotation):
+def questions(rotation, food):
+    """The numbered questions: the gap, now, `food` (the card's nutrition Field) unless None, then next week."""
     gap = (f"One tag for the whole gap ({_MISS_TAG_TEXT}), or one per session if it was mixed. If you were ill: "
            f"have you been {validity.SYMPTOM_FREE_HOURS} hours symptom-free?")
     now = "Anything hurting, or different about kit, travel or schedule?"
     next_week = "Which days can you train next week?" + (f" {rotation}" if rotation else "")
-    return [{"id": "gap", "n": 1, "ask": gap}, {"id": "now", "n": 2, "ask": now},
-            {"id": "next_week", "n": 3, "ask": next_week}]
+    found = [("gap", QUESTION_LABELS["gap"], None, gap), ("now", QUESTION_LABELS["now"], None, now)]
+    if food is not None:
+        found.append(("nutrition", food.label, food.prefill, food.ask))
+    found.append(("next_week", QUESTION_LABELS["next_week"], None, next_week))
+    return [{"id": qid, "n": n, "label": label, "prefill": prefill, "ask": ask}
+            for n, (qid, label, prefill, ask) in enumerate(found, 1)]
+
+
+def reply_line(count, accepts):
+    """The closing instruction for `count` questions; `accepts` when one "ok" can settle the check-in."""
+    numbers = f"any of 1–{count}"
+    return f"Reply ok to accept all of this, or answer {numbers}." if accepts else f"Answer {numbers}."
 
 
 def write_line(config, doc):
@@ -221,7 +232,7 @@ def return_week(inst, today, now):
     }, None
 
 
-def build(inst, card, window, end, today, now, live, workouts):
+def build(inst, card, window, end, today, now, live, workouts, food):
     """The card's `catch_up` object; the return week only on a live card (the record region has none)."""
     rows, covered = planned(inst, window, card["sessions"]["rows"], workouts, today)
     found = {
@@ -229,7 +240,7 @@ def build(inst, card, window, end, today, now, live, workouts):
         "summary": summary(inst, window, rows, covered, workouts, card["sessions"]["external"]),
         "missed": [{"date": r["date"], "session_id": r["session_id"], "title": r["title"], "tag": r["tag"]}
                    for r in rows if r["tier"] == "core" and r["status"] == "missed"],
-        "questions": questions(rotation_text(inst, end)),
+        "questions": questions(rotation_text(inst, end), food),
         "return_week": None, "return_week_problem": None, "write_line": None,
     }
     if live:
@@ -338,7 +349,7 @@ def summary_table(card):
 
 
 def text_lines(card, first_line):
-    """The catch-up message: the weeks at a glance, the return week, three questions, the write line."""
+    """The catch-up message: the weeks at a glance, the return week, the questions, the write line."""
     catch_up = card["catch_up"]
     lines = [first_line, ""] + summary_table(card)
     if card["facts"]:
@@ -354,12 +365,11 @@ def text_lines(card, first_line):
         lines.append(f"No return week could be proposed: {catch_up['return_week_problem']}")
     lines.append("")
     for question in catch_up["questions"]:
-        lines.append(f"{question['n']}. {QUESTION_LABELS[question['id']]}. {question['ask']}")
+        lines += checkin_parts.field_lines(question)
     lines.append("")
     if catch_up["write_line"]:
-        lines += [catch_up["write_line"], REPLY_OK]
-    else:
-        lines.append("Answer 1–3.")
+        lines.append(catch_up["write_line"])
+    lines.append(reply_line(len(catch_up["questions"]), bool(catch_up["write_line"])))
     return lines
 
 

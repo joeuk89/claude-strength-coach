@@ -7,7 +7,9 @@ computes from nutrition data.
 
 import importlib
 import string
+from datetime import timedelta
 
+from coach import render
 from coach.checkin_parts import Contribution, Field
 
 FIELDS = ("nutrition", "meal_plan")
@@ -26,6 +28,13 @@ def _question(item):
     return None, item
 
 
+def _coverage(ctx, days):
+    """A catch-up's readings are the latest `days` days only; the gap before them stays unmeasured."""
+    start = ctx.today - timedelta(days=days - 1)
+    return (f"Readings for the last {days} days ({render.day_label(start)} – {render.day_label(ctx.today)}) only, "
+            f"not the whole gap since {render.day_label(ctx.window.start)}.")
+
+
 def contribute(ctx):
     module = _module()
     if module is None:
@@ -34,6 +43,8 @@ def contribute(ctx):
     if not status.get("enabled"):
         return None
     lines, prefills = [], []
+    if ctx.mode == "catch_up":
+        prefills.append(_coverage(ctx, module.FULL_WEEK))
     if status.get("plan"):
         prefills.append(f"Meal plan: {status['plan']}.")
     for letter, item in zip(string.ascii_lowercase, status.get("questions") or []):
