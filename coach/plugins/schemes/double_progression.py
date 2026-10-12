@@ -58,43 +58,84 @@ def _load_step(ctx, source, prescribed, program_sets):
     return True, None, f"RPE {base.number(rpe)} over the target RPE {base.number(wanted)} does not hold isolation work"
 
 
-def _range_text(program_sets):
-    first = program_sets[0]
-    if first.target_reps == first.top_reps:
-        return f"{first.target_reps}"
-    return f"{first.target_reps}–{first.top_reps}"
+def _shape(spec):
+    return spec.target_reps, spec.top_reps, spec.rpe
+
+
+def _groups(program_sets):
+    """(first set number, the sets) for each run of working sets asking for the same reps and RPE."""
+    found = []
+    for number, spec in enumerate(program_sets, 1):
+        if found and _shape(found[-1][1][-1]) == _shape(spec):
+            found[-1][1].append(spec)
+        else:
+            found.append((number, [spec]))
+    return found
+
+
+def _range_text(spec):
+    if spec.target_reps == spec.top_reps:
+        return f"{spec.target_reps}"
+    return f"{spec.target_reps}–{spec.top_reps}"
 
 
 def _target_text(program_sets):
-    rpe = program_sets[0].rpe
-    return f"{_range_text(program_sets)} reps" + (f" at RPE {base.number(rpe)}" if rpe is not None else "")
+    parts = []
+    for _, specs in _groups(program_sets):
+        rpe = specs[0].rpe
+        parts.append(f"{_range_text(specs[0])} reps" + (f" at RPE {base.number(rpe)}" if rpe is not None else ""))
+    return ", then ".join(parts)
+
+
+def _set_numbers(first, count):
+    return f"set {first}" if count == 1 else f"sets {first}–{first + count - 1}"
 
 
 def _where(ctx, load):
     return "on the band" if ctx.exercise.load_mode == "band" else f"at {base.load_words(ctx, load)}"
 
 
+def _held_and_easier(ctx, load):
+    """What the hold keeps and the easier option the coach reviews, in this load mode's words."""
+    if ctx.exercise.load_mode == "band":
+        return "the band", "an easier band"
+    if ctx.exercise.load_direction < 0:
+        return "the load", "more assistance"
+    if ctx.exercise.load_mode == "bodyweight" and not load:
+        return "the load", "an easier variation"
+    return "the load", "a lighter load"
+
+
 def _mismatch(ctx, source, program_sets, load):
-    """A flag when the held load's exposure fell below the range or 2 or more RPE over target, else None."""
+    """A flag when the held load's exposure fell below a set group's range or 2 or more RPE over target, else None.
+
+    A slot of one set group names its location once; a slot of several
+    names each short group's sets and logged load.
+    """
     logged = base.working(source.sets)[:len(program_sets)]
-    bottoms = [s.target_reps for s in program_sets]
-    targets = [s.rpe for s in program_sets]
-    below = any(got.reps is not None and _at(bottoms, i) is not None and got.reps < _at(bottoms, i)
-                for i, got in enumerate(logged))
-    over = [(got.rpe, _at(targets, i)) for i, got in enumerate(logged)
-            if got.rpe is not None and _at(targets, i) is not None and got.rpe >= _at(targets, i) + MISMATCH_RPE_OVER]
-    if not below and not over:
-        return None
+    groups = _groups(program_sets)
+    single = len(groups) == 1
     found = []
-    if below:
-        reps = ", ".join(str(got.reps) if got.reps is not None else "?" for got in logged)
-        found.append(f"{reps} reps, below the program's {_range_text(program_sets)}")
+    for first, specs in groups:
+        got = logged[first - 1:first - 1 + len(specs)]
+        bottom = specs[0].target_reps
+        if bottom is None or not any(s.reps is not None and s.reps < bottom for s in got):
+            continue
+        reps = ", ".join(str(s.reps) if s.reps is not None else "?" for s in got)
+        where = "" if single else f" on {_set_numbers(first, len(got))} {_where(ctx, base.top_load(got))}"
+        found.append(f"{reps} reps{where}, below the program's {_range_text(specs[0])}")
+    over = [(got.rpe, program_sets[i].rpe, i) for i, got in enumerate(logged)
+            if got.rpe is not None and program_sets[i].rpe is not None
+            and got.rpe >= program_sets[i].rpe + MISMATCH_RPE_OVER]
     if over:
-        rpe, target = max(over)
-        found.append(f"RPE {base.number(rpe)} against the target RPE {base.number(target)}")
-    band = ctx.exercise.load_mode == "band"
-    held, easier = ("the band", "an easier band") if band else ("the load", "a lighter load")
-    message = (f"{ctx.exercise.name}: {source.date.isoformat()} logged {' and '.join(found)} {_where(ctx, load)}; "
+        rpe, target, index = max(over)
+        where = "" if single else f" on set {index + 1} {_where(ctx, logged[index].load)}"
+        found.append(f"RPE {base.number(rpe)}{where} against the target RPE {base.number(target)}")
+    if not found:
+        return None
+    held, easier = _held_and_easier(ctx, load)
+    where = f" {_where(ctx, load)}" if single else ""
+    message = (f"{ctx.exercise.name}: {source.date.isoformat()} logged {' and '.join(found)}{where}; "
                f"holding {held} at the program's range does not make it reachable, so review {easier} or a "
                f"different rep range with the athlete")
     return base.flag(ctx, "range_effort_mismatch", message)
@@ -118,7 +159,9 @@ def propose(ctx):
                              derived_from=source, state={})
     target = _target_text(program_sets)
     hit, why, note = _load_step(ctx, source, base.working(source.prescribed), program_sets)
-    reached = f"every working set reached {program_sets[0].top_reps} reps"
+    single = len(_groups(program_sets)) == 1
+    reached = (f"every working set reached {program_sets[0].top_reps} reps" if single
+               else "every working set reached the top of its range")
     reached += f" ({note})" if note else " at or under the target RPE"
     if hit and ctx.exercise.load_mode == "band":
         return base.Proposal(

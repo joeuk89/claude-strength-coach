@@ -55,7 +55,7 @@ coach/                       # framework: synced to instances
   flags/__init__.py          # flag registry + auto-discovery                            (R-20)
   flags/<topic>.py           # one module per item that registers codes                  (each item)
   validity.py                # validity window, return bands, prescription checks        (R-24)
-  patterns.py                # COMPOUND_PATTERNS, is_compound(), is_isolation(), rpe_drift() (R-23a)
+  patterns.py                # is_compound(), is_isolation(), rpe_drift()                (R-23a)
   plugins/__init__.py        # plugin loader: framework + instance, kinds by subpackage  (R-23a)
   plugins/base.py            # context and proposal types, default_decay                 (R-23a)
   plugins/schemes/<name>.py, plugins/schedules/<name>.py, plugins/transforms/<name>.py  (R-23a, R-23b, R-31)
@@ -2274,7 +2274,7 @@ Reserved codes:
 | `prescription_unknown` | warn | R-23a | | Historical prescription unknown; no prescribed hit or miss inferred. Prescription validation still runs. |
 | `linear_below_start` | info | R-23a | | Linear reset fell below the starting load; review progression without automatic adjustment. |
 | `rpe_drift` | warn | R-23a | | Compound or recovery-capped exercise: logged RPE at least 1 over target on two or more working sets of the last exposure. |
-| `range_effort_mismatch` | warn | R-23a | | Double progression held a load whose derived-from exposure had a working set below the program's rep range or 2 or more RPE over target; review a lighter load or a different rep range. |
+| `range_effort_mismatch` | warn | R-23a | | Double progression held a load whose derived-from exposure had a working set below its set group's rep range or 2 or more RPE over target; review a lighter load or a different rep range. |
 | `return_week` | info | R-23a | | Decay applied; names the band and days off. A lifting line's flag adds the load change (`loads × 0.9`, or `assistance held` on an `assisted` line), the set change and any RPE cap. |
 | `return_after_illness` | warn | R-23a | | An `ill` miss or status day in the gap: confirm `SYMPTOM_FREE_HOURS` (48) hours symptom-free; first session capped at RPE `ILLNESS_RPE_CAP` (7). |
 | `constraint_applied` | info | R-23a | | A cap, a slot constraint or a niggle constraint changed the proposal. |
@@ -2682,11 +2682,15 @@ and `plugins test` runs them. Loaded with
   `rpe_cap` constraint, whose rationale then names the effort the step
   went past. When it holds, the line raises `range_effort_mismatch` if
   one of the derived-from exposure's working sets, up to the program's
-  set count, fell below the range's bottom or was logged 2 or more RPE
-  over its target (`base.RPE_STEP_BACK`, the framework's existing
-  step-back distance; a coaching heuristic, not a research threshold).
-  The flag asks the coach to review a lighter load or a different rep
-  range; restating the range never claims it is reachable. `LOAD_MODES`
+  set count, fell below its own set group's bottom or was logged 2 or
+  more RPE over its target (`base.RPE_STEP_BACK`, the framework's
+  existing step-back distance; a coaching heuristic, not a research
+  threshold). The flag asks the coach to review a lighter load (more
+  assistance on an assisted line, an easier variation at bodyweight) or
+  a different rep range; restating the range never claims it is
+  reachable. A slot of several set groups (a top set plus back-offs) is
+  described group by group, in the rationale and in the flag, which
+  names the short sets and their logged load. `LOAD_MODES`
   leaves out `duration` and `distance`, which it cannot progress. A
   refused slot's message names the path that works: for `duration`,
   `hold` and a `propose override --sets "2x35s rpe7"`; for `distance`,

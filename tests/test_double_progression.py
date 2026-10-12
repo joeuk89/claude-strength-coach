@@ -10,7 +10,7 @@ from coach.plugins.schemes import double_progression
 from tests.support.history import read_json
 from tests.support.skills import flat, step_text
 from tests.support.templates import cache_catalogue_templates
-from tests.test_progression_schemes import context, exposure, run
+from tests.test_progression_schemes import PULL_UP, SQUAT, context, exposure, run
 from tests.test_propose import FIRST_ID, NOW, ProposeCase, find_line, working
 
 DAY = date(2026, 10, 5)
@@ -109,6 +109,44 @@ class RangeAndEffortTargetTest(unittest.TestCase):
         self.assertEqual(line(proposal), [(100, 5, None, 7)] * 3)
 
 
+    def test_a_top_set_without_a_logged_load_holds_and_says_so(self):
+        proposal = propose(BENCH, program(3, 8, 12), [(None, 12, 8)] * 3)
+        self.assertIn("logged without a load", proposal.rationale)
+        self.assertNotIn("None", proposal.rationale)
+        self.assertEqual(proposal.flags, ())
+
+    def test_a_slot_with_no_working_sets_is_left_as_programmed(self):
+        slot = ({"count": 2, "type": "warmup", "reps": 10},)
+        proposal = propose(BENCH, slot, [(80, 12, 8)])
+        self.assertEqual(proposal.sets, base.expand(slot))
+        self.assertIn("no working sets", proposal.rationale)
+
+
+class SetGroupsTest(unittest.TestCase):
+    """A top set plus back-offs: each set group keeps its own reps and RPE, in the line and in the words."""
+
+    SLOT = ({"count": 1, "type": "normal", "reps": 3, "rpe": 8}, {"count": 3, "type": "normal", "reps": 5, "rpe": 7})
+
+    def test_a_short_back_off_is_judged_against_its_own_group(self):
+        proposal = propose(SQUAT, self.SLOT, [(140, 3, 8), (120, 3, 7), (120, 3, 7), (120, 3, 7)])
+        [message] = [f["message"] for f in proposal.flags if f["code"] == "range_effort_mismatch"]
+        self.assertNotIn("below the program's 3", message)
+        self.assertIn("logged 3, 3, 3 reps on sets 2–4 at 120, below the program's 5;", message)
+        self.assertIn("140 holds and the target is 3 reps at RPE 8, then 5 reps at RPE 7", proposal.rationale)
+        self.assertEqual([(s.reps, s.rpe) for s in proposal.sets], [(3, 8), (5, 7), (5, 7), (5, 7)])
+
+    def test_effort_over_target_names_the_set_it_was_on(self):
+        proposal = propose(SQUAT, self.SLOT, [(140, 3, 8), (120, 5, 9), (120, 5, 7), (120, 5, 7)])
+        [message] = [f["message"] for f in proposal.flags if f["code"] == "range_effort_mismatch"]
+        self.assertIn("logged RPE 9 on set 2 at 120 against the target RPE 7;", message)
+
+    def test_every_group_at_its_top_adds_the_increment_and_keeps_each_group(self):
+        proposal = propose(SQUAT, self.SLOT, [(140, 3, 8), (120, 5, 7), (120, 5, 7), (120, 5, 7)])
+        self.assertIn("every working set reached the top of its range", proposal.rationale)
+        self.assertIn("the target is 3 reps at RPE 8, then 5 reps at RPE 7", proposal.rationale)
+        self.assertEqual([(s.reps, s.rpe) for s in proposal.sets], [(3, 8), (5, 7), (5, 7), (5, 7)])
+
+
 class LoadStepGateTest(unittest.TestCase):
     TOP = [(20, 15, 8), (20, 15, 9), (20, 15, 9.5)]
 
@@ -167,6 +205,20 @@ class BandAndModesTest(unittest.TestCase):
         self.assertIn("on the band; holding the band at the program's range does not make it reachable", message)
         self.assertIn("review an easier band or a different rep range", message)
         self.assertNotIn("load", message)
+
+    def test_an_assisted_mismatch_asks_for_more_assistance(self):
+        held = propose(PULL_UP, program(3, 8, 12), [(30, 5, 8)] * 3)
+        [message] = [f["message"] for f in held.flags if f["code"] == "range_effort_mismatch"]
+        self.assertIn("review more assistance or a different rep range", message)
+        self.assertNotIn("lighter", message)
+
+    def test_a_bodyweight_mismatch_at_bodyweight_asks_for_an_easier_variation(self):
+        dip = replace(BENCH, id="dip", name="Dip", load_mode="bodyweight")
+        at_bw = propose(dip, program(3, 8, 12), [(0, 5, 8)] * 3)
+        loaded = propose(dip, program(3, 8, 12), [(10, 5, 8)] * 3)
+        self.assertIn("at BW; ", at_bw.flags[0]["message"])
+        self.assertIn("review an easier variation or a different rep range", at_bw.flags[0]["message"])
+        self.assertIn("review a lighter load or a different rep range", loaded.flags[0]["message"])
 
     def test_programs_every_load_mode_but_duration_and_distance(self):
         self.assertEqual(set(double_progression.LOAD_MODES),
