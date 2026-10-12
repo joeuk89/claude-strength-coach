@@ -271,6 +271,31 @@ class ApplyTest(MissedCase):
         self.assertEqual(self.snapshot(), before)
 
 
+class OneOffWeekTest(MissedCase):
+    """A miss in a coach-built one-off week whose Saturday leaves out a program exercise (hotel kit)."""
+
+    ONE_OFF = "2026-10-12-one-off"
+
+    def setUp(self):
+        super().setUp()
+        old = self.root / "data" / "overlays" / f"{WEEKLY}.json"
+        doc = read_json(old)
+        saturday = next(s for s in doc["sessions"] if s["date"] == "2026-10-17")
+        saturday["exercises"] = [e for e in saturday["exercises"] if e["exercise_id"] != "db_bench_press"]
+        doc.update(id=self.ONE_OFF, kind="one_off", approval=None)
+        old.unlink()
+        write_json(self.root / "data" / "overlays" / f"{self.ONE_OFF}.json", doc)
+        self.coach("overlay", "approve", self.ONE_OFF)
+
+    def test_the_mid_week_overlay_a_rule_writes_is_approved(self):
+        data = self.apply("--tag", "sleep")
+        self.assertEqual(data["overlay_id"], MIDWEEK)
+        doc = overlay.load(self.root, MIDWEEK)
+        self.assertNotIn("db_bench_press", [e["exercise_id"] for e in doc["sessions"][0]["exercises"]])
+        approved = self.coach("overlay", "approve", MIDWEEK)["data"]
+        self.assertTrue(approved["written"])
+
+
 class UnfoldTest(MissedCase):
     def setUp(self):
         super().setUp()

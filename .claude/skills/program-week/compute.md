@@ -8,8 +8,8 @@ applied blindly is not coaching.
 Run `python3 -m coach history sync`, then the proposal for the mode:
 
 - **normal:** `python3 -m coach propose week --week <label>`.
-- **midweek:** the same with `--kind midweek`, which re-proposes only
-  the remaining days of the week.
+- **midweek:** the same with `--kind midweek`: only the days left, less any
+  session trained today, keeping each override approved for them.
 - **light:** the `command` that `block decide` printed for the light week
   the check-in agreed. Standalone, with no light week agreed in `state
   show`, run the command it would print: `python3 -m coach propose week
@@ -33,20 +33,12 @@ Run `python3 -m coach history sync`, then the proposal for the mode:
   week --week <label> --plan <the path structure minimum printed>`
   proposes the week from it as a weekly overlay.
 
-`propose week` plans the span's dated sessions with the program's
-schedule rule and asks each exercise's progression scheme for its line,
-in the athlete's units and the load mode's own number. Each scheme reads
-the log: double progression keeps the program's rep range and target
-RPE and adds the increment once every set reaches the top of the range
-(at or under target RPE, except uncapped isolation work), missed reps
-hold, and loads never derive from an open convention slip. The core
-then decays a lift past its validity window to its return band, caps
-every set of the first session after illness at RPE 7, applies the
-slot's load constraints and the caps and kit at the session's location,
-and rounds each load to the kit. It writes an editable draft
-(`.coach/proposals/<id>.json`) and prints `data.lines`: per line its
-sets (loads through `units format`), the `change`, a one-sentence
-`rationale` and its flags.
+Each scheme proposes its line: double progression adds the increment once every set tops
+the range at or under target RPE (except uncapped isolation work), missed reps hold, and
+no load derives from an open convention slip. The core applies return bands, the illness
+cap, constraints, caps and kit, and writes the draft `.coach/proposals/<id>.json`.
+`data.lines` gives each line's sets, its `change` from the last approved prescription
+(or `first prescription`), a `rationale` and its flags.
 
 ## 2. Read every line against the check-in
 
@@ -99,7 +91,7 @@ rotation position, and settle its flags:
   state set-training-max --session <s> --exercise <e> --value <n> --reason
   "<why>" --dry-run`; once agreed, drop `--dry-run` and run step 1 again.
 - `no_data` (set the first load with the athlete), `stalled`,
-  `constraint_applied`, `override_standing`, `scheme_reset`,
+  `constraint_applied`, `override_standing`, `override_kept`, `scheme_reset`,
   `rotation_unconfirmed` (state the position for confirmation, as context.md
   says); build.md's check settles its own flags.
 
@@ -116,8 +108,7 @@ sessions to that date, and a deload or light week still cuts it. A per-exercise
 line, with an `override` reason; a line changed without a reason is refused. An
 approved override onto a rung moves the ladder to that rung.
 
-Niggle limits are already in the proposal: `propose week` applies each active
-niggle's constraints to every matching line and names the niggle in
+Each active niggle's constraints are already on every matching line, named in
 `constraint_applied`; `python3 -m coach niggles constraints` lists them. A
 `niggle_escalate` flag means recommend a qualified professional and keep
 programming around it, never diagnose; a `followup_due` flag names a follow-up
@@ -140,11 +131,20 @@ conditioning and optional ones included — and push back if the athlete asks;
 exercise swaps within a session are fine. An override goes in the next
 check-in's adherence decision line.
 
+After "go", once write.md step 1 has edited `data/program.json`, run `python3 -m coach
+propose rebuild --proposal <id>`: the same id and days (a midweek draft less any session
+trained since) from the new program, keeping every explained edit and resolution and
+removing the earlier finalized overlay. If `lost` names an edit, or a line beyond the
+approved change differs from the brief, present the revised brief; else finalize again (step 6).
+
 ## 6. Finalize
 
 `python3 -m coach propose finalize --proposal <id>` writes
 `data/overlays/<id>.json`. Exit 1 names each line changed without an override
 reason; exit 3 names each unresolved `block` flag. A refused finalize writes
-nothing: fix what it names and run it again. Then go to build.md with that id,
-starting at "Where it renders". A tweak to the coach's brief later means:
-override or resolve in the draft, finalize again, then check and render again.
+nothing: fix what it names and run it again. A stale draft (span ended, or a
+newer approved overlay covers it) exits 3: drop it with `python3 -m coach
+propose discard --proposal <id>`, which leaves approved work alone. Then go to
+build.md with that id, starting at "Where it renders". A tweak to the coach's
+brief later means: override or resolve in the draft, finalize again, then check
+and render again.

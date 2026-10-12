@@ -213,7 +213,7 @@ Phase 2 to 4 command inventory. No command here writes to Hevy.
 | `plugins list`, `plugins show NAME`, `plugins validate` | R-23a | |
 | `plugins test` | R-23a | runs instance plugin tests; never allowlisted |
 | `schedule plan --week W`, `decisions list`, `propose show ID` | R-23a | |
-| `schedule confirm --position P`, `propose week`, `propose override`, `propose resolve`, `propose finalize`, `decisions withdraw ID` | R-23a | W |
+| `schedule confirm --position P`, `propose week`, `propose override`, `propose resolve`, `propose finalize`, `propose rebuild`, `propose discard`, `decisions withdraw ID` | R-23a | W |
 | `propose restore --proposal ID --session S --reason TEXT [--dry-run]` | R-44b | W |
 | `followups list`, `followups render`, `niggles list`, `niggles constraints` | R-27 | |
 | `followups add\|resolve\|drop\|defer`, `niggles add\|update\|resolve\|import` | R-27 | W |
@@ -795,7 +795,7 @@ none and `bodyweight`, `assisted`, `duration` or `distance`; band and
 | `plugins/<kind>/<name>.py`, `plugins/tests/test_<name>.py` | instance plugins and their tests | committed | the athlete, as a code change |
 | `.coach/cache/hevy/` | raw Hevy cache, rebuildable with `hevy pull --full` | **gitignored** | R-12 |
 | `.coach/backups/<UTC timestamp>/` | pre-migration copies; old recipe cards and index before conversion | gitignored | R-17a; R-33b (`recipes convert --apply`) |
-| `.coach/proposals/<id>.json`, `<id>.proposed.json`, `<id>.meta.json` | editable proposal draft (an overlay draft, C10), its untouched original, and the run's facts (kind, span, transform, rotation, each slot's proposed scheme state and a hash of the stored state it started from) | gitignored | R-23a |
+| `.coach/proposals/<id>.json`, `<id>.proposed.json`, `<id>.meta.json` | editable proposal draft (an overlay draft, C10), its untouched original, and the run's facts (kind, span, transform, rotation, each slot's proposed scheme state and a hash of the stored state it started from, and a `--plan` run's dated sessions for `propose rebuild`) | gitignored | R-23a |
 | `.coach/plans/<week start>-<name>.json` | schedule plans handed to `propose week --plan` | gitignored | R-30b; R-22 may |
 | `.coach/drafts/` | drafts the coach edits before a command applies them (program drafts, log drafts, custom-exercise entries, recipe drafts and saved recipe pages) | gitignored | R-40c, R-41a, R-41b; the coach (R-33b recipe pages) |
 
@@ -1066,7 +1066,14 @@ for every non-GET request, success or failure, once its retries are over.
   still refuses, naming `prescription check --overlay ID --write`, since
   push refuses on stored blocks. An invalid library exits 1.
   `overlay build` warns once per such line, and nothing when the library
-  is invalid.
+  is invalid. `overlay approve` also refuses (exit 3) an overlay with a
+  proposal draft of its id (C24) whose sessions no longer hold their
+  program session's exercises (an exercise added to or dropped from
+  `data/program.json` since it was built; folded lines are not
+  compared, and a line the program lacks passes when it carries
+  `override.reason`), naming each
+  difference and `propose rebuild`. An overlay with no draft, such as a
+  one-off or a missed-day rule's mid-week copy (C37), is not compared.
 - Later versions: v2 adds line `provenance` (R-24, C21); v3 adds line
   `fold` and session `moved_from` (R-22, C37); v5 adds a set's `rep_out`
   (C23). Its migration turns the `failure` set of each wave line
@@ -2429,6 +2436,7 @@ Reserved codes:
 | `ill_day_excluded` | info | R-23a | | An `ill` status day covers a session's date, so the proposal leaves the session out; the message names the session, date and row. |
 | `constraint_applied` | info | R-23a | | A cap, a slot constraint or a niggle constraint changed the proposal. |
 | `override_standing` | info | R-23a | | A standing override was applied again instead of the scheme's proposal. |
+| `override_kept` | info | R-23a | | An override approved for this session in the overlay in force (a one-week override included) was kept instead of the scheme's proposal. |
 | `scheme_reset` | warn | R-23a | | A slot's scheme changed; its state restarted. |
 | `rotation_unconfirmed` | warn | R-23a | | The schedule rule advanced the rotation without confirmation. |
 | `niggle_escalate` | warn | R-27 | | Niggle reported three check-ins running, or worse: recommend a qualified professional. |
@@ -3201,8 +3209,10 @@ propose week  ──►  .coach/proposals/<id>.json (+ .proposed.json)  ──�
    constraints, caps, rounding. A standing override (C25) active on the
    session's date replaces the scheme's sets before decay and runs the
    same steps, so the transform applies once to the sets the line
-   delivers. A scheme defining `final_note` then names the line's
-   `target_note` from those final sets.
+   delivers. Without one, an override on the session's line in the
+   approved overlay in force on its date (C25) is kept the same way. A
+   scheme defining `final_note` then names the line's `target_note` from
+   those final sets.
    A `model_hold` proposal with no decay, transform or cut whose
    rounded load C22's `judge_set` puts beyond failure at the line's
    model evidence holds the heaviest lighter load the derived-from
@@ -3210,9 +3220,18 @@ propose week  ──►  .coach/proposals/<id>.json (+ .proposed.json)  ──�
    ranges, RPE and sets; the rationale names the rejected load, its model
    result and the held load. When no logged load passes, the scheme's
    load stays and the check flags it. No flag is resolved for it.
+   The line's `change` compares its final sets with
+   the slot's prior agreed prescription, its line in the newest approved
+   overlay other than this proposal: the set shape (count, reps, RPE)
+   and the top working load apart, `3×8–10 RPE 8 → 4×8 RPE 8`, `100 →
+   110` or both with the load last; a load profile that moved under an
+   unchanged top load gives both full set texts; nothing that moved
+   gives null, and a slot with no prior prescription reads `first
+   prescription`.
 4. Core flags: `no_data`, `stalled`, `rpe_drift`, `convention_slip`,
    `return_week`, `return_after_illness`, `constraint_applied`,
-   `override_standing`, `scheme_reset`, `rotation_unconfirmed`.
+   `override_standing`, `override_kept`, `scheme_reset`,
+   `rotation_unconfirmed`.
 5. Build through `coach.overlay.build` and run `coach.validity.check_overlay`.
    - 5a. Week-level flags (R-43): every provider in `coach/weekflags/`
      returns flags for the overlay span (C49); they are appended to the
@@ -3230,7 +3249,8 @@ id follows C10. `data.lines_digest` (R-21b) is the C7 canonical hash of
 
 - `propose override --proposal ID --session S --exercise E (--sets SPEC | --load N) --reason TEXT [--standing [--until D]]`
   changes one line, keeps the original in the line's C10 `override.proposed_sets`,
-  and records a C25 decision when standing. For a `per_hand_x2` line,
+  sets its `change` against the prior agreed prescription (step 3), never
+  the proposal it replaces, and records a C25 decision when standing. For a `per_hand_x2` line,
   its reason must pass C13 load-statement validation before any proposal
   or decision artifact changes; ambiguous load prose exits 1.
 - `propose resolve --proposal ID --flag INDEX --resolution TEXT` resolves
@@ -3241,11 +3261,14 @@ id follows C10. `data.lines_digest` (R-21b) is the C7 canonical hash of
   reason; finalize accepts it.
 - `propose finalize --proposal ID [--dry-run]` re-runs step 5. It exits
   1 if any line differs from `.proposed.json` without `override.reason`,
-  and exits 3 if a `block` flag is unresolved. It also exits 3 when a
-  slot's stored scheme state differs from the state `propose week`
-  started from (the run facts keep a hash of each, `state_basis`), as
-  after `state set-training-max`: the draft's loads and pending state
-  come from the old state, so the span is proposed again. Otherwise it writes the
+  and exits 3 if a `block` flag is unresolved, if the draft is stale
+  (below) or if its sessions no longer hold the program's exercises (as
+  `overlay approve`, C10). It also exits 3 when a slot's stored scheme
+  state differs from the state `propose week` started from (the run
+  facts keep a hash of each, `state_basis`), as after `state
+  set-training-max`: the draft's loads and pending state come from the
+  old state, so the span is proposed again (`propose rebuild` keeps the
+  id and the explained edits). Otherwise it writes the
   overlay, decisions and pending scheme state. It builds and checks all
   three first, the updated state against the program included (C16), so
   a refusal or `--dry-run` writes nothing. It writes the state, then the
@@ -3256,6 +3279,28 @@ id follows C10. `data.lines_digest` (R-21b) is the C7 canonical hash of
   stays approvable against the new pending state, so finalize again
   before approving.
 
+- `propose rebuild --proposal ID [--dry-run]` proposes the draft's
+  span, kind and transform again under the same id from the program as
+  it is now (a `--plan` run keeps its dated sessions). Each line edit the
+  draft explained with `override.reason` goes onto the same session,
+  date and exercise, with the new scheme sets as `proposed_sets`; one
+  whose line is gone is listed in `lost`. Flag resolutions carry to
+  identical flags. An unapproved overlay finalized from the old draft is
+  removed, so only a new finalize reaches approval. A midweek draft
+  keeps its span and id, and leaves out each session trained from the
+  span start through today, so a rebuild the next day never plans a
+  session trained the day before. It exits 3 for an approved overlay of
+  that id or a stale draft.
+- `propose discard --proposal ID [--dry-run]` removes the draft files,
+  any unapproved overlay of that id and the scheme state pending on it.
+  An approved overlay of that id and every decision stay;
+  `data.standing_decisions` lists active standing decisions the draft
+  made, to withdraw with `decisions withdraw` if they no longer stand.
+- A draft is **stale** when its span has ended, or when an overlay
+  created after the draft was proposed, and approved, overlaps its days
+  from today on. A stale draft is never finalized or rebuilt (exit 3),
+  so it cannot displace the plan in force.
+
 A hand edit of the draft is allowed; finalize catches unexplained
 changes. One-off weeks for travel or limited kit (`program-week`'s
 constrained mode) stay coach-built through `overlay build`.
@@ -3263,10 +3308,14 @@ constrained mode) stay coach-built through `overlay build`.
 **Built with R-23a** (details the steps above leave open):
 
 - Default span: the week holding tomorrow. `--kind midweek` starts the
-  span at today when today falls inside the week. A run that plans no
-  active session exits 1; one whose every session falls on an `ill`
-  status day exits 3, and one with only some leaves those out (C22).
-  Every line's layoff runs to the span's first session back (C22).
+  span at today when today falls inside the week. A midweek run planned
+  by the schedule rule leaves out each session already trained from the
+  span start through today (a planned session `stats adherence` counts
+  as trained, on its planned date, or another workout logged on that
+  date, C18); with nothing left to train today it starts tomorrow. A run that plans no active session exits 1; one whose every
+  session falls on an `ill` status day exits 3, and one with only some
+  leaves those out (C22). Every line's layoff runs to the span's first
+  session back (C22).
 - `--kind deload` writes overlay kind `deload` whose sessions keep their
   program session ids, are `temporary: true` (so R-14b gives them
   temporary routines, as `program-week`'s light mode expects) and are titled
@@ -3317,15 +3366,18 @@ constrained mode) stay coach-built through `overlay build`.
 - `propose finalize` also appends a one-week override decision
   (`standing: false`, `until` the overlay's span end) for each line whose
   `override` no decision yet records: neither one made for this proposal
-  nor a standing decision for that scope, with the same reason, active
-  on the line's session date.
+  nor an active decision on the line's session date for that scope with
+  the same reason, standing or with the same chosen sets.
 - `propose show ID` returns the built overlay, `lines`, `unexplained`
   (what finalize would refuse with exit 1) and `unresolved_blocks`.
 - `schedule confirm --position P [--week W]` records the position for
   the week holding tomorrow by default, with `confirmed_at` today.
 - Steps 5a and 5b are left to R-43 and R-44b, which own those providers.
 - R-23a adds the status provider `proposal` (C52, order 35): drafts in
-  `.coach/proposals/` with no overlay yet, at `attention`.
+  `.coach/proposals/` with no overlay yet. An open draft is at
+  `attention` and names finalize, a new proposal or discard; when every
+  such draft is stale, one `info` line names them and `propose discard`.
+  `data` holds `unfinalised` (open) and `stale`.
 
 ## C25. Decisions file and `last_override` (R-23a; R-25, R-30a, R-31 read and append)
 
@@ -3381,7 +3433,15 @@ constrained mode) stay coach-built through `overlay build`.
   `override_standing`. A cut of the kept sets is measured from the
   lower of their top load and the derived-from load, and its rationale
   and `load_cut_held` follow C23 for the kept sets. A one-week override
-  (not standing) is only information to the scheme.
+  (not standing) is information to the scheme in later weeks. Within its
+  own week a re-proposal (a midweek rebuild) keeps it: a line whose
+  session has an override in the approved overlay in force on its date
+  keeps that line's sets, unless a decision with that scope and reason
+  exists and none is active on the date. The kept sets take only the
+  steps they have not had: decay when the approved line had none, and a
+  run's transform unless the approved overlay was a `deload`; a deload
+  overlay's override is kept only by a run with a transform. The line
+  raises `override_kept`.
 - Standing overrides need an `until` date, default four weeks after
   `made_at`, at most eight. Renewing one is another `propose override
   --standing`: the newest active decision for a scope wins.
@@ -5267,7 +5327,11 @@ these headings:
   missed, blank upcoming. A session dated `as_of`'s own day with no
   workout and no miss tag is blank, not ✗: the day is not over.
 - Changed: lines whose `change` is set, by date then exercise order, at
-  most five, then "and N more in the check-in". Each reads `<page name>
+  most five, then "and N more in the check-in", with the program's
+  priority lifts first in their listed order. One exercise with the same
+  change on several days is one item naming the days (`Back Squat (Mon,
+  Thu) 100 → 102.5`); an exercise with different changes gets an item
+  per change, each naming its days. Each reads `<page name>[ (<days>)]
   <change>: <reason>`. Reason: `override.reason`, else
   `provenance.rationale` (C21), else `target_note`. A `per_hand_x2`
   change that ends on the bare per-hand load (`22.5 → 25/hand`) gets the

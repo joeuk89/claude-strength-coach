@@ -42,6 +42,9 @@ register("constraint_applied", owner=OWNER, severities=("info",),
          summary="A cap, a slot constraint or a niggle constraint changed the proposal.")
 register("override_standing", owner=OWNER, severities=("info",),
          summary="A standing override was applied again instead of the scheme's proposal.")
+register("override_kept", owner=OWNER, severities=("info",),
+         summary="An override approved for this session in the overlay in force was kept instead of the scheme's "
+                 "proposal.")
 register("scheme_reset", owner=OWNER, severities=("warn",),
          summary="A slot's scheme changed; its state restarted.")
 register("rotation_unconfirmed", owner=OWNER, severities=("warn",),

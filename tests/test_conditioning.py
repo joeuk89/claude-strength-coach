@@ -482,6 +482,14 @@ class DropTest(DropCase):
         self.assertIn(("no_data", "kb_swing"), [(f["code"], f["exercise_id"]) for f in restored["flags"]])
         self.data("propose", "finalize", "--proposal", data["id"])
 
+    def test_a_rebuild_reports_a_restore_the_drop_rule_removes_again(self):
+        proposal = self.propose()["id"]
+        self.data("propose", "restore", "--proposal", proposal, "--session", "circuit", "--reason", "athlete wants it")
+        rebuilt = self.data("propose", "rebuild", "--proposal", proposal)
+        self.assertEqual([(r["session_id"], r["date"]) for r in rebuilt["restores_lost"]],
+                         [("circuit", "2026-10-17")])
+        self.assertNotIn("circuit", [s["session_id"] for s in rebuilt["overlay"]["sessions"]])
+
     def test_restore_refuses_a_session_that_was_not_dropped(self):
         proposal = self.propose()["id"]
         self.coach("propose", "restore", "--proposal", proposal, "--session", "session-a", "--reason", "x", expect=1)

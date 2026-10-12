@@ -684,6 +684,16 @@ class TrainingMaxCommandTest(WavePipelineCase):
         line = squat(self.propose("--dry-run", week="2026-W43", env={"COACH_NOW": "2026-10-18T18:00:00Z"})["overlay"])
         self.assertIn("training max of 95", line["provenance"]["rationale"])
 
+    def test_a_rebuild_proposes_the_draft_again_from_the_new_training_max(self):
+        self.propose()
+        self.set_max()
+        self.coach("propose", "finalize", "--proposal", FIRST_ID, expect=3)
+        rebuilt = self.coach("propose", "rebuild", "--proposal", FIRST_ID)["data"]
+        self.assertEqual(rebuilt["id"], FIRST_ID)
+        self.assertIn("training max of 95", squat(rebuilt["overlay"])["provenance"]["rationale"])
+        self.coach("propose", "finalize", "--proposal", FIRST_ID)
+        self.assertEqual(self.state()["pending"]["data"]["training_max"], 95)
+
     def test_finalizing_a_draft_again_after_the_change_is_refused(self):
         self.propose()
         self.coach("propose", "finalize", "--proposal", FIRST_ID)
