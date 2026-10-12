@@ -30,10 +30,15 @@ DEFAULT_PRIORITY = 50
 
 @dataclass(frozen=True)
 class Item:
-    """One line (or, in `progress.sections`, one section's markdown); lower priority sorts first."""
+    """One line (or, in `progress.sections`, one section's markdown); lower priority sorts first.
+
+    `keys` name what a Watch item is about (`niggle:n-0001`, `sleep`): of the items sharing a key, only the first
+    by priority shows.
+    """
 
     text: str
     priority: int = DEFAULT_PRIORITY
+    keys: tuple = ()
 
 
 @dataclass(frozen=True)

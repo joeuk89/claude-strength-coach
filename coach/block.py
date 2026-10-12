@@ -483,6 +483,27 @@ def status_line(root):
         return None
 
 
+def watch_facts(root):
+    """What the athlete pages say about the block now: the light-week state and its decision, the hard-week count,
+    and the newest closed week's triggers and signals when that week is the state's last closed one. None without a
+    readable state."""
+    try:
+        state_doc = state_module.load(root)
+        ledger = load(root)
+        decisions_doc = decisions.load(root)
+    except ValidationError:
+        return None
+    block_state = state_doc["block"]
+    entry = _newest_entry(ledger) if ledger else None
+    if entry is not None and entry["week"] != block_state["last_closed_week"]:
+        entry = None
+    light = block_state["light_week"]
+    return {"light_week": dict(light), "hard_weeks": block_state["hard_weeks_completed"],
+            "week": entry["week"] if entry else None, "triggers": list(entry["triggers"]) if entry else [],
+            "signals": dict(entry["signals"]) if entry else None,
+            "decision": _decision(decisions_doc, light["decision_id"])}
+
+
 def _deep_tier(inst, block_state):
     """(reasons, last deep date) by the check-in's own deep rules, counting a `--deep` close as a deep record."""
     from coach import checkin

@@ -21,7 +21,7 @@ Run `python3 -m coach history sync`, then the proposal for the mode:
   current working loads (a target before the kit rounds it) and caps every set at RPE 6
   (rn:deloads.9); these numbers are a coaching heuristic. It cuts bodyweight work by
   sets and takes it further from failure. Its sessions are temporary (`"temporary": true`,
-  titled "Deload — <title>", or "Return — <title>" in a return week) and keep their program
+  titled "Deload — <title>", "Light — <title>" or "Return — <title>" by week) and keep their program
   session ids. Keep priority protocols alive at a reduced dose (ladders resumed, not restarted).
   Remind the athlete to tell any coach or PT it's a deload week, and deload whatever the
   profile says moves with the lifting (conditioning and the like). A week back after

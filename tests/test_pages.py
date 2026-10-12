@@ -213,16 +213,33 @@ class RenderTest(PagesCase):
             "- and 1 more in the check-in",
         ])
 
-    def test_the_reason_comes_from_the_override_then_the_rationale_then_the_target_note(self):
+    def test_the_reason_is_the_target_note_then_an_override_then_days_off_then_the_rationale(self):
         doc = self.overlay_doc()
         squat, bench = doc["sessions"][0]["exercises"]
-        squat["override"] = {"reason": "athlete asked to hold", "proposed_sets": []}
+        row = doc["sessions"][1]["exercises"][0]
+        squat["override"] = {"reason": "internal calibration review: no previous log", "proposed_sets": []}
         bench["provenance"] = {"scheme": "double_progression", "derived_from": None, "inferred": False,
                                "decay": None, "rationale": "hit 3×10 at RPE 8"}
+        row.update(change="30 → 28", target_note=None, provenance={
+            "scheme": "double_progression", "derived_from": None, "inferred": False, "rationale": "Double progression",
+            "decay": {"days_off": 12, "band": "11-21", "load_factor": 0.95, "set_delta": -1, "rpe_cap": None}})
         self.write_overlay(doc)
         changed = section(self.brief(), "Changed")
-        self.assertEqual(changed[0], "- Back Squat 97.5 → 100: athlete asked to hold")
+        self.assertEqual(changed[0], "- Back Squat 97.5 → 100: add 2.5 from last week")
         self.assertEqual(changed[1], "- Bench Press 22.5 → 25/hand (Hevy: 50): hit 3×10 at RPE 8")
+        self.assertEqual(changed[2], "- Single Arm Row 30 → 28: eased back after 12 days off")
+        squat["target_note"] = None
+        self.write_overlay(doc)
+        changed = section(self.brief(), "Changed")
+        self.assertEqual(changed[0], "- Back Squat 97.5 → 100: agreed with your coach")
+        self.assertNotIn("calibration", self.page("this-week.md"))
+
+    def test_a_session_trained_on_another_day_says_where_it_moved(self):
+        self.workouts[-1] = session_a_workout(day="2026-10-13")
+        self.cache(self.workouts)
+        self.sync()
+        rows = [line.split(" | ") for line in section(self.brief(), "Sessions")[2:]]
+        self.assertEqual((rows[0][0].strip("| "), rows[0][-1].strip("| ")), ("Mon 12", "✔ moved to Tue 13"))
 
     def test_watch_shows_three_block_flags_first(self):
         doc = self.overlay_doc()

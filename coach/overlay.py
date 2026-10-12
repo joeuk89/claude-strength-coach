@@ -28,6 +28,8 @@ SCHEMA_PROBLEM = "schema"
 ARITHMETIC_PROBLEM = "arithmetic"
 
 _ID = re.compile(r"^\d{4}-\d{2}-\d{2}-[a-z0-9-]+$")
+RECOVERY_LABELS = {"light": "Light", "deload": "Deload", "return": "Return"}
+TITLE_SEPARATOR = " — "
 _LOAD_FIELDS = ("mode", "unit", "per_hand", "hevy_total", "hevy_kg")
 _LINE_DEFAULTS = {
     "hevy_template_id": None, "rest_seconds": None, "superset_id": None, "cues": None, "focus": None,
@@ -37,6 +39,19 @@ _LINE_DEFAULTS = {
 
 def current_version():
     return jsonio.current_version(jsonio.load_schema(SCHEMA))
+
+
+def recovery_intent(doc):
+    """`light`, `deload` or `return` for a `deload`-kind overlay, read from the label its session titles start
+    with (`Light — Session A`), `deload` when they carry none; None for any other kind."""
+    if doc["kind"] != "deload":
+        return None
+    by_label = {label: intent for intent, label in RECOVERY_LABELS.items()}
+    for session in doc["sessions"]:
+        label = session["title"].split(TITLE_SEPARATOR, 1)[0]
+        if TITLE_SEPARATOR in session["title"] and label in by_label:
+            return by_label[label]
+    return "deload"
 
 
 def is_working(set_):

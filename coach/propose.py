@@ -20,7 +20,7 @@ from typing import NamedTuple
 from coach import constraints as constraints_module
 from coach import dates, decisions, flags, followups, history, jsonio, niggles, overlay, paths, patterns, plugins
 from coach import capacity, cardio, conditioning, external, first_loads, interference, program, research, statusdays
-from coach import timing, weekflags
+from coach import timing, week_view, weekflags
 from coach import state as state_module
 from coach import stats, units, validity
 from coach.activity.records import utc_text
@@ -836,7 +836,7 @@ def propose_line(run, session, day, exercise, ctx_extra):
         proposal = transformed(proposal, ctx.scheme_deload)
         if proposal.rationale != before:
             clauses[0] = proposal.rationale.rstrip(". ")
-        adjusted.append(f"the {transform[0].name} deload")
+        adjusted.append(_transform_words(transform))
     newest = base.newest(exposures)
     first_after_illness = ctx_extra["illness"] is not None and day == ctx_extra["first_day"]
     try:
@@ -941,7 +941,7 @@ def propose_line(run, session, day, exercise, ctx_extra):
         if transform is not None and kept_from["transform"]:
             # A scheme's own deload rebuilds the scheme's prescription and would drop the coach's sets.
             chosen = transformed(chosen, None)
-            kept_adjusted.append(f"the {transform[0].name} deload")
+            kept_adjusted.append(_transform_words(transform))
         chosen_sets, kept_words, kept_kit_changes, unchecked = limited(chosen.sets, chosen.round_down, chosen.load_cut,
                                                                        chosen_cut_from)
         cut = (_load_cut(chosen_cut_from, chosen, kept, chosen_sets, kept_kit_changes, rounding)
@@ -1488,11 +1488,17 @@ def _transform(run, kind, name):
 
 
 def _week_label(kind, transform):
-    """What a deload-kind week is for: "Return" for the return transform, which the next week progresses from,
-    else "Deload"; None for other kinds."""
+    """What a deload-kind week is for, named by its transform: "Light", "Return" (which the next week progresses
+    from) or "Deload"; None for other kinds."""
     if kind != "deload":
         return None
-    return "Return" if transform is not None and transform[0].name == "return" else "Deload"
+    name = transform[0].name if transform is not None else None
+    return overlay.RECOVERY_LABELS[name] if name in ("light", "return") else overlay.RECOVERY_LABELS["deload"]
+
+
+def _transform_words(transform):
+    name = transform[0].name
+    return f"the {name} week" if name in ("light", "return") else f"the {name} deload"
 
 
 def _focus(kind, span, transform):
@@ -1585,7 +1591,7 @@ def _build_week(root, config, today, now, span, kind, transform_name, plan_file=
         session_keys.append(([key for key, _ in results], session_id))
         draft_sessions.append({
             "session_id": session_id, "date": day.isoformat(),
-            "title": f"{label} — {session['title']}" if label else session["title"],
+            "title": f"{label}{overlay.TITLE_SEPARATOR}{session['title']}" if label else session["title"],
             "temporary": kind == "deload", "location": session["location"], "focus": session["focus"],
             "exercises": lines,
         })
@@ -1651,7 +1657,8 @@ def _week_result(root, config, built, dry_run):
         "lines": lines,
         "lines_digest": jsonio.canonical_hash(lines), "settled": built["settled"], "rotation": built["rotation"],
         "dropped": [_dropped_row(entry) for entry in built["dropped"]],
-        "approved_guidance": built.get("approved_guidance"), "written": not dry_run,
+        "approved_guidance": built.get("approved_guidance"),
+        "other_work": week_view.rows(root, built["span"], built["run"].today), "written": not dry_run,
     }
 
 
