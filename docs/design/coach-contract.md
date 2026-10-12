@@ -3201,8 +3201,9 @@ constrained mode) stay coach-built through `overlay build`.
   transform, the load constraints, the illness cap, caps and rounding.
   Under the `scheme` transform the kept sets take the standard deload,
   since a scheme's own `deload` rebuilds the scheme's sets. The
-  rationale names the kept sets, each adjustment and the scheme's own
-  proposal, and the line raises `override_standing`. A one-week override
+  rationale names the kept sets, each adjustment, any load the kit
+  changes and the scheme's own proposal, and the line raises
+  `override_standing`. A one-week override
   (not standing) is only information to the scheme.
 - Standing overrides need an `until` date, default four weeks after
   `made_at`, at most eight. Renewing one is another `propose override

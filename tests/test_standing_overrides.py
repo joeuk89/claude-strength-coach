@@ -96,6 +96,19 @@ class StandingOverrideTransformTest(StandingOverrideCase):
         self.assertNotIn("adjusted for", squat["provenance"]["rationale"])
 
 
+class StandingOverrideKitTest(StandingOverrideCase):
+    def test_the_rationale_names_a_kept_load_the_kit_changes(self):
+        self.coach("propose", "override", "--proposal", FIRST_ID, "--session", "session-a", "--exercise",
+                   "bb_back_squat", "--sets", "2x15@61 rpe9", "--reason", "synthetic: knee settles at 15 reps",
+                   "--standing")
+        squat = find_line(self.propose("--dry-run")["overlay"], "bb_back_squat")
+        loads = {coaching(s["load"]) for s in working(squat)}
+        self.assertEqual(len(loads), 1)
+        [load] = loads
+        self.assertNotEqual(load, 61)
+        self.assertIn(f"the kit makes {load:g}, not 61", squat["provenance"]["rationale"])
+
+
 class StandingOverrideExpiryTest(StandingOverrideCase):
     def test_an_override_ending_sunday_is_not_kept_for_monday_whenever_the_week_is_proposed(self):
         self.stand("--until", "2026-11-15")
