@@ -585,7 +585,6 @@ def propose_line(run, session, day, exercise, ctx_extra):
     if first_after_illness:
         adjusted.append(f"an RPE {validity.ILLNESS_RPE_CAP} cap on the first session after illness")
     if constraint_words:
-        line_flags.append(line_flag("constraint_applied", "; ".join(constraint_words)))
         adjusted += constraint_words
     if adjusted:
         clauses.append(f"adjusted for {', '.join(adjusted)}: {sets_text(sets, mode, run.unit)}")
@@ -629,11 +628,13 @@ def propose_line(run, session, day, exercise, ctx_extra):
             clauses.append(_cut_words(cut, mode, run.unit))
         line_flags.append(line_flag("override_standing", f"Standing override {last['id']} until {last['until']} "
                                                          f"kept; the scheme proposed {scheme_text}"))
-        sets = chosen_sets
+        sets, constraint_words = chosen_sets, kept_words
     if cut is not None and cut["held"]:
         line_flags.append(line_flag("load_cut_held", _held_cut_words(cut, info.name, mode, run.unit),
                                     "info" if cut["other_cuts"] and not cut["rose"] else "warn"))
 
+    if constraint_words:
+        line_flags.append(line_flag("constraint_applied", "; ".join(constraint_words)))
     line_flags += _core_flags(ctx, entry, exercise, sets, exposures, active, line_flag, mode)
     evidence_clause, evidence_flags = _evidence(run, plugin, transform, line_flag)
     line_flags += evidence_flags

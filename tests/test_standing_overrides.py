@@ -78,6 +78,17 @@ class StandingOverrideTransformTest(StandingOverrideCase):
         self.assertEqual({s["rpe"] for s in sets}, {7})
         self.assertIn("slot load cap 50 (synthetic knee)", squat["provenance"]["rationale"])
 
+    def test_the_constraint_flag_follows_the_kept_sets_not_the_schemes(self):
+        for cap, flagged in ((70, False), (50, True)):
+            with self.subTest(cap=cap):
+                self.edit_program(lambda doc: self.slot(doc, "session-a", "bb_back_squat").update(
+                    constraints=[{"kind": "load_cap", "value": cap, "reason": "synthetic knee"}]))
+                doc = self.propose("--dry-run")["overlay"]
+                squat = find_line(doc, "bb_back_squat")
+                scheme_sets = working({"sets": squat["override"]["proposed_sets"]})
+                self.assertEqual(max(coaching(s["load"]) for s in scheme_sets), cap)
+                self.assertEqual("constraint_applied" in codes(doc, "bb_back_squat"), flagged)
+
     def test_an_ordinary_week_keeps_the_sets_as_chosen(self):
         doc = self.propose("--dry-run")["overlay"]
         squat = find_line(doc, "bb_back_squat")

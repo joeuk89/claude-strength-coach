@@ -3018,9 +3018,12 @@ and `plugins test` runs them. Loaded with
   the rung the line delivers (`final_note`): the rung whose load every
   final working set carries, `Between rungs this week: <load>` for one
   load off the rungs, none for mixed loads, and the proposed rung when
-  no set carries a load (a `band` line). When a deload's held assistance
+  no set carries a load (a `band` line). Rungs sharing that load (such
+  as bodyweight variations at 0) resolve to the proposed rung, else the
+  nearest rung below it, else the nearest above. When a deload's held assistance
   delivers an easier rung than the one earned, the note adds `rung <n>
-  waits for an ordinary week`; the deload stores no state, so the next
+  waits for an ordinary week`, unless a standing override holds the
+  line; the deload stores no state, so the next
   ordinary week judges the climb again. `decay` steps back `bands_back(days_off)` rungs from the
   lower of the stored and the proposed rung (never below the first),
   so a climb never reaches a return week, with the band's set cut and
@@ -3232,7 +3235,8 @@ niggle rows (C27):
 - On a slot, a constraint applies to that line. On a niggle, it applies
   to every line whose exercise matches `applies_to` (C27).
 - The core clips the proposal and raises `constraint_applied` naming the
-  source (`slot`, `cap`, or the niggle id). It never removes or swaps an
+  source (`slot`, `cap`, or the niggle id). Under a standing override
+  (C25) the flag follows the kept sets the line delivers. It never removes or swaps an
   exercise; swaps are the coach's call.
 - "Constraint" here means a load limit on an exercise. Session placement
   rules are **interference rules** (C51), a separate plugin kind.

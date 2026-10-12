@@ -426,7 +426,7 @@ class LadderDeloadPipelineTest(LadderPipelineCase):
         self.assertEqual(line["target_note"], "Rung 2 of 3: 25 kg assist")
 
 
-class BodyweightLadderOverridePipelineTest(ProposeCase):
+class BodyweightLadderCase(ProposeCase):
     """The pull-up as a bodyweight ladder stored at its top rung, +10 kg, every logged exposure consumed."""
 
     def setUp(self):
@@ -452,6 +452,8 @@ class BodyweightLadderOverridePipelineTest(ProposeCase):
         return next(line for session in doc["sessions"] for line in session["exercises"]
                     if line["exercise_id"] == "pull_up")
 
+
+class BodyweightLadderOverridePipelineTest(BodyweightLadderCase):
     def test_an_approved_override_back_to_bodyweight_holds_the_ladder_on_its_first_rung(self):
         line = self.pull_up(self.propose()["overlay"])
         self.assertEqual({coaching(s["load"]) for s in working(line)}, {10})
@@ -464,6 +466,25 @@ class BodyweightLadderOverridePipelineTest(ProposeCase):
         again = self.pull_up(self.propose("--dry-run")["overlay"])
         self.assertEqual({coaching(s["load"]) for s in working(again)}, {0})
         self.assertEqual(again["target_note"], "Rung 1 of 3: Bodyweight")
+
+
+class VariationLadderPipelineTest(BodyweightLadderCase):
+    """Two bodyweight variations under a weighted top rung, held on the second variation."""
+
+    def setUp(self):
+        super().setUp()
+        self.edit_program(lambda doc: self.slot(doc, "session-b", "pull_up").update(start_load=0, scheme={
+            "name": "assistance_ladder",
+            "params": {"rungs": [{"name": "Negative"}, {"name": "Band-free pull-up"}, {"name": "+10 kg", "load": 10}]},
+        }))
+        self.edit_json("data/state.json", lambda doc: doc["scheme_state"]["session-b/pull_up"]["data"].update(rung=1))
+
+    def test_every_week_names_the_variation_to_train(self):
+        for extra in ((), ("--kind", "deload")):
+            with self.subTest(extra=extra):
+                line = self.pull_up(self.propose("--dry-run", *extra)["overlay"])
+                self.assertEqual({coaching(s["load"]) for s in working(line)}, {0})
+                self.assertEqual(line["target_note"], "Rung 2 of 3: Band-free pull-up")
 
 
 class FinalizeAtomicTest(ProposeCase):

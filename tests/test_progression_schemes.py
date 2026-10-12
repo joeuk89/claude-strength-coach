@@ -380,6 +380,33 @@ class AssistanceLadderTest(unittest.TestCase):
         self.assertEqual(self.final_note((None, None), params={"rungs": [{"name": "a", "load": None}] * 3}),
                          "Rung 2 of 3: medium band")
 
+    def variation_note(self, proposed, load, week_kind="weekly", last_override=None):
+        params = {"rungs": [{"name": "negative"}, {"name": "pull-up"}, {"name": "weighted", "load": 10}]}
+        bodyweight = replace(PULL_UP, load_mode="bodyweight", load_direction=1)
+        ctx = replace(context("assistance_ladder", params, exercise=bodyweight, sets=self.SETS, start_load=0,
+                              week_kind=week_kind), last_override=last_override)
+        proposal = base.Proposal(sets=(), rationale="x", derived_from=None, state={"rung": proposed, "through": None},
+                                 flags=(), target_note=f"Rung {proposed + 1} of 3: proposed")
+        sets = (base.SetSpec(reps=8, rpe=6, load=load),) * 3
+        return scheme("assistance_ladder").module.final_note(ctx, proposal, sets)
+
+    def test_a_variation_rung_sharing_its_load_keeps_its_name(self):
+        for week_kind in ("weekly", "deload"):
+            with self.subTest(week_kind=week_kind):
+                self.assertEqual(self.variation_note(1, 0, week_kind), "Rung 2 of 3: pull-up")
+                self.assertEqual(self.variation_note(0, 0, week_kind), "Rung 1 of 3: negative")
+
+    def test_a_load_moved_onto_shared_rungs_names_the_nearest_one_below(self):
+        self.assertEqual(self.variation_note(2, 0), "Rung 2 of 3: pull-up")
+        self.assertEqual(self.variation_note(2, 0, "deload"),
+                         "Rung 2 of 3: pull-up; rung 3 waits for an ordinary week")
+
+    def test_a_deload_under_a_standing_override_promises_no_climb(self):
+        standing = {"standing": True, "id": "d1", "until": "2026-11-15"}
+        self.assertEqual(self.variation_note(2, 0, "deload", standing), "Rung 2 of 3: pull-up")
+        self.assertEqual(self.variation_note(2, 0, "deload", dict(standing, standing=False)),
+                         "Rung 2 of 3: pull-up; rung 3 waits for an ordinary week")
+
 
 class Wave531Test(unittest.TestCase):
     def wave(self, state, params=None, e1rm=None, exercise=SQUAT, days_off=0, exposures=(), session_date=SESSION_DATE,
