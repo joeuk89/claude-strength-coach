@@ -8,6 +8,12 @@ for every day to be logged, with an estimate of the day or the missed
 meal on a day they couldn't track and no half-logged days (MacroFactor's
 guidance, in `/goals`). Record the days logged either way.
 
+**Nutrition off.** Run `python3 -m coach nutrition status` first. If it
+says `enabled: false`, keep any weigh-in with `python3 -m coach bodyweight
+record --date <day> --weight X` in place of `nutrition record`, note it in
+the record, prompt `/goals` to get set up, and go straight to the sleep
+gate below.
+
 **Record the reading.** Turn the Food field's numbers into one reading
 with `python3 -m coach nutrition record --date <check-in date>
 --trend-weight X --expenditure N --target-kcal N --target-protein N
@@ -23,7 +29,10 @@ stretch, anchors, any override) are in `config.toml`'s `[nutrition]`
 table; `nutrition status` returns them.
 
 **Weight trend.** Read `data.trend.basis`, `span`, `days`, rate and
-`target_rate_per_week` from `nutrition status`. Confirm the observation:
+`target_rate_per_week` from `nutrition status`. A `fallback: true` trend
+is raw scale weight standing in for an app trend that covers under 14
+days: say so. `sources` and `python3 -m coach bodyweight list` name where
+each weight came from. Confirm the observation:
 source, dates, comparable weigh-ins, logging and temporary weight shifts.
 The endpoint trend is not proof that every intervening day was measured.
 One odd week does not automatically change calories; use a supported
@@ -93,9 +102,6 @@ floor.
 trailing 14-day coverage, the retained heuristic and profile provenance.
 Complete manual coverage resolves pending to the actual result; a period
 mean stays self-report and supplies no individual short-night count.
-
-If `nutrition status` says `enabled: false`, just note the scale weight
-in the record and prompt `/goals` to get set up.
 
 **Deep tier, body composition:** when the reply carries a reading, read
 it against the goal or phase trigger that uses it and against the last

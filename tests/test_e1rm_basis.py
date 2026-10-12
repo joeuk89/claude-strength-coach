@@ -178,6 +178,13 @@ class TotalSystemTest(NoHevyCase):
         self.nutrition_readings(scale)
         self.assertEqual(self.pull_up()["e1rm"], 106.67)
 
+    def test_a_recorded_weigh_in_wins_over_a_same_day_nutrition_reading(self):
+        self.nutrition_readings(reading("2026-10-08", 82))
+        self.coach("bodyweight", "record", "--date", "2026-10-08", "--weight", "80")
+        point = self.pull_up()
+        self.assertEqual(point["e1rm"], 106.67)
+        self.assertEqual(point["bodyweight"], {"value": 80, "date": "2026-10-08", "source": "wellness"})
+
     def test_load_lifts_keep_the_load_basis(self):
         self.nutrition_readings(reading("2026-10-08", 80))
         squat = self.e1rm()["series"]["bb_back_squat"][-1]

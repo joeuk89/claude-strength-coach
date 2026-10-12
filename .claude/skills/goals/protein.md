@@ -2,17 +2,19 @@
 
 ## Set the numbers
 
-Run `python3 -m coach nutrition targets` and quote its output. It takes
-bodyweight and recent intake from the newest reading of the last 14 days
-and goal weight from `[nutrition]`. Pass what the athlete told you:
+Run `python3 -m coach nutrition targets` and quote its output. From the
+last 14 days it takes bodyweight from the newest weight on file (the
+weigh-in kept in SKILL.md step 1 counts) and recent intake from the newest
+reading; goal weight comes from `[nutrition]`. Pass what the athlete told you:
 
 - `--body-fat <pct> --body-fat-source credible|rough` for a body-fat
   reading (`--help` says which methods count as credible);
 - `--sex` when `missing` asks for it;
 - `--height` for the BMI cue with a rough or absent reading (cm, or
   inches with lb);
-- `--bodyweight` for a fresh weigh-in, `--goal-weight` for the goal
-  agreed in step 3, and `--recent-intake` for a typical day's protein.
+- `--goal-weight` for the goal agreed in step 3, `--recent-intake` for
+  a typical day's protein, and `--bodyweight` only for a what-if weight
+  (a fresh weigh-in is kept with `bodyweight record` first, then read).
 
 When `missing` names an input, ask the athlete for it and run again.
 

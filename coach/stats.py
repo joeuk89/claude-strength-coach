@@ -10,10 +10,10 @@ from datetime import date, datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
 
 from coach import config as config_module
-from coach import capacity, dates, flags, history, nutrition, overlay, program, state, units
+from coach import bodyweight as bodyweight_module
+from coach import capacity, dates, flags, history, overlay, program, state, units
 from coach.config_tables.sessions import cap_minutes
 from coach.errors import ConfigError
-from coach.hevy.cache import HevyCache
 from coach.library import Library, e1rm_supported
 
 MAX_REPS_TO_FAILURE = 12
@@ -94,31 +94,10 @@ def _span(value):
     return dates.Span(_as_date(start), _as_date(end))
 
 
-def _bodyweights(root, unit, until=None):
-    """[(date, weight in `unit`, source)] from Hevy body measurements and nutrition readings dated by `until`."""
-    found = []
-    for reading in HevyCache(root).body_measurements() or []:
-        day = (reading.get("date") or "")[:10]
-        if reading.get("weight_kg") and day and (until is None or day <= until):
-            found.append((dates.parse_date(day), units.from_hevy_kg(reading["weight_kg"], "total", unit), "hevy"))
-    for reading in nutrition.readings(root):
-        weight = reading["trend_weight"] if reading["trend_weight"] is not None else reading["scale_weight"]
-        if weight is None or (until is not None and reading["date"] > until):
-            continue
-        if reading["weight_unit"] != unit:
-            weight = units.mass_from_kg(units.mass_kg(weight, reading["weight_unit"]), unit)
-        found.append((dates.parse_date(reading["date"]), weight, "nutrition"))
-    return found
-
-
-def _bodyweight_on(readings, day):
-    """The reading nearest `day` within the window as {value, date, source}; a tie goes to the earlier date, then Hevy."""
-    near = [(abs((when - day).days), when, source != "hevy", weight, source) for when, weight, source in readings
-            if abs((when - day).days) <= BODYWEIGHT_WINDOW_DAYS]
-    if not near:
-        return None
-    _, when, _, weight, source = min(near)
-    return {"value": weight, "date": when.isoformat(), "source": source}
+def _bodyweight_on(found, day):
+    """The C35 bodyweight observation nearest `day` within the window, as {value, date, source}."""
+    item = bodyweight_module.nearest(found, day, BODYWEIGHT_WINDOW_DAYS)
+    return None if item is None else {"value": item["value"], "date": item["date"], "source": item["source"]}
 
 
 def _formula_load(exposure, logged, bodyweight):
@@ -145,8 +124,8 @@ def _unavailable(exposure, reason):
                    "mislead; judge it by its logged reps and load")
     else:
         message = (f"no e1RM on {exposure['date']}: a total-system e1RM counts body mass, and no bodyweight "
-                   f"reading lies within {BODYWEIGHT_WINDOW_DAYS} days of it; record one as a Hevy body measurement "
-                   "or a nutrition reading")
+                   f"reading lies within {BODYWEIGHT_WINDOW_DAYS} days of it; record one with bodyweight record, "
+                   "as a Hevy body measurement or as a nutrition reading")
     sets = [{"set_index": s["index"], "load": history.coaching_number(s["load"]), "reps": s["reps"], "rpe": s["rpe"]}
             for s in exposure["sets"] if not s["discounted"] and not s["convention_unknown"]]
     return {"reason": reason, "message": message, "date": exposure["date"], "workout_id": exposure["workout_id"],
@@ -188,7 +167,7 @@ def e1rm_series(root, exercise_id=None, since=None, include_unsynced=False, now=
     """
     config = config_module.load(root)
     until = _today(config, as_of).isoformat() if as_of else None
-    readings = _bodyweights(root, config.athlete.units, until)
+    readings = bodyweight_module.observations(root, config, config.athlete.units, until)
     since = str(since) if since else None
     series, observations, unavailable = {}, {}, {}
     recovery = capacity.Context(root, as_of)

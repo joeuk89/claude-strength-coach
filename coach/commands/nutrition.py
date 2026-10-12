@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from coach import calories, dates, nutrition, paths, protein, units
+from coach import bodyweight, calories, dates, nutrition, paths, protein, units
 from coach.commands import arg, command
 from coach.config_tables.nutrition import APPS, PHASES
 from coach.errors import ConfigError, ValidationError
@@ -12,7 +12,7 @@ _REPLACE = arg("--replace", action="store_true", help="overwrite a reading alrea
 def _enabled_config(ctx):
     if not nutrition.enabled(ctx.config):
         raise ConfigError("nutrition is not enabled: set [nutrition] enabled = true in config.toml (/goals sets "
-                          "up the table)")
+                          "up the table); to keep a weigh-in without it, run python3 -m coach bodyweight record")
     return ctx.config
 
 
@@ -50,12 +50,11 @@ def _fresh(series, today, pick):
     return None
 
 
-def _weight(unit):
-    def pick(reading):
-        if reading["weight_unit"] != unit:
-            return None
-        return reading["trend_weight"] if reading["trend_weight"] is not None else reading["scale_weight"]
-    return pick
+def _fresh_weight(ctx, unit, today):
+    """The newest C35 bodyweight observation of the last STALE_AFTER_DAYS, as (value, where from)."""
+    found = bodyweight.observations(ctx.root, ctx.config, unit, until=today.isoformat())
+    item = bodyweight.newest(found, today, nutrition.STALE_AFTER_DAYS)
+    return None if item is None else (item["value"], item["ref"])
 
 
 def _height_m(height, height_unit, weight_unit):
@@ -133,7 +132,7 @@ def _warn_below_resting(estimate, ctx):
     help="The protein reference mass and the floor, target and stretch set from it; names any input still missing",
     args=(
         arg("--bodyweight", type=float, metavar="X", help="bodyweight in [athlete] bodyweight_units (default: the "
-            "newest reading's weight from the last 14 days)"),
+            "newest weigh-in, Hevy body measurement or nutrition reading weight from the last 14 days)"),
         arg("--goal-weight", type=float, metavar="X", help="goal weight (default: [nutrition] goal_weight)"),
         arg("--body-fat", type=float, metavar="PCT", help="a body-fat reading, in %%; needs --body-fat-source"),
         arg("--body-fat-source", choices=("credible", "rough"), help="credible: DEXA, a BodPod, underwater "
@@ -177,7 +176,7 @@ def targets(args, ctx):
         phase_on_file = ([[table["phase"], units.json_number(table["target_rate_per_week"])]], "config")
     series = nutrition.readings(ctx.root)
     today = ctx.today()
-    weight = _fresh(series, today, _weight(unit))
+    weight = _fresh_weight(ctx, unit, today)
     inputs = {
         "bodyweight": _given(args.bodyweight, weight, unit=unit),
         "goal_weight": _given(args.goal_weight, None if goal_on_file is None else (goal_on_file, "config"),
