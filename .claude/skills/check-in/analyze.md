@@ -17,18 +17,15 @@ athlete hit the prescribed load × reps @ RPE?
   which days slipped, with their miss tags.
 - Cardio, kept separate from lifting adherence: `python3 -m coach cardio
   week --week <the week>` for runs, conditioning and other activity, with
-  each one's quality and session-RPE load (information only, never a
-  ratio); `cardio reconcile --week <the week>` for planned against
-  logged when the cardio tier is `review` or `program`; and `cardio
-  flags --week <the week>` (`cap_breach`, `run_volume_spike`,
-  `quality_stack`, `sleep_debt`, `status_active`, `niggle_link`, and
-  `collision` from the program's interference rules). Name each flag in
-  the Coach's read.
-  An `ambiguous` reconcile row has no confident match and lends no plan
-  its quality: show the athlete its `candidate_ids`, and once they say
-  which run was which plan, run `python3 -m coach cardio associate
-  ACTIVITY_ID --planned-id PLANNED_ID`. A `duplicate` row is a session
-  another source also planned and the athlete did: never call it missed.
+  each one's quality and session-RPE load (information only, never a ratio);
+  `cardio reconcile --week <the week>` for planned against logged when the
+  cardio tier is `review` or `program`; and `cardio flags --week <the week>`
+  (`cap_breach`, `run_volume_spike`, `quality_stack`, `sleep_debt`,
+  `status_active`, `niggle_link`, and
+  `collision` from the program's interference rules). Name each flag in the
+  Coach's read. An `ambiguous` reconcile row lends no plan its quality: show
+  its `candidate_ids` and record the athlete's answer with `cardio associate
+  ACTIVITY_ID --planned-id PLANNED_ID`. A `duplicate` row was done, not missed.
 - When an outside running plan or endurance event is relevant, consult
   `reference/runner-review.md` for its strength and fuelling claims,
   using the Sunday reply. Otherwise skip runner-specific research and
@@ -41,17 +38,15 @@ athlete hit the prescribed load × reps @ RPE?
   or more working sets of one exposure. Drift on isolation work gets one
   summary line in the record ("isolation RPE ran about 1 high on curls
   and raises") and never drives a decision.
-- Priority work: `python3 -m coach structure priority` gives each
-  priority lift's KPI now, its trend, and its exposures per week
-  against plan. Name each `priority_exposures_missed` flag (a planned
-  exposure missed with no floor dose in its place) in the Coach's read.
-  A KPI with `unavailable` quotes its message as the reason its newest
-  exposure gave no e1RM; with no `now`, judge that lift by its logged
-  reps and load. A `now` with
-  `basis` `total_system` counts body mass: say "total system mass" with its number.
-  For priority protocols the program holds only in prose: did they
-  happen as written? Watch for this athlete's known drift patterns
-  (Coach's notes).
+- Priority work: `python3 -m coach structure priority` gives each priority
+  lift's KPI now, its trend, and its exposures per week against plan. Name
+  each `priority_exposures_missed` flag (a planned exposure missed with no
+  floor dose in its place) in the Coach's read. A KPI with `unavailable`
+  quotes its message as the reason its newest exposure gave no e1RM; with no
+  `now`, judge that lift by its logged reps and load. A `now` with `basis`
+  `total_system` counts body mass: say "total system mass" with its number.
+  For priority protocols the program holds only in prose: did they happen as
+  written? Watch for this athlete's known drift patterns (Coach's notes).
 
 **Deep tier** — all of the above, plus:
 - Per main lift: loads/reps across the window, and the e1RM trend from
