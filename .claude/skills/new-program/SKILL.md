@@ -83,8 +83,8 @@ redesign), offer the three paths in one message and recommend one from
 - Later edits to `data/program.json` (a swap, a fix): edit it, then
   `python3 -m coach program validate` and `python3 -m coach program
   render`. The pages are rendered — never edit them by hand.
-- Weekly balance before adoption: `python3 -m coach structure balance
-  --program .coach/drafts/program.json`; settle its flags per design.md step 4.
+- Show `python3 -m coach structure balance --program .coach/drafts/program.json`
+  in the walk-through before adoption; settle its flags per design.md step 4.
 
 ## 3. Redesigns: adopt with `--replace`
 

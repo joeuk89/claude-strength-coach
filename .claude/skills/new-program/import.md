@@ -70,8 +70,7 @@ until the athlete agrees an edit. Run mode still applies every safety check.
    --program .coach/drafts/program.json` (the draft, before or after
    adopting) and agree `dose_targets` and `dose_intent` as design.md step
    4 sets out, keeping the athlete's own numbers as the ordinary baseline.
-   Then assess it — weekly balance gaps,
-   missing progression scheme, junk volume, recovery clashes between
-   adjacent days. **Propose improvements; don't force them.** Small fixes
+   Then assess it — weekly balance gaps, missing progression scheme, junk
+   volume, recovery clashes between adjacent days. **Propose improvements; don't force them.** Small fixes
    can land now (with approval); big ones can wait for a `/check-in` or a
    redesign. In run mode, mention them as information only.

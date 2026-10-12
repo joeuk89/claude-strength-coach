@@ -125,6 +125,8 @@ class CoverageTest(StructureCase):
             self.assertEqual(data["coverage"][muscle], "gap")
         gaps = messages(data["flags"], "dose_coverage_gap")
         self.assertEqual(sorted(m.split(":")[0] for m in gaps), ["abdominals", "calves", "hamstrings", "side_delts"])
+        self.assertIn("calves: no hard sets planned on core or coach-led sessions and no agreed target; agree a "
+                      "target, or set it to 0 with a reason in dose_intent.reasons (dose_intent needs a goal)", gaps)
 
     def test_secondary_credit_stays_without_a_primary_exercise(self):
         muscles = self.data("structure", "balance")["muscles"]
@@ -188,7 +190,17 @@ class DoseIntentTest(StructureCase):
                     'phase = "cut"', f'phase = "{phase}"'), encoding="utf-8")
                 data = self.data("structure", "balance")
                 self.assertIsNone(data["goal"])
-                self.assertEqual(data["targets"]["chest"], structure.DEFAULT_TARGET)
+                self.assertEqual(data["targets"]["chest"], structure.FALLBACK_TARGET)
+
+    def test_every_row_target_comes_from_the_effective_targets(self):
+        effective = structure.targets(program.load(self.root))
+        changed = dict(effective, chest=effective["chest"] + 5)
+        with mock.patch.object(structure, "targets", return_value=changed):
+            data = structure.balance(self.root, today="2026-10-11")
+        self.assertEqual(data["targets"], changed)
+        self.assertEqual({m: data["muscles"][m]["target"] for m in changed}, changed)
+        self.assertEqual(data["muscles"]["chest"]["source"], "fallback")
+        self.assertIn("volume_undershoot", codes(data["flags"]))
 
     def test_maintenance_without_targets_or_baseline_is_pending_not_a_default(self):
         self.intent({"goal": "maintenance"})
@@ -319,6 +331,8 @@ class SkillTextTest(unittest.TestCase):
         for name in ("SKILL.md", "design.md", "import.md", "starter.md"):
             with self.subTest(file=name):
                 self.assertIn(command, flat(step_text("new-program", name)))
+        self.assertIn(f"Show `{command}` in the walk-through before adoption",
+                      flat(step_text("new-program", "SKILL.md")))
 
 
 class _Context:

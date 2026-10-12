@@ -3,7 +3,7 @@
 Planned and delivered dose count sets the same way (`coach.stats.set_weights`
 and the same hard-set rule), so the two compare like for like. The 70 % and
 80 % adherence thresholds and the three-of-four undershoot rule are coaching
-heuristics (R-02), not research cut-offs. `DEFAULT_TARGET` is the low end
+heuristics (R-02), not research cut-offs. `FALLBACK_TARGET` is the low end
 of the weekly range (rn:volume-frequency.1), a hypertrophy starting fallback
 only; `SESSION_CEILING` is the per-session ceiling (rn:volume-frequency.3).
 `MINIMUM_SHARE` compares ordinary programmed dose as application policy
@@ -23,7 +23,7 @@ from coach.errors import ValidationError
 from coach.library import Library
 from coach.plugins import base
 
-DEFAULT_TARGET = 10
+FALLBACK_TARGET = 10
 HYPERTROPHY = "hypertrophy"
 COVERAGE = ("chest", "lats", "upper_back", "front_delts", "side_delts", "rear_delts", "biceps", "triceps",
             "abdominals", "quadriceps", "hamstrings", "glutes", "calves")
@@ -125,7 +125,7 @@ def targets(program_doc, library=None):
     `dose_intent` records no goal or hypertrophy; any other goal has no target until one is agreed.
     """
     library = library or Library()
-    found = dict.fromkeys(_core_primary_muscles(program_doc, library), DEFAULT_TARGET) \
+    found = dict.fromkeys(_core_primary_muscles(program_doc, library), FALLBACK_TARGET) \
         if _uses_fallback(program_doc) else {}
     found.update(program_doc.get("dose_targets") or {})
     return {muscle: found[muscle] for muscle in sorted(found)}
@@ -587,33 +587,44 @@ def _new_sessions(current, candidate):
             + [e["id"] for e in candidate["external_sessions"] if e["id"] not in externals])
 
 
-def _muscle_rows(program_doc, library, average):
-    """{muscle: {target, average, met, source, baseline, reason}} for each muscle balance reports, and their flags.
+def _muscle_rows(program_doc, library, average, effective):
+    """{muscle: {target, average, met, source, baseline, reason}} for each muscle balance reports.
 
-    `source`: `explicit` (in `dose_targets`), `omitted` (an explicit 0 with a recorded reason), `fallback` (the
-    hypertrophy starting fallback), `pending` (another goal, no agreed target yet) or null (no target).
+    `effective` is `targets()`. `source`: `explicit` (in `dose_targets`), `omitted` (an explicit 0 with a recorded
+    reason), `fallback` (the hypertrophy starting fallback), `pending` (another goal, no agreed target yet) or null
+    (no target).
     """
-    goal = dose_goal(program_doc)
     intent = program_doc.get("dose_intent") or {}
     explicit = program_doc.get("dose_targets") or {}
     baseline, reasons = intent.get("baseline") or {}, intent.get("reasons") or {}
     trained = _core_primary_muscles(program_doc, library)
     fallback = _uses_fallback(program_doc)
-    names = sorted(set(explicit) | trained | set(COVERAGE) | {m for m, v in average.items() if v})
-    rows, raised = {}, []
+    names = sorted(set(effective) | trained | set(COVERAGE) | {m for m, v in average.items() if v})
+    rows = {}
     for muscle in names:
         planned = _round(average.get(muscle, 0.0))
-        target, source = None, None
+        target = effective.get(muscle)
         if muscle in explicit:
-            target = explicit[muscle]
-            source = "omitted" if target == 0 and muscle in reasons else "explicit"
-        elif muscle in trained and fallback:
-            target, source = DEFAULT_TARGET, "fallback"
+            source = "omitted" if explicit[muscle] == 0 and muscle in reasons else "explicit"
+        elif target is not None:
+            source = "fallback"
         elif not fallback and (muscle in trained or muscle in COVERAGE):
             source = "pending"
+        else:
+            source = None
         rows[muscle] = {"target": target, "average": planned, "met": None if target is None else planned >= target,
                         "source": source, "baseline": baseline.get(muscle), "reason": reasons.get(muscle)}
-        if rows[muscle]["met"] is False:
+    return rows
+
+
+def _muscle_flags(program_doc, muscles):
+    """The volume_undershoot, dose_coverage_gap and dose_target_pending flags for the muscle rows."""
+    goal = dose_goal(program_doc)
+    baseline = (program_doc.get("dose_intent") or {}).get("baseline") or {}
+    raised = []
+    for muscle, row in muscles.items():
+        planned, target, source = row["average"], row["target"], row["source"]
+        if row["met"] is False:
             below = "the hypertrophy starting fallback of" if source == "fallback" else "its target of"
             raised.append(flags.make("volume_undershoot", message=(
                 f"{muscle}: planned {planned} fractional sets a week on core and coach-led sessions, below {below} "
@@ -623,7 +634,7 @@ def _muscle_rows(program_doc, library, average):
                 f"{muscle}: target 0 with no reason recorded; record why in dose_intent.reasons, or agree a target"
                 if source == "explicit" else
                 f"{muscle}: no hard sets planned on core or coach-led sessions and no agreed target; agree a target, "
-                "or set it to 0 with a reason in dose_intent.reasons")))
+                "or set it to 0 with a reason in dose_intent.reasons (dose_intent needs a goal)")))
         elif source == "pending" and planned:
             if muscle in baseline:
                 basis = f"; agree one from the ordinary baseline of {_round(baseline[muscle])} recorded"
@@ -633,13 +644,13 @@ def _muscle_rows(program_doc, library, average):
                 basis = "; agree one with the athlete"
             raised.append(flags.make("dose_target_pending", message=(
                 f"{muscle}: planned {planned} fractional sets a week with no agreed {goal} target{basis}")))
-    return rows, raised
+    return raised
 
 
 def _balance_notes(inst, program_doc, muscles, conditioning):
     notes = []
     if any(row["source"] == "fallback" for row in muscles.values()):
-        notes.append(f"A fallback target is the hypertrophy starting fallback of {DEFAULT_TARGET} fractional sets a "
+        notes.append(f"A fallback target is the hypertrophy starting fallback of {FALLBACK_TARGET} fractional sets a "
                      "week (rn:volume-frequency.1); for a strength or maintenance goal, record dose_intent and agree "
                      "each target with the athlete.")
     if conditioning:
@@ -669,7 +680,8 @@ def _balance(inst, program_doc, candidate):
                           "external": [e["id"] for e in program_doc["external_sessions"]], "muscles": _rounded(dose)})
     average = {m: v / len(positions) for m, v in totals.items()}
     target = targets(program_doc, inst.library)
-    muscles, raised = _muscle_rows(program_doc, inst.library, average)
+    muscles = _muscle_rows(program_doc, inst.library, average, target)
+    raised = _muscle_flags(program_doc, muscles)
     coverage = {m: "planned" if muscles[m]["average"] else "omitted" if muscles[m]["source"] == "omitted" else "gap"
                 for m in COVERAGE}
     conditioning = []

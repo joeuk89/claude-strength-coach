@@ -338,7 +338,7 @@ class TemplateRepoTest(unittest.TestCase):
         self.assertIn("rn:minimum-effective-dose.4", cited)
 
     def test_dose_default_values_are_unchanged(self):
-        self.assertEqual((structure.DEFAULT_TARGET, structure.SESSION_CEILING), (10, 11.0))
+        self.assertEqual((structure.FALLBACK_TARGET, structure.SESSION_CEILING), (10, 11.0))
         self.assertEqual(stats.SECONDARY_WEIGHT, 0.5)
         self.assertEqual(missed.DEFAULT_FOLD_SETS, 2)
         self.assertEqual(program._FLOOR_DEFAULTS, {"sets": 2, "rpe": None})

@@ -61,8 +61,9 @@ table, the athlete wants their own program run as written. Progression,
 return weeks, validity checks, light weeks and every `block` flag work
 as in coach mode. Structural flags (`restructure_required`,
 `add_session_type_blocked`, `volume_undershoot`, `session_volume_high`,
-`dose_coverage_gap`, `dose_target_pending`) come out of `checkin prepare` and the `structure` commands at `info`,
-their message starting "run mode: ": mention them as information only.
+`dose_coverage_gap`, `dose_target_pending`) come out of `checkin
+prepare` and the `structure` commands at `info`, their message starting
+"run mode: ": mention them as information only.
 Still report adherence from `structure adherence`, but do not present a
 restructure or a smaller schedule and do not call `structure decide`,
 unless the athlete asks for a restructure themselves. The adherence
