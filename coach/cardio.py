@@ -645,5 +645,5 @@ def _signed(value):
 
 
 def splice(text, label, region):
-    """Replace the cardio snapshot, or add it to the retrospective section."""
-    return render.splice_region(text, REGION_KIND, label, region, heading="## Week in review")
+    """Replace the cardio snapshot, or add it to the Week in review section."""
+    return render.splice_region(text, REGION_KIND, label, region, heading=render.WEEK_IN_REVIEW_HEADING)

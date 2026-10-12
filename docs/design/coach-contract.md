@@ -1071,8 +1071,8 @@ for every non-GET request, success or failure, once its retries are over.
   the end of the file. Cardio uses `heading="## Week in review"`. A recipe card
   (C33) finds its region with `find_regions` but places a missing one
   right after its data block, so it does not use `splice_region`.
-- **Archive rule:** `week-review` regions in any completed review but the newest are
-  archive. `render_week_review(id)` returns them unchanged, so R-16's sweep
+- **Archive rule:** `week-review` regions in any completed review but the newest,
+  and in any unrecognised record (C36), are archive. `render_week_review(id)` returns them unchanged, so R-16's sweep
   never fails an old record because history was later corrected. `cardio`
   regions are snapshots with no freshness check (late syncs must not fail
   old records).
@@ -4315,8 +4315,9 @@ and `render_card` would capture R-33b's `card` regions.
 - `due_date` = last completed review date + `[checkin] cadence_days`.
   Before the first review, anchor it to the earliest known start across
   Program start records, ledger block starts and `state.block.started`
-  (set on adoption). A later setup record or block rollover cannot postpone
-  an earlier known adoption. Block dates are legacy provenance fallbacks.
+  (set on adoption). A later Program start record or block rollover
+  cannot postpone an earlier known adoption. Block dates are legacy provenance fallbacks.
+  An invalid ledger or state.json adds no start; its own check reports it.
   Without an anchor, the date is unknown. Setup-day status is informational until the due date;
   the first actual review is still deep. The 42-day clock starts at that review.
 - `checkin prepare --deep-reason CODE` (repeatable) carries the block preview's

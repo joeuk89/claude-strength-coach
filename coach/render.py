@@ -10,6 +10,7 @@ from coach import dates, overlay, units
 from coach.units import format_load
 
 REGION_KIND = "overlay"
+WEEK_IN_REVIEW_HEADING = "## Week in review"
 WEEK_AHEAD_HEADING = "## The week ahead"
 CHOOSE_THE_LOAD = "choose the load"
 

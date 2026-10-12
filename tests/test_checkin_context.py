@@ -3,6 +3,7 @@
 from datetime import date
 
 from coach import block, checkin, dates, pages, render
+from coach.errors import ValidationError
 from tests.support import INSTANCES
 from tests.support.history import HistoryCase, write_json
 
@@ -94,6 +95,19 @@ class ReviewContextTest(HistoryCase):
         self.assertEqual(checkin.due(self.root, date(2026, 11, 1)).due_date, date(2026, 10, 18))
         self.assertEqual(self.status("2026-10-18")["level"], "attention")
 
+    def test_an_invalid_block_ledger_leaves_the_first_due_date_on_the_other_starts(self):
+        open_block = {"seed_hard_weeks": 0, "seed_reason": None, "ended": None, "end_reason": None, "weeks": []}
+        write_json(self.root / "data/blocks.json", {"schema_version": 1, "blocks": [
+            dict(open_block, id="b-0001", started="2026-10-04"),
+            dict(open_block, id="b-0002", started="2026-10-11")]})
+        with self.assertRaises(ValidationError):
+            block.load(self.root)
+        due = self.coach("checkin", "due", env={"COACH_NOW": "2026-10-11T18:00:00Z"})["data"]
+        self.assertEqual((due["mode"], due["due_date"]), ("first", "2026-10-18"))
+        status = self.status("2026-10-11")
+        self.assertEqual((status["level"], status["data"]["due_date"]), ("info", "2026-10-18"))
+        self.assertEqual(self.status("2026-10-18")["level"], "attention")
+
     def test_malformed_and_mismatched_titles_do_not_count_but_legacy_checkins_do(self):
         for day, title in (("2026-10-11", "# Notes"),
                            ("2026-10-12", "# Check-in — 2026-10-13 (deep)"),
@@ -121,6 +135,17 @@ class ReviewContextTest(HistoryCase):
         self.record("2026-10-11", "# Program start — 2026-10-11")
         card = self.coach("checkin", "prepare", "--until", "2026-10-18")["data"]["card"]
         self.assertEqual(card["window"], {"start": "2026-10-11", "end": "2026-10-18"})
+
+    def test_an_unrecognised_record_keeps_its_week_review_region_as_archive(self):
+        for day in ("2026-10-18", "2026-10-25"):
+            self.coach("checkin", "skeleton", "--date", day, "--tier", "deep")
+        path = self.root / "check-ins/2026-10-25.md"
+        text = path.read_text(encoding="utf-8")
+        path.write_text(text.replace("# Check-in — 2026-10-25", "# Check-in 2026-10-25"), encoding="utf-8")
+        self.assertEqual(checkin.render_week_review(self.root, date(2026, 10, 25)),
+                         text[slice(*render.find_regions(text, checkin.REGION_KIND)[0][1:])])
+        sweep = self.checks("render_fresh_sweep")
+        self.assertEqual({r["status"] for r in sweep}, {"pass"})
 
     def test_refresh_refuses_a_malformed_record_without_changing_it(self):
         path = self.record("2026-10-11", "# Notes")

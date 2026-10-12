@@ -222,10 +222,14 @@ def mode_for(found, day):
 
 
 def first_review_anchor(root):
-    """The earliest persisted program start, or None; a later setup record or block rollover never postpones it."""
+    """The earliest persisted program start, or None; a later Program start record or block rollover never
+    postpones it. An invalid block ledger or state.json adds no start: its own check reports why."""
     from coach import block
     starts = [record.date for record in records(root) if record.kind == PROGRAM_START]
-    ledger = block.load(root)
+    try:
+        ledger = block.load(root)
+    except ValidationError:
+        ledger = None
     starts += [dates.parse_date(item["started"]) for item in (ledger or {}).get("blocks", []) if item["started"]]
     state_doc = history.load_optional(state, root)
     started = (state_doc or {}).get("block", {}).get("started")
@@ -988,17 +992,22 @@ def _record_path(day):
 
 
 def render_week_review(root, record_date):
-    """The week-review region of the record dated `record_date` (C11). An older record's region is archive:
-    it comes back exactly as the file holds it, so a later history correction never fails an old record."""
+    """The week-review region of the record dated `record_date` (C11). An older review's region is archive:
+    it comes back exactly as the file holds it, so a later history correction never fails an old record.
+    An unrecognised record's region is archive too: `checkin_records` reports its title instead."""
     root, day = Path(root), _as_date(record_date)
+    dated = [r for r in records(root) if r.date == day]
     found = reviews(root)
-    record = next((r for r in found if r.date == day), None)
+    record = next((r for r in dated if r.kind == CHECK_IN), None)
+    archive = next((r for r in dated if r.kind == UNRECOGNISED), None)
     if record is not None and found[-1].date != day:
-        text = (root / record.path).read_text(encoding="utf-8")
+        archive = record
+    if archive is not None:
+        text = (root / archive.path).read_text(encoding="utf-8")
         for region_id, start, end in render.find_regions(text, REGION_KIND):
             if region_id == day.isoformat():
                 return text[start:end]
-        raise ValueError(f"{record.path.as_posix()} holds no {REGION_KIND} {day.isoformat()} region")
+        raise ValueError(f"{archive.path.as_posix()} holds no {REGION_KIND} {day.isoformat()} region")
     tier = record.tier if record else "weekly"
     return _region(_review_card(root, day, tier), day.isoformat())
 
@@ -1012,7 +1021,7 @@ def _collapsed(text, start, end):
 
 
 def skeleton_text(day, tier, review, overlay_region=None):
-    sections = [f"# Check-in — {day.isoformat()} ({tier})", "", "## Week in review", review, "",
+    sections = [f"# Check-in — {day.isoformat()} ({tier})", "", render.WEEK_IN_REVIEW_HEADING, review, "",
                 "## Coach's read", "", "## Decisions", ""]
     if tier == "deep":
         sections += ["## Block planning", ""]

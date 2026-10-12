@@ -23,9 +23,9 @@ appendix in **The week ahead**; it also collapses a region that
 
 Add the cardio block with `python3 -m coach cardio render --week <the
 week> --into check-ins/<today>.md`: in **Week in review**, the week's
-numbers, the reconcile and the cardio flags. It is a snapshot, which no check re-renders, so
-run it again only when the week's data changes before the record is
-committed.
+numbers, the reconcile and the cardio flags. It is a snapshot, which no
+check re-renders, so run it again only when the week's data changes
+before the record is committed.
 
 Write the prose, each section short. The hand-written lines' shapes are
 in `reference/record-formats.md`.
