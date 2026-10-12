@@ -2141,12 +2141,16 @@ rounded half up to 2 decimals; `load` is the number the formula used
 source}` (`hevy` or `nutrition`), else null. Every human display of a
 total-system e1RM follows the number with `stats.basis_label(point)`,
 " total system mass" (check-in card and record, `progress.md`, the
-dashboard, the program page's priority KPI). Those displays print an
-e1RM through `stats.e1rm_text(point, per_hand, unit)` and a change
-through `units.signed_whole`, both rounded half up to whole athlete
-units (`33 kg/hand`, `+1`, `±0`), and say once, nearby, what an e1RM is
-(`stats.E1RM_MEANING`, or the sentence `stats.e1rm_meaning(unit)`). The
-data keeps its 2 decimals.
+dashboard, the program page's priority KPI). The displays that print an
+e1RM value (check-in card and record, `progress.md`, the dashboard's
+bests, the brief's Wins) print it through `stats.e1rm_text(point,
+per_hand, unit)` and a change through `units.signed_whole`, both rounded
+half up to whole athlete units (`33 kg/hand`, `+1`, `±0`), and say once,
+nearby, what an e1RM is: the card through `stats.E1RM_MEANING`, the
+record and `progress.md` through the sentence `stats.e1rm_meaning(unit)`,
+and the dashboard and brief by labelling their first e1RM line with
+`stats.E1RM_LABEL` (`Best e1RM (estimated one-rep max): …`). The data
+keeps its 2 decimals.
 
 `data.unavailable[exercise_id]` explains an exercise whose newest exposure
 in the window can give no e1RM, for one of two reasons, each the same code
@@ -4487,8 +4491,8 @@ earliest overlay, else at the first-review anchor, else on the end day:
   `prescribed` and `logged` text use `units.format_load`; status and
   `rpe_delta` from C18. `logged` groups consecutive sets of equal load and
   RPE; when there is more than one group, each names its sets and groups
-  are separated by `; ` (`set 1: 9 @ 25/hand @ RPE 9.5; sets 2–3: 7, 6 @
-  25/hand @ RPE 8.5`). Text shows `rpe_delta` in words, to one decimal,
+  are separated by `; ` (`set 1: 9 @ 25/hand (Hevy: 50) @ RPE 9.5; sets
+  2–3: 7, 6 @ 25/hand (Hevy: 50) @ RPE 8.5`). Text shows `rpe_delta` in words, to one decimal,
   through `checkin.rpe_gap_text` (`RPE 0.8 below target`), and nothing
   when it rounds to 0.
 - `notes`: the athlete's own words from each workout dated in the window,
@@ -4994,7 +4998,8 @@ these headings:
   rules, one line saying so.
 - Wins: at most three, by priority: a new best e1RM in the last seven
   days (20; `total`, `per_hand_x2` and `single_implement` lifts only, a
-  point strictly above every earlier one); a core-complete streak of two
+  point strictly above every earlier one; the first such line names
+  `stats.E1RM_LABEL`); a core-complete streak of two
   weeks or more (30); every core session trained last week (40); part
   items.
 - An empty Changed, Watch or Wins prints one line saying so.
@@ -5019,8 +5024,9 @@ these headings:
 count (unresolved `warn` and `block` flags on the week's overlays); the
 page's as-of time as "Updated <day> <HH:MM> (<zone>)", then part lines up
 to six), then the Sessions table, then a progress summary of at most
-five lines (three e1RM bests, streak, latest bodyweight with the same
-basis and sources as `progress.md`), then links
+five lines (three e1RM bests, the first naming `stats.E1RM_LABEL`;
+streak, latest bodyweight with the same basis and sources as
+`progress.md`), then links
 (`this-week.md`, `progress.md`, latest record, `routine/program.md`,
 `check-ins/`, and the template's README on GitHub for "how this works").
 The Sessions table header is within the first 12 lines. The three bests
@@ -6654,8 +6660,9 @@ markdown. The lifting line counts workouts and sets in the singular or
 plural, gives hard sets out of working sets and says why a set is not
 hard (logged at RPE `stats.EASY_RPE` or below). The session-RPE line
 shows the whole-number total in arbitrary units, names its inputs
-(minutes × session RPE, summed over the week) and says it is
-information only, with no target or limit. With `--into` it replaces the region between
+(minutes × session RPE, summed over the week, with a lifting session's
+RPE the mean of its working sets' RPEs) and says it is information only,
+with no target or limit. With `--into` it replaces the region between
 `<!-- coach:begin cardio <week label> -->` and
 `<!-- coach:end cardio <week label> -->` (C11), appending the region when
 absent. No freshness check: the block is a snapshot.

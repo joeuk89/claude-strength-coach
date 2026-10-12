@@ -104,6 +104,22 @@ class CheckInNumbersTest(NoHevyWeek):
         self.assertNotIn("32.92", progress)
         self.assertIn("estimated one-rep max", progress.split("| Lift |")[0])
 
+    def test_dashboard_bests_say_what_an_e1rm_is_on_their_first_line(self):
+        dashboard = self.coach("pages", "show", "dashboard")["text"]
+        bests = [line for line in dashboard.splitlines() if "Best e1RM" in line]
+        self.assertGreaterEqual(len(bests), 2, dashboard)
+        self.assertTrue(bests[0].startswith("- Best e1RM (estimated one-rep max): "), bests[0])
+        self.assertEqual(sum("estimated one-rep max" in line for line in bests), 1)
+        self.assertNotIn("32.92", dashboard)
+
+    def test_brief_wins_say_what_an_e1rm_is_on_their_first_e1rm_line(self):
+        brief = self.coach("pages", "show", "brief", now="2026-10-13T08:00:00Z")["text"]
+        wins = [line for line in brief.split("## Wins")[1].splitlines() if "e1RM" in line]
+        self.assertGreaterEqual(len(wins), 2, brief)
+        self.assertTrue(wins[0].startswith("- New best e1RM (estimated one-rep max): "), wins[0])
+        self.assertEqual(sum("estimated one-rep max" in line for line in wins), 1)
+        self.assertIn("33 kg/hand", brief)
+
 
 class CardioLineTest(NoHevyWeek):
     def setUp(self):
@@ -125,6 +141,7 @@ class CardioLineTest(NoHevyWeek):
         text = self.coach("cardio", "render", "--week", "2026-W42")["text"]
         line = next(line for line in text.splitlines() if line.startswith("Session-RPE load"))
         self.assertIn("minutes × session RPE", line)
+        self.assertIn("a lifting session's is the mean RPE of its working sets", line)
         self.assertIn("arbitrary units", line)
         self.assertIn("information only", line)
         for word in ("target", "threshold", "too high", "risk"):

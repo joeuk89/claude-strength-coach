@@ -456,7 +456,8 @@ class _View:
             best = max(points, key=lambda p: (p["e1rm"], p["date"]))
             earlier = [p["e1rm"] for p in points if p["date"] < best["date"]]
             if best["date"] >= start and earlier and best["e1rm"] > max(earlier):
-                items.append(Item(f"New best e1RM: {self.short_name(exercise_id)} "
+                label = "e1RM" if items else stats.E1RM_LABEL
+                items.append(Item(f"New best {label}: {self.short_name(exercise_id)} "
                                   f"{self.e1rm_text(exercise_id, best)} "
                                   f"({render.day_label(best['date'])})", PRIORITY["e1rm"]))
         current, _ = self.streak
@@ -579,7 +580,8 @@ def _progress_summary(view):
     found = []
     for exercise_id in view.program_order(view.series)[:SUMMARY_BESTS]:
         top = max(view.series[exercise_id], key=lambda p: (p["e1rm"], p["date"]))
-        found.append(f"Best e1RM: {view.short_name(exercise_id)} {view.e1rm_text(exercise_id, top)} "
+        label = "e1RM" if found else stats.E1RM_LABEL
+        found.append(f"Best {label}: {view.short_name(exercise_id)} {view.e1rm_text(exercise_id, top)} "
                      f"({_long_date(top['date'])})")
     if not found:
         found.append("No e1RM yet.")

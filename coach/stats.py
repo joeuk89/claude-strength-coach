@@ -26,6 +26,7 @@ TOTAL_SYSTEM = "total_system"
 LOAD_BASIS = "load"
 TOTAL_SYSTEM_LABEL = "total system mass"
 E1RM_MEANING = "an estimated one-rep max worked out from logged working sets"
+E1RM_LABEL = "e1RM (estimated one-rep max)"
 PRIMARY_WEIGHT = 1.0
 SECONDARY_WEIGHT = 0.5
 EQUIPMENT_INCREMENT = {

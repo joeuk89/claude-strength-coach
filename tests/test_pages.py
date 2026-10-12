@@ -430,7 +430,8 @@ class StreakTest(PagesCase):
         self.assertIn("- Core-complete streak: 2 weeks", wins)
         self.render("--only", "brief", env={"COACH_NOW": "2026-10-11T18:00:00Z"})
         self.assertEqual(section(self.page("this-week.md"), "Wins"), [
-            "- New best e1RM: Back Squat 122 kg (Mon 5 Oct)", "- Core-complete streak: 2 weeks",
+            "- New best e1RM (estimated one-rep max): Back Squat 122 kg (Mon 5 Oct)",
+            "- Core-complete streak: 2 weeks",
             "- Every core session trained last week (2 of 2)"])
 
     def test_an_unannotated_coach_led_session_does_not_break_it(self):

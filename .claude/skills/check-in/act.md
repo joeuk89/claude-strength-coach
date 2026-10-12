@@ -10,10 +10,10 @@
   (below); re-check the day before and after any edited day and the
   program's weekly balance.
 - Update `profile.md`: e1RMs (a `total_system` one with "total system
-  mass" after its number), watch notes, and `_Last reviewed_` when
-  they move (the deep tier refreshes the whole file). Add or retire
-  **Coach's notes** as patterns emerge or resolve, with the athlete's
-  confirmation.
+  mass" after its number) in whole units as the card shows them, watch
+  notes, and `_Last reviewed_` when they move (the deep tier refreshes
+  the whole file). Add or retire **Coach's notes** as patterns emerge or
+  resolve, with the athlete's confirmation.
 - **Maintain the niggle log** in `data/niggles.json` with the `niggles`
   commands; statuses `aggravated` / `watching` / `easing` / `resolved`,
   and `chronic` for a lasting limitation. New complaint: `python3 -m

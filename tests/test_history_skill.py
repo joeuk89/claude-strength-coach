@@ -26,7 +26,8 @@ class CheckInSkillTest(unittest.TestCase):
 
     def test_profile_e1rms_carry_the_total_system_label(self):
         act = flat(step_text("check-in", "act.md"))
-        self.assertIn('e1RMs (a `total_system` one with "total system mass" after its number)', act)
+        self.assertIn('e1RMs (a `total_system` one with "total system mass" after its number) '
+                      'in whole units as the card shows them', act)
 
     def test_ambiguous_cardio_rows_point_at_cardio_associate(self):
         analyse = flat(step_text("check-in", "analyze.md"))
