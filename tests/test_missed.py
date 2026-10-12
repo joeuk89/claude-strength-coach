@@ -260,7 +260,8 @@ class ApplyTest(MissedCase):
         self.set_rules([])
         before = self.snapshot()
         envelope = self.apply(expect=3)
-        self.assertIn("propose week --kind midweek", envelope["error"]["message"])
+        self.assertIn("--move-to", envelope["error"]["message"])
+        self.assertIn("--drop", envelope["error"]["message"])
         self.assertEqual(self.snapshot(), before)
 
     def test_a_second_apply_of_the_same_miss_is_refused_and_writes_nothing(self):
@@ -360,7 +361,10 @@ class ShiftTest(MissedCase):
         path.write_text(path.read_text(encoding="utf-8").replace("available_days = []",
                                                                  'available_days = ["mon", "wed", "sat"]'),
                         encoding="utf-8")
-        self.assertFalse(self.plan(session="session-a", day="2026-10-12")["matched"])
+        data = self.plan(session="session-a", day="2026-10-12")
+        self.assertFalse(data["matched"])
+        self.assertIn("Sat 17 Oct already has Session A planned", data["reason"])
+        self.assertIn("Thu is not one of the athlete's available days", data["reason"])
 
 
 class UnmatchedTest(MissedCase):
@@ -368,7 +372,8 @@ class UnmatchedTest(MissedCase):
         self.assertFalse(data["matched"])
         self.assertIsNone(data["draft"])
         self.assertEqual(codes(data), ["missed_rule_unmatched"])
-        self.assertIn("propose week --kind midweek", data["flags"][0]["message"])
+        self.assertIn("--move-to", data["flags"][0]["message"])
+        self.assertIn("--drop", data["flags"][0]["message"])
 
     def test_a_session_with_no_rule(self):
         self.set_rules([])
@@ -547,7 +552,8 @@ class ProgramWeekSkillTest(MissedCase):
         positions = [step.index(word) for word in order]
         self.assertEqual(positions, sorted(positions), step)
         self.assertIn("`missed_rule_unmatched`", step)
-        self.assertIn("compute.md's proposal with `--kind midweek`", step)
+        self.assertIn('"No rule applies"', step)
+        self.assertNotIn("--kind midweek", step)
         self.assertNotIn("missed apply", step[:step.index('"go"')])
         self.assertIn("for Hevy users, `python3 -m coach routines push", step)
         self.assertIn("`recorded: true`", step)

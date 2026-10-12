@@ -5197,8 +5197,8 @@ changed lines and moved sessions carry `missed_day_rule` (info). It runs
   `data.summary` (at most five lines, loads via `format_load`),
   `data.write_line` (R-03 shape), `data.draft` (the midweek draft). Unmatched:
   `missed_rule_unmatched` and no draft.
-- `missed apply --session S --date D [--tag T]`: run after the athlete's
-  "go". Writes the `miss` annotation (untagged when no `--tag`), the
+- `missed apply --session S --date D [--tag T] [--move-to D2 | --drop]`: run
+  after the athlete's "go". Writes the `miss` annotation (untagged when no `--tag`), the
   midweek overlay (unapproved), and appends three lines under
   `## Mid-week` in the newest record:
 
@@ -5214,7 +5214,11 @@ changed lines and moved sessions carry `missed_day_rule` (info). It runs
   the filter to R-23a's code and tests that the next weekly proposal does
   not carry a fold forward).
 - Checks: `missed_rules_valid` (sessions, exercises and `into` exist and
-  are active; weekdays valid; fold sets ≥ 1); `overlay_folds_expired`
+  are active; weekdays valid; fold sets ≥ 1); `available_days_conflicts`
+  (warn, with a non-empty `[athlete] available_days`: a weekday the
+  schedule plans a session on, over each rotation position of the coming
+  week, or a `shift` rule's weekday, outside the list; an empty list
+  passes, since every day is available); `overlay_folds_expired`
   (fail: a `weekly` or `deload` overlay holds a `fold` line, or a fold's
   `from_date` is more than 6 days before the overlay's span start).
 
@@ -5257,7 +5261,44 @@ changed lines and moved sessions carry `missed_day_rule` (info). It runs
   the first date with that weekday after the miss.
 - A day before today (the athlete's time zone, C2 `COACH_NOW`) is never
   a fold target or a free shift day, so a miss planned once those days
-  have passed is unmatched and falls back to the mid-week reprogram.
+  have passed is unmatched and goes to the athlete's choice below.
+- **Destinations.** `coach.missed.destination(doc, missed_day, day,
+  config, today)` gives a day's `(status, reason)` for taking a moved
+  session: `outside` (not after the miss, or past the span's end),
+  `elapsed` (before today), `occupied` (a session is planned that day),
+  `unavailable` (not in a non-empty `[athlete] available_days`), else
+  `free`, checked in that order. A shift's unmatched reason joins each
+  weekday's reason ("none of Sat is free after the miss: Sat is not one
+  of the athlete's available days ([athlete] available_days: Mon, Thu)").
+  Nothing widens `available_days` to make a rule fit.
+- **The athlete's choice for an unmatched miss.** `missed plan` and
+  `missed apply` take `--move-to D2` or `--drop` (not both: exit 2) in
+  place of the program's rules. A move applies a one-off `shift` rule
+  (id `move`, `action.on` = D2): a day that is not `free` leaves it
+  unmatched with that day's reason, and no priority floor stands in for
+  it. A drop applies a one-off `skip` rule (id `drop`): no overlay, and a
+  priority floor (C40) still folds alongside it, kept as `floor_rule`.
+  `missed plan` returns `decision` (`move`, `drop` or null) and
+  `destinations` (each day after the miss to the span's end: `{date,
+  status, reason}`); an unmatched plan's summary lists the free days and
+  asks for the choice, and `missed apply` refuses it (exit 3) naming
+  `--move-to` and `--drop`. The `miss` annotation's `reason` records the
+  choice (`moved to <D2> by choice`, `dropped this week by choice`;
+  null for a program rule), and the record's rule line reads `- Moved by
+  choice: <change>.` or `- Dropped by choice: <session> is not trained
+  this week.` The guard on an already recorded miss makes a second apply
+  write nothing. A reshuffle (C10 one-off) records the miss with
+  `history annotate --kind miss` and its reason.
+- **A lift with no session left in a proposal's span.** `propose
+  override` on a line the draft lacks exits 1; when no session in the
+  span has the exercise, the message names the next-exposure route: a
+  dated follow-up (`followups add`, C27) reviewed by the next weekly
+  proposal's `followup_due`, then an override on that proposal's line.
+- `coach.missed.recovery(root, session_id, date, today, ...)`: read-only,
+  builds nothing: `{rule_id, kind, to, to_title, reason}` for what the
+  program's matching rule would do with the miss today (`to`: the day a
+  shift moves it to or a fold adds its work to; `reason`: why none
+  applies). The `missed` status provider (C52) reads it.
 - `missed list` returns `data.missed`: `{date, session_id, title,
   overlay_id, recorded, tag}` per missed core session (optional sessions
   are never a miss), reading unsynced workouts too (C17); `recorded` is
@@ -7641,6 +7682,14 @@ unfinalised proposal draft), R-27 (follow-ups due, aggravated niggles),
 R-31 (light week proposed), R-32a (expired research notes), R-33a
 (nutrition override expiring), R-42a (source sync age), R-47 (goal
 events: countdown, agreed window and pending decisions; order 45, C55).
+R-22's `missed` provider (order 32, `attention`) names each core session
+`missed list` gives before today that has no recorded miss, with the
+recovery its rule offers as of today (`coach.missed.recovery`, C37): the
+shift's day ("today, Sat 17 Oct"), the fold's target, a skip, or why no
+rule applies (move, drop or reshuffle), plus the `missed plan` command.
+At most two sessions are named, then a count. Logging the session, a
+`trained_unlogged` note or a recorded miss clears its line; the provider
+writes nothing.
 
 The `checkin` and `program` providers read `coach.pages.header_facts`
 (C38) and stop computing those facts themselves (R-25 made the switch;

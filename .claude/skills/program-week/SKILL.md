@@ -56,7 +56,7 @@ it in the brief's first line:
 | Mode | When | Overlay kind | How |
 | --- | --- | --- | --- |
 | normal | the coming program week | `weekly` | [compute.md](compute.md): `propose week`, settle each line, `propose finalize` |
-| midweek | a missed session, or a change partway through a trained week | `midweek` | [midweek.md](midweek.md): `missed plan`; no matching rule → compute.md with `--kind midweek` |
+| midweek | a missed session, or a change partway through a trained week | `midweek` | [midweek.md](midweek.md): `missed plan`; no matching rule → the athlete moves, reshuffles or drops it; other changes → compute.md with `--kind midweek` |
 | light | a deload, light or return week the check-in agreed, or a return after illness | `deload` | compute.md: the `command` that `block decide` printed, or `--kind deload` |
 | minimum | short on time at the usual kit, with a configured `minimum_week` | `weekly` | [short-week.md](short-week.md): configure and validate, then `structure minimum` and `--plan` |
 | constrained | travel, limited kit, or short on time without a valid minimum | `one_off` | [one-off.md](one-off.md): a coach-built draft through `overlay build` |

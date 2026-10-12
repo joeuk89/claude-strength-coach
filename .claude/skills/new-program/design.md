@@ -23,7 +23,11 @@ and `config.toml` (units, equipment and its increments).
    constraint (equipment load caps, session time limits, recovery windows around coach-led
    sessions and cardio). The program's interference rules flag quality
    cardio placed too close to lifting: `python3 -m coach interference
-   list` shows the rules available and their defaults.
+   list` shows the rules available and their defaults. Missed-day rules
+   are optional: say what one does (a fold, a shift to a named day inside
+   `[athlete] available_days`, or a skip) and that without one each miss
+   is decided when it happens; for a redesign, review the current ones
+   (`python3 -m coach missed rules`).
 4. **Walk the athlete through it** — the reasoning, not just the tables.
    Iterate until they'd actually train it. Confirm before writing files,
    then write the draft to `.coach/drafts/program.json` and adopt it as

@@ -29,14 +29,20 @@ def list_rules(args, ctx):
                        "description": missed.describe(rule, ctx.root), "rule": rule} for rule in found]}
 
 
+CHOICE = (arg("--move-to", metavar="D", help="the athlete's choice: move the session to this free day, this week only"),
+          arg("--drop", action="store_true", help="the athlete's choice: drop the session this week"))
+
+
 @command(
     "missed plan",
-    help="What the matching missed-day rule does to the rest of the week: summary, write line and draft overlay",
+    help="What the matching missed-day rule, or the athlete's chosen move or drop, does to the rest of the week: "
+         "summary, write line, draft overlay and each later day's status for a move",
     args=(arg("--session", required=True, metavar="S", help="the missed session's id"),
-          arg("--date", required=True, metavar="D", help="the day it was planned")),
+          arg("--date", required=True, metavar="D", help="the day it was planned"), *CHOICE),
 )
 def plan(args, ctx):
-    return missed.plan(ctx.root, args.session, _date(args.date, "--date"), ctx.now())
+    return missed.plan(ctx.root, args.session, _date(args.date, "--date"), ctx.now(),
+                       _date(args.move_to, "--move-to"), args.drop)
 
 
 @command(
@@ -44,11 +50,12 @@ def plan(args, ctx):
     help='After the athlete\'s "go": write the miss, the mid-week overlay (unapproved) and the record lines',
     args=(arg("--session", required=True, metavar="S", help="the missed session's id"),
           arg("--date", required=True, metavar="D", help="the day it was planned"),
-          arg("--tag", choices=history.MISS_TAGS, help="why it was missed")),
+          arg("--tag", choices=history.MISS_TAGS, help="why it was missed"), *CHOICE),
     writes=True,
 )
 def apply(args, ctx):
-    found = missed.apply(ctx.root, args.session, _date(args.date, "--date"), args.tag, args.dry_run, ctx.now())
+    found = missed.apply(ctx.root, args.session, _date(args.date, "--date"), args.tag, args.dry_run, ctx.now(),
+                         _date(args.move_to, "--move-to"), args.drop)
     if found["record"] is None:
         ctx.warn("No check-in record yet, so the mid-week lines were not written anywhere")
     return found

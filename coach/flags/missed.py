@@ -5,5 +5,5 @@ from coach.flags import register
 register("missed_day_rule", owner="R-22", severities=("info",),
          summary="A missed-day rule changed this line or session; the message names the rule.")
 register("missed_rule_unmatched", owner="R-22", severities=("info",),
-         summary="No missed-day rule matched; reprogram the rest of the week with `propose week --kind midweek` "
-                 "and a coach's brief.")
+         summary="No missed-day rule matched, or the chosen day cannot take the session; ask the athlete to "
+                 "move it to a free day or drop it this week.")

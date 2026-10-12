@@ -704,6 +704,19 @@ def _cycle(inst, program_doc, reference, schedule=None, allowed=None):
     return found
 
 
+def scheduled_days(root, today=None, now=None):
+    """{weekday: [session ids]} the program's schedule plans in the coming week, over every rotation position."""
+    inst = _Instance.load(root, today, now)
+    reference = inst.week(inst.today + timedelta(days=1))
+    found = {}
+    for _, planned in _cycle(inst, inst.program, reference):
+        for day, session_id in planned:
+            ids = found.setdefault(base.WEEKDAYS[day.weekday()], [])
+            if session_id not in ids:
+                ids.append(session_id)
+    return found
+
+
 def _new_sessions(current, candidate):
     """Ids of sessions active in the candidate but not in the current program, and of new coach-led sessions."""
     active = {s["id"] for s in current["sessions"] if s["status"] == "active"} if current else set()
