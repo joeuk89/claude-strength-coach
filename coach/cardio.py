@@ -191,6 +191,7 @@ class _Week:
                           self.settings["quality_rpe_min"])
         self.items = [i for i in all_items if span.contains(dates.parse_date(i["date"]))
                       or (i["activity_date"] and span.contains(dates.parse_date(i["activity_date"])))]
+        self.activity_days = {a["id"]: dates.parse_date(a["local_date"]) for a in activities}
         self.match_for = {i["activity_id"]: i for i in all_items if i["_planned"] and i["_activity"]}
         self.plan_for = {key: i["_planned"] for key, i in self.match_for.items()}
 
@@ -245,11 +246,20 @@ class _Week:
         return found
 
     def upcoming_planned(self):
-        """Planned bouts no logged Activity matched or might have (tier review or program): from today on, or all with no today."""
+        """Unmatched planned bouts in the span, from today on when today is given.
+
+        An ambiguous plan stays when all its candidate runs come before its date, so a run done on
+        its own day cannot hide a later plan; a plan on or before a candidate's day may be that run,
+        which already counts.
+        """
         return [_planned_bout(i["_planned"]) for i in self.items
-                if i["_planned"] and not i["_activity"] and not i["candidate_ids"]
+                if i["_planned"] and not i["_activity"] and self._still_ahead(i)
                 and self.span.contains(dates.parse_date(i["date"]))
                 and (self.today is None or dates.parse_date(i["date"]) >= self.today)]
+
+    def _still_ahead(self, item):
+        day = dates.parse_date(item["date"])
+        return all(self.activity_days[ref] < day for ref in item["candidate_ids"])
 
 
 def _srpe(rpe, minutes, method):

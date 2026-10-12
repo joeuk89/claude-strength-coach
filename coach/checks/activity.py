@@ -32,14 +32,18 @@ def activity_records_valid(ctx):
         try:
             jsonio.read_doc(sync_path, SYNC_SCHEMA)
         except ValidationError as exc:
-            where = paths.ACTIVITY_SYNC.as_posix()
-            results += [Result("fail", f"{where}: {d['path']}: {d['message']}", where) for d in exc.details] \
-                or [Result("fail", exc.message, where)]
+            results += _doc_failures(paths.ACTIVITY_SYNC, exc)
     try:
         associations.load(ctx.root)
     except ValidationError as exc:
-        results.append(Result("fail", exc.message, paths.ACTIVITY_ASSOCIATIONS.as_posix()))
+        results += _doc_failures(paths.ACTIVITY_ASSOCIATIONS, exc)
     return results
+
+
+def _doc_failures(relative, exc):
+    where = relative.as_posix()
+    return [Result("fail", f"{where}: {d['path']}: {d['message']}", where) for d in exc.details] \
+        or [Result("fail", exc.message, where)]
 
 
 @check(id="activity_wellness_location", owner="R-42a")

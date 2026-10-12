@@ -3766,10 +3766,11 @@ enabled = false
   the check fails and names the exact `mv` (and `git rm --cached` when
   moving out of git), or `cat src >> dst && rm src` when both files exist.
 - Checks (R-42a): `activity_records_valid` (every line of the activity,
-  planned and both wellness files, and `sync.json`; one `fail` per
-  problem, naming file, line and JSONPath), `activity_wellness_location`,
-  `activity_source_fresh` (`warn` per enabled source past
-  `gap_warn_days`). All three `skip` while `[activity] enabled = false`.
+  planned and both wellness files, `sync.json` and `associations.json`;
+  one `fail` per problem, naming file, line and JSONPath),
+  `activity_wellness_location`, `activity_source_fresh` (`warn` per
+  enabled source past `gap_warn_days`). All three `skip` while
+  `[activity] enabled = false`.
 - `activity list`, `wellness list|summary` and `planned list` take
   `--from`/`--to`; either left out falls back to the week holding today.
 
@@ -6360,8 +6361,8 @@ coach.cardio.bouts(root, span, mode, overlay=None, today=None) -> list[Bout]
 #   mode "proposal": the overlay's sessions (kind "conditioning" for a conditioning session, else
 #                    "lifting"; ref "<overlay id>/<session id>", minutes None), external sessions
 #                    placed on their `weekday`, and at tier review|program the planned activities
-#                    no logged Activity matched (an ambiguous plan with a candidate activity is
-#                    left out); with `today`, only dates from today on.
+#                    no logged Activity matched (an ambiguous plan is left out unless every
+#                    candidate activity is dated before it); with `today`, only dates from today on.
 #                    No logged bouts: `evaluate` reads those itself (see Flags)
 coach.cardio.match(planned, logged, move_days, today=None, associations=None, quality_rpe_min=7) -> list[dict]   # the reconcile matcher; R-44b reuses it
 #   planned: C30 planned records; logged: resolved Activities. With today None every
@@ -6480,8 +6481,10 @@ def flags(ctx: WeekFlagContext) -> list[dict]     # coach.flags.make(...) result
 `propose week` runs every provider at C24 step 5a and appends their flags
 to the overlay. `cardio flags` runs them over the span with logged bouts
 dated up to today and, at `review`/`program`, planned bouts dated today or
-later that no logged Activity matched, leaving out ambiguous plans whose
-candidate activity already counts. A provider that raises fails the
+later that no logged Activity matched. An ambiguous plan counts only when
+every candidate activity is dated before it: a plan on or before a
+candidate's day may be that activity, which already counts, while a run
+done on its own day never hides a later plan. A provider that raises fails the
 command (exit 9); it is never skipped silently. `cardio flags` returns
 `{span, tier, today, sleep_judged_to, flags, skipped, bouts}`; `skipped`
 lists the runs `run_volume_spike` could not judge (`{ref, date, source,

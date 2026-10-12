@@ -192,8 +192,10 @@ class IdentityTest(CardioCase):
         path = self.root / paths.ACTIVITY_ASSOCIATIONS
         path.write_text('{"schema_version": 1, "associations": {"manual:a": 7}}')
         result = self.coach("check", "--only", "activity_records_valid", expect=1)
-        self.assertTrue(any(r["status"] == "fail" and r["path"] == paths.ACTIVITY_ASSOCIATIONS.as_posix()
-                            for r in result["data"]["results"]))
+        where = paths.ACTIVITY_ASSOCIATIONS.as_posix()
+        failures = [r for r in result["data"]["results"] if r["status"] == "fail" and r["path"] == where]
+        self.assertEqual(len(failures), 1, failures)
+        self.assertIn(f"{where}: $.associations", failures[0]["message"])
 
     def test_source_sync_correction_and_repeat_keep_the_explicit_plan(self):
         from tests.support import FIXTURES
@@ -353,6 +355,36 @@ class IdentityTest(CardioCase):
         found = cardio.flag_bouts(self.root, config_module.load(self.root), span, dates.parse_date("2026-10-06"))
         self.assertEqual([(b.date.isoformat(), b.source, b.ref) for b in found if b.kind == "run"],
                          [("2026-10-06", "logged", "manual:a1")])
+
+    def test_a_later_ambiguous_plan_still_counts_as_upcoming(self):
+        from coach import config as config_module
+
+        def runs(found):
+            return [(b.date.isoformat(), b.source, b.ref, b.quality) for b in found if b.kind == "run"]
+
+        self.set_records([plan("manual:easy", "2026-10-07", None, title="Easy", seconds=2400),
+                          plan("manual:tempo", "2026-10-08", None, True, title="Tempo", seconds=2400)],
+                         [activity("manual:a", "2026-10-07", None, 2460, name="Outdoor Run")])
+        now = "2026-10-07T18:00:00Z"
+        rows = self.coach("cardio", "reconcile", "--week", "2026-W41", now=now)["data"]["items"]
+        self.assertEqual({i["status"] for i in rows}, {"ambiguous"})
+        expected = [("2026-10-07", "logged", "manual:a", False), ("2026-10-08", "planned", "manual:tempo", True)]
+        flags = self.coach("cardio", "flags", "--week", "2026-W41", now=now)["data"]
+        self.assertEqual([(b["date"], b["source"], b["ref"], b["quality"]) for b in flags["bouts"]
+                          if b["kind"] == "run"], expected)
+        span, today = dates.parse_week("2026-W41", "monday"), dates.parse_date("2026-10-07")
+        self.assertEqual(runs(cardio.flag_bouts(self.root, config_module.load(self.root), span, today)), expected)
+        self.assertEqual(runs(cardio.bouts(self.root, span, "proposal", today=today)), expected[1:])
+
+    def test_a_sunday_run_on_schedule_leaves_monday_quality_upcoming_next_week(self):
+        from coach import config as config_module
+
+        self.set_records([plan("manual:sun", "2026-10-11", 6000), plan("manual:mon", "2026-10-12", 6000, True)],
+                         [activity("manual:a", "2026-10-11", 6000)])
+        span, today = dates.parse_week("2026-W42", "monday"), dates.parse_date("2026-10-11")
+        found = cardio.flag_bouts(self.root, config_module.load(self.root), span, today)
+        self.assertEqual([(b.date.isoformat(), b.source, b.ref, b.quality) for b in found if b.kind == "run"],
+                         [("2026-10-12", "planned", "manual:mon", True)])
 
     def test_associate_rejections_write_nothing(self):
         self.set_records([plan("manual:p", "2026-10-06", 10000), plan("manual:far", "2026-10-11", 10000),

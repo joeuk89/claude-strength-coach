@@ -156,6 +156,15 @@ class MigrationTest(Case):
         self.assertEqual({r["name"] for r in data["available"]}, {"same_day", "quality_before_heavy_lower"})
 
 
+class EarlyTempoTest(Case):
+    def test_an_unplanned_run_that_reconciles_as_the_tempo_clears_the_collision(self):
+        rows = self.data("cardio", "reconcile", "--week", "2026-W41")["items"]
+        tempo = next(i for i in rows if i["planned_id"] == "manual:2026-10-11-run-1")
+        self.assertEqual((tempo["status"], tempo["activity_id"], tempo["quality"]),
+                         ("moved", "manual:2026-10-08-run-1", False))
+        self.assertEqual(self.collisions(self.proposal()["overlay"]["flags"]), [])
+
+
 class ProposalTest(Case):
     def setUp(self):
         super().setUp()
