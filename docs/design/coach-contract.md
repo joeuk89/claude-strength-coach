@@ -2150,7 +2150,9 @@ nearby, what an e1RM is: the card through `stats.E1RM_MEANING`, the
 record and `progress.md` through the sentence `stats.e1rm_meaning(unit)`,
 and the dashboard and brief by labelling their first e1RM line with
 `stats.E1RM_LABEL` (`Best e1RM (estimated one-rep max): …`). The data
-keeps its 2 decimals.
+keeps its 2 decimals, and so do the C22 validity flags and the scheme
+rationales, which quote an e1RM as the basis of an implied RPE or a
+computed load.
 
 `data.unavailable[exercise_id]` explains an exercise whose newest exposure
 in the window can give no e1RM, for one of two reasons, each the same code
@@ -6661,8 +6663,9 @@ plural, gives hard sets out of working sets and says why a set is not
 hard (logged at RPE `stats.EASY_RPE` or below). The session-RPE line
 shows the whole-number total in arbitrary units, names its inputs
 (minutes × session RPE, summed over the week, with a lifting session's
-RPE the mean of its working sets' RPEs) and says it is information only,
-with no target or limit. With `--into` it replaces the region between
+RPE the mean of its working sets' RPEs, or the `kind_default` 6 when
+more working sets lack an RPE than carry one) and says it is information
+only, with no target or limit. With `--into` it replaces the region between
 `<!-- coach:begin cardio <week label> -->` and
 `<!-- coach:end cardio <week label> -->` (C11), appending the region when
 absent. No freshness check: the block is a snapshot.

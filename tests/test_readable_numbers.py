@@ -1,12 +1,13 @@
 """Athlete-facing numbers: whole-unit e1RMs, RPE gaps in words, labelled set groups and the cardio line."""
 
 import json
+import re
 import shutil
 import tempfile
 import unittest
 from pathlib import Path
 
-from coach import stats, units
+from coach import cardio, checkin, stats, units
 from tests.support import INSTANCES, run_cli
 
 NOHEVY = INSTANCES / "nohevy"
@@ -84,6 +85,36 @@ class CheckInNumbersTest(NoHevyWeek):
         row = next(r for r in card["exercises"] if r["exercise_id"] == "db_single_arm_row")
         self.assertTrue(row["logged"].startswith("10, 10, 10 @ 30"), row["logged"])
 
+    def row_week(self, rpes):
+        self.log(workout("2026-10-15", "session-b",
+                         [("db_single_arm_row", "single_implement", [(30, 10, rpe) for rpe in rpes])]))
+        prepared = self.coach("checkin", "prepare")
+        row = next(r for r in prepared["card"]["exercises"] if r["exercise_id"] == "db_single_arm_row")
+        return prepared, row
+
+    def test_an_rpe_above_target_reads_as_above(self):
+        prepared, row = self.row_week([8.5, 8.5, 8.5])
+        self.assertEqual((row["status"], row["rpe_delta"]), ("hit", 0.5))
+        self.assertIn(f"{row['name']} hit (RPE 0.5 above target)", prepared["text"])
+        self.assertIn("| hit, RPE 0.5 above target |", self.region())
+
+    def test_an_rpe_gap_that_rounds_to_nothing_is_not_shown(self):
+        prepared, row = self.row_week([8, 8, 8.1])
+        self.assertEqual(row["status"], "hit")
+        self.assertAlmostEqual(row["rpe_delta"], 0.03, places=2)
+        self.assertIn(f"{row['name']} hit", prepared["text"])
+        self.assertNotIn(f"{row['name']} hit (", prepared["text"])
+        region_row = next(line for line in self.region().splitlines() if "| db_single_arm_row |" in line)
+        self.assertTrue(region_row.endswith("| hit |"), region_row)
+
+    def test_a_lift_with_no_earlier_estimate_reads_as_a_first_estimate(self):
+        prepared, row = self.row_week([8, 8, 8])
+        estimate = next(r for r in prepared["card"]["e1rm"] if r["exercise_id"] == "db_single_arm_row")
+        self.assertIsNone(estimate["delta"])
+        line = next(line for line in prepared["text"].splitlines() if line.startswith("e1RM"))
+        self.assertRegex(line, re.escape(row["name"]) + r" \d+ kg \(first estimate\)")
+        self.assertNotIn("(—)", line)
+
     def test_estimates_show_whole_units_with_their_basis_and_keep_precision_in_data(self):
         bench = self.e1rm("db_bench_press")
         self.assertEqual((bench["e1rm"], bench["delta"]), (32.92, 1.42))
@@ -141,11 +172,23 @@ class CardioLineTest(NoHevyWeek):
         text = self.coach("cardio", "render", "--week", "2026-W42")["text"]
         line = next(line for line in text.splitlines() if line.startswith("Session-RPE load"))
         self.assertIn("minutes × session RPE", line)
-        self.assertIn("a lifting session's is the mean RPE of its working sets", line)
+        self.assertIn("a lifting session's is the mean RPE of its working sets, "
+                      f"or {cardio.KIND_RPE['lifting']} when most have none", line)
         self.assertIn("arbitrary units", line)
         self.assertIn("information only", line)
         for word in ("target", "threshold", "too high", "risk"):
             self.assertNotIn(word, line.split("information only")[0])
+
+
+class RpeGapTextTest(unittest.TestCase):
+    def test_a_gap_reads_as_its_size_and_direction_against_the_target(self):
+        self.assertEqual(checkin.rpe_gap_text(-0.83), "RPE 0.8 below target")
+        self.assertEqual(checkin.rpe_gap_text(0.5), "RPE 0.5 above target")
+        self.assertEqual(checkin.rpe_gap_text(0.05), "RPE 0.1 above target")
+
+    def test_no_gap_or_one_that_rounds_to_nothing_gives_no_text(self):
+        for delta in (None, 0, 0.04, -0.04):
+            self.assertIsNone(checkin.rpe_gap_text(delta), delta)
 
 
 class WholeNumberTest(unittest.TestCase):

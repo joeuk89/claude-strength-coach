@@ -648,7 +648,8 @@ def render_text(root, week_value, today):
                  f"(a working set logged at RPE {stats.EASY_RPE} or below is not a hard set) · "
                  f"coach-led done: {numbers['external']['done']}")
     lines += ["", f"Session-RPE load: {units.whole(numbers['srpe']['total'])} arbitrary units, each session's "
-                 "minutes × session RPE (0–10; a lifting session's is the mean RPE of its working sets), "
+                 "minutes × session RPE (0–10; a lifting session's is the mean RPE of its working sets, "
+                 f"or {KIND_RPE[LIFTING]} when most have none), "
                  "summed over the week; information only, with no target or limit"]
     if not numbers["activity_source"]:
         lines += ["", "No activity source: runs and conditioning are not counted."]
