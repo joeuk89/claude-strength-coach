@@ -233,9 +233,10 @@ _Avoid_: main lift (looser), key lift, focus lift
 **Floor dose**:
 The least a priority lift gets in a disrupted week: by default two hard
 working sets at the prescribed load and reps. When the session carrying
-the lift is missed and the program's missed-day rule doesn't keep the
-lift in the week, the floor is folded into the next session that week. A
-program fold that carries the lift at fewer sets is topped up to the floor.
+the lift is missed and a program `skip` rule or the athlete's choice to
+drop it takes the lift out of the week, the floor is folded into the next
+session that week. A program fold that carries the lift at fewer sets is
+topped up to the floor. With no rule, the athlete still chooses a move or a drop.
 _Avoid_: minimum sets, maintenance sets
 
 **Minimum week**:

@@ -1,8 +1,8 @@
 """Missed-day rules: match a missed session to the program's rule and apply it as a mid-week overlay (contract C37).
 
 Matching (`match`) and application (`apply_rule`) stay separate so a caller
-can apply a rule it builds itself (a priority lift's floor dose), after the
-program's rules as a fallback, alone or on top of a program fold.
+can apply a rule it builds itself (a priority lift's floor dose) after the
+program's rules: alongside a skip or a chosen drop, or on top of a program fold.
 `plan` is read-only; `apply` writes the miss, the overlay and the record
 lines once the athlete has said "go".
 A fold carries `DEFAULT_FOLD_SETS` working sets unless the rule says
@@ -30,6 +30,8 @@ MOVE, DROP = "move", "drop"
 FREE, OCCUPIED, ELAPSED, UNAVAILABLE, OUTSIDE = "free", "occupied", "elapsed", "unavailable", "outside"
 DECIDE_WORDS = ("ask the athlete whether to move it to a free day (missed plan --move-to D) or drop it this week "
                 "(missed plan --drop)")
+NO_FREE_DAY_WORDS = ("ask the athlete whether to drop it this week (missed plan --drop) or reshuffle the rest of the "
+                     "week")
 
 
 class Unmatched(Exception):
@@ -475,11 +477,23 @@ def _decision_words(decision, title, rule):
     return f"{title} is dropped this week: its lifts are not trained, and the rest of the week stays as planned."
 
 
+def _free_days(rows):
+    return [render.day_label(row["date"]) for row in rows if row["status"] == FREE]
+
+
 def _free_days_line(rows):
-    free = [render.day_label(row["date"]) for row in rows if row["status"] == FREE]
+    free = _free_days(rows)
     if not free:
         return "No day is free to move it to before the overlay's span ends."
     return f"Free days to move it to: {_and(free)}."
+
+
+def _floor_on_drop_line(floor_rule, names):
+    if floor_rule is None:
+        return []
+    lifts = _and([f"{_sets_words(item['sets'])} of {names.exercise(item['exercise_id'])}"
+                  for item in floor_rule["action"]["exercises"]])
+    return [f"A drop still folds the priority floor {floor_rule['id']}: {lifts} into the next session, this week only."]
 
 
 def _decision(move_to, drop):
@@ -527,17 +541,20 @@ def plan(root, session_id, day, now=None, move_to=None, drop=False):
     if not (decision == MOVE and reason is not None):
         floor_rule = _left_out(structure.priority_floor(root, session_id, day, doc, program_doc), rule,
                                reason is None, missed)
-    floor_flags, added = [], None
+    floor_flags, added, floor_on_drop = [], None, None
     if floor_rule is not None:
         try:
             if draft is not None:
                 draft, added = _build(root, doc, session_id, day, [rule, floor_rule], now, config, library), floor_rule
+            elif reason is not None:
+                apply_rule(root, doc, session_id, day, floor_rule, now, config, library)
+                floor_on_drop = floor_rule
             else:
                 draft = apply_rule(root, doc, session_id, day, floor_rule, now, config, library)
                 if decision == DROP:
                     added = floor_rule
                 else:
-                    rule, reason = floor_rule, None
+                    rule = floor_rule
         except Unmatched as why:
             floor_flags = _floor_missed(floor_rule, missed, day, why, names)
 
@@ -547,17 +564,19 @@ def plan(root, session_id, day, now=None, move_to=None, drop=False):
         found.update(rule=rule, action=rule["action"]["kind"], description=description)
     if reason is not None:
         found["reason"] = str(reason)
+        free = bool(_free_days(rows))
         if decision == MOVE:
             head = f"{missed['title']} cannot move to {render.day_label(move_to)} ({reason})"
-            then = "pick a free day, or drop it with --drop"
+            then = "pick a free day, or drop it with --drop" if free else "drop it with --drop, or reshuffle the week"
         else:
             head = f"No missed-day rule applies to {missed['title']} on {render.day_label(day)} ({reason})"
-            then = DECIDE_WORDS
+            then = DECIDE_WORDS if free else NO_FREE_DAY_WORDS
         found["flags"] = floor_flags + [flags.make("missed_rule_unmatched", session_id=session_id,
                                                    message=f"{head}; {then}.")]
         lead = (f"{missed_text}; it cannot move to {render.day_label(move_to)} ({reason})." if decision == MOVE
                 else f"{missed_text}; no missed-day rule applies ({reason}).")
-        found["summary"] = [lead, _free_days_line(rows), f"Next: {then}."]
+        found["summary"] = [lead, _free_days_line(rows), *_floor_on_drop_line(floor_on_drop, names),
+                            f"Next: {then}."]
         return found
 
     found.update(matched=True, draft=draft, floor_rule=added, write_line=write_line(config, draft), flags=floor_flags)

@@ -179,6 +179,17 @@ class NoRuleTest(RecoveryCase):
         self.assertIn("Sat is not one of the athlete's available days", refused["error"]["message"])
         self.assertEqual(self.snapshot(), before)
 
+    def test_with_no_free_day_only_a_drop_or_a_reshuffle_is_offered(self):
+        self.set_available(["mon", "thu"])
+        unmatched, failed_move = self.plan(), self.plan("--move-to", "2026-10-14")
+        for data in (unmatched, failed_move):
+            self.assertEqual(data["summary"][1], "No day is free to move it to before the overlay's span ends.")
+            self.assertNotIn("--move-to", data["summary"][-1])
+            self.assertNotIn("pick a free day", data["summary"][-1])
+            self.assertIn("--drop", data["summary"][-1])
+            self.assertIn("reshuffle", data["summary"][-1])
+            self.assertEqual(data["summary"][-1][len("Next: "):], data["flags"][-1]["message"].split("; ", 1)[1])
+
     def test_an_apply_with_no_choice_is_refused_and_names_both(self):
         refused = self.apply("--tag", "time", expect=3)
         self.assertIn("--move-to", refused["error"]["message"])

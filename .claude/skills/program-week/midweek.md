@@ -36,7 +36,8 @@ the athlete chooses that. Show `missed plan`'s `reason` and its
   --kind miss --date <date> --session <id> --tag <tag> --reason
   "reshuffled to <day>"`.
 - **Drop it**: `missed plan ... --drop`; the rest of the week stays as
-  planned.
+  planned, but a priority lift's floor dose still folds into the next
+  session (the summary says so).
 
 After "go", run `missed apply` with the same `--move-to <date>` or `--drop`
 and the athlete's `--tag`; it records the choice with the miss, and a

@@ -109,6 +109,9 @@ class FloorCase(PriorityCase):
         self.edit_json("data/history/2026-10.json",
                        lambda doc: doc.update(workouts=[w for w in doc["workouts"] if w["date"] not in days]))
 
+    def snapshot(self):
+        return {p.relative_to(self.root).as_posix(): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+
     def priority(self, env=None):
         return self.data("structure", "priority", "--since", "2026-10-12", env=env)
 
@@ -145,15 +148,41 @@ class FloorRuleTest(FloorCase):
 
 
 class FloorFoldTest(FloorCase):
+    DROP = ("missed", "plan", "--session", "session-a", "--date", "2026-10-12", "--drop")
+
     def setUp(self):
         super().setUp()
         self.set_rule(None)
 
-    def test_with_no_program_rule_the_floor_folds_the_lift(self):
+    def drop(self, *extra):
+        return self.data("missed", "apply", *self.DROP[2:], *extra)
+
+    def test_with_no_program_rule_a_priority_lift_still_gets_the_move_or_drop_choice(self):
         data = self.plan()
-        self.assertTrue(data["matched"])
-        self.assertEqual(data["rule"]["id"], FLOOR_ID)
-        self.assertIsNone(data["floor_rule"])
+        self.assertEqual((data["matched"], data["rule"], data["draft"]), (False, None, None))
+        self.assertEqual(data["reason"], "no rule names this session with its condition met")
+        self.assertEqual(data["summary"], [
+            "Missed Mon 12 Oct Session A; no missed-day rule applies (no rule names this session with its condition "
+            "met).",
+            "Free days to move it to: Tue 13 Oct, Wed 14 Oct, Fri 16 Oct, Sat 17 Oct and Sun 18 Oct.",
+            f"A drop still folds the priority floor {FLOOR_ID}: 2 sets of Back Squat (Barbell) into the next "
+            "session, this week only.",
+            "Next: ask the athlete whether to move it to a free day (missed plan --move-to D) or drop it this week "
+            "(missed plan --drop).",
+        ])
+        self.assertEqual(codes(data["flags"]), ["missed_rule_unmatched"])
+        before = self.snapshot()
+        refused = self.data("missed", "apply", "--session", "session-a", "--date", "2026-10-12", expect=3)
+        self.assertIn("--drop", refused["error"]["message"])
+        self.assertEqual(self.snapshot(), before)
+
+    def test_status_agrees_that_no_rule_applies(self):
+        line = next(s for s in self.data("status")["sections"] if s["id"] == "missed")["lines"][0]
+        self.assertIn("Session A is not logged; no missed-day rule applies", line)
+
+    def test_a_chosen_drop_folds_the_floor_into_the_next_session(self):
+        data = self.data(*self.DROP)
+        self.assertEqual((data["matched"], data["rule"]["id"], data["floor_rule"]["id"]), (True, "drop", FLOOR_ID))
         draft = data["draft"]
         self.assertEqual([(s["date"], s["session_id"]) for s in draft["sessions"]], [("2026-10-15", "session-b")])
         last = draft["sessions"][0]["exercises"][-1]
@@ -163,24 +192,10 @@ class FloorFoldTest(FloorCase):
         self.assertEqual(last["fold"], {"rule_id": FLOOR_ID, "from_session_id": "session-a",
                                         "from_date": "2026-10-12", "scope": "one_week"})
         self.assertIn("missed_day_rule", codes(draft["flags"]))
-        self.assertNotIn("priority_exposures_missed", codes(data["flags"]))
         self.assertEqual(data["flags"], [])
 
-    def test_apply_writes_the_floor_and_the_record_line(self):
-        data = self.data("missed", "apply", "--session", "session-a", "--date", "2026-10-12", "--tag", "time")
-        self.assertTrue(data["record_lines"][1].startswith(f"- Rule {FLOOR_ID}: Back Squat (Barbell) 2×5"))
-        doc = overlay.load(self.root, data["overlay_id"])
-        self.assertEqual(doc["sessions"][0]["exercises"][-1]["fold"]["rule_id"], FLOOR_ID)
-        self.data("overlay", "validate", data["overlay_id"])
-
     def test_a_chosen_drop_still_folds_the_floor_and_records_both(self):
-        argv = ("missed", "plan", "--session", "session-a", "--date", "2026-10-12", "--drop")
-        planned = self.data(*argv)
-        self.assertEqual((planned["matched"], planned["decision"], planned["floor_rule"]["id"]),
-                         (True, "drop", FLOOR_ID))
-        self.assertEqual([(s["date"], s["session_id"]) for s in planned["draft"]["sessions"]],
-                         [("2026-10-15", "session-b")])
-        data = self.data("missed", "apply", *argv[2:], "--tag", "time")
+        data = self.drop("--tag", "time")
         self.assertEqual(data["record_lines"][1],
                          f"- Dropped by choice, with the priority floor {FLOOR_ID}: Back Squat (Barbell) 2×5 @ 100 kg "
                          "added to Thu 15 Oct Session B, this week only.")
@@ -191,9 +206,10 @@ class FloorFoldTest(FloorCase):
         miss = next(a for a in read_json(self.root / "data" / "history" / "annotations.json")["annotations"]
                     if a["kind"] == "miss")
         self.assertEqual(miss["reason"], "dropped this week by choice")
+        self.data("overlay", "validate", data["overlay_id"])
 
     def test_a_pending_floor_raises_nothing_and_a_trained_one_counts_as_replaced(self):
-        self.data("missed", "apply", "--session", "session-a", "--date", "2026-10-12")
+        self.drop()
         week = self.priority()["lifts"][0]["weeks"][-1]
         self.assertEqual((week["planned"], week["missed"], week["pending"], week["unreplaced"]), (1, 1, 1, 0))
         self.train_session_b_on("2026-10-15")
@@ -203,7 +219,7 @@ class FloorFoldTest(FloorCase):
         self.assertEqual(data["flags"], [])
 
     def test_a_floor_whose_session_is_missed_too_raises_the_flag(self):
-        self.data("missed", "apply", "--session", "session-a", "--date", "2026-10-12")
+        self.drop()
         data = self.priority(env={"COACH_NOW": "2026-10-19T08:00:00Z"})
         self.assertEqual(codes(data["flags"]), ["priority_exposures_missed"])
         self.assertEqual(data["flags"][0]["exercise_id"], SQUAT)
@@ -241,18 +257,31 @@ class RuleOrderTest(FloorCase):
         self.assertEqual(self.folds(data["draft"]), [("2026-10-15", SQUAT, FLOOR_ID)])
         self.assertEqual(data["flags"], [])
 
-    def test_a_manual_rule_lets_the_floor_fold_the_lift(self):
-        self.set_rule({"kind": "manual"}, text="Ask the coach.")
-        data = self.plan()
-        self.assertEqual((data["matched"], data["rule"]["id"]), (True, FLOOR_ID))
-        self.assertEqual(self.folds(data["draft"]), [("2026-10-15", SQUAT, FLOOR_ID)])
+    def test_a_manual_rule_or_a_shift_with_no_free_day_leaves_the_choice_and_a_drop_folds_the_floor(self):
+        cases = (({"kind": "manual"}, "Ask the coach.", "rule miss-a is manual"),
+                 ({"kind": "shift", "to_weekdays": ["thu"]}, None, "Thu 15 Oct already has Session B planned"))
+        for action, text, reason in cases:
+            with self.subTest(action=action["kind"]):
+                self.set_rule(action, text)
+                data = self.plan()
+                self.assertEqual((data["matched"], data["rule"]["id"], data["draft"]), (False, "miss-a", None))
+                self.assertIn(reason, data["reason"])
+                self.assertIn(f"A drop still folds the priority floor {FLOOR_ID}", " ".join(data["summary"]))
+                self.assertEqual(codes(data["flags"]), ["missed_rule_unmatched"])
+                dropped = self.data("missed", "plan", "--session", "session-a", "--date", "2026-10-12", "--drop")
+                self.assertEqual((dropped["rule"]["id"], dropped["floor_rule"]["id"]), ("drop", FLOOR_ID))
+                self.assertEqual(self.folds(dropped["draft"]), [("2026-10-15", SQUAT, FLOOR_ID)])
 
-    def test_a_shift_with_no_free_day_falls_back_to_the_floor(self):
-        self.set_rule({"kind": "shift", "to_weekdays": ["thu"]})
+    def test_a_shift_to_an_unavailable_day_says_so_for_a_priority_lift(self):
+        path = self.root / "config.toml"
+        path.write_text(path.read_text(encoding="utf-8").replace("available_days = []",
+                                                                 'available_days = ["mon", "thu"]'),
+                        encoding="utf-8")
+        self.set_rule({"kind": "shift", "to_weekdays": ["sat"]})
         data = self.plan()
-        self.assertEqual((data["matched"], data["rule"]["id"]), (True, FLOOR_ID))
-        self.assertEqual(self.folds(data["draft"]), [("2026-10-15", SQUAT, FLOOR_ID)])
-        self.assertEqual(data["flags"], [])
+        self.assertFalse(data["matched"])
+        self.assertIn("Sat is not one of the athlete's available days", data["reason"])
+        self.assertIn("Sat is not one of the athlete's available days", data["summary"][0])
 
     def test_a_fold_leaving_out_the_lift_applies_and_the_floor_adds_the_lift(self):
         self.set_rule({"kind": "fold", "into": "next", "exercises": [{"exercise_id": "db_bench_press", "sets": 1}]})

@@ -5189,7 +5189,7 @@ changed lines and moved sessions carry `missed_day_rule` (info). It runs
 - `coach.missed.apply_rule(root, overlay, session_id, date, rule) -> draft`
   applies any rule object, including a synthetic one built by another item
   (R-30b builds a `fold` rule for a priority lift's floor dose and applies
-  it after the program's rules, as a fallback, C40). Matching and
+  it after the program's rules, C40). Matching and
   application stay separate so callers can do this without copying either.
 - `missed list [--date D]`: planned sessions in the overlay in force dated
   before D with no matching workout and no `trained_unlogged` annotation (C18).
@@ -5280,9 +5280,10 @@ changed lines and moved sessions carry `missed_day_rule` (info). It runs
   a priority floor (C40) folds alongside it, kept as `floor_rule`.
   `missed plan` returns `decision` (`move`, `drop` or null) and
   `destinations` (each day after the miss to the span's end: `{date,
-  status, reason}`); an unmatched plan's summary lists the free days and
-  asks for the choice, and `missed apply` refuses it (exit 3) naming
-  `--move-to` and `--drop`. The `miss` annotation's `reason` records the
+  status, reason}`); an unmatched plan's summary lists the free days,
+  says when a drop still folds a priority floor, and asks for the choice
+  (a move or a drop, or with no free day a drop or a reshuffle), and
+  `missed apply` refuses it (exit 3) naming the options. The `miss` annotation's `reason` records the
   choice (`moved to <D2> by choice`, `dropped this week by choice`;
   null for a program rule), and the record's rule line reads `- Moved by
   choice: <change>.` or `- Dropped by choice: <session> is not trained
@@ -5305,7 +5306,7 @@ changed lines and moved sessions carry `missed_day_rule` (info). It runs
   true when a `miss` annotation names that session and date.
 - `missed plan` also returns `title`, `overlay_id`, `action`,
   `description`, `reason` (why unmatched), `floor_rule` (the priority
-  floor applied alongside a program fold, C40, else null) and `flags`
+  floor applied alongside a program fold or a chosen drop, C40, else null) and `flags`
   (the `missed_rule_unmatched` flag when unmatched). The summary is the miss
   and the rule, the change (loads in C12 Target form), the overlay and
   its span, and the prescription check's block and warn counts.
@@ -5737,8 +5738,8 @@ null`:
   Loads and reps come from the approved prescription (no progression);
   `rpe` applies only when lower than the prescribed RPE.
 - R-30b applies it through `coach.missed.apply_rule(root, overlay,
-  session_id, date, rule)` after the program's own rules, as a fallback
-  (see "Order in `missed plan`" below), in R-22's plan and apply path. Folded lines
+  session_id, date, rule)` after the program's own rules (see "Order in
+  `missed plan`" below), in R-22's plan and apply path. Folded lines
   get R-22's `fold` marker (`scope: one_week`, overlay v3) and its
   `missed_day_rule` flag, five-line summary and write line.
 - When `apply_rule` returns unmatched (no later session in the span),
@@ -5782,25 +5783,31 @@ null`:
   approval and the report lists them (as C21).
 - **Order in `missed plan`** (and so `missed apply`): the program's rules
   are matched and applied first, as C37 reads. The floor rule is tried
-  after them, as a fallback, only when:
-  - no program rule matches the miss;
-  - the matched rule is `skip` or `manual`;
-  - the matched rule can't be applied (`apply_rule` raises `Unmatched`,
-    for example a shift with no free day);
+  after them only when:
+  - no program rule matches the miss, or the matched rule can't be
+    applied (`manual`, or `apply_rule` raises `Unmatched`, for example a
+    shift with no free day);
+  - the matched rule is `skip`, or the athlete chose `--drop` (C37);
   - the matched rule is a fold that leaves out a priority lift the missed
     session carried, or carries it short.
 
   A shift that moves the whole session carries every lift with it, so
-  the floor is not tried and no `priority_exposures_missed` is raised.
-  In the first three cases the floor rule, when it applies, becomes the
-  miss's rule (`data.rule`). In the fourth, the floor rule covers only
+  the floor is not tried and no `priority_exposures_missed` is raised;
+  neither is it for a chosen `--move-to`. In the first case the miss
+  stays unmatched, so the athlete still chooses a move or a drop (C37):
+  the floor is only tried, and the summary says a drop still folds it,
+  with no draft. In the second, the floor rule, when it applies, folds
+  the lifts into the next session: after a program `skip` it becomes
+  the miss's rule (`data.rule`); after a chosen drop `data.rule` stays
+  `drop` and `data.floor_rule` holds it. In the third, the floor rule covers only
   the lifts the fold leaves out or carries short (its id names just
   those), it folds into the week the program's fold has already changed,
   a short lift's folded line is topped up to `floor.sets` working sets
   (never more than prescribed) at its prescribed load and `floor.rpe`,
   keeping the program rule's `fold.rule_id`, `data.rule` stays the
   program's rule, and
-  `data.floor_rule` holds the floor rule (null in every other case).
+  `data.floor_rule` holds the floor rule (null in every other case but
+  a chosen drop).
   The summary's first line then ends `, with the priority floor <id>.`
   and the record line reads `- Rules <rule id> and <floor id>: …`. A
   fold covers a lift it gives `floor.sets` working sets or more, or
@@ -7687,9 +7694,9 @@ R-22's `missed` provider (order 32, `attention`) names each core session
 recovery its rule offers as of today (`coach.missed.recovery`, C37): the
 shift's day ("today, Sat 17 Oct"), the fold's target, a skip, or why no
 rule applies (move, drop or reshuffle), plus the `missed plan` command.
-Up to three sessions are named; with more, two are named, then a count. Logging the session, a
-`trained_unlogged` note or a recorded miss clears its line; the provider
-writes nothing.
+Up to three sessions are named; with more, two are named, then a count.
+Logging the session, a `trained_unlogged` note or a recorded miss clears
+its line; the provider writes nothing.
 
 The `checkin` and `program` providers read `coach.pages.header_facts`
 (C38) and stop computing those facts themselves (R-25 made the switch;
