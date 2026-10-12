@@ -1967,16 +1967,18 @@ capacity loss. `coach.stats.capacity_note(observation)` words why an
 observation is left out, or returns None: only for `SERIES_MODES` and
 `BODYWEIGHT_MODES` exposures left out by recovery context or the rep cap.
 Check-in `e1rm_notes` and the progress page's "e1RM notes:" use it; the
-raw values remain inspectable through `stats e1rm` and history. No
+progress page notes each lift's newest exposure only when it falls in the
+last `CHANGE_DAYS` days. The raw values remain inspectable through `stats e1rm` and history. No
 lower-bound estimate is invented above the cap.
 
 `coach.stats.capacity_evidence(data, exercise_id, before, window_days)`
 picks the e1RM that may limit a prescription from `e1rm_series` data:
-the best comparable point in the window before `before`, unless the
-newest progression observation is over the cap with no eligible set.
-Progression observations are comparable ones plus over-cap `normal` and
-`return` work (return-week logs are the next week's baseline); deload,
-light and reduced work neither supplies nor removes the e1RM.
+the best comparable point in the window before `before`, unless an
+exposure newer than every comparable point has no eligible set and an
+over-cap set at or above the load behind that best point. Only `normal`
+and `return` work counts (return-week logs are the next week's baseline);
+deload, light and reduced work neither supplies nor removes the e1RM.
+Lighter over-cap work leaves the older e1RM in force.
 
 `e1rm_series` reads config, adopted decisions and approved overlays to
 build each observation's `context`, so it, and every command built on it,
@@ -2292,7 +2294,8 @@ coach.validity.estimate_minutes(root, session) -> int
 - **Feasibility** uses C18's `implied_rpe` with the best e1RM point in
   the 42 days before the session date (none older), using comparable
   normal work, chosen by `coach.stats.capacity_evidence` (C18): newer
-  over-cap normal or return work makes older estimates unavailable for
+  over-cap normal or return work at or above the load behind the older
+  estimate makes it unavailable for
   feasibility and scheme model inputs. Every returned prescription-check
   line exposes `model_evidence` with `estimate`, `reason`, `date` and a
   plain `message`. The existing no-e1RM load-step guard, equipment checks,

@@ -379,6 +379,17 @@ class CapacityEvidenceTest(NoHevyCase):
         bench = next(r for r in result["lines"] if r["exercise_id"] == "db_bench_press")
         self.assertNotIn("unavailable", bench["rationale"])
 
+    def test_lighter_over_cap_work_keeps_the_older_estimate(self):
+        self.log_session("2026-10-05")
+        self.log_session("2026-10-12", bench=15, bench_reps=15, rpe=5)
+        observed = stats.e1rm_series(self.root)["observations"]["db_bench_press"][-1]
+        self.assertEqual((observed["reason"], observed["context"]["kind"]), ("over_rep_cap", "normal"))
+        flags, row = self.next_week_bench(22.5, 10, 8)
+        self.assertNotIn("unearned_load", flags)
+        self.assertIsNone(row["model_evidence"]["reason"])
+        self.assertEqual(row["model_evidence"]["estimate"]["e1rm"], 31.5)
+        self.assertNotIn("unavailable", row["model_evidence"]["message"])
+
     def test_every_prescription_check_line_carries_its_model_evidence(self):
         self.log_session("2026-10-05")
         flags, row = self.next_week_bench(22.5, 10, 8)
@@ -452,6 +463,24 @@ class CapacityEvidenceTest(NoHevyCase):
         notes, _, _ = self.card_and_progress()
         self.assertEqual(notes, [f"{name} (2026-10-12): light week, kept in the log and left out of e1RM changes"
                                  for name in ("Back Squat (Barbell)", "Bench Press (Dumbbell)")])
+
+    def test_notes_name_return_and_reduced_work_plainly(self):
+        for kind, wording in (("return", "return week"), ("reduced", "reduced by an override")):
+            with self.subTest(kind=kind):
+                observation = {"comparable": False, "load_mode": "per_hand_x2", "reason": "recovery_context",
+                               "context": {"kind": kind}}
+                self.assertEqual(stats.capacity_note(observation),
+                                 f"{wording}, kept in the log and left out of e1RM changes")
+
+    def test_progress_notes_only_recent_exposures(self):
+        from coach import pages
+
+        self.log_session("2026-10-05")
+        self.log_session("2026-10-12", bench=25, rpe=6)
+        for day, shown in ((8, True), (9, False)):
+            with self.subTest(day=day):
+                progress = pages.render_progress(self.root, datetime(2026, 11, day, 19, tzinfo=timezone.utc))
+                self.assertEqual("more than 12 reps from failure" in progress, shown)
 
     def test_progress_without_an_e1rm_says_where_one_comes_from(self):
         from coach import pages

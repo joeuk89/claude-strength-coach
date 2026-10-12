@@ -234,8 +234,9 @@ e1RM came from longer sets than the prescription. `unearned_load` or
   over-cap observations with an explicit unavailable-estimate reason.
   Compare e1RMs from ordinary exposures only; light-week, return-week and
   reduced work stays visible without becoming a strength loss. A newer
-  over-cap exposure of ordinary or return-week work makes an older
-  estimate unavailable as a progression veto, while the other
+  over-cap exposure of ordinary or return-week work, at or above the load
+  behind an older estimate, makes that estimate unavailable as a
+  progression veto, while the other
   prescription guards remain active. These are model-use policies, not
   physiological thresholds established by Reynolds or Halperin.
 - Before lowering a deadlift or other hinge load for `unearned_load` or

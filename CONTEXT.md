@@ -75,7 +75,11 @@ An e1RM from an exposure of ordinary training whose sets fall within the
 reps-to-failure cap. Only comparable e1RMs feed a lift's best e1RM, its
 change and a priority lift's e1RM KPI; light-week, return-week and
 reduced work stays in the log beside them without counting as a loss.
-_Avoid_: capacity evidence, model evidence
+
+**Model evidence**:
+The comparable e1RM that limits a prescription's load, or the reason none
+does: no comparable e1RM in the window, or newer over-cap work at or above
+the load behind it.
 
 **Validity window**:
 How long an exercise's newest exposure keeps its prescription current:

@@ -634,13 +634,13 @@ def render_progress(root, as_of, view=None):
 
 
 def _lifts_table(view):
+    cutoff = (view.today - timedelta(days=CHANGE_DAYS)).isoformat()
     notes = [f"- {view.name(exercise_id)} ({observed[-1]['date']}): {note}"
              for exercise_id, observed in view.capacity["observations"].items()
-             if (note := stats.capacity_note(observed[-1]))]
+             if observed[-1]["date"] > cutoff and (note := stats.capacity_note(observed[-1]))]
     notes = ["", "e1RM notes:"] + notes if notes else []
     if not view.series:
         return ["No e1RM yet: it comes from logged working sets of barbell, dumbbell and machine lifts."] + notes
-    cutoff = (view.today - timedelta(days=CHANGE_DAYS)).isoformat()
     rows = [_row(["Lift", f"Best e1RM ({view.unit})", "Date", "Latest", f"{CHANGE_DAYS}-day change"]),
             "|---|---|---|---|---|"]
     for exercise_id, points in sorted(view.series.items(), key=lambda pair: view.name(pair[0])):
