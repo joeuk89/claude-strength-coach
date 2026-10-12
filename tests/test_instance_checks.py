@@ -1,14 +1,17 @@
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 
-from coach import overlay
+from coach import load_statements, overlay
+from coach.library import Library
 from coach.checks import instance
 from tests.support import INSTANCES, REPO_ROOT, VALID, run_cli, run_module
+from tests.support.load_statements import LOAD_STATEMENTS
 
 NOW = {"COACH_NOW": "2026-10-11T18:00:00Z"}
 OVERLAY = "data/overlays/2026-10-12-weekly.json"
@@ -376,6 +379,96 @@ class EnvUntrackedTest(unittest.TestCase):
 
 
 class BareHevyValuesTest(unittest.TestCase):
+    def test_equipment_and_other_exercises_are_not_dumbbell_prescriptions(self):
+        examples = (
+            "Home only: adjustable dumbbells, 2–20 kg per hand in 2 kg steps.",
+            "dumbbells 5–40 kg per hand in 2.5 kg steps. Plates down to 1.25 kg",
+            "cables and dumbbells to 30 kg.",
+            "Next block: the 20 kg dumbbell is the heaviest she has. Goal plan current: 1.9 kg to 73 kg.",
+            "dumbbell Romanian deadlift 20/hand × 10–12, leg curl 25 kg × 15, "
+            "assisted pull-up 6s at 50 kg assistance.",
+            "Dumbbells go up in 2.5 kg at the gym.",
+            "Lateral raise at 15 lb fell short: the 5 lb cable step is a third of the load.",
+            "Lateral raise on the cable machine: 10 kg.",
+            "dumbbells up to 30 kg per hand.",
+            "DB bench 20 kg per hand, leg curl 25 kg.",
+        )
+        for text in examples:
+            with self.subTest(text=text), TempCopy() as tmp:
+                config = (tmp.root / "config.toml").read_text()
+                tmp.write("config.toml", config.replace("enabled = true", "enabled = false", 1))
+                tmp.write("profile.md", text)
+                code, results, _ = check(tmp.root, "bare_hevy_values")
+                self.assertEqual(code, 0, failures(results, "bare_hevy_values"))
+
+    def test_each_prose_line_flags_exactly_its_bare_dumbbell_loads(self):
+        with TempCopy() as tmp:
+            tmp.write("profile.md", "\n".join(line for line, _ in LOAD_STATEMENTS) + "\n")
+            _, results, _ = check(tmp.root, "bare_hevy_values")
+        reported = {}
+        for row in failures(results, "bare_hevy_values"):
+            number, listed, exercise = re.match(
+                r"profile\.md line (\d+): (.*?) for (.*?) (?:is a|are) bare dumbbell", row["message"]).groups()
+            reported.setdefault(int(number), {})[exercise] = ", ".join(re.findall(r"'([^']*)'", listed))
+        for number, (line, flagged) in enumerate(LOAD_STATEMENTS, start=1):
+            with self.subTest(line=line):
+                self.assertEqual(reported.get(number, {}), flagged)
+
+    def test_measurement_exemption_does_not_hide_a_later_prescription(self):
+        with TempCopy() as tmp:
+            tmp.edit_overlay(lambda doc: db_bench(doc).update(target_note="bodyweight 73 kg and move to 8 kg"))
+            code, results, _ = check(tmp.root, "bare_hevy_values")
+            self.assertEqual(code, 1)
+            [failed] = failures(results, "bare_hevy_values")
+            self.assertIn(": '8 kg' for db_bench_press", failed["message"])
+
+    def test_confirmed_per_hand_goblet_load_fails_without_hevy_requirement(self):
+        with TempCopy() as tmp:
+            tmp.edit_json("data/exercises.json", lambda d: d["exercises"].update(
+                goblet_squat={"load_mode": "per_hand_x2"}))
+            config = (tmp.root / "config.toml").read_text()
+            tmp.write("config.toml", config.replace("enabled = true", "enabled = false", 1))
+            tmp.write("profile.md", "goblet squat 20 kg")
+            code, results, _ = check(tmp.root, "bare_hevy_values")
+            self.assertEqual(code, 1)
+            [failed] = failures(results, "bare_hevy_values")
+            self.assertIn("per-hand", failed["message"])
+            self.assertNotIn("Hevy", failed["message"])
+
+    def test_hevy_on_diagnostic_shows_both_numbers_first(self):
+        with TempCopy() as tmp:
+            tmp.write("profile.md", "DB bench 20 kg")
+            _, results, _ = check(tmp.root, "bare_hevy_values")
+            [failed] = failures(results, "bare_hevy_values")
+            message = failed["message"]
+            self.assertLess(message.index("25/hand (Hevy: 50)"), message.index("25 kg per hand"))
+
+    def test_a_missing_config_still_checks_with_per_hand_wording(self):
+        with TempCopy() as tmp:
+            (tmp.root / "config.toml").unlink()
+            tmp.write("profile.md", "DB bench 20 kg")
+            code, results, _ = check(tmp.root, "bare_hevy_values")
+            self.assertEqual(code, 1, results)
+            [failed] = failures(results, "bare_hevy_values")
+            self.assertIn("'20 kg' for db_bench_press", failed["message"])
+            self.assertIn("per-hand", failed["message"])
+            self.assertNotIn("Hevy", failed["message"])
+
+    def test_overlay_ignores_measurements_but_still_checks_its_load(self):
+        with TempCopy() as tmp:
+            tmp.edit_overlay(lambda doc: db_bench(doc).update(
+                target_note="bodyweight 73 kg; dumbbells up to 30 kg; move to 8 kg"))
+            _, results, _ = check(tmp.root, "bare_hevy_values")
+            [failed] = failures(results, "bare_hevy_values")
+            self.assertIn(": '8 kg' for db_bench_press", failed["message"])
+
+    def test_per_hand_only_passes_with_hevy_enabled(self):
+        with TempCopy() as tmp:
+            tmp.write("profile.md", "DB bench 20 kg per hand.")
+            tmp.edit_overlay(lambda doc: db_bench(doc).update(target_note="move to 20 kg per hand"))
+            code, results, _ = check(tmp.root, "bare_hevy_values")
+            self.assertEqual(code, 0, failures(results, "bare_hevy_values"))
+
     def test_two_number_form_passes(self):
         with TempCopy() as tmp:
             tmp.edit_overlay(lambda doc: db_bench(doc).update(target_note="go to 25/hand (Hevy: 50)"))
@@ -474,6 +567,26 @@ class LoadFigureTest(unittest.TestCase):
     def test_figures(self):
         cases = {
             "go to 50 kg": ["50 kg"],
+            "dumbbells go up in 2.5 kg": [],
+            "move dumbbells to 8 kg": ["8 kg"],
+            "dumbbells up to 30 kg; move to 8 kg": ["8 kg"],
+            "equipment has 2.5 kg steps; add 2.5 kg": ["2.5 kg"],
+            "the cable step is 5 kg and move to 8 kg": ["8 kg"],
+            "bodyweight 73 kg; move to 8 kg": ["8 kg"],
+            "bodyweight 73 kg and move to 8 kg": ["8 kg"],
+            "bodyweight 73 or 74 kg": [],
+            "bodyweight 73 or 74 kg; move to 8 kg": ["8 kg"],
+            "bodyweight fell 2 kg; move to 8 kg per hand": [],
+            "bodyweight dropped by 2 kg and move to 8 kg": ["8 kg"],
+            "bodyweight went from 75 kg to 73 kg and move to 8 kg": ["8 kg"],
+            "bodyweight was 75 kg and now 73 kg; move to 8 kg per hand": [],
+            "bodyweight 75 → 73 and move to 8 kg": ["8 kg"],
+            "bodyweight stable and move to 8 kg": ["8 kg"],
+            "Goal plan current: 1.9 kg to 73 kg and move to 8 kg": ["8 kg"],
+            "cables and dumbbells to 30 kg.": [],
+            "move cables and dumbbells to 8 kg": ["8 kg"],
+            "Next block: the 20 kg dumbbell is the heaviest she has.": [],
+            "plates down to 1.25 kg": [],
             "go to 25/hand (Hevy: 50)": [],
             "22.5 → 25/hand": [],
             "45 → 50": ["45", "50"],
@@ -484,6 +597,13 @@ class LoadFigureTest(unittest.TestCase):
             "add 2.5 kg": ["2.5 kg"],
             "25 kg each": [],
             "25 lb per hand": [],
+            "move to 8 kg in each hand": [],
+            "move to 8 kg in both hands": [],
+            "move to 8 kg per arm": [],
+            "move to 8 kg a side": [],
+            "move to 8 kg per dumbbell": [],
+            "a pair of 8 kg dumbbells": [],
+            "the 8 kg DBs": [],
             "25 (Hevy: 50)": [],
             "Hevy: 50": [],
             "on 2026-10-11": [],
@@ -492,6 +612,24 @@ class LoadFigureTest(unittest.TestCase):
         for text, expected in cases.items():
             with self.subTest(text):
                 self.assertEqual(self.bare(text), expected)
+
+    def test_statements_keep_load_instructions_with_their_exercise(self):
+        cases = {
+            "DB bench 20/hand, then move to 22.5 kg. Leg curl 25 kg":
+                ["DB bench 20/hand, then move to 22.5 kg", " Leg curl 25 kg"],
+            "DB bench 20/hand, and leg curl 25 kg": ["DB bench 20/hand", " leg curl 25 kg"],
+            "Arnold press, bodyweight 73 kg, move to 15 kg": ["Arnold press, bodyweight 73 kg, move to 15 kg"],
+            "DB bench 3x10, keeping 20 kg": ["DB bench 3x10, keeping 20 kg"],
+            "DB bench 20/hand or leg curl 25 kg": ["DB bench 20/hand ", " leg curl 25 kg"],
+            "DB bench 20/hand. If leg curl 25 kg moves fast, go heavier.":
+                ["DB bench 20/hand", " If leg curl 25 kg moves fast, go heavier"],
+            "DB bench 20/hand. Sled 100 kg.": ["DB bench 20/hand", " Sled 100 kg"],
+            "DB bench, tempo 3-1-1, rest 90 s, 22 kg": ["DB bench, tempo 3-1-1, rest 90 s, 22 kg"],
+        }
+        mentions = load_statements.Mentions(Library())
+        for text, expected in cases.items():
+            with self.subTest(text):
+                self.assertEqual([s for s in mentions.statements(text) if s.strip()], expected)
 
     def test_load_column_cells(self):
         self.assertEqual(self.bare("45", load_column=True), ["45"])

@@ -82,6 +82,7 @@ coach/                       # framework: synced to instances
   nutrition.py               # nutrition config, readings, status                        (R-33a)
   protein.py                 # protein reference mass, floor, target, stretch            (R-33a)
   calories.py                # no-app starting calorie estimate per phase                (R-33a)
+  load_statements.py         # load figures, statements, exercise mentions, diagnostics  (R-16)
   recipes.py                 # recipe cards, index, import                               (R-33b)
   meals.py                   # meal plans, shopping list                                 (R-33c)
   log.py, sheets.py          # manual log and session sheets                             (R-40c)
@@ -1330,32 +1331,92 @@ JSONPath or line, and the offending value.
 | `overlay_library_consistency` | span not ended | a line's `load_mode` differs from the confirmed one (unconfirmed is `load_modes_confirmed`'s), or its `hevy_template_id` is not one of the entry's | no such overlay; invalid library |
 | `load_caps` | span not ended | a set's load is above the C22 cap: `[caps]` id first (per hand for per-hand modes, total otherwise), else `dumbbell_max` of the session's location for per-hand modes | no such overlay |
 | `env_untracked` | — | `.env` is tracked, or exists and is not ignored (warn when absent and not ignored) | not a git working tree; no git |
-| `bare_hevy_values` | span not ended | a `per_hand_x2` load figure is not in the two-number form (below) | — |
+| `bare_hevy_values` | span not ended | a `per_hand_x2` prescription load figure lacks explicit per-hand or Hevy wording (below) | — |
 | `render_fresh_sweep` | — | see C11 "The sweep" | — |
 
-**Bare Hevy values.** A load figure is a number with a weight unit
-(`50 kg`), a number in a table column whose header says load, weight, kg
-or lb (and not Hevy), or a number in an arrow chain (`45 → 50`). It is
-in the two-number form when it, or another figure in its chain, says per
-hand (`/hand`, `per hand`, `each`) or gives the Hevy value (`(Hevy: 50)`).
-In a table, a figure is also in the two-number form when its column
-header says per hand (`Per hand (kg)`, `Load/hand (kg)`), when it sits
-in a Hevy-headed column, or, in a load column, when the same row has a
-number in a Hevy-headed column (`| DB bench press | 25 | 50 |` under
-`| Exercise | Per hand (kg) | Hevy (kg) |`). Ranges, dates, sets × reps,
-RPE, durations and distances are not load figures. The check reads a
-`per_hand_x2` overlay line's `target_note`, `change`, `cues`, `focus`
-and `override.reason`, and the prose of `profile.md` and
-`check-ins/*.md` outside rendered regions. In prose a figure belongs to
-the nearest exercise named before it on its line, and to no exercise
-when none is. A table row's figures belong to the exercise named before
-them on the row, else to the exercise in the row's exercise cell (the
-column headed exercise, lift or movement, else the first). A row whose
-exercise cell is empty continues the row above and takes its exercise;
-a row whose exercise cell names nothing the library knows has none.
-Library names, aliases, Hevy titles and ids name exercises, and
-"dumbbell" or "DB" alone means `per_hand_x2`. Only `per_hand_x2`
-figures can be bare: a single implement's two numbers match.
+**Bare Hevy values.** A prescription load figure is a number with a
+weight unit (`50 kg`), a number in a table column whose header says
+load, weight, kg or lb (and not Hevy), or a number in an arrow chain
+(`45 → 50`). Its interpretation is explicit when it, or another figure
+in its chain, says per hand (`/hand`, `per hand`, `each`, `in each
+hand`, `in both hands`, `per arm`, `per side`, `per dumbbell`), weighs a
+dumbbell (`a pair of 12 kg dumbbells`, `the 24 kg DBs`), or gives the
+Hevy value (`(Hevy: 50)`). Per-hand-only wording is valid whether Hevy
+is enabled or disabled. With Hevy enabled, diagnostics show the
+two-number form first and per-hand wording as the minimum; with Hevy
+disabled, or without a readable `config.toml`, they request per-hand
+wording only.
+In a table, a figure is also explicit when its column header says per
+hand (`Per hand (kg)`, `Load/hand (kg)`), when it sits in a Hevy-headed
+column, or, in a load column, when the same row has a number in a
+Hevy-headed column. Ranges, dates, sets × reps, RPE, durations,
+distances, equipment increments and capacities (`100 kg capacity`, or
+`up to 30 kg` under an `Equipment:` or `Kit:` label) and bodyweight
+measurements (`bodyweight`, `goal weight`, `weighed`) are not
+prescription loads. An excluded measurement covers only its own figures;
+a later instruction in the same sentence is still checked. Measurement
+subjects include changes (`bodyweight fell 2 kg`) and numeric
+continuations (`bodyweight went from 75 kg to 73 kg`); their verbs do
+not change which figures they describe. Equipment
+capacity descriptions follow the same rules in profiles, overlay text
+and override reasons.
+
+The check reads a `per_hand_x2` overlay line's `target_note`, `change`,
+`cues`, `focus` and `override.reason`, and the prose of `profile.md` and
+`check-ins/*.md` outside rendered regions. Overlay text and override
+authoring use the same load-figure parser.
+
+Free prose fails safe: a figure is reported only when one dumbbell
+exercise unambiguously owns it. A figure belongs to an exercise named
+before it in its statement. Punctuation and conjunctions (`and`, `but`,
+`or`, `then`, `plus`, `while`, `whereas`, alone or combined, as in `,
+and then`) end a clause. A clause continues the statement before it,
+across commas, conjunctions and sentence ends, only when every word
+before its first load, outside a bodyweight measurement, is
+prescription wording: sets, reps, RPE, rest, tempo, warm-ups, load
+instructions and conditions (`, 3x12 @ 14 kg`, `, keeping 20 kg`,
+`, rest 90 s, 22 kg`, `. If fresh, 22 kg`, `. Go heavier: 16 kg`,
+`, next week 22.5 kg`). Any other clause starts a new statement (`and
+leg curl 25 kg`, `. Sled 100 kg`, `. Dumbbells at home go up to 24
+kg`), and when it names no exercise its figures are not checked.
+
+Library names, aliases, Hevy titles and ids identify exercises, and so
+does an entry's name without its parenthetical equipment (`Lateral Raise
+(Cable)` gives `lateral raise`). Hyphens and spaces match each other,
+`DB` and `dumbbells` are spellings of `dumbbell`, and a final plural
+matches (`DB step-ups`, `DB curls`). A phrase also matches every variant
+of the movement it names. An entry that lists the phrase as its own
+name, alias, Hevy title or id owns it; a phrase only derived for
+variants with different load modes is ambiguous and is not checked.
+Equipment inside the matched phrase picks among the variants (`DB RDL`
+finds the dumbbell RDL, `cable lateral raise` the cable one); equipment
+elsewhere in the statement never picks a dumbbell variant (`RDL with
+dumbbells 30 kg` and `Bench press 80 kg, dumbbells for accessories`
+keep the barbell entries that own `RDL` and `bench press`). A dumbbell
+word followed by movement words the library uses names a `per_hand_x2`
+exercise when no entry matches (`DB incline press 22 kg`) or every
+entry it matches uses other equipment (`DB split squat`, `dumbbell
+deadlift`); a dumbbell entry the library knows resolves through it
+(`DB row` is a single implement). A dumbbell word with no movement
+after it (`dumbbells up to 30 kg`) names no exercise. A `per_hand_x2`
+exercise is checked only when its statement names no equipment other
+than dumbbells. Barbells, cables, machines, kettlebells, bands, a
+landmine, a vest, plates, a sandbag, a backpack, a medicine ball or
+assistance anywhere in the statement make it ambiguous, and it is not
+checked (`barbell lunges 40 kg`, `lunges with a 10 kg vest`, `lateral
+raise 10 kg on the cable machine`, `Arnold press 20 kg on the machine
+days`). Equipment inside a bodyweight measurement does not count, and
+`bodyweight` itself is a measurement word, not equipment (`Arnold press
+20 kg with bodyweight stable` is checked). A mention the library cannot
+resolve to one mode is not checked. No library load modes are changed
+to interpret prose.
+
+A table row's figures belong to the exercise named before them on the
+row, else to the exercise in the row's exercise cell (the column headed
+exercise, lift or movement, else the first). A row whose exercise cell
+is empty continues the row above and takes its exercise; a row whose
+exercise cell names nothing the library knows has none. Only
+`per_hand_x2` figures can be bare: a single implement's two numbers match.
 
 ## C14. Shared test fixture ids
 
@@ -2875,7 +2936,9 @@ id follows C10. `data.lines_digest` (R-21b) is the C7 canonical hash of
 
 - `propose override --proposal ID --session S --exercise E (--sets SPEC | --load N) --reason TEXT [--standing [--until D]]`
   changes one line, keeps the original in the line's C10 `override.proposed_sets`,
-  and records a C25 decision when standing.
+  and records a C25 decision when standing. For a `per_hand_x2` line,
+  its reason must pass C13 load-statement validation before any proposal
+  or decision artifact changes; ambiguous load prose exits 1.
 - `propose resolve --proposal ID --flag INDEX --resolution TEXT` resolves
   one flag on the draft. It refuses (exit 3) a `load_mode_unconfirmed`
   flag, which only a confirmed load mode clears.

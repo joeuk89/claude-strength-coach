@@ -25,13 +25,12 @@ from coach.config import equipment_for
 from coach.errors import ConfigError, ValidationError
 from coach.hevy.cache import HevyCache
 from coach.library import Library
+from coach.load_statements import PER_HAND_X2, Mentions, bare_figures, bare_message
 
 OWNER = "R-16"
 PATHS_KEY = "x-coach-paths"
-PER_HAND_X2 = "per_hand_x2"
 SNAPSHOT_KINDS = ("cardio",)
 OVERLAY_TEXT_FIELDS = ("target_note", "change", "cues", "focus")
-TWO_NUMBER_EXAMPLE = "25/hand (Hevy: 50)"
 MIGRATE_RUN = "run python3 -m coach migrate run"
 REBUILD_HEVY_CACHE = "rebuild the cache with python3 -m coach hevy pull --full"
 FRAMEWORK_SYNC_MARKER = ".claude/framework-sync.json"
@@ -338,90 +337,6 @@ def env_untracked(ctx):
     return [Result("pass", ".env is untracked and ignored by git.", where)]
 
 
-@dataclass(frozen=True)
-class Figure:
-    text: str
-    start: int
-    end: int
-    unit: bool
-    two_number: bool
-    rpe: bool
-
-
-_NUMBER = re.compile(r"(?<![\w.])\d+(?:\.\d+)?(?!\d)")
-_RANGE_OR_DATE_BEFORE = re.compile(r"\d\s*[-–—]\s*$|\d:$")
-_RANGE_OR_DATE_AFTER = re.compile(r"\s*[-–—]\s*\d|:\d")
-_SETS_BY_REPS_BEFORE = re.compile(r"\d\s*[×xX*]\s*$")
-_SETS_BY_REPS_AFTER = re.compile(r"\s*[×xX*]\s*\d")
-_EXPLICIT_HEVY_BEFORE = re.compile(r"hevy\s*[:=]?\s*$", re.IGNORECASE)
-_RPE_BEFORE = re.compile(r"(?:rpe|rir)\s*[:@]?\s*$", re.IGNORECASE)
-_NOT_A_LOAD_AFTER = re.compile(
-    r"\s*(?:%|(?:reps?|sets?|s|secs?|seconds?|mins?|minutes?|h|hrs?|hours?|days?|weeks?|wks?|m|km|cm|mm|kcal|g)"
-    r"(?![A-Za-z]))",
-    re.IGNORECASE,
-)
-_UNIT_AFTER = re.compile(r"\s*(?:kgs?|lbs?|kilos?|pounds?)(?![A-Za-z])", re.IGNORECASE)
-_PER_HAND_AFTER = re.compile(r"\s*(?:/\s*hand|per\s+hand|each\s+hand|a\s+hand|each)(?![A-Za-z])", re.IGNORECASE)
-_HEVY_AFTER = re.compile(r"\s*\(\s*hevy\b[^)]*\)", re.IGNORECASE)
-_ARROW = re.compile(r"\s*(?:→|->|=>|⇒)\s*")
-
-
-def _figures(text):
-    figures = []
-    for match in _NUMBER.finditer(text):
-        before, after = text[:match.start()], text[match.end():]
-        if (_RANGE_OR_DATE_BEFORE.search(before) or _RANGE_OR_DATE_AFTER.match(after)
-                or _SETS_BY_REPS_BEFORE.search(before) or _SETS_BY_REPS_AFTER.match(after)
-                or _EXPLICIT_HEVY_BEFORE.search(before) or _NOT_A_LOAD_AFTER.match(after)):
-            continue
-        end = match.end()
-        unit = _UNIT_AFTER.match(text, end)
-        if unit:
-            end = unit.end()
-        text_end = end
-        hand = _PER_HAND_AFTER.match(text, end)
-        if hand:
-            end = hand.end()
-        hevy = _HEVY_AFTER.match(text, end)
-        if hevy:
-            end = hevy.end()
-        figures.append(Figure(text=text[match.start():text_end], start=match.start(), end=end, unit=bool(unit),
-                              two_number=bool(hand or hevy), rpe=bool(_RPE_BEFORE.search(before))))
-    return figures
-
-
-def _chains(text, figures):
-    chains = []
-    for figure in figures:
-        if chains and _ARROW.fullmatch(text[chains[-1][-1].end:figure.start]):
-            chains[-1].append(figure)
-        else:
-            chains.append([figure])
-    return chains
-
-
-def bare_figures(text, load_column=False):
-    """The load figures in `text` that, for a two-dumbbell exercise, give one number where two are needed.
-
-    A load figure carries a weight unit, sits in a load column, or is part
-    of an arrow chain (`45 → 50`). It is in the two-number form when it, or
-    another figure in its chain, says per hand or gives the Hevy value.
-    """
-    bare = []
-    for chain in _chains(text, _figures(text)):
-        if any(f.two_number or f.rpe for f in chain):
-            continue
-        bare += [f for f in chain if f.unit or load_column or len(chain) > 1]
-    return bare
-
-
-def _bare_message(rel, where, figures, exercise, text):
-    listed = ", ".join(repr(figure.text) for figure in figures)
-    what = "is a bare dumbbell number" if len(figures) == 1 else "are bare dumbbell numbers"
-    return (f"{rel} {where}: {listed} for {exercise} {what} in {text.strip()!r}; "
-            f"write the per-hand load and the Hevy value, as in {TWO_NUMBER_EXAMPLE}")
-
-
 def _overlay_text(line):
     for field in OVERLAY_TEXT_FIELDS:
         if line.get(field):
@@ -430,36 +345,20 @@ def _overlay_text(line):
         yield "override.reason", line["override"]["reason"]
 
 
-class _Mentions:
-    """Finds exercise names in prose and the load mode each one implies."""
-
-    _GENERIC = {"dumbbell": PER_HAND_X2, "dumbbells": PER_HAND_X2, "db": PER_HAND_X2, "dbs": PER_HAND_X2}
-
-    def __init__(self, lib):
-        modes = {}
-        for entry in lib.entries():
-            mode = entry["effective_load_mode"] or entry["load_mode_default"]
-            for phrase in (entry["name"], *entry["aliases"], *entry["hevy_titles"], entry["id"]):
-                modes.setdefault(self._key(phrase), (entry["id"], mode))
-        for word, mode in self._GENERIC.items():
-            modes.setdefault(word, (word, mode))
-        self._modes = modes
-        alternatives = sorted(modes, key=len, reverse=True)
-        body = "|".join(r"\s+".join(re.escape(token) for token in phrase.split()) for phrase in alternatives)
-        self._pattern = re.compile(rf"(?<![A-Za-z0-9_])(?:{body})(?![A-Za-z0-9_])", re.IGNORECASE)
-
-    @staticmethod
-    def _key(phrase):
-        return " ".join(phrase.lower().split())
-
-    def find(self, text):
-        """[(start, end, exercise, mode)] in order."""
-        return [(m.start(), m.end(), *self._modes[self._key(m.group(0))]) for m in self._pattern.finditer(text)]
-
-
 def _attribute(position, mentions, carried):
     before = [m for m in mentions if m[1] <= position]
     return before[-1] if before else carried
+
+
+def _bare_results(rel, number, text, positioned, mentions, carried, hevy_enabled):
+    """A failure per per-hand exercise owning any of `positioned`, given as [(figure, offset in text)]."""
+    bare = {}
+    for figure, position in positioned:
+        mention = _attribute(position, mentions, carried)
+        if mention and mention[3] == PER_HAND_X2:
+            bare.setdefault(mention[2], []).append(figure)
+    return [Result("fail", bare_message(rel, f"line {number}", listed, exercise, text, hevy_enabled), rel)
+            for exercise, listed in bare.items()]
 
 
 _REGION = re.compile(r"<!-- coach:begin ([a-z-]+) (\S+) -->.*?<!-- coach:end \1 \2 -->", re.DOTALL)
@@ -511,7 +410,7 @@ def _row_figures(line, table):
     return found
 
 
-def _prose_results(rel, text, mentions):
+def _prose_results(rel, text, mentions, hevy_enabled):
     results = []
     lines = _without_regions(text).split("\n")
     table, carried = None, None
@@ -527,26 +426,22 @@ def _prose_results(rel, text, mentions):
                 table = _Table.from_header(line)
                 continue
             table = _Table()
+        if not is_row:
+            for statement in mentions.statements(line):
+                positioned = [(figure, figure.start) for figure in bare_figures(statement)]
+                results += _bare_results(rel, number, statement, positioned, mentions.find(statement), None,
+                                         hevy_enabled)
+            continue
         found = mentions.find(line)
-        if is_row:
-            cells = _cells(line)
-            name_cell = ""
-            if table.exercise < len(cells):
-                a, b = cells[table.exercise]
-                name_cell = line[a + 1:b]
-            if name_cell.strip():
-                named = mentions.find(name_cell)
-                carried = named[-1] if named else None
-            figures = _row_figures(line, table)
-        else:
-            figures = [(f, f.start) for f in bare_figures(line)]
-        bare = {}
-        for figure, position in figures:
-            mention = _attribute(position, found, carried if is_row else None)
-            if mention and mention[3] == PER_HAND_X2:
-                bare.setdefault(mention[2], []).append(figure)
-        for exercise, listed in bare.items():
-            results.append(Result("fail", _bare_message(rel, f"line {number}", listed, exercise, line), rel))
+        cells = _cells(line)
+        name_cell = ""
+        if table.exercise < len(cells):
+            a, b = cells[table.exercise]
+            name_cell = line[a + 1:b]
+        if name_cell.strip():
+            named = mentions.find(name_cell)
+            carried = named[-1] if named else None
+        results += _bare_results(rel, number, line, _row_figures(line, table), found, carried, hevy_enabled)
     return results
 
 
@@ -561,6 +456,10 @@ def _prose_files(ctx):
 @check(id="bare_hevy_values", owner=OWNER)
 def bare_hevy_values(ctx):
     results = []
+    try:
+        hevy_enabled = ctx.config.hevy.enabled
+    except ConfigError:
+        hevy_enabled = False
     for rel, doc in _overlays(ctx, live_only=True):
         for where, session, line in _lines(doc):
             if line["load_mode"] != PER_HAND_X2:
@@ -568,13 +467,13 @@ def bare_hevy_values(ctx):
             for field, text in _overlay_text(line):
                 figures = bare_figures(text)
                 if figures:
-                    results.append(Result("fail", _bare_message(rel, f"{where}.{field}", figures,
-                                                                line["exercise_id"], text), rel))
+                    results.append(Result("fail", bare_message(rel, f"{where}.{field}", figures,
+                                                               line["exercise_id"], text, hevy_enabled), rel))
     prose = _prose_files(ctx)
     if prose:
-        mentions = _Mentions(_library(ctx) or Library())
+        mentions = Mentions(_library(ctx) or Library())
         for path in prose:
-            results += _prose_results(_rel(ctx, path), path.read_text(encoding="utf-8"), mentions)
+            results += _prose_results(_rel(ctx, path), path.read_text(encoding="utf-8"), mentions, hevy_enabled)
     return results
 
 

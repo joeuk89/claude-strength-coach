@@ -16,6 +16,7 @@ from unittest import mock
 from coach import checks, hooks
 from tests.support import INSTANCES, REPO_ROOT, VALID, run_cli
 from tests.support.git import git
+from tests.support.load_statements import LOAD_STATEMENTS
 
 NOW = "2026-10-11T18:00:00Z"
 ENV = {"COACH_NOW": NOW}
@@ -219,6 +220,35 @@ class SessionStartTest(unittest.TestCase):
 
 
 class PostToolUseTest(unittest.TestCase):
+    def test_profile_lines_without_a_bare_dumbbell_load_do_not_block(self):
+        root = copy_of(self, VALID)
+        profile = root / "profile.md"
+        profile.write_text("\n".join(line for line, flagged in LOAD_STATEMENTS if not flagged) + "\n",
+                           encoding="utf-8")
+        code, response, _ = run_hook("posttooluse", root, edit_input(profile))
+        self.assertEqual((code, response), (0, None))
+
+    def test_profile_lines_with_a_bare_dumbbell_load_block_for_each_one(self):
+        root = copy_of(self, VALID)
+        profile = root / "profile.md"
+        flagging = [(line, flagged) for line, flagged in LOAD_STATEMENTS if flagged]
+        profile.write_text("\n".join(line for line, _ in flagging) + "\n", encoding="utf-8")
+        code, response, _ = run_hook("posttooluse", root, edit_input(profile))
+        self.assertEqual(code, 0)
+        self.assertEqual(response["decision"], "block")
+        shown = response["reason"].count("bare_hevy_values: ")
+        more = re.search(r"and (\d+) more \(python3 -m coach check\)", response["reason"])
+        self.assertEqual(shown + (int(more.group(1)) if more else 0), sum(len(f) for _, f in flagging))
+
+    def test_equipment_profile_write_does_not_block(self):
+        root = copy_of(self, VALID)
+        profile = root / "profile.md"
+        profile.write_text("Home only: adjustable dumbbells, 2–20 kg per hand in 2 kg steps.\n"
+                           "dumbbells 5–40 kg per hand in 2.5 kg steps. Plates down to 1.25 kg\n"
+                           "cables and dumbbells to 30 kg.\n", encoding="utf-8")
+        code, response, _ = run_hook("posttooluse", root, edit_input(profile))
+        self.assertEqual((code, response), (0, None))
+
     def test_hand_edited_routine_page_blocks_naming_the_check(self):
         root = copy_of(self, STALE)
         code, response, _ = run_hook("posttooluse", root, edit_input(root / "routine" / "session-a.md"))
