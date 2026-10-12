@@ -458,8 +458,8 @@ class WavePipelineCase(ProposeCase):
     def state(self):
         return read_json(self.root / "data" / "state.json")["scheme_state"].get(SLOT)
 
-    def approve(self, week, now):
-        data = self.propose(week=week, env={"COACH_NOW": now})
+    def approve(self, week, now, *extra):
+        data = self.propose(*extra, week=week, env={"COACH_NOW": now})
         self.coach("propose", "finalize", "--proposal", data["id"], env={"COACH_NOW": now})
         self.coach("overlay", "approve", data["id"], env={"COACH_NOW": now})
         return data
@@ -546,6 +546,18 @@ class WavePipelineTest(WavePipelineCase):
         self.assertNotIn("as many reps", rationale)
         self.assertIn("no + set this week", rationale)
 
+    def test_a_light_or_deload_week_explains_the_cut_by_the_week_not_by_the_wave(self):
+        """Each overlay is created after the fixture's, so the brief reads it."""
+        for transform, reason, now in (("light", "light week", "2026-10-11T19:00:00Z"),
+                                       ("standard", "deload week", "2026-10-11T20:00:00Z")):
+            with self.subTest(transform=transform):
+                data = self.approve("2026-W42", now, "--kind", "deload", "--transform", transform)
+                self.assertIn("Wave week", squat(data["overlay"])["target_note"])
+                text = self.coach("pages", "show", "brief", env={"COACH_NOW": now})["data"]["text"]
+                lines = [line for line in text.splitlines() if line.startswith("- Back Squat ")]
+                self.assertEqual(len(lines), 1, text)
+                self.assertTrue(lines[0].endswith(f": {reason}"), lines[0])
+
     def test_a_light_week_that_keeps_the_rep_out_set_names_its_lower_cap(self):
         self.edit_program(lambda doc: self.slot(doc, "session-a", "bb_back_squat").update(
             sets=[WAVE_GROUP, BACK_OFFS]))
@@ -631,6 +643,19 @@ class WaveOverrideTest(WavePipelineCase):
         self.assertEqual(self.state()["pending"]["data"]["training_max"], 100)
         line = squat(self.propose("--dry-run", week="2026-W43", env={"COACH_NOW": "2026-10-18T18:00:00Z"})["overlay"])
         self.assertIn("training max of 100", line["provenance"]["rationale"])
+
+    def test_the_brief_credits_an_override_to_the_coach_not_the_wave(self):
+        """The wave prescribes 65/75/85 this week; the coach's flat 60 is not the wave's doing."""
+        self.propose()
+        self.override("3x5@60", reason="synthetic: lighter while the knee settles")
+        self.coach("propose", "finalize", "--proposal", FIRST_ID)
+        self.coach("overlay", "approve", FIRST_ID)
+        self.assertIn("Wave week", squat(overlay.load(self.root, FIRST_ID))["target_note"])
+        text = self.coach("pages", "show", "brief")["data"]["text"]
+        lines = [line for line in text.splitlines() if line.startswith("- Back Squat ")]
+        self.assertEqual(len(lines), 1, text)
+        self.assertTrue(lines[0].endswith(": agreed with your coach"), lines[0])
+        self.assertNotIn("knee settles", text)
 
 
 class TrainingMaxCommandTest(WavePipelineCase):

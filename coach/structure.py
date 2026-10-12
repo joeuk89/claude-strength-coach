@@ -268,7 +268,18 @@ def _external_rows(inst, span):
     have none. One with no annotation on a planned-break day (C50) is `on_break`, not upcoming or unconfirmed; one
     the trainer cancelled is `cancelled`, which is not a planned session.
     """
-    notes = [a for a in history.external_occurrences(inst.root) if span.contains(dates.parse_date(a["date"]))]
+    return [row for row, _ in _external_pairs(inst, span)]
+
+
+def coach_led(root, span, *, today=None, now=None, as_of=None):
+    """(row, annotation or None) for each coach-led session `_external_rows` places in a span, with annotations
+    created by `as_of`; empty without a program."""
+    inst = _Instance.load(root, today, now, require_program=False)
+    return _external_pairs(inst, span, as_of) if inst.program else []
+
+
+def _external_pairs(inst, span, as_of=None):
+    notes = [a for a in history.external_occurrences(inst.root, as_of) if span.contains(dates.parse_date(a["date"]))]
     off = statusdays.break_days(inst.root, span)
     rows = []
     for external in inst.program["external_sessions"]:
@@ -300,8 +311,8 @@ def _external_rows(inst, span):
                 row["break_id"] = off[day]
             if status == history.CANCELLED:
                 row["cancellation"] = dict(note["cancellation"])
-            rows.append(row)
-    return sorted(rows, key=lambda r: (r["date"], r["external_id"]))
+            rows.append((row, note))
+    return sorted(rows, key=lambda pair: (pair[0]["date"], pair[0]["external_id"]))
 
 
 def _activity_dates(inst, until):

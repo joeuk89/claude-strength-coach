@@ -175,7 +175,8 @@ def render_week_ahead(doc, name=None, show_hevy=True):
     """
     name = name or _exercise_id
     span = doc["span"]
-    kind = doc["kind"].replace("_", " ")
+    intent = overlay.recovery_intent(doc)
+    kind = f"{intent} week" if intent else doc["kind"].replace("_", " ")
     header = f"**Overlay** `{doc['id']}` ({kind}) · {day_label(span['start'])} – {day_label(span['end'])}"
     unit = _unit(doc)
     if unit:

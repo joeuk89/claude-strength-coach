@@ -427,8 +427,9 @@ exactly what approval will write.
 _Avoid_: summary, proposal, plan preview
 
 **Brief** (this week's brief):
-The standing one-page statement of the current week: focus, sessions,
-what changed, what to watch, what to do if a day is missed. Rewritten
+The standing one-page statement of the current week: focus, the whole
+week's sessions (lifting, coach-led and activities), what changed, what
+to watch, what to do if a day is missed. Rewritten
 every programming pass; the thing the athlete reads during the week.
 _Avoid_: dashboard, summary, this-week doc
 

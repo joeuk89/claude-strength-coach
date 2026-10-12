@@ -71,6 +71,7 @@ coach/                       # framework: synced to instances
   checkin_parts/<topic>.py   # one module per item that adds card fields                 (each item)
   missed.py                  # missed-day rule matching and application                  (R-22)
   pages.py                   # brief, dashboard, progress renderers, publish             (R-25)
+  week_view.py               # the week's coach-led and activity rows, recovery Watch items (C38)
   closeout.py                # training-record commit plan for publish (C38)             (R-25)
   page_parts/__init__.py     # page part discovery                                       (R-25)
   page_parts/<topic>.py      # one module per item that adds page items                  (each item)
@@ -3360,7 +3361,12 @@ null except for a `--kind midweek` run, where it reports the guidance
 carried from the approved overlay in force (C25): `kept` rows
 (`session_id`, `date`, `exercise_id`, `overlay_id`, `fields`), `review`
 rows (the same ids and `approved`, each field with the overlay's text)
-and `focus` (`overlay_id`, `text`, `kept`, or null).
+and `focus` (`overlay_id`, `text`, `kept`, or null). `data.other_work`
+lists the span's coach-led sessions and planned or logged activities as
+`coach.week_view.rows` gives them to the brief's Sessions (C38): `{type:
+coach_led | activity, date, id, kind, title, status, moved_to, quality,
+quality_basis, minutes, rpe, distance_meters, reason}`, so the coach's
+brief names the rest of the week beside the lifting it proposes.
 
 - `propose override --proposal ID --session S --exercise E (--sets SPEC | --load N) --reason TEXT [--date D | --standing [--until D]]`
   changes the slot's line on every date, or with `--date` only that
@@ -3501,11 +3507,17 @@ constrained mode) stay coach-built through `overlay build`.
 - `--kind deload` writes overlay kind `deload` whose sessions keep their
   program session ids, are `temporary: true` (so R-14b gives them
   temporary routines, as `program-week`'s light mode expects) and are titled
-  `Deload — <session title>`, or `Return — <session title>` with
-  `--transform return`, whose focus reads `Return week of <start>`: a
-  return week's logged loads are the next week's baseline, a deload's are
-  not (C23). `--transform NAME` applies that transform
-  to any kind; a deload with none uses the program's `deload_rule`.
+  `Deload — <session title>`, `Light — <session title>` with
+  `--transform light` or `Return — <session title>` with `--transform
+  return`, and the focus reads `<Light|Deload|Return> week of <start>:
+  <the transform's SUMMARY>`; a line's rationale names `the light week`,
+  `the return week` or `the <name> deload`. A return week's logged loads
+  are the next week's baseline, a deload's are not (C23).
+  `coach.overlay.recovery_intent(doc)` reads the label back for the pages
+  and the week-ahead region header (`(light week)`), so nothing calls a
+  light week a deload for its overlay kind. `--transform NAME` applies
+  that transform to any kind; a deload with none uses the program's
+  `deload_rule`.
 - The `--plan FILE` shape is `schedule plan`'s output:
   `{"sessions": [{"date", "session_id"}], "flags": [...]}`; other keys
   are ignored and the rotation is left unchanged.
@@ -5616,6 +5628,8 @@ these headings:
 | Day | Session | Tier | Key | Done |
 |---|---|---|---|---|
 | Mon 12 | Session A | core | Back Squat 3×5 @ 100 kg | ✔ |
+| Wed 14 | PT | coach-led |  |  |
+| Fri 16 | Tempo | run | quality (planned), 40 min |  |
 
 ## Changed
 - Bench Press 22.5 → 25/hand (Hevy: 50): hit 3×10 at RPE 8.
@@ -5644,28 +5658,65 @@ these headings:
   its own; a break covering only some of the week's sessions adds "No
   overlay covers the rest of this week yet; the next programming pass
   writes one."
-- Sessions: every session of the overlay in force on each day of the
-  week, by date (C18 adherence over the week's span, as of); Tier from
-  the program (`core` for a session the program lacks); Key = first
-  exercise's page name (below) and its working sets in C12 Target form
-  without RPE (consecutive sets with equal reps and load collapse; a
-  `total` load carries its unit: `Back Squat 3×5 @ 100 kg`); Done = ✔ trained, ✗
-  missed, blank upcoming. A session dated `as_of`'s own day with no
-  workout and no miss tag is blank, not ✗: the day is not over.
+- Sessions: the whole week by date, from `coach.week_view` for all but
+  the lifting rows, so the page, adherence and cardio give one status:
+  - every session of the overlay in force on each day of the week (C18
+    adherence over the week's span, as of); Tier from the program
+    (`core` for a session the program lacks); Key = first exercise's
+    page name (below) and its working sets in C12 Target form without
+    RPE (consecutive sets with equal reps and load collapse; a `total`
+    load carries its unit: `Back Squat 3×5 @ 100 kg`); Done = ✔
+    trained, `✔ moved to Tue 13` when trained on another day, ✗ missed,
+    blank upcoming. A session dated `as_of`'s own day with no workout
+    and no miss tag is blank, not ✗: the day is not over.
+  - each coach-led session C41 places in the week (none on a planned
+    break), its `external` annotations read as of: Tier `coach-led`;
+    Key what the athlete recorded (modality, minutes, RPE); Done ✔, ✗
+    not done, `cancelled by the trainer`, `not confirmed` once its day
+    is over with no annotation, `✔ moved to <day>` when the annotation
+    that matched it is dated another day.
+  - each planned or logged activity in the week: at `[cardio] tier`
+    review or program the C49 reconcile items (a duplicate plan left
+    out), a matched pair as one row on its planned date; at `count` no
+    plan is read, so only logged activities show, each `✔ logged`. Tier
+    is the activity kind; Key reads `quality` or `easy`, what says so
+    (`planned`, `logged RPE`, `by its name`, `conditioning`), then its
+    distance and minutes; Done ✔, `✔ moved to <day>`, ✗ missed, `✔
+    logged` for one no plan matched, `to confirm with the coach` for an
+    ambiguous match, blank upcoming. Planned and logged activities are
+    read as they are now, like the program.
+  On one day, lifting rows come first, then coach-led sessions, then
+  activities. With no row at all, the section says no sessions are
+  planned.
 - Changed: lines whose `change` is set, by date then exercise order, at
   most five, then "and N more in the check-in", with the program's
   priority lifts first in their listed order. One exercise with the same
   change on several days is one item naming the days (`Back Squat (Mon,
   Thu) 100 → 102.5`); an exercise with different changes gets an item
   per change, each naming its days. Each reads `<page name>[ (<days>)]
-  <change>: <reason>`. Reason: `override.reason`, else
-  `provenance.rationale` (C21), else `target_note`. A `per_hand_x2`
+  <change>: <reason>`. Reason, in athlete words: in a light, deload or
+  return week (`coach.overlay.recovery_intent`), `light week`, `deload
+  week` or `return week`; else `agreed with your coach` for an override,
+  its `reason` being the coach's audit record that never reaches the
+  page; else `eased back after <n> days off` for a decayed line; else
+  `provenance.rationale` (C21); else `target_note`. The note comes last
+  because it also carries the coach's guidance and the warm-up and
+  calibration notes (C10), which say how to train the line, not why it
+  changed; it stays on the sheet. A `per_hand_x2`
   change that ends on the bare per-hand load (`22.5 → 25/hand`) gets the
   Hevy value appended (`22.5 → 25/hand (Hevy: 50)`).
 - Watch: at most three items by priority: unresolved `block` flags
-  (priority 20), then unresolved `warn` flags (30) on the overlays behind
-  the week's sessions, then part items (default 50). R-40a routes them
-  through `coach.flags.for_mode` (C44).
+  (priority 20) and unresolved `warn` flags (30) on the overlays behind
+  the week's sessions, and part items (default 50). R-40a routes the
+  flags through `coach.flags.for_mode` (C44). A stored `niggle_link` or
+  `niggle_escalate` flag whose niggle is resolved, or not yet noted, on
+  the brief's date is retired, the overlay keeping it; a chronic niggle
+  stays open. An item repeating a shown one
+  word for word, or sharing one of its keys (`niggle:<id>`, `sleep`,
+  `light_week`: a `niggle_*` flag carries its niggle's key, `sleep_debt`
+  carries `sleep`), is left out, so an overlay flag and the live item it
+  matches show once. A `sleep_debt` flag replaces the `sleep` part item
+  whatever their priorities.
 - If you miss a day: R-22's `missed` part fills the slot with one line
   per `program.missed_day_rules` entry, in `describe`'s words; with no
   rules, one line saying so.
@@ -5694,7 +5745,8 @@ these headings:
 **Dashboard** (`README.md`): first, a status block of at most six lines
 (the brief's header line; the block status line from
 `coach.block.status_line` (C43); last check-in date, tier and link; open flag
-count (unresolved `warn` and `block` flags on the week's overlays); the
+count (unresolved `warn` and `block` flags on the week's overlays, less
+the niggle flags Watch retires); the
 page's as-of time as "Updated <day> <HH:MM> (<zone>)", then part lines up
 to six), then the Sessions table, then a progress summary of at most
 five lines (three e1RM bests, the first naming `stats.E1RM_LABEL`;
@@ -5740,7 +5792,7 @@ complete nor missed, and it ends a streak.
 SLOTS = ("brief.watch",)
 def contribute(ctx: PageContext) -> dict[str, list[Item]] | None
 # PageContext: root, as_of, today (as_of's local date), overlay (in force for the week), program, state
-# Item(text: str, priority: int = 50)     # lower sorts first
+# Item(text: str, priority: int = 50, keys: tuple = ())     # lower sorts first; keys as Watch says
 ```
 
 | Slot | Semantics |
@@ -5758,10 +5810,29 @@ Two parts replacing the same slot, a part naming an unknown slot, and a
 part filling a slot it does not declare in `SLOTS` are errors (exit 1,
 naming the modules). Parts run in module-name order and read only.
 
-R-25 ships one part itself, `nutrition`: when `coach.nutrition` exists and
-`nutrition status` says enabled, it adds `data.brief_line` to
-`brief.lines` (once) and the phase to `brief.header.phase`; absent or
-disabled, it adds nothing. A soft dependency on R-33a, computing nothing.
+R-25 ships two parts itself. The `nutrition` part: when
+`coach.nutrition` exists and `nutrition status` says enabled, it adds
+`data.brief_line` to `brief.lines` (once) and the phase to
+`brief.header.phase`; absent or disabled, it adds nothing. A soft dependency on R-33a, computing nothing.
+
+The `recovery` part adds current recovery context to `brief.watch`,
+each item keyed so an equivalent overlay flag shows once:
+
+- each niggle aggravated, watching or easing on the brief's date (C27),
+  key `niggle:<id>`, priority 22 aggravated or escalating, else 26: its
+  area, status and since when, and what it applies to; an escalating one
+  says to have it assessed by a qualified professional. A chronic one
+  shows (45) while its limits are in force on the brief's date, saying
+  they apply to this week's loads. A resolved one drops out; its rows
+  stay.
+- the block's state now (`coach.block.watch_facts`, C43): a fatigue
+  watch whose trigger fired in the state's last closed week (27; key
+  `sleep` for a sleep trigger, so this week's `sleep_debt` flag shows in
+  its place), a proposed light week with its week, type and
+  reason (24), a declined one with its decision's reason and,
+  at the ceiling, that it is proposed again (28), or a skipped one with
+  its triggers (35); key `light_week`. A later close that changes the
+  state replaces it; the ledger keeps every week.
 
 R-25 prints every load through one call site, `_load`. R-40c gives it,
 and the two helpers that call it (`sets_text`, `_change_text`), a
@@ -5785,7 +5856,8 @@ which must be of the same `root` and `now`.
 `as_of` (an aware datetime, default None = no bound): workouts started at
 or before it (a workout with no start time: dated on or before its local
 date), annotations created at or before it, and body weights dated on or
-before its local date. Withdrawals created later do not apply. Capacity
+before its local date. Withdrawals created later do not apply. Coach-led
+sessions read their `external` annotations as of too. Capacity
 context only reads overlays created and approved by `as_of`, and
 recovery decisions made by then; later decision withdrawals cannot
 change that snapshot.

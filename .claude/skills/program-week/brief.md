@@ -22,7 +22,12 @@ first, tables second. Every mode uses the same brief.
    program's warm-up sets, or the qualitative ramp note the proposal
    adds (reword it with the athlete if they want); no warm-up loads or
    percentages the coach has not agreed, and never a test to failure.
-   Their sheets end with a short RPE and rep-range key.
+   Their sheets end with a short RPE and rep-range key. Then name the
+   rest of the week from the proposal's `other_work`: each coach-led
+   session and planned run by day, quality ones named as quality, and
+   each unresolved `collision` or `quality_stack` flag beside the days
+   it ties together, so the athlete sees the whole week the lifting
+   fits around.
 2. **What's changing:** plain-word bullets, changes only, each with its
    reason ("Squat 80 → 82.5 kg: you hit 5×5 @ RPE 7.5 last week, room
    to move"). Never restate every exercise here. If nothing changes, say
