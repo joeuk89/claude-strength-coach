@@ -415,7 +415,7 @@ _Avoid_: check-in form, intake, questionnaire
 **Catch-up check-in**:
 The check-in after more than 10 days without one. Its Sunday message
 drops the per-session questions for one summary row per week of the gap,
-three questions (the gap, now, next week) and the proposed return week,
+the questions (the gap, now, food, next week) and the proposed return week,
 which one "ok" accepts and writes. It never runs deep: a deep review that
 was due moves to the next check-in.
 _Avoid_: long check-in, gap review

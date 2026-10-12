@@ -2,8 +2,10 @@
 
 import json
 import unittest
+from unittest import mock
 
-from coach import checkin, jsonio, validity
+from coach import checkin, checkin_parts, jsonio, validity
+from coach.checkin_parts import nutrition as nutrition_part
 from tests.support import FIXTURES, INSTANCES, REPO_ROOT
 from tests.support.config_edit import apply
 from tests.support.history import HistoryCase, read_json, write_json
@@ -342,6 +344,26 @@ class CatchUpFoodTest(HistoryCase):
                          "Readings for the last 7 days (Mon 19 Oct – Sun 25 Oct) only, not the whole gap since "
                          "Mon 12 Oct.")
         self.assertNotIn("14-day", food["ask"])
+
+    def test_the_food_prefill_sits_on_its_own_line_above_the_lettered_asks(self):
+        lines = self.prepared()["text"].splitlines()
+        at = lines.index("3. Food.")
+        self.assertEqual(lines[at + 1], "   Readings for the last 7 days (Mon 19 Oct – Sun 25 Oct) only, not the "
+                                        "whole gap since Mon 12 Oct.")
+        self.assertTrue(lines[at + 2].startswith("   a. trend weight"), lines[at + 2])
+
+    def test_a_part_that_leaves_food_out_drops_the_question_and_renumbers(self):
+        def no_food(ctx):
+            return checkin_parts.Contribution(fields={"nutrition": None})
+
+        with mock.patch.object(nutrition_part, "contribute", no_food):
+            data = self.prepared()
+        questions = data["card"]["catch_up"]["questions"]
+        self.assertEqual([(q["id"], q["n"]) for q in questions], [("gap", 1), ("now", 2), ("next_week", 3)])
+        self.assertNotIn("Food.", data["text"])
+        self.assertNotIn("Bodyweight.", data["text"])
+        self.assertIn("\n3. Next week.", data["text"])
+        self.assertTrue(data["text"].splitlines()[-1].endswith("any of 1–3."))
 
     def test_known_values_stay_prefills_and_are_not_asked_again(self):
         self.edit_json("data/nutrition/plans/2026-10-12.json",
