@@ -280,11 +280,11 @@ class LinearTest(ProposeCase):
         super().setUp()
         self.set_scheme("session-a", "bb_back_squat", "linear")
 
-    def test_two_missed_exposures_reset_to_ninety_percent_rounded_down(self):
+    def test_two_missed_exposures_reset_to_the_nearest_load_to_ninety_percent(self):
         data = self.propose()
         line = find_line(data["overlay"], "bb_back_squat")
         self.assertEqual({coaching(s["load"]) for s in working(line)}, {87.5})
-        self.assertLessEqual(87.5, 97.5 * 0.9)
+        self.assertLess(abs(87.5 - 97.5 * 0.9), 1.25)
         meta = read_json(self.root / ".coach" / "proposals" / f"{FIRST_ID}.meta.json")
         self.assertEqual(meta["scheme_state"]["session-a/bb_back_squat"],
                          {"scheme": "linear", "data": {"misses": 2, "through": "2026-10-05"}})

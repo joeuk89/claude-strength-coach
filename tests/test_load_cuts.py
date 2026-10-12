@@ -1,7 +1,9 @@
 """Load cuts (resets, return bands, deloads, light weeks) take the nearest load the kit makes (C23, C24, R-24)."""
 
+import math
 import unittest
 
+from coach import overlay, propose, stats, units
 from coach.loads import AvailableLoads
 from tests.support.history import read_json
 from tests.test_propose import SQUAT, LayoffCase, ProposeCase, codes, coaching, edit_sets, find_line, working
@@ -32,6 +34,17 @@ class SelectCutTest(unittest.TestCase):
     def test_nothing_at_or_under_the_bounds_selects_nothing(self):
         rack = AvailableLoads("dumbbell", "per_hand_x2", {"dumbbells": [22.5, 25]}, 2.5)
         self.assertIsNone(rack.select_cut(18, 20))
+
+
+class CutWordsTest(unittest.TestCase):
+    def test_a_cut_the_kit_can_only_make_heavier_says_the_load_rises(self):
+        cut = {"baseline": 4, "target": 3.6, "actual": 5, "held": True, "rose": True, "other_cuts": True,
+               "lighter": None}
+        self.assertIn("the kit makes nothing at or under 4, so the load rises to 5, the nearest it makes",
+                      propose._cut_words(cut, "total", "kg"))
+        held = propose._held_cut_words(cut, "Curl", "total", "kg")
+        self.assertIn("so the load rises to 5, the nearest it makes", held)
+        self.assertNotIn("holds", held)
 
 
 def squat_rationale(doc):
@@ -123,6 +136,53 @@ class DeloadCutTest(MachineSquatCase):
         doc = self.deload("light", load_factor=0.95)
         self.assertEqual(set(squat_loads(doc)), {20})
         self.assertNotIn("load_cut_held", codes(doc, "bb_back_squat"))
+
+
+class EffortCeilingCutTest(ProposeCase):
+    """A fixed_reps_rpe squat: its e1RM load sits below the derived-from 97.5 and is an effort ceiling."""
+
+    def setUp(self):
+        super().setUp()
+        self.set_scheme("session-a", "bb_back_squat", "fixed_reps_rpe")
+        best = max(p["e1rm"] for p in stats.e1rm_series(self.root)["series"]["bb_back_squat"])
+        self.scheme_load = stats.load_for(best, 5, 7)
+
+    def test_a_deload_measures_its_cut_from_the_scheme_load_and_rounds_down(self):
+        target = self.scheme_load * 0.9
+        below = 2.5 * math.floor(target / 2.5)
+        self.assertLess(self.scheme_load, 97.5)
+        self.assertGreater(target - below, 1.25, "the nearest load would be heavier than the round-down one")
+        doc = self.propose("--kind", "deload", "--dry-run")["overlay"]
+        self.assertEqual(set(squat_loads(doc)), {below})
+        actual = units.format_number(round((self.scheme_load - below) / self.scheme_load * 100, 1))
+        self.assertIn(f"a 10 % cut from {units.format_number(self.scheme_load)} targets "
+                      f"{units.format_number(target)}; the kit makes {units.format_number(below)}, an actual "
+                      f"{actual} % cut", squat_rationale(doc))
+
+
+class CutBelowTheDerivedLoadTest(MachineSquatCase):
+    """A hold squat on a 5-step machine whose newest exposure (25) sits above the line's own load (20)."""
+
+    def setUp(self):
+        super().setUp()
+        self.set_scheme("session-a", "bb_back_squat", "hold")
+
+    def test_a_cut_the_kit_rounds_back_to_the_week_s_load_holds(self):
+        self.edit_json("data/overlays/2026-10-12-weekly.json", self.approved_at(20))
+        doc = self.deload("light", load_factor=0.95)
+        self.assertEqual(set(squat_loads(doc)), {20})
+        self.assertIn("a 5 % cut from 20 targets 19; the nearest load the kit makes no heavier than 20 is 20 itself",
+                      squat_rationale(doc))
+        self.assertIn("load_cut_held", codes(doc, "bb_back_squat"))
+
+    @staticmethod
+    def approved_at(load):
+        def edit(doc):
+            line = find_line(doc, "bb_back_squat")
+            for s in working(line):
+                s["load"] = units.make_load(load, line["load_mode"], "kg")
+            doc["approval"]["hash"] = overlay.approval_hash(doc)
+        return edit
 
 
 class ReturnBandCutTest(LayoffCase):
