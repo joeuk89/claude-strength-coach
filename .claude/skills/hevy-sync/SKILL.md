@@ -110,8 +110,10 @@ span that differs, so write once, after every discrepancy is settled.
   -m coach library search <name>`, or `python3 -m coach library seed`
   after the next pull if it was added in the app. `routines preflight
   --overlay <id>` lists every unresolved template. No or ambiguous
-  match: settle the identity, then `library set-template <exercise-id>
-  <cached-template-id>` and rebuild the overlay before approval.
+  match: settle the identity (cached ids and titles are in
+  `.coach/cache/hevy/exercise_templates.json`), then `library
+  set-template <exercise-id> <cached-template-id>` and rebuild the
+  overlay before approval.
 - After writing, `python3 -m coach routines verify --overlay <id>`
   confirms the change landed; quote it.
 - Only when a command keeps failing and the athlete agrees, use

@@ -675,8 +675,9 @@ confirming load modes. `library set-template ID TEMPLATE_ID [--dry-run]`
 chooses a primary ID locally, requiring that ID in the cached collection
 and rejecting an ID owned by another exercise before mutation. The choice
 survives later pulls and seeding. A routine exercise's own template id
-settles a title that several cached templates share: seed records it on
-the matched entry. Custom local entries remain valid with no external ID. For each distinct routine `exercise_template_id`, in
+outranks a title match, and settles a title that several cached templates
+share: seed records it on the matched entry first, then persists unique
+title matches only for entries still without a primary ID. Custom local entries remain valid with no external ID. For each distinct routine `exercise_template_id`, in
 routine order, it finds a library entry by template id, then Hevy title,
 then alias or name (both by match key), and proposes a load mode from the
 first row that applies:

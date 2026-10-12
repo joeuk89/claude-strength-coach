@@ -482,11 +482,6 @@ def seed(lib, routines, templates):
     """
     by_id = {item.get("id"): item for item in templates or []}
     doc = copy.deepcopy(lib.instance)
-    owners = lib.template_owners()
-    for entry in lib.entries():
-        resolution = template_resolution(entry, templates or [], owners)
-        if resolution["status"] in ("mapped", "matched") and not doc["exercises"].get(entry["id"], {}).get("hevy_template_id"):
-            doc["exercises"].setdefault(entry["id"], {})["hevy_template_id"] = resolution["template_id"]
     proposals, guessed = [], []
     for template_id, routine_title, in_routines in routine_exercises(routines):
         current = Library(doc, lib.path)
@@ -508,8 +503,19 @@ def seed(lib, routines, templates):
             # The athlete's own routine names this template, so it settles a title shared by several.
             proposal["action"] = _record(exercises, current.get(proposal["matched_id"]), template_id, proposal)
         proposals.append(proposal)
+    _record_title_matches(doc, Library(doc, lib.path), templates or [])
     Library(doc, lib.path)
     return proposals, doc, guessed
+
+
+def _record_title_matches(doc, lib, templates):
+    """Persist each unique cache title match, after routine templates so those take precedence."""
+    owners = lib.template_owners()
+    for entry in lib.entries():
+        resolution = template_resolution(entry, templates, owners)
+        if resolution["status"] == "matched":
+            doc["exercises"].setdefault(entry["id"], {})["hevy_template_id"] = resolution["template_id"]
+            owners[resolution["template_id"]] = entry["id"]
 
 
 def _record(exercises, entry, template_id, proposal):

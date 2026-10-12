@@ -48,9 +48,10 @@ from `overlay build --input <draft>`.
    the region: the per-session tables the brief shows.
 5. **Hevy users:** run `python3 -m coach routines preflight --overlay
    <id>`. Settle every unresolved template, including lines in sessions
-   without routines: `library show <exercise>` and the cached template
-   collection identify choices; `python3 -m coach library set-template
-   <exercise> <cached-id>` records the chosen mapping locally. Rebuild
+   without routines: `library show <exercise>` and the cached templates
+   (`id` and `title` in `.coach/cache/hevy/exercise_templates.json`)
+   identify choices; `python3 -m coach library set-template <exercise>
+   <cached-id>` records the chosen mapping locally. Rebuild
    the proposal/overlay after mapping, then preflight again until ready.
    For sessions without routines, run `python3 -m coach routines create
    --overlay <id> --dry-run` before approval. It names each new or reused

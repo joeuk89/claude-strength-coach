@@ -28,9 +28,9 @@ first, tables second. Every mode uses the same brief.
    structural change and lands in `data/program.json`; a replaced one is
    overwritten. List managed orphan routines and the athlete's choice
    for each: leave, reuse for a named session, or retire. Preview any
-   ended one-off retirement with `--routine <id>` for each leftover;
-   exclude routines the create preview reuses. Retain its `plan_hash`
-   for write.md. Reuse itself replaces the old content; it needs no
+   ended one-off retirement with `--routine <id>` for each of its
+   temporary routines; exclude routines the create preview reuses.
+   Retain its `plan_hash` for write.md. Reuse itself replaces the old content; it needs no
    preceding retirement.
 6. **The write line:** the brief's last line names exactly what "go"
    will write: each Hevy routine in the span by its Hevy title from

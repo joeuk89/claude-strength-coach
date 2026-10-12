@@ -563,8 +563,7 @@ def push(ctx, overlay_id, dry_run, refresh=False):
             raise ValidationError(
                 f"{entry['title']} did not read back as written ({len(remaining)} difference(s)); "
                 "later routines were not written.",
-                details=[{"path": c["path"], "message": f"sent {c['after']!r}, Hevy has {c['before']!r}"}
-                         for c in remaining],
+                details=_read_back_details(remaining),
                 data=report,
             )
     return _report("push", doc, ctx, entries, writes=writes)
@@ -642,9 +641,17 @@ def retire(ctx, overlay_id, dry_run, routine_ids=(), expect_plan=None):
         if remaining:
             for later, _, _ in planned[position + 1:]:
                 later["status"] = "not_reached"
-            raise ValidationError(f"{entry['title']} did not read back as retired; later routines were not retired.",
-                                  data=_report("retire", doc, ctx, entries, writes=writes))
+            raise ValidationError(
+                f"{entry['title']} did not read back as retired ({len(remaining)} difference(s)); "
+                "later routines were not retired.",
+                details=_read_back_details(remaining),
+                data=_report("retire", doc, ctx, entries, writes=writes),
+            )
     return _report("retire", doc, ctx, entries, writes=writes)
+
+
+def _read_back_details(remaining):
+    return [{"path": c["path"], "message": f"sent {c['after']!r}, Hevy has {c['before']!r}"} for c in remaining]
 
 
 def _routines_in_live_overlays(root, doc, today):
@@ -775,8 +782,7 @@ def create(ctx, overlay_id, dry_run, reuse_choices=(), expect_plan=None):
             raise ValidationError(
                 f"{entry['title']} did not read back as written ({len(remaining)} difference(s)); "
                 "its id is recorded in state.json, and later routines were not written.",
-                details=[{"path": c["path"], "message": f"sent {c['after']!r}, Hevy has {c['before']!r}"}
-                         for c in remaining],
+                details=_read_back_details(remaining),
                 data=_create_report(doc, ctx, entries, folder, dry_run, writes, stale),
             )
     return _create_report(doc, ctx, entries, folder, dry_run, writes, stale)

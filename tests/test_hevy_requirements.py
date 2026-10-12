@@ -133,6 +133,19 @@ class SeedSameTitleTest(ImportCase):
         self.assertEqual((pec["load_mode"], pec["start_load"]), ("total", 40))
 
 
+    def test_a_routine_template_matched_by_alias_outranks_a_cached_title_match(self):
+        root = self.instance()
+        HevyCache(root).write_collection("exercise_templates", [
+            template("Butterfly (Pec Deck)", equipment="machine", tid="H1"),
+            template("Pec Deck", equipment="machine", tid="C1", custom=True)], NOW)
+        self.cached([routine("Push", [hevy_exercise("C1", "Pec Deck", [hevy_set(40, reps=12)])])], root)
+        code, envelope, stderr = self.cli(root, "library", "seed")
+        self.assertEqual(code, 0, (envelope, stderr))
+        pec = next(p for p in envelope["data"]["proposals"] if p["hevy_template_id"] == "C1")
+        self.assertEqual((pec["matched_id"], pec["action"]), ("machine_pec_deck", "created"))
+        self.assertEqual(read_library(root)["exercises"]["machine_pec_deck"]["hevy_template_id"], "C1")
+        self.assertEqual(Library.load(root).get("machine_pec_deck")["hevy_template_id"], "C1")
+
 class RequirementsTest(CreateCase):
     def test_all_missing_templates_and_missing_session_are_reported_together(self):
         self.forget_session_b(approve=False)

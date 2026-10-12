@@ -17,10 +17,10 @@ write line named, nothing more.
    load mode: tell the athlete why, settle it, and present the brief
    again.
 3. **An ended one-off week.** If `state show` has a `one_off` whose span
-   ended before today, execute only the leftover retirements named in
-   the brief: `python3 -m coach routines retire --overlay <its overlay_id>
-   --routine <leftover-id> --expect-plan <approved-retire-hash>` (repeat
-   `--routine` for each selected leftover). Routines step 4 reuses stay
+   ended before today, execute only the retirements of its temporary
+   routines named in the brief: `python3 -m coach routines retire --overlay <its overlay_id>
+   --routine <routine-id> --expect-plan <approved-retire-hash>` (repeat
+   `--routine` for each selected routine). Routines step 4 reuses stay
    untouched until reuse. Then set `one_off` to null in
    `data/state.json` and run `python3 -m coach state show` to check it.
 4. **Hevy users.** If `routines diff` named sessions with no routine,
