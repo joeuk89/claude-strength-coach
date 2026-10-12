@@ -265,10 +265,15 @@ class Library:
 
         `library confirm` is offered only when the instance holds a proposal
         for it to confirm; otherwise the coach records the athlete's answer.
+        An id the library lacks cannot take a mode, so it is sent to search or create.
         """
         set_mode = f"python3 -m coach library set-mode {exercise_id} {mode}"
         entry = self._entries.get(exercise_id)
-        proposed = entry["load_mode_proposed"] if entry else None
+        if entry is None:
+            custom_id = exercise_id if exercise_id.startswith(CUSTOM_PREFIX) else CUSTOM_PREFIX + exercise_id
+            return (f"python3 -m coach library search {exercise_id} and use the id it finds, or add it with "
+                    f"python3 -m coach library create {custom_id} --input FILE (reference/custom-exercises.md)")
+        proposed = entry["load_mode_proposed"]
         if proposed:
             return f"python3 -m coach library confirm {exercise_id} (proposed {proposed}), or {set_mode}"
         return set_mode

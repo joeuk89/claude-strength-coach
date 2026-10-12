@@ -87,6 +87,16 @@ class BeforeApprovalTest(OneOffCase):
             self.assertNotIn("library confirm", flag["message"])
             self.assertNotIn("library seed", flag["message"])
 
+    def test_an_exercise_missing_from_the_library_is_sent_to_search_or_create_not_set_mode(self):
+        draft = one_off_draft()
+        draft["sessions"][0]["exercises"][0]["exercise_id"] = "hotel_floor_press"
+        write_json(self.draft, draft)
+        message = unconfirmed(self.check_file())["hotel_floor_press"]["message"]
+        self.assertNotIn("set-mode", message)
+        self.assertIn("python3 -m coach library search hotel_floor_press", message)
+        self.assertIn("python3 -m coach library create custom_", message)
+        self.coach("library", "search", "hotel_floor_press")
+
     def test_build_warns_about_each_unconfirmed_mode(self):
         warnings = " ".join(self.build().get("warnings", []))
         self.assertIn("push_up", warnings)

@@ -705,6 +705,8 @@ none and `bodyweight`, `assisted`, `duration` or `distance`; band and
   names `library confirm ID` only when the instance holds a
   `load_mode_proposed` for it, and always `library set-mode ID MODE`
   (`Library.mode_repair`, shared with R-24's `load_mode_unconfirmed`).
+  An id no library entry holds names `library search ID` and
+  `library create custom_ID --input FILE` instead.
 
 ## C6. Instance file layout
 
@@ -2226,7 +2228,8 @@ coach.validity.estimate_minutes(root, session) -> int
   `load_modes_confirmed` judges it). The message names the repair from
   `Library.mode_repair` with the line's own mode: `library set-mode ID
   MODE`, plus `library confirm ID` only when the instance holds a
-  proposal to confirm. Nothing marks a catalogue `load_mode_default` as
+  proposal to confirm, or `library search` and `library create` for an
+  id the library lacks. Nothing marks a catalogue `load_mode_default` as
   confirmed, and confirming changes no load: a confirmed mode that
   differs from the line is `load_mode_mismatch`.
 
