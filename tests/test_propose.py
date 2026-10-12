@@ -402,7 +402,12 @@ class AssistedLayoffCase(LayoffCase):
 
 
 class AssistedReturnTest(AssistedLayoffCase):
+    def on_an_assistance_machine(self):
+        self.edit_json("data/exercises.json", lambda doc: doc["exercises"]["pull_up"].update(equipment="machine"))
+        self.set_config("machine_increment = 5.0", "machine_increment = 2.5")
+
     def test_mixed_assistance_rounds_up_to_keep_the_least_logged_assistance(self):
+        self.on_an_assistance_machine()
         self.log_pull_up_loads("assisted", (20, 18.75, 18.75))
         self.set_scheme("session-b", "pull_up", "double_progression")
         data = self.propose()
@@ -410,7 +415,16 @@ class AssistedReturnTest(AssistedLayoffCase):
         self.assertEqual([coaching(s["load"]) for s in working(line)], [20, 20])
         self.assertEqual(self.pull_up_check(data), [])
 
+    def test_assistance_with_no_declarable_kit_holds_the_least_logged_assistance(self):
+        self.log_pull_up_loads("assisted", (20, 18.75, 18.75))
+        self.set_scheme("session-b", "pull_up", "double_progression")
+        data = self.propose()
+        line = find_line(data["overlay"], "pull_up")
+        self.assertEqual([coaching(s["load"]) for s in working(line)], [18.75, 18.75])
+        self.assertEqual(self.pull_up_check(data), [])
+
     def test_a_cap_still_wins_over_rounding_assistance_up(self):
+        self.on_an_assistance_machine()
         self.log_pull_up_loads("assisted", (20, 18.75, 18.75))
         self.set_scheme("session-b", "pull_up", "double_progression")
         self.set_config("[caps]", "[caps]\npull_up = 19")

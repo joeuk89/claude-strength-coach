@@ -57,6 +57,17 @@ class AvailableLoads:
         return []
 
     @property
+    def belt_loaded(self):
+        """Added load on a bodyweight lift, built from single plates as on a dip belt."""
+        return (self.mode == "bodyweight" and self.equipment not in stats.EQUIPMENT_INCREMENT
+                and bool(self.kit.get("plates")))
+
+    @property
+    def declarable(self):
+        """Whether config declares this load's physical kit; otherwise the step only requests a load."""
+        return bool(self.rack) or self.belt_loaded or self.equipment in stats.EQUIPMENT_INCREMENT
+
+    @property
     def plate_built(self):
         return self.plates_win and self.base_weight is not None and bool(self.kit.get("plates"))
 
@@ -65,8 +76,10 @@ class AvailableLoads:
             return value
         if self.rack:
             return units.select_available(value, self.rack, direction, cap)
-        if self.equipment == "kettlebell":
-            return value
+        if self.belt_loaded:
+            return units.round_plate_load(value, 0, self.kit["plates"], direction, cap, pairs=False)
+        if not self.declarable:
+            return value if cap is None else min(value, cap)
         if self.plate_built:
             return units.round_plate_load(value, self.base_weight, self.kit["plates"], direction, cap)
         if self.increment:
@@ -74,11 +87,13 @@ class AvailableLoads:
         return value
 
     def problem(self, value):
-        if self.geometry_warning or (self.equipment == "kettlebell" and not self.rack):
+        if self.geometry_warning or not self.declarable:
             return None
         selected = self.select(value)
         if selected is not None and abs(selected - value) < 1e-6:
             return None
+        if self.belt_loaded:
+            return "no combination of single declared plates"
         if self.plate_built:
             return f"no plate breakdown with base mass {units.json_number(self.base_weight)}"
         if self.rack:

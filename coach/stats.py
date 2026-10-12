@@ -14,7 +14,6 @@ from coach import bodyweight as bodyweight_module
 from coach import capacity, dates, flags, history, overlay, program, state, units
 from coach.config_tables.sessions import cap_minutes
 from coach.errors import ConfigError
-from coach.hevy.cache import HevyCache
 from coach.library import Library, e1rm_supported
 
 MAX_REPS_TO_FAILURE = 12
@@ -28,7 +27,7 @@ LOAD_BASIS = "load"
 TOTAL_SYSTEM_LABEL = "total system mass"
 PRIMARY_WEIGHT = 1.0
 SECONDARY_WEIGHT = 0.5
-_EQUIPMENT_INCREMENT = {
+EQUIPMENT_INCREMENT = {
     "dumbbell": "dumbbell_increment", "barbell": "barbell_increment",
     "ez_bar": "barbell_increment", "trap_bar": "barbell_increment", "smith_machine": "barbell_increment",
     "plate": "barbell_increment", "machine": "machine_increment", "cable": "cable_increment",
@@ -286,7 +285,7 @@ def load_increment(library, config, exercise_id, location):
     step = library.increment(exercise_id, unit)
     if equipment == "kettlebell":
         return step if step is not None else _KETTLEBELL_STEP[unit]
-    key = _EQUIPMENT_INCREMENT.get(equipment)
+    key = EQUIPMENT_INCREMENT.get(equipment)
     if key is None:
         return step if step is not None else 0
     try:

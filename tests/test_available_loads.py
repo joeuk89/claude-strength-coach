@@ -5,6 +5,7 @@ import unittest
 from coach import config, library, loads, onboarding, stats, units, validity
 from coach.library import Library
 from tests.support import VALID
+from tests.support.history import W
 from tests.test_propose import SQUAT, ProposeCase, coaching, codes, edit_sets, find_line, working
 from tests.test_plugins import fixed_load_plugin
 
@@ -56,6 +57,26 @@ class AvailableLoadsTest(unittest.TestCase):
         kit = loads.available_loads(Library.load(VALID), cfg, "bb_back_squat", "total", None)
         self.assertIsNotNone(kit.problem(102.5))
         self.assertEqual(kit.select(102.5, "down"), 100)
+
+    def test_bodyweight_added_load_is_built_from_single_plates_not_the_catalogue_step(self):
+        kit = loads.AvailableLoads("bodyweight", "bodyweight", config.load(VALID).equipment, 2.5)
+        self.assertEqual(kit.select(3.75, "down"), 3.75)
+        self.assertIsNone(kit.problem(1.25))
+        self.assertEqual(kit.select(1.125, "down"), 0)
+        self.assertIn("single declared plates", kit.problem(1.1))
+        coarse = loads.AvailableLoads("bodyweight", "bodyweight", {"plates": [5, 10]}, 2.5)
+        self.assertEqual(coarse.select(12, "up"), 15)
+        self.assertEqual(coarse.select(12, cap=11), 10)
+
+    def test_equipment_with_no_declarable_kit_takes_the_requested_load(self):
+        for equipment, mode, kit, step, value in (("other", "total", config.load(VALID).equipment, 10, 65),
+                                                  ("bodyweight", "bodyweight", {"plates": []}, 2.5, 1.1),
+                                                  ("bodyweight", "assisted", config.load(VALID).equipment, 2.5, 3)):
+            available = loads.AvailableLoads(equipment, mode, kit, step)
+            for direction in ("nearest", "down", "up"):
+                self.assertEqual(available.select(value, direction), value)
+            self.assertIsNone(available.problem(value))
+        self.assertEqual(loads.AvailableLoads("other", "total", {}, 10).select(65, cap=60), 60)
 
     def test_base_masses_are_optional_nonnegative_and_location_specific(self):
         for key in ("smith_base_weight", "ez_bar_weight", "trap_bar_weight"):
@@ -149,6 +170,11 @@ class PhysicalKitProposalTest(ProposeCase):
         self.write_plugin("custom_kit_fixed", fixed_load_plugin("custom_kit_fixed"))
         self.set_scheme(session, exercise_id, "custom_kit_fixed", {"load": value})
         return self.propose("--dry-run")["overlay"]
+
+    def test_a_manual_off_step_bodyweight_added_load_is_kept_and_not_flagged(self):
+        doc = self.fixed("pull_up", 1.25, session="session-b")
+        self.assertEqual({coaching(s["load"]) for s in working(find_line(doc, "pull_up"))}, {1.25})
+        self.assertNotIn("load_unrepresentable", codes(doc, "pull_up"))
 
     def test_nohevy_bench_requests_25_on_declared_two_point_five_grid(self):
         self.set_config("enabled = true", "enabled = false")
@@ -349,3 +375,19 @@ class HeldLoadOnCoarseKitTest(ProposeCase):
         self.assertIn("97.5 holds", squat["provenance"]["rationale"])
         self.assertIn("the kit makes 90", squat["provenance"]["rationale"])
         self.assertNotIn("load_unrepresentable", codes(doc, "bb_back_squat"))
+
+
+class WeightedBodyweightOnMicroplatesTest(ProposeCase):
+    workouts = staticmethod(edit_sets("F0000004", lambda wid, i, s: s.update(weight_kg=1.25, rpe=8),
+                                      workout_ids=(W[2], W[4])))
+
+    def test_added_load_progresses_one_catalogue_step_from_the_logged_load(self):
+        data = self.propose("--dry-run")
+        line = find_line(data["overlay"], "pull_up")
+        self.assertEqual({coaching(s["load"]) for s in working(line)}, {3.75})
+        self.assertNotIn("the kit makes", line["provenance"]["rationale"])
+        self.assertNotIn("load_unrepresentable", codes(data["overlay"], "pull_up"))
+
+    def test_a_deload_takes_a_load_the_plates_make(self):
+        line = find_line(self.propose("--kind", "deload", "--dry-run")["overlay"], "pull_up")
+        self.assertEqual({coaching(s["load"]) for s in working(line)}, {0})

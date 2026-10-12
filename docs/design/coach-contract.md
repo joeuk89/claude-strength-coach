@@ -378,7 +378,7 @@ bar_weight = 20.0
 # smith_base_weight = 15.0 # explicitly known effective unloaded mass; no default
 # ez_bar_weight = 10.0     # the EZ bar's own mass; no default
 # trap_bar_weight = 25.0   # the trap bar's own mass; no default
-plates = [25, 20, 15, 10, 5, 2.5, 1.25]   # per side, pairs available
+plates = [25, 20, 15, 10, 5, 2.5, 1.25]   # per side, pairs available; singly on a dip belt
 machine_increment = 5.0
 cable_increment = 2.5
 
@@ -2556,9 +2556,16 @@ coach.validity.estimate_minutes(root, session) -> int
   no longer names (a historical session's) falls back to the main table.
   Kettlebells have no grid: a declared `kettlebells` list (main table or
   location) names the bells, and without one a kettlebell load is neither
-  selected nor checked. A bar total's grid starts at its known base mass.
-  Machine, cable and other loaded equipment use their corresponding
-  increment from zero: a machine total is the load added to it. Historical off-grid loads are checked too. A load
+  selected nor checked. Added load on a bodyweight lift (`bodyweight`
+  mode on equipment with no step key) comes from single declared plates,
+  unlimited of each size, as on a dip belt; with no plates it is neither
+  selected nor checked. Other equipment with no step key (`bodyweight`
+  assistance, `band`, `suspension`, `cardio_machine`, `other`) has no
+  declarable kit: its step is a progression request only, and its load is
+  neither selected nor checked beyond its cap. A bar total's grid starts at
+  its known base mass. Machine and cable totals use their increment from
+  zero: a machine total is the load added to it. Historical off-grid loads
+  are checked too. A load
   already over its cap is flagged `load_cap` only for representability.
   Impossible loads and explicit rungs raise `load_unrepresentable` with
   instructions to correct the load/rung or equipment configuration.
@@ -2862,8 +2869,9 @@ and `plugins test` runs them. Loaded with
   load_direction=1)` takes the line's direction the same way.
 - **Rounding** (step 3 of C24): a scheme's increment requests a step;
   the shared available-load resolver selects the actual load. Explicit
-  racks and plate combinations win, otherwise the physical increment
-  grid applies as above. Historical loads never anchor that grid or
+  racks and plate combinations (single plates for bodyweight added load)
+  win, otherwise the physical increment grid applies as above; a load
+  with no declarable kit stays as requested, within its cap. Historical loads never anchor that grid or
   bypass it. A load no heavier than the derived-from load (a hold
   included), or marked `round_down`, rounds toward the lighter lift: down,
   or up for assistance. When selection changes a load, the rationale says
