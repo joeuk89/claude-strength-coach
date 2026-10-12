@@ -158,7 +158,13 @@ class TagGapTest(GapCase):
 
     def test_the_next_card_carries_the_illness_rule(self):
         self.coach("checkin", "tag-gap", "--tag", "ill")
-        card = self.card()
+        data = self.prepare()["data"]
+        card = data["card"]
+        lines = data["text"].splitlines()
+        self.assertIn(WRITE_LINE, lines)
+        self.assertEqual(lines[-1], "Answer any of 1–4.")
+        gap = next(q for q in card["catch_up"]["questions"] if q["id"] == "gap")
+        self.assertIn(f"have you been {validity.SYMPTOM_FREE_HOURS} hours symptom-free?", gap["ask"])
         summary = card["catch_up"]["summary"]
         self.assertEqual(summary[0]["missed_by_tag"], {"ill": 1})
         week = card["catch_up"]["return_week"]
@@ -455,7 +461,8 @@ class CheckInSkillTest(unittest.TestCase):
                 self.assertIn(words, self.text)
 
     def test_catch_up_food(self):
-        for words in ("or answer any of 1–4", "with nutrition off, **Bodyweight**",
+        for words in ("or answer any of 1–n.", 'ends "Answer any of 1–n." instead',
+                      "with nutrition off, **Bodyweight**",
                       "one reading dated the check-in date, and nothing for the earlier weeks of the gap"):
             with self.subTest(words=words):
                 self.assertIn(words, self.text)

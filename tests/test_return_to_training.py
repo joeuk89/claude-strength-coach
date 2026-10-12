@@ -143,13 +143,24 @@ class DaysOffTest(ReturnCase):
 
 
 class CatchUpSpanTest(ReturnCase):
-    def test_a_saturday_catch_up_plans_nothing_in_the_past(self):
+    def catch_up(self, now):
         (self.root / "check-ins").mkdir(exist_ok=True)
         (self.root / "check-ins" / "2026-10-18.md").write_text("# Check-in — 2026-10-18 (weekly)\n", encoding="utf-8")
-        card = self.data("checkin", "prepare", now="2026-10-31T10:00:00Z")["card"]
-        week = card["catch_up"]["return_week"]
+        return self.data("checkin", "prepare", now=now)["card"]["catch_up"]["return_week"]
+
+    def test_a_saturday_catch_up_plans_nothing_in_the_past(self):
+        week = self.catch_up("2026-10-31T10:00:00Z")
         self.assertEqual([s["date"] for s in week["sessions"]], ["2026-11-02", "2026-11-05"])
         self.assertEqual((week["days_off"], week["band"], week["week"]), (18, "11-21", "2026-W45"))
+
+    def test_a_midweek_catch_up_plans_the_rest_of_the_week_from_tomorrow(self):
+        now = "2026-11-04T10:00:00Z"
+        week = self.catch_up(now)
+        span = (week["span"]["start"], week["span"]["end"])
+        self.assertEqual(span, ("2026-11-05", "2026-11-08"))
+        self.assertEqual([s["date"] for s in week["sessions"]], ["2026-11-05"])
+        self.assertEqual((week["days_off"], week["band"]), (21, "11-21"))
+        self.assertEqual(self.propose("--span", "..".join(span), now=now)["lines_digest"], week["lines_digest"])
 
 
 class AfterTheReturnWeekTest(ReturnCase):

@@ -1,4 +1,4 @@
-"""The rpe_anchored, wave_531, assistance_ladder and maintenance progression schemes (contract C23)."""
+"""The rpe_anchored, wave_531, assistance_ladder, maintenance and hold progression schemes (contract C23)."""
 
 import unittest
 from dataclasses import replace
@@ -89,6 +89,28 @@ class MaintenanceTest(unittest.TestCase):
         ctx = context("maintenance", exposures=(source,), days_off=28)
         decayed = scheme("maintenance").module.decay(ctx, run(ctx), 28)
         self.assertEqual(loads_and_reps(decayed), [(90, 5)] * 2)
+
+
+class HoldAfterOnlyRecoveryWorkTest(unittest.TestCase):
+    """The only approved line is return work: the program's sets come back, at the load the return week set."""
+
+    def recovery_ctx(self, exposures=()):
+        last = {"overlay_id": "o-0001", "session_id": "session-a", "date": "2026-10-05",
+                "exercise_id": SQUAT.id, "load_mode": "total", "override": None, "recovery": "return",
+                "sets": (base.SetSpec.from_dict({"type": "normal", "reps": 5, "rpe": 7}, load=90),) * 2}
+        return replace(context("hold", exposures=exposures), last_prescription=last)
+
+    def test_the_program_sets_at_the_load_the_return_week_logged(self):
+        logged = exposure(date(2026, 10, 5), [(92.5, 5, 6)] * 2, week_kind="return")
+        proposal = run(self.recovery_ctx((logged,)))
+        self.assertEqual(loads_and_reps(proposal), [(92.5, 5)] * 3)
+        self.assertIn("in o-0001, is return work", proposal.rationale)
+        self.assertIn("the load logged on 2026-10-05", proposal.rationale)
+
+    def test_with_nothing_logged_the_program_sets_at_the_approved_load(self):
+        proposal = run(self.recovery_ctx())
+        self.assertEqual(loads_and_reps(proposal), [(90, 5)] * 3)
+        self.assertIn("at its load", proposal.rationale)
 
 
 class AssistedReturnAndDeloadTest(unittest.TestCase):

@@ -6,11 +6,12 @@ summary row per week since the newest review, the return week
 (`card.catch_up.return_week`: band, days off, load and set change, RPE
 cap, each session's lines and flags), the numbered questions (the gap,
 now, Food, next week), then the write line and "Reply ok to accept all
-of this, or answer any of 1–4." Then stop and wait for the athlete's
-reply. A catch-up never runs deep; when one was due, the card has
-`deep_deferred: true` and the next check-in runs deep, with the reason
-"deferred from catch-up <date>". Write its record with `checkin
-skeleton` as record.md says; its title says `(catch-up)`.
+of this, or answer any of 1–n.", n being the last question's number.
+Then stop and wait for the athlete's reply. A catch-up never runs deep;
+when one was due, the card has `deep_deferred: true` and the next
+check-in runs deep, with the reason "deferred from catch-up <date>".
+Write its record with `checkin skeleton` as record.md says; its title
+says `(catch-up)`.
 
 - **One tag for the whole gap:** run `python3 -m coach checkin tag-gap
   --tag <tag>`. It writes one `miss` annotation per untagged missed core
@@ -36,7 +37,7 @@ skeleton` as record.md says; its title says `(catch-up)`.
   push --overlay <id>` as program-week's write step describes, without
   asking again. Different: something changed since the card, so present
   the new return week and wait for the reply. A return week carrying
-  `return_after_illness` ends "Answer any of 1–4." instead: resolve
+  `return_after_illness` ends "Answer any of 1–n." instead: resolve
   that flag only on the athlete's answer that they have been 48 hours
   symptom-free.
 - **A reply that mentions illness, travel or no kit:** present `python3

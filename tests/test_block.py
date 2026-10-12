@@ -380,6 +380,14 @@ class TriggerTest(BlockCase):
         self.assertEqual(data["weeks"][-1]["class"], "low")
         self.assertEqual(data["block"]["light_week"]["status"], "not_due")
 
+    def test_illness_over_every_session_left_keeps_the_return_week_with_nine_days_off(self):
+        ill_week(self)
+        self.edit_workout("2026-10-01", lambda w: w.update(date="2026-10-03", start_time="2026-10-03T10:00:00Z",
+                                                            end_time="2026-10-03T11:00:00Z"))
+        self.data("status-days", "add", "--kind", "ill", "--from", "2026-10-11", "--note", "Head cold")
+        light = self.close()["block"]["light_week"]
+        self.assertEqual((light["status"], light["type"], light["reason"]), ("proposed", "return", "illness"))
+
     def test_a_coach_led_session_done_shortens_the_illness_gap(self):
         ill_week(self, pt_done=True)
         data = self.close()
