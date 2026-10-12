@@ -86,6 +86,14 @@ class SuggestTest(unittest.TestCase):
             self.assertIn("equipment.apparatus", [note["key"] for note in data["notes"]])
             self.assertNotIn("apparatus", data["values"]["equipment"])
 
+    def test_every_suggestion_asks_the_athlete_to_confirm_the_dumbbell_step(self):
+        for unit in ("kg", "lb"):
+            for gym in ("commercial", "home"):
+                with self.subTest(unit=unit, gym=gym):
+                    notes = {n["key"]: n["message"] for n in self.suggest("--unit", unit, "--gym", gym)["notes"]}
+                    self.assertIn("equipment.dumbbell_increment", notes)
+                    self.assertIn("dumbbells", notes["equipment.dumbbell_increment"])
+
     def test_every_note_names_a_key_and_says_what_to_confirm(self):
         for unit in ("kg", "lb"):
             for gym in ("commercial", "home"):

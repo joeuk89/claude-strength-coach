@@ -403,6 +403,15 @@ def equipment_for(config, location=None):
     return main
 
 
+def declared_equipment_for(config, location=None):
+    """The equipment keys the athlete wrote, main table then the named location's, without defaults."""
+    declared = getattr(config, "declared_equipment", None) or {}
+    found = {k: v for k, v in declared.items() if k != "locations"}
+    if location is not None:
+        found.update(declared.get("locations", {}).get(location, {}))
+    return found
+
+
 def approximate_age(config, today):
     birth_year = config.athlete.get("birth_year")
     if birth_year is None:

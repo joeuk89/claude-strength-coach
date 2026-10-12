@@ -12,13 +12,13 @@ from collections import namedtuple
 from datetime import timedelta
 
 from coach import config as config_module
-from coach import loads as available_loads
 from coach import dates, flags, history, overlay, state, stats, units
 from coach.checks.instance import _capped_value as capped_value
 from coach.checks.instance import cap_for
 from coach.config_tables.sessions import cap_minutes
 from coach.errors import ConfigError, ValidationError
 from coach.library import Library, e1rm_supported
+from coach.loads import available_loads
 
 OWNER = "R-24"
 
@@ -414,7 +414,8 @@ class _Checker:
             return
         try:
             cap, source = cap_for(self.config, line["exercise_id"], line["load_mode"], session["location"])
-            kit = config_module.equipment_for(self.config, session["location"])
+            available = available_loads(self.library, self.config, line["exercise_id"], line["load_mode"],
+                                        session["location"])
         except ConfigError:
             return
         per_hand = " per hand" if line["load_mode"] in units.PER_HAND_MODES else ""
@@ -425,9 +426,6 @@ class _Checker:
                       f"{self.where(session, line)}: {units.format_load(heaviest)} is above the {source} cap of "
                       f"{units.json_number(cap)} {self.unit}{per_hand}")
         within = [load for load in loads if load not in over]
-        available = available_loads.AvailableLoads(
-            (self.library.get(line["exercise_id"]) or {}).get("equipment") if self.library else None,
-            line["load_mode"], kit, self.increment(line, session))
         if available.geometry_warning:
             self.flag("load_geometry_unknown", session, line,
                       f"{self.where(session, line)}: {available.geometry_warning}")

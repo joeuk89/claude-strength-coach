@@ -16,7 +16,7 @@ cache_max_age_hours = 24
 [equipment]
 available = []
 dumbbells = []
-dumbbell_increment = 2.0
+dumbbell_increment = 2.5
 dumbbell_max = 40.0
 barbell_increment = 2.5
 bar_weight = 20.0

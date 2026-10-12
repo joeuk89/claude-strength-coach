@@ -14,17 +14,18 @@ import re
 from dataclasses import replace
 from datetime import timedelta, timezone
 from pathlib import Path
+from typing import NamedTuple
 
-from coach import config as config_module
 from coach import constraints as constraints_module
 from coach import dates, decisions, flags, followups, history, jsonio, niggles, overlay, paths, patterns, plugins
 from coach import cardio, conditioning, external, program, research, weekflags
 from coach import state as state_module
-from coach import loads, stats, units, validity
+from coach import stats, units, validity
 from coach.checks.instance import cap_for
 from coach.errors import ConfigError, RefusedError, UsageError, ValidationError
 from coach.library import Library, e1rm_supported
 from coach.load_statements import PER_HAND_X2, bare_figures, bare_message
+from coach.loads import available_loads
 from coach.plugins import base
 
 KINDS = ("weekly", "midweek", "deload")
@@ -247,9 +248,6 @@ class Run:
                                           for s in line["sets"]),
                             "override": line["override"]}
         return None
-
-    def kit(self, location):
-        return config_module.equipment_for(self.config, location)
 
     def increment(self, exercise_id, location):
         return stats.load_increment(self.library, self.config, exercise_id, location) or 0
@@ -549,8 +547,12 @@ def propose_line(run, session, day, exercise, ctx_extra):
             ceilings.append(newest.top_load)
         else:
             floor = newest.top_load
-    rounding = (run, entry, exercise_id, location, mode, min(ceilings, default=None), floor, source,
-                info.load_direction, scheme_name == "assistance_ladder")
+    rungs = tuple(r["load"] for r in params["rungs"] if r.get("load") is not None) \
+        if scheme_name == "assistance_ladder" else ()
+    rounding = _Rounding(
+        available_loads(run.library, run.config, exercise_id, mode, location) if mode in units.LOADED_MODES else None,
+        min(ceilings, default=None), floor, source.top_load if source is not None else None, info.load_direction,
+        rungs)
 
     def limited(sets, round_down):
         """Constraints, the illness cap, caps and rounding: what every load passes after its scheme."""
@@ -564,12 +566,14 @@ def propose_line(run, session, day, exercise, ctx_extra):
                 clipped.update(changed)
                 per_hand = "/hand" if mode in units.PER_HAND_MODES else ""
                 words.append(f"{cap_source} caps the load at {units.json_number(cap)}{per_hand}")
-        if scheme_name == "assistance_ladder" and clipped:
-            raise ValidationError(f"{slot_key}: an explicit ladder rung conflicts with a load cap or constraint; "
-                                  "edit the rung or equipment/constraint configuration before proposing")
-        return _rounded(sets, clipped, round_down, rounding), words
+        sets, kit_changes, off_ladder = _rounded(sets, clipped, round_down, rounding)
+        words += [f"no ladder rung fits within it, so the line leaves the ladder at {_load_text(v, mode, run.unit)}"
+                  for v in off_ladder]
+        kit_words = [f"the kit makes {_load_text(after, mode, run.unit)}, not {_load_text(before, mode, run.unit)}"
+                     for before, after in kit_changes.items()]
+        return sets, words, kit_words
 
-    sets, constraint_words = limited(proposal.sets, proposal.round_down)
+    sets, constraint_words, kit_words = limited(proposal.sets, proposal.round_down)
     if first_after_illness:
         adjusted.append(f"an RPE {validity.ILLNESS_RPE_CAP} cap on the first session after illness")
     if constraint_words:
@@ -577,6 +581,7 @@ def propose_line(run, session, day, exercise, ctx_extra):
         adjusted += constraint_words
     if adjusted:
         clauses.append(f"adjusted for {', '.join(adjusted)}: {sets_text(sets, mode, run.unit)}")
+    clauses += kit_words
 
     override = None
     last = ctx.last_override
@@ -585,7 +590,7 @@ def propose_line(run, session, day, exercise, ctx_extra):
                                derived_from=source, state={})
         if decay is not None:
             chosen = plugin.module.decay(ctx, chosen, days_off)
-        chosen_sets, _ = limited(chosen.sets, chosen.round_down)
+        chosen_sets, _, _ = limited(chosen.sets, chosen.round_down)
         override = {"reason": last["reason"], "proposed_sets": [s.to_dict() for s in sets]}
         scheme_text = sets_text(sets, mode, run.unit)
         clauses = [f"standing override until {last['until']} ({last['reason'].rstrip('. ')}) kept as "
@@ -750,35 +755,61 @@ def _check_proposal(plugin, proposal):
         raise ValidationError(f"Scheme {plugin.name} gave no rationale")
 
 
-def _rounded(sets, clipped, round_down, rounding):
-    """Each load snapped to the kit: toward less effort when lightened, nearest otherwise; never past a cap (C23).
+class _Rounding(NamedTuple):
+    available: object
+    cap: object
+    floor: object
+    derived: object
+    load_direction: int
+    rungs: tuple
 
-    More assistance is a lighter lift, so assistance rounds up where other loads round down.
+
+def _rounded(sets, clipped, round_down, rounding):
+    """(sets, {requested: selected}, off-ladder loads): each load snapped to the kit, never past a cap (C23).
+
+    A load no heavier than the derived-from load rounds toward the lighter lift: down, or up for assistance,
+    where more assistance is a lighter lift. An explicit ladder rung stays exact; a clipped rung moves to the
+    nearest rung inside the bounds, else leaves the ladder.
     """
-    run, entry, exercise_id, location, mode, cap, floor, source, load_direction, exact = rounding
-    if mode not in units.LOADED_MODES:
-        return tuple(replace(s, load=None) for s in sets)
-    kit = run.kit(location)
-    available = loads.AvailableLoads(entry.get("equipment"), mode, kit, run.increment(exercise_id, location))
-    derived = source.top_load if source is not None else None
-    found = []
+    if rounding.available is None:
+        return tuple(replace(s, load=None) for s in sets), {}, []
+    found, changes, off_ladder = [], {}, []
     for index, s in enumerate(sets):
         if s.load is None:
             found.append(s)
             continue
         value = max(0, s.load)
-        lighter = round_down or (derived is not None and (value - derived) * load_direction < -1e-9) or index in clipped
-        direction = ("down" if load_direction > 0 else "up") if lighter else "nearest"
-        if not exact:
-            selected = available.select(value, direction, cap)
-            if selected is not None and floor is not None and selected < floor and (cap is None or cap >= floor):
-                selected = available.select(floor, "up", cap)
-            if selected is None and cap is not None:
-                selected = available.select(cap, "down", cap)
-            if selected is not None:
-                value = selected
+        if rounding.rungs:
+            rung = _bounded_rung(value, rounding) if index in clipped else next(
+                (r for r in rounding.rungs if _same(value, r)), None)
+            if rung is not None:
+                found.append(replace(s, load=units.json_number(rung)))
+                continue
+            if index in clipped and value not in off_ladder:
+                off_ladder.append(value)
+        derived = rounding.derived
+        lighter = (round_down or index in clipped
+                   or (derived is not None and (value - derived) * rounding.load_direction <= 1e-9))
+        direction = ("down" if rounding.load_direction > 0 else "up") if lighter else "nearest"
+        selected = rounding.available.select(value, direction, rounding.cap)
+        floor, cap = rounding.floor, rounding.cap
+        if selected is not None and floor is not None and selected < floor and (cap is None or cap >= floor):
+            selected = rounding.available.select(floor, "up", cap)
+        if selected is None and cap is not None:
+            selected = rounding.available.select(cap, "down", cap)
+        if selected is not None and not _same(selected, value):
+            changes[value] = selected
+            value = selected
         found.append(replace(s, load=units.json_number(max(0, value))))
-    return tuple(found)
+    return tuple(found), changes, off_ladder
+
+
+def _bounded_rung(value, rounding):
+    """The rung nearest a clipped load inside the cap and floor, ties to the lighter lift; None when none fits."""
+    fits = [r for r in rounding.rungs
+            if (rounding.cap is None or r <= rounding.cap + 1e-9)
+            and (rounding.floor is None or r >= rounding.floor - 1e-9)]
+    return min(fits, key=lambda r: (abs(r - value), r * rounding.load_direction), default=None)
 
 
 def change_text(before_sets, after_sets, mode, unit):

@@ -584,7 +584,7 @@ class ConventionSlipTest(ProposeCase):
         bench = find_line(doc, "db_bench_press")
         self.assertEqual(bench["provenance"]["derived_from"], {"date": "2026-09-28", "workout_id": W[1]})
         self.assertIn("convention_slip", codes(doc, "db_bench_press"))
-        self.assertEqual({coaching(s["load"]) for s in working(bench)}, {24})
+        self.assertEqual({coaching(s["load"]) for s in working(bench)}, {25})
 
 
 class DeloadTest(ProposeCase):

@@ -169,6 +169,14 @@ class AdherenceTest(HistoryCase):
         self.assertEqual(self.exercise(session_a, "db_bench_press")["status"], "hit")
         self.assertEqual(data["summary"]["trained"], 1)
 
+    def test_a_session_at_a_location_config_no_longer_names_falls_back_to_the_main_kit(self):
+        self.edit_json("data/overlays/2026-10-12-weekly.json",
+                       lambda doc: doc["sessions"][0].update(location="hotel"))
+        self.cache(workouts=[session_a_workout()])
+        self.sync()
+        squat = self.exercise(self.session(self.adherence(), "session-a"), "bb_back_squat")
+        self.assertEqual(squat["status"], "hit")
+
     def test_two_of_three_squat_sets_is_under(self):
         self.cache(workouts=[session_a_workout(squat_sets=2)])
         self.sync()

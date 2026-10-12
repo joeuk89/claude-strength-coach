@@ -617,7 +617,8 @@ merges them; with no instance file the catalogue stands alone.
   and `distance`. `Library.increment(id, unit)` returns null when the
   entry has none. A declared equipment increment from `equipment_for`
   (C54) takes precedence over this fallback (not for a kettlebell, which
-  only borrows the dumbbell step); scheme parameters request a
+  has no equipment key: its step is this one, else 4 kg or 10 lb, the
+  catalogue's kettlebell step); scheme parameters request a
   progression step but never define physically available loads.
 - Optional `e1rm: "unsupported"` marks a lift whose external load is too
   small a share of the mass moved for any e1RM: the dumbbell split squat,
@@ -2541,11 +2542,13 @@ coach.validity.estimate_minutes(root, session) -> int
   athlete units. It is optional, nonnegative and inherited/overridden by
   location. Missing Smith geometry raises `load_geometry_unknown` (warn)
   and leaves representability unknown; an ordinary bar is never inferred.
-  Without an enumerated rack or plates, the declared location equipment
-  increment defines the physical grid; the library increment is fallback,
-  then the equipment default. A kettlebell has no increment key of its
-  own: `dumbbell_increment` is only its default, so a declared dumbbell
-  step never defines its grid. Grids start at zero, or the known base mass
+  Plates filled from the unit default never override a declared
+  `barbell_increment`. Without an enumerated rack or plates, the declared
+  location equipment increment defines the physical grid; the library
+  increment is fallback, then the equipment default. A location the config
+  no longer names (a historical session's) falls back to the main table.
+  A kettlebell never takes `dumbbell_increment`: its grid is the library
+  increment, else 4 kg or 10 lb. Grids start at zero, or the known base mass
   for a bar/Smith total. Other loaded equipment uses its corresponding
   increment when known. Historical off-grid loads are checked too. A load
   already over its cap is flagged `load_cap` only for representability.
@@ -2853,15 +2856,20 @@ and `plugins test` runs them. Loaded with
   the shared available-load resolver selects the actual load. Explicit
   racks and plate combinations win, otherwise the physical increment
   grid applies as above. Historical loads never anchor that grid or
-  bypass it. A load below the derived-from load, or marked `round_down`,
-  rounds toward the lighter lift: down, or up for assistance. Caps and
+  bypass it. A load no heavier than the derived-from load (a hold
+  included), or marked `round_down`, rounds toward the lighter lift: down,
+  or up for assistance. When selection changes a load, the rationale says
+  so ("the kit makes 25/hand, not 24.5/hand"). Caps and
   clipped constraints remain upper numeric bounds, with a buildable load
   below the cap taking precedence when assistance cannot round up within
   it. If no physical load fits, retain the bounded request and flag it as
   unrepresentable instead of crossing the cap. Explicit assistance-ladder
-  rungs remain exact; an incompatible rung is flagged without snapping,
-  and a cap/constraint that would change it refuses the proposal with
-  instructions to correct the rung or configuration. No kg/lb conversion
+  rungs remain exact; an incompatible rung is flagged without snapping.
+  A cap or constraint that clips a rung moves it to the nearest rung
+  within the bounds (ties to the lighter lift); when none fits, the line
+  leaves the ladder at the bounded load, selected from the kit, and its
+  `constraint_applied` flag says so. Other loads on a ladder slot (a
+  deload's raised assistance) go through the resolver. No kg/lb conversion
   occurs during selection: all kit facts and requests use athlete units;
   C5 builds the Hevy load object afterwards.
 
@@ -5934,6 +5942,11 @@ values:
   `dumbbell_max` out, so an lb home config fails validation until the
   athlete's answer is written. `notes` is `[{key, message}]`, `key` a
   dotted config path such as `equipment.dumbbell_max`.
+- `notes` always asks the athlete to confirm `dumbbell_increment`: with no
+  `dumbbells` list it is the per-hand physical grid (C22 Representable).
+  An existing instance whose approved loads sit off that step gets a
+  `load_unrepresentable` flag naming the step; the fix is the confirmed
+  step or a `dumbbells` list.
 - `/setup` writes Hevy free as `[hevy] enabled = false`. It writes
   `[nutrition]` only as `enabled = false`, when the athlete declines
   nutrition coaching. On a yes it writes nothing and `/goals` sets the

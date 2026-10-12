@@ -2,10 +2,10 @@
 
 import unittest
 
-from coach import config, loads, stats, units
+from coach import config, library, loads, stats, units, validity
 from coach.library import Library
 from tests.support import VALID
-from tests.test_propose import ProposeCase, coaching, codes, find_line, working
+from tests.test_propose import SQUAT, ProposeCase, coaching, codes, edit_sets, find_line, working
 from tests.test_plugins import fixed_load_plugin
 
 
@@ -38,6 +38,10 @@ class AvailableLoadsTest(unittest.TestCase):
         cfg.declared_equipment.pop("dumbbell_increment")
         self.assertEqual(stats.load_increment(library, cfg, "db_bench_press", None), 2)
 
+    def test_a_location_config_does_not_name_uses_the_main_step(self):
+        cfg = config.load(VALID)
+        self.assertEqual(stats.load_increment(Library.load(VALID), cfg, "db_bench_press", "hotel"), 2.5)
+
     def test_a_declared_dumbbell_step_does_not_define_the_kettlebell_grid(self):
         cfg = config.load(VALID)
         library = Library.load(VALID)
@@ -45,6 +49,13 @@ class AvailableLoadsTest(unittest.TestCase):
         step = stats.load_increment(library, cfg, "kb_swing", None)
         self.assertEqual(step, 4)
         self.assertIsNone(loads.AvailableLoads("kettlebell", "single_implement", {}, step).problem(24))
+
+    def test_default_plates_do_not_override_a_declared_barbell_step(self):
+        raw = {"schema_version": 1, "athlete": {"units": "kg"}, "equipment": {"barbell_increment": 5}}
+        cfg = config.parse(raw, "config.toml")
+        kit = loads.available_loads(Library.load(VALID), cfg, "bb_back_squat", "total", None)
+        self.assertIsNotNone(kit.problem(102.5))
+        self.assertEqual(kit.select(102.5, "down"), 100)
 
     def test_smith_base_is_optional_nonnegative_and_location_specific(self):
         raw = {"schema_version": 1, "athlete": {"units": "kg"},
@@ -113,7 +124,6 @@ class PhysicalKitProposalTest(ProposeCase):
         self.assertNotIn("load_unrepresentable", codes(doc, "bb_back_squat"))
         for s in line["sets"]:
             s["load"] = units.make_load(102.5, "total", "kg")
-        from coach import validity
         checked = validity.report(self.root, doc)
         self.assertIn("load_unrepresentable", [f["code"] for f in checked["flags"]])
 
@@ -138,15 +148,16 @@ class PhysicalKitProposalTest(ProposeCase):
         self.assertIn("smith_base_weight", flag["message"])
         self.assertIn("ordinary bar_weight", flag["message"])
 
-    def ladder(self, value):
+    def ladder(self, *values, extra=()):
         self.edit_json("data/exercises.json", lambda doc: doc["exercises"]["pull_up"].update(
             load_mode="assisted", load_mode_proposed="assisted", equipment="machine"))
         self.edit_program(lambda doc: self.slot(doc, "session-b", "pull_up").update(load_mode="assisted"))
-        self.set_scheme("session-b", "pull_up", "assistance_ladder", {"rungs": [{"name": "assisted", "load": value}]})
+        self.set_scheme("session-b", "pull_up", "assistance_ladder",
+                        {"rungs": [{"name": f"assisted {v}", "load": v} for v in values]})
         self.edit_json("data/history/2026-10.json", lambda doc: [
             (e.update(load_mode="assisted"), [s.update(load=units.make_load(22.5, "assisted", "kg")) for s in e["sets"]])
             for w in doc["workouts"] for e in w["exercises"] if e["exercise_id"] == "pull_up"])
-        return self.propose("--dry-run")["overlay"]
+        return self.propose("--dry-run", *extra)["overlay"]
 
     def test_explicit_assistance_rung_stays_exact_after_off_grid_log(self):
         doc = self.ladder(25)
@@ -167,11 +178,49 @@ class PhysicalKitProposalTest(ProposeCase):
         self.assertIn("load_unrepresentable", codes(doc, "db_bench_press"))
         self.assertNotIn("load_cap", codes(doc, "db_bench_press"))
 
-    def test_ladder_cap_conflict_refuses_instead_of_changing_the_rung(self):
+    def test_a_cap_no_rung_fits_under_flags_the_line_and_proposes_the_rest_of_the_week(self):
         self.ladder(25)
         self.set_config("[caps]", "[caps]\npull_up = 20")
-        result = self.propose("--dry-run", expect=1)
-        self.assertIn("explicit ladder rung conflicts", result["error"]["message"])
+        doc = self.propose("--dry-run")["overlay"]
+        self.assertEqual({coaching(s["load"]) for s in working(find_line(doc, "pull_up"))}, {20})
+        [flag] = [f for f in doc["flags"] if f["code"] == "constraint_applied" and f["exercise_id"] == "pull_up"]
+        self.assertIn("no ladder rung", flag["message"])
+        self.assertTrue(find_line(doc, "bb_back_squat")["sets"])
+
+    def test_no_added_load_holds_the_nearest_rung_that_keeps_the_assistance(self):
+        def constrained(doc):
+            self.slot(doc, "session-b", "pull_up")["constraints"] = [
+                {"kind": "no_added_load", "value": None, "reason": "elbow niggle"}]
+        self.edit_program(constrained)
+        doc = self.ladder(25, 15)
+        self.assertEqual({coaching(s["load"]) for s in working(find_line(doc, "pull_up"))}, {25})
+        self.assertIn("constraint_applied", codes(doc, "pull_up"))
+        self.assertNotIn("load_unrepresentable", codes(doc, "pull_up"))
+
+    def test_a_ladder_deload_rounds_its_off_rung_assistance_up_to_the_kit(self):
+        doc = self.ladder(25, 15, extra=("--kind", "deload"))
+        self.assertEqual({coaching(s["load"]) for s in working(find_line(doc, "pull_up"))}, {25})
+        self.assertNotIn("load_unrepresentable", codes(doc, "pull_up"))
+
+    def test_rationale_names_the_load_the_kit_makes(self):
+        self.set_scheme("session-a", "db_bench_press", "double_progression", {"increment": 2})
+        data = self.propose("--dry-run")
+        rationale = find_line(data["overlay"], "db_bench_press")["provenance"]["rationale"]
+        self.assertIn("24.5/hand", rationale)
+        self.assertIn("the kit makes 25/hand", rationale)
+
+    def test_custom_kettlebell_takes_the_kettlebell_step_not_the_declared_dumbbell_step(self):
+        entry = library.custom_entry("F00000KB", "Bottoms-Up Press (Kettlebell)",
+                                     {"equipment": "kettlebell", "primary_muscle_group": "shoulders"},
+                                     "single_implement")
+        entry.update(load_mode="single_implement", load_mode_proposed="single_implement", confidence="high",
+                     avoid=None)
+        self.edit_json("data/exercises.json", lambda doc: doc["exercises"].update(custom_bottoms_up_press=entry))
+        step = stats.load_increment(Library.load(self.root), config.load(self.root), "custom_bottoms_up_press", None)
+        self.assertEqual(step, 4)
+        kit = loads.AvailableLoads("kettlebell", "single_implement", {}, step)
+        self.assertIsNone(kit.problem(16))
+        self.assertIsNone(kit.problem(24))
 
     def test_location_smith_base_overrides_main_geometry(self):
         self.smith()
@@ -189,3 +238,17 @@ class PhysicalKitProposalTest(ProposeCase):
         doc = self.fixed("pull_up", 20, session="session-b")
         self.assertEqual({coaching(s["load"]) for s in working(find_line(doc, "pull_up"))}, {25})
         self.assertNotIn("load_unrepresentable", codes(doc, "pull_up"))
+
+
+class HeldLoadOnCoarseKitTest(ProposeCase):
+    workouts = staticmethod(edit_sets(SQUAT, lambda wid, i, s: s.update(weight_kg=97.5, rpe=9)))
+
+    def test_a_held_load_off_the_kit_rounds_to_the_lighter_lift_and_says_so(self):
+        self.set_config("barbell_increment = 2.5", "barbell_increment = 10")
+        self.set_config("plates = [25, 20, 15, 10, 5, 2.5, 1.25]", "plates = [20, 10, 5]")
+        doc = self.propose("--dry-run")["overlay"]
+        squat = find_line(doc, "bb_back_squat")
+        self.assertEqual({coaching(s["load"]) for s in working(squat)}, {90})
+        self.assertIn("97.5 holds", squat["provenance"]["rationale"])
+        self.assertIn("the kit makes 90", squat["provenance"]["rationale"])
+        self.assertNotIn("load_unrepresentable", codes(doc, "bb_back_squat"))

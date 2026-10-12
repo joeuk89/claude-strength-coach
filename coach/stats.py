@@ -13,6 +13,7 @@ from coach import config as config_module
 from coach import bodyweight as bodyweight_module
 from coach import capacity, dates, flags, history, overlay, program, state, units
 from coach.config_tables.sessions import cap_minutes
+from coach.errors import ConfigError
 from coach.hevy.cache import HevyCache
 from coach.library import Library, e1rm_supported
 
@@ -28,10 +29,13 @@ TOTAL_SYSTEM_LABEL = "total system mass"
 PRIMARY_WEIGHT = 1.0
 SECONDARY_WEIGHT = 0.5
 _EQUIPMENT_INCREMENT = {
-    "dumbbell": "dumbbell_increment", "kettlebell": "dumbbell_increment", "barbell": "barbell_increment",
+    "dumbbell": "dumbbell_increment", "barbell": "barbell_increment",
     "ez_bar": "barbell_increment", "trap_bar": "barbell_increment", "smith_machine": "barbell_increment",
     "plate": "barbell_increment", "machine": "machine_increment", "cable": "cable_increment",
 }
+
+# Kettlebells have no config step and bell sizes are not a dumbbell grid; this matches the catalogue's kettlebell.
+_KETTLEBELL_STEP = {"kg": 4, "lb": 10}
 
 
 def _round(value, places=2):
@@ -271,17 +275,26 @@ def _half(increment):
 
 
 def load_increment(library, config, exercise_id, location):
-    """The declared location step, then the library fallback, then the equipment default."""
+    """The declared location step, then the library fallback, then the equipment default.
+
+    A location the config no longer names falls back to the main table, as a historical session may.
+    """
     entry = library.get(exercise_id)
-    key = _EQUIPMENT_INCREMENT.get(entry["equipment"]) if entry else None
-    kit = config_module.equipment_for(config, location)
-    declared = dict(config.declared_equipment)
-    if location is not None:
-        declared.update(declared.get("locations", {}).get(location, {}))
-    # Kettlebells borrow the dumbbell step only as a default: a declared dumbbell step says nothing about them.
-    if key in declared and entry["equipment"] != "kettlebell":
+    equipment = entry["equipment"] if entry else None
+    unit = config.athlete.units
+    step = library.increment(exercise_id, unit)
+    if equipment == "kettlebell":
+        return step if step is not None else _KETTLEBELL_STEP[unit]
+    key = _EQUIPMENT_INCREMENT.get(equipment)
+    if key is None:
+        return step if step is not None else 0
+    try:
+        kit = config_module.equipment_for(config, location)
+    except ConfigError:
+        location = None
+        kit = config_module.equipment_for(config)
+    if key in config_module.declared_equipment_for(config, location):
         return kit[key]
-    step = library.increment(exercise_id, config.athlete.units)
     return step if step is not None else kit.get(key, 0)
 
 
