@@ -96,6 +96,15 @@ class RetireTest(FirstLoadCase):
         self.assertTrue(self.first_loads(found)[0]["resolved"])
         self.assertIn("load_unrepresentable", [f["code"] for f in found if f["exercise_id"] == "bb_back_squat"])
 
+    def test_setting_a_session_time_keeps_the_retirement(self):
+        self.propose()
+        self.override("--load", "60")
+        self.run_coach("propose", "time", "--proposal", WEEKLY, "--session", "session-a", "--start", "18:00",
+                       "--duration-min", "60")
+        [flag] = self.first_loads(self.draft()["flags"])
+        self.assertEqual((flag["resolved"], flag["resolution"]),
+                         (True, f"first load set: 60 on {MONDAY}, not yet trained"))
+
 
 class OccurrenceTest(FirstLoadCase):
     def test_each_date_has_its_own_warning_and_a_dated_override_retires_only_its_own(self):
