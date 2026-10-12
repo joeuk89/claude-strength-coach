@@ -76,11 +76,15 @@ def make(code, severity=None, *, session_id=None, exercise_id=None, message):
             "message": message, "resolved": False, "resolution": None}
 
 
+def condition(flag):
+    """What a flag states, without its resolution; a hand-edited draft flag may omit its session and exercise."""
+    return flag["code"], flag["severity"], flag.get("session_id"), flag.get("exercise_id"), flag["message"]
+
+
 def ref(flag):
     """A flag's stable reference, `<code>:<6 hex>`: a digest of the condition it states, never of its list
     position or resolution, so it survives reordering, saving and revalidation while the condition stands."""
-    condition = [flag["code"], flag["severity"], flag.get("session_id"), flag.get("exercise_id"), flag["message"]]
-    return f"{flag['code']}:{jsonio.canonical_hash(condition).split(':', 1)[1][:REF_DIGITS]}"
+    return f"{flag['code']}:{jsonio.canonical_hash(list(condition(flag))).split(':', 1)[1][:REF_DIGITS]}"
 
 
 def with_refs(found):

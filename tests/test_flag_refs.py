@@ -170,6 +170,20 @@ class LifecycleTest(ProposalRefCase):
         self.assertIn(self.bench_rpe(self.shown())["ref"], str(envelope["error"]["details"]))
         self.assertEqual(self.snapshot(), before)
 
+    def test_a_hand_added_flag_with_only_the_required_fields_resolves_by_its_ref(self):
+        draft = read_json(self.draft_path())
+        draft["flags"].append({"code": "unearned_load", "severity": "warn", "message": "hand added"})
+        write_json(self.draft_path(), draft)
+        [hand] = [f for f in self.shown() if f["message"] == "hand added"]
+
+        envelope = self.resolve("unearned_load:000000", expect=1)
+        self.assertIn(hand["ref"], str(envelope["error"]["details"]))
+
+        resolved = self.resolve(hand["ref"])["flag"]
+        self.assertEqual((resolved["ref"], resolved["resolved"], resolved["resolution"]), (hand["ref"], True, REASON))
+        [after] = [f for f in self.shown() if f["message"] == "hand added"]
+        self.assertTrue(after["resolved"])
+
 
 class SkillTest(unittest.TestCase):
     def test_program_week_resolves_a_flag_by_its_ref(self):

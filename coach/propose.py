@@ -1835,8 +1835,8 @@ def resolve(root, proposal_id, reference, resolution, dry_run):
         raise ValidationError(
             f"Proposal {proposal_id} has no flag {reference}: the condition it named is gone or has changed. Run "
             f"python3 -m coach propose show {proposal_id} and resolve the current flag by its ref",
-            details=[{"path": None, "message": f"{flags.ref(f)}: {f['message']}"} for f in found if not f["resolved"]])
-    if len({validity.flag_key(found[index]) for index in matches}) > 1:
+            details=[{"path": None, "message": f"{flags.ref(f)}: {f['message']}"} for f in found if not f.get("resolved")])
+    if len({flags.condition(found[index]) for index in matches}) > 1:
         raise ValidationError(f"Flag {reference} names more than one condition in proposal {proposal_id}; settle "
                               "them through propose override or edit the draft",
                               details=[{"path": None, "message": found[index]["message"]} for index in matches])

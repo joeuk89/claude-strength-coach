@@ -219,10 +219,10 @@ _Avoid_: weekly plan, week's targets, weekly overlay
 
 **Flag reference**:
 The name a proposal flag is resolved by, built from the condition it
-states (its code, session, exercise and message), so it stays with that
-condition however the flags are reordered or checked again. A condition
-that changes or disappears takes its reference with it; nothing else
-inherits it.
+states (its code, severity, session, exercise and message), so it stays
+with that condition however the flags are reordered or checked again. A
+condition that changes or disappears takes its reference with it;
+nothing else inherits it.
 _Avoid_: flag index, flag number
 
 **Missed-day rule**:
