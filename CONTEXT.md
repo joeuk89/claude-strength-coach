@@ -411,6 +411,21 @@ which one "ok" accepts and writes. It never runs deep: a deep review that
 was due moves to the next check-in.
 _Avoid_: long check-in, gap review
 
+**Review**:
+A completed check-in: a record in `check-ins/` with a valid Check-in
+title, `# Check-in — <date>` with or without a `(<tier>)` marker (no
+marker counts as deep), and the filename's date. Only reviews
+count for check-in timing: the next due date, the deep clock and the
+week-review window.
+_Avoid_: retrospective, any record in `check-ins/`
+
+**Program start record**:
+The record in `check-ins/` titled `# Program start — <date>`, which the
+first programming pass of a brand-new program writes. It is not a
+review; before the first review, the earliest program start anchors the
+first due date.
+_Avoid_: setup record, setup check-in
+
 **Return brief**:
 The coach's brief for the week back after a gap (illness, travel, no
 kit or a plain layoff): the gap in one sentence, what the return week

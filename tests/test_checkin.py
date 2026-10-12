@@ -439,6 +439,8 @@ class CardPartsTest(CheckinCase):
         """)
         with self.paths():
             card = self.card()
+            explicit = self.card("--tier", "deep")
+        self.assertEqual(explicit["tier_reasons"], ["two fatigue triggers"])
         self.assertEqual(card["mode"], "deep")
         self.assertIn("two fatigue triggers", card["tier_reasons"])
         self.assertIn("from a part", [f["message"] for f in card["flags"]])
@@ -469,7 +471,7 @@ class SkeletonTest(CheckinCase):
         text = self.record()
         self.assertTrue(text.startswith("# Check-in — 2026-10-11 (weekly)\n"))
         self.assertIn("<!-- coach:begin week-review 2026-10-11 -->", text)
-        for heading in ("## Week in review", "## Coach's read", "## Decisions", "## Next week"):
+        for heading in ("## Week in review", "## Coach's read", "## Decisions", "## The week ahead"):
             self.assertIn(f"\n{heading}\n", text)
         self.assertNotIn("## Block planning", text)
         details = text[text.index("<details>"):text.index("</details>")]
@@ -628,6 +630,14 @@ class CheckInSkillTest(unittest.TestCase):
     def test_record_comes_from_the_skeleton(self):
         step = " ".join(step_text("check-in", "record.md").split())
         self.assertIn("python3 -m coach checkin skeleton", step)
+
+    def test_block_deep_reasons_reach_the_card_without_forcing_the_tier(self):
+        step = " ".join(step_text("check-in", "sunday-message.md").split())
+        self.assertIn("one `--deep-reason <code>` for each `deep_review.reasons` code and no `--tier`", step)
+        self.assertIn("Pass `--tier deep` only when the athlete asks for a deep review", step)
+        record = " ".join(step_text("check-in", "record.md").split())
+        self.assertIn("Pass `--tier` with the tier of the card you sent", record)
+        self.assertIn("or `deep` when step 4 switched the check-in to deep", record)
 
     def test_deep_tier_reads_misses(self):
         self.assertIn("python3 -m coach checkin misses", self.text)

@@ -67,8 +67,9 @@ own lines below it, filled by `overlay render --into`:
 
 A one-off week ends the section with "Normal program resumes <date>."
 With no check-in record yet (a brand-new program), the pass creates
-`check-ins/YYYY-MM-DD.md`: a header noting the program's start date and
-structure, then `## The week ahead` holding the region.
+`check-ins/YYYY-MM-DD.md` with `# Program start — YYYY-MM-DD`, a note
+on the structure, then `## The week ahead` holding the region. Program
+start records remain accessible but never count as completed reviews.
 
 ## profile.md: the first version
 

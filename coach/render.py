@@ -10,6 +10,7 @@ from coach import dates, overlay, units
 from coach.units import format_load
 
 REGION_KIND = "overlay"
+WEEK_IN_REVIEW_HEADING = "## Week in review"
 WEEK_AHEAD_HEADING = "## The week ahead"
 CHOOSE_THE_LOAD = "choose the load"
 
@@ -218,17 +219,17 @@ def find_regions(text, kind):
     return regions
 
 
-def splice_region(text, kind, region_id, region):
-    """`text` with the region replaced, or added at the end of "The week ahead" (else of the file)."""
+def splice_region(text, kind, region_id, region, heading=WEEK_AHEAD_HEADING):
+    """Replace an existing region or append within `heading`, falling back to the end of the file."""
     for found_id, start, end in find_regions(text, kind):
         if found_id == region_id:
             return text[:start] + region + text[end:]
     position = len(text)
-    heading = re.search(rf"^{re.escape(WEEK_AHEAD_HEADING)}\b.*$", text, flags=re.MULTILINE)
-    if heading:
-        following = re.search(r"^## ", text[heading.end():], flags=re.MULTILINE)
+    match = re.search(rf"^{re.escape(heading)}\b.*$", text, flags=re.MULTILINE)
+    if match:
+        following = re.search(r"^## ", text[match.end():], flags=re.MULTILINE)
         if following:
-            position = heading.end() + following.start()
+            position = match.end() + following.start()
     before, after = text[:position], text[position:]
     if before and not before.endswith("\n"):
         before += "\n"

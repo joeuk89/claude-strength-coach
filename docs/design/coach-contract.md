@@ -215,7 +215,7 @@ Phase 2 to 4 command inventory. No command here writes to Hevy.
 | `propose restore --proposal ID --session S --reason TEXT [--dry-run]` | R-44b | W |
 | `followups list`, `followups render`, `niggles list`, `niggles constraints` | R-27 | |
 | `followups add\|resolve\|drop\|defer`, `niggles add\|update\|resolve\|import` | R-27 | W |
-| `checkin prepare [--until D] [--tier weekly\|deep]`, `checkin misses [--since D] [--until D]`, `checkin due` | R-21a | |
+| `checkin prepare [--until D] [--tier weekly\|deep] [--deep-reason CODE ...]`, `checkin misses [--since D] [--until D]`, `checkin due` | R-21a | |
 | `checkin skeleton --date D [--tier T] [--overlay ID] [--refresh]` | R-21a | W |
 | `checkin return-brief (--proposal ID \| --overlay ID) --reason R` | R-21b | |
 | `checkin tag-gap --tag T` | R-21b | W |
@@ -395,7 +395,7 @@ Tables later items add, each in its own PR:
 
 ```toml
 [checkin]                   # R-21a
-cadence_days = 7            # days between check-ins; the due date is the last record's date + this
+cadence_days = 7            # days between check-ins; the due date is the newest review's date + this (C36)
 ```
 
 **Nutrition keys** (R-33a, R-33b, R-33c). Nutrition is enabled only by
@@ -1065,14 +1065,14 @@ for every non-GET request, success or failure, once its retries are over.
   `coach.render.render_overlay(root, id)`. The region's bytes run from the
   start of the begin marker to the end of the end marker.
 - `coach.render.find_regions(text, kind)` and `coach.render.splice_region(text,
-  kind, id, region)` (R-13) find and replace marked regions for every
-  renderer. `splice_region` replaces the region in place; when the file has
-  none, it adds the region at the end of the `## The week ahead` section,
-  or at the end of the file, and changes nothing else. A recipe card
+  kind, id, region, heading="## The week ahead")` (R-13) find and replace
+  marked regions for every renderer. `splice_region` replaces the region
+  in place; when absent, it adds the region at the end of `heading`, or at
+  the end of the file. Cardio uses `heading="## Week in review"`. A recipe card
   (C33) finds its region with `find_regions` but places a missing one
   right after its data block, so it does not use `splice_region`.
-- **Archive rule:** `week-review` regions in any record but the newest are
-  archive. `render_week_review(id)` returns them unchanged, so R-16's sweep
+- **Archive rule:** `week-review` regions in any completed review but the newest,
+  and in any unrecognised record (C36), are archive. `render_week_review(id)` returns them unchanged, so R-16's sweep
   never fails an old record because history was later corrected. `cardio`
   regions are snapshots with no freshness check (late syncs must not fail
   old records).
@@ -4265,17 +4265,25 @@ reply.
 
 **Records.** A check-in record is `check-ins/YYYY-MM-DD.md` whose first line
 is `# Check-in — YYYY-MM-DD (<tier>)`, tier `weekly`, `deep` or `catch-up`.
-A record with no tier marker counts as deep (the current skill's rule).
-Other markdown files in `check-ins/` are ignored.
+A valid Check-in title with no tier marker counts as deep (legacy handling).
+`# Program start — YYYY-MM-DD` identifies setup (kind `program-start`, no
+tier). Both titles must match the filename date; a title that does not
+parse or names another date warns and gives kind `unrecognised`. Other
+filenames are ignored. `records` returns every kind, so record links,
+missed-session lines and publishing still find setup and unrecognised
+records; `reviews` returns kind `check-in` only, and only reviews count
+for review timing.
 
 ```python
-coach.checkin.records(root) -> list[Record]        # Record(date, tier, path), oldest first
+coach.checkin.records(root) -> list[Record]        # Record(date, tier, path, kind), oldest first
+coach.checkin.reviews(root) -> list[Record]        # kind "check-in" only
 coach.checkin.due(root, today) -> Due
 # Due(last: Record | None, days_since: int | None, due_date: date | None,
 #     overdue_days: int, mode: "first" | "weekly" | "deep" | "catch_up", tier_reasons: list[str])
-coach.checkin.prepare(root, today, until=None, tier=None, now=None) -> dict   # the card
+coach.checkin.prepare(root, today, until=None, tier=None, now=None, *, deep_review_reasons=()) -> dict   # the card
 coach.checkin.card_text(card) -> str                                         # the Sunday message
 coach.checkin.misses(root, since, until, now=None) -> dict
+coach.checkin.misses_since(root, until) -> date                              # the deep card's misses start
 coach.checkin.render_week_review(root, record_date) -> str                   # C11
 coach.checkin.skeleton(root, date, tier=None, overlay_id=None, refresh=False, dry_run=False, now=None) -> dict
 coach.checkin.mode_for(found, day) -> (mode, deep_reasons)                   # R-21b; due() and prepare() share it
@@ -4289,11 +4297,12 @@ The message renderer is `card_text`, not `render_card`: the C11 sweep
 takes any top-level `render_<kind>` as the renderer of that region kind,
 and `render_card` would capture R-33b's `card` regions.
 
-- **Window**: day after the last record's date to today (`--until` sets
-  the end). No record: from the program's first overlay span start.
+- **Window**: day after the newest review's date to today (`--until`
+  sets the end). No review: from the earliest overlay span start, else
+  the first-review anchor, else the end day.
 - **Mode**: `catch_up` when `days_since > catch_up_after_days()`, the
   first return band's upper edge (C22).
-  Otherwise `deep` when there is no record, the last deep record is
+  Otherwise `deep` when there is no review, the last deep review is
   `DEEP_AFTER_DAYS` (42, rn:deloads.12) or more days old, a card part
   adds a reason, or `--tier deep`; else `weekly`. `--tier weekly` or `--tier deep` overrides a catch-up. A
   catch-up never runs deep; it sets `deep_deferred: true` (a record-based
@@ -4305,13 +4314,29 @@ and `render_card` would capture R-33b's `card` regions.
   catch-up <date>", so a check-in that is not itself a catch-up runs
   deep. A part's tier reason is not recorded, so only record-based
   reasons carry over. `checkin due` uses the same rule.
-- `due_date` = last record date + `[checkin] cadence_days`.
+- `due_date` = last completed review date + `[checkin] cadence_days`.
+  Before the first review, anchor it to the earliest known start across
+  Program start records, ledger block starts and `state.block.started`
+  (set on adoption). A later Program start record or block rollover
+  cannot postpone an earlier known adoption. Block dates are legacy provenance fallbacks.
+  An invalid ledger or state.json adds no start; its own check reports it.
+  Without an anchor, the date is unknown. Setup-day status is informational until the due date;
+  the first actual review is still deep. The 42-day clock starts at that review.
+- `checkin prepare --deep-reason CODE` (repeatable) carries the block preview's
+  `deep_review.reasons` into the card using `block.DEEP_REASON_WORDS`.
+  It supplies a deep reason without overriding catch-up or `--tier weekly`,
+  so the check-in skill passes the codes without `--tier`;
+  `--tier deep` explicitly selects deep (an athlete's request). The record-derived codes
+  (`block.RECORD_DEEP_REASONS`) add no words when the card's own record
+  reasons already apply. Only an explicit deep request with
+  no record, block or card-part reason displays "asked for".
 
 **Card document** (`checkin prepare` → `data.card`; `data.text` is the
 markdown from `coach.checkin.card_text(card)`). It reads history with
-`include_unsynced=True` (C17). The last record is the newest one dated
+`include_unsynced=True` (C17). The last record is the newest review dated
 before the window end, so re-running `prepare` after writing today's
-record gives the same card:
+record gives the same card. With no review, the window starts at the
+earliest overlay, else at the first-review anchor, else on the end day:
 
 ```json
 {
@@ -4382,8 +4407,10 @@ record gives the same card:
 - `flags`: C20 objects for the window: `convention_slip` (open audit
   candidates), `duration_over_cap`, `stale_routine`, plus part flags.
   Presented through `coach.flags.for_mode` (C44).
-- `misses` (deep tier only): `coach.checkin.misses(root, since=last deep
-  record date, until=window end)` →
+- `misses` (deep tier only): `coach.checkin.misses(root, since=newest deep
+  review date, else the first window's start, until=window end)` →
+  (`checkin misses` without `--since` uses the same start, from
+  `coach.checkin.misses_since(root, until)`)
   `{"by_tag": {"time": 0, "sleep": 2, "ill": 0, "family": 0, "skipped": 0, "other": 0, "untagged": 1},
     "by_session": {"session-a": 2}, "sessions_missed": 3}`, plus `since`
   and `until`. Counts each missed planned session (C18 adherence over the
@@ -4461,7 +4488,7 @@ as it was):
 
 ## Decisions
 
-## Next week
+## The week ahead
 
 <details>
 <summary>Prescription</summary>
@@ -4478,15 +4505,19 @@ as it was):
   and takes its tier from the record's title, so a fresh render needs
   nothing gitignored. The skeleton warns when the window holds workouts
   not yet synced. The overlay region is R-13's `overlay render`.
-- `--refresh` re-renders the week-review region only on the newest
-  record (an older one is archive, C11), and every `overlay` region in
-  the file; with `--overlay ID` it adds the collapsed prescription when
+- `--refresh` refuses an `unrecognised` record (exit 1, file unchanged).
+  It re-renders the week-review region only on the newest review (an
+  older one is archive, C11), and every `overlay` region in the file; with `--overlay ID` it adds the collapsed prescription when
   the record has no region for it, and wraps a bare region for it (one
   `overlay render --into` appended) in the `<details>` block.
-- Coach's read, Decisions and Next week are prose the coach writes. R-01's
+- Coach's read, Decisions and The week ahead are prose the coach writes. R-01's
   `Missed:` line lives in the region; R-02's adherence decision line and
   block status line are prose in Decisions until R-30a and R-31 script
   them.
+- Cardio snapshots are inserted in **Week in review**; overlays in **The
+  week ahead**. Re-rendering replaces the existing region in place and
+  preserves prose. An empty overlay placeholder warns "not rendered yet";
+  changed nonempty content fails freshness. Rendering clears either result.
 - Deep records add `## Block planning` after Decisions, and `misses` in
   the region.
 - Check `checkin_record_words` (warn): prose outside the title, rendered
@@ -4772,7 +4803,7 @@ from R-33a's `nutrition status` when present (null when absent or
 disabled). `checkin` comes from C36 `due()` on `as_of`'s date: `last`,
 `due_date`, `days_since` and `mode` as `due()` gives them, and `tier`, the
 next check-in's tier: `deep` when `deep_reasons` holds on the due date
-(today when there is no record), else `weekly`.
+(today when the due date is unknown), else `weekly`.
 
 `as_of` bounds history (workouts started and annotations created at or
 before it); "today" inside a render is `as_of`'s local date. Program,
@@ -4963,7 +4994,8 @@ change that snapshot.
    git repository needs an agreed remote and `git push -u <remote>
    <branch>`. Setup and weekly close-out explain this prerequisite.
 3. Renders all three pages and refreshes the record's regions
-   (`checkin skeleton --refresh`). When Hevy is off, also renders
+   (`checkin skeleton --refresh`); an `unrecognised` record (C36) is
+   committed as it stands, without the refresh. When Hevy is off, also renders
    `this-week-sheets.md` from the same approved overlay as the brief,
    refreshing missing or stale sheets. Hevy-enabled publication leaves
    existing sheets alone and does not require them.
@@ -6767,7 +6799,7 @@ Providers R-26b ships:
 | `hevy` | cache age against `[hevy] cache_max_age_hours`; skipped when Hevy is disabled |
 | `overlay` | the overlay in force today (id, kind, span), else the next to start with its first session; whether it is approved, pushed and verified (a routine counts as verified when its latest `verify` line for the overlay's id and approval hash says so; Hevy off: approved only); the next one or two planned sessions; and the days of the coming week no overlay covers. The coming week is the week holding tomorrow (`[athlete] week_starts`), from today on: the rest of this week, or all of next week on its last day. Invalid overlays are skipped (`checks` names them) |
 | `program` | rotation position and whether it is confirmed (R-25's `header_facts`), the confirmation date (`state.json`); the block status line (`coach.block.status_line`, C43) and `light_week` (`state.json`); `attention` when the position is unconfirmed or the light week is `proposed` or `agreed` |
-| `checkin` | last check-in, days since, due date, tier and mode (`first`, `weekly`, `deep`, `catch_up`) from R-25's `header_facts` (its `data` is `header_facts`' `checkin`); `attention` when there is no record or the due date is today or past |
+| `checkin` | last check-in, days since, due date, tier and mode (`first`, `weekly`, `deep`, `catch_up`) from R-25's `header_facts` (its `data` is `header_facts`' `checkin`); `attention` when the due date is today or past, including the first review |
 
 Later items add a provider when they own a fact the coach should see at
 session start: R-21b (next check-in runs in catch-up mode), R-23a (an

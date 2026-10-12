@@ -746,6 +746,18 @@ class PublishTest(PublishCase):
         self.assertEqual(git(self.root, "rev-parse", "HEAD", env=self.git_env),
                          git(self.remote, "rev-parse", "main", env=self.git_env))
 
+    def test_a_record_with_an_unrecognised_title_publishes_unchanged(self):
+        path = self.root / "check-ins" / "2026-10-11.md"
+        text = path.read_text(encoding="utf-8")
+        retitled = "# Week one plan — 2026-10-11\n" + text.split("\n", 1)[1]
+        path.write_text(retitled, encoding="utf-8")
+        self.approve()
+        data = self.publish()["data"]
+        self.assertTrue(data["pushed"])
+        self.assertEqual(data["record"], "check-ins/2026-10-11.md")
+        self.assertEqual(path.read_text(encoding="utf-8"), retitled)
+        self.assertEqual(self.remote_page("check-ins/2026-10-11.md"), retitled)
+
     def test_hevy_publication_leaves_old_unlinked_sheets_alone(self):
         self.approve()
         old_sheet = self.root / "this-week-sheets.md"

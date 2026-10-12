@@ -40,8 +40,9 @@ newest is weekly).
 Run a **deep** check-in when any of these is true, otherwise run
 **weekly**:
 
-- **6+ weeks** since the last deep check-in (rn:deloads.12). Records
-  without a tier marker count as deep; the first check-in ever runs deep.
+- **6+ weeks** since the last deep check-in (rn:deloads.12). A review
+  whose title has no tier counts as deep; a Program start record is not
+  a review. The first check-in ever runs deep.
 - **A light week is being proposed** (the hard-week count reached the
   ceiling, or two fatigue triggers fired).
 - **The adherence trigger fires** (under 70 %).
@@ -100,7 +101,7 @@ the sleep gate.
 ## 6. Write the record
 
 Read [record.md](record.md): `checkin skeleton` writes the record and its
-rendered regions; you write the Coach's read, Decisions and Next week.
+rendered regions; you write the Coach's read, Decisions and The week ahead.
 
 ## 7. Act on it
 

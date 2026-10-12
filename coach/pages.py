@@ -233,7 +233,7 @@ class _View:
             rotation = {"position": self.state["rotation"]["position"],
                         "confirmed": self.state["rotation"]["confirmed"]}
         nutrition = nutrition_part.status(self.root, self.today)
-        found = [r for r in checkin.records(self.root) if r.date <= self.today]
+        found = [r for r in checkin.reviews(self.root) if r.date <= self.today]
         due = checkin.due(self.root, self.today)
         tier = "deep" if checkin.deep_reasons(found, due.due_date or self.today) else "weekly"
         return {
@@ -482,7 +482,7 @@ def _ranked(items, limit):
 def _checkin_text(found, today):
     tier = found["tier"]
     if found["due_date"] is None:
-        return f"First check-in due ({tier})"
+        return f"First check-in date unknown ({tier})"
     due = dates.parse_date(found["due_date"])
     if due < today:
         return f"Check-in overdue since {render.day_label(due)} ({tier})"
@@ -560,8 +560,9 @@ def render_dashboard(root, as_of, view=None):
     if view.state:
         status.append(block_module.status_line(view.root) or f"Block: {view.state['block']['id']}")
     records = [r for r in checkin.records(view.root) if r.date <= view.today]
-    if records:
-        last = records[-1]
+    completed = [r for r in checkin.reviews(view.root) if r.date <= view.today]
+    if completed:
+        last = completed[-1]
         status.append(f"Last check-in: [{render.day_label(last.date)} ({last.tier})]({last.path.as_posix()})")
     else:
         status.append("Last check-in: none yet")
@@ -605,7 +606,8 @@ def _weeks_text(count):
 def _links(records):
     found = ["[This week's brief](this-week.md)", "[Progress](progress.md)"]
     if records:
-        found.append(f"[Latest check-in]({records[-1].path.as_posix()})")
+        label = "Program start" if records[-1].kind == checkin.PROGRAM_START else "Latest check-in"
+        found.append(f"[{label}]({records[-1].path.as_posix()})")
     found += [f"[Program]({paths.ROUTINE_PROGRAM_PAGE.as_posix()})",
               f"[All check-ins]({paths.CHECKINS_DIR.as_posix()}/)", f"[How this works]({TEMPLATE_README})"]
     return found
@@ -842,7 +844,8 @@ def publish(root, overlay_id, now, record_date=None, dry_run=False, env=None, in
     report["rendered"] = write(root, now, KINDS)["pages"]
     if sheet_text is not None:
         (root / paths.SESSION_SHEETS).write_text(sheet_text, encoding="utf-8")
-    checkin.skeleton(root, record.date, refresh=True, now=now)
+    if record.kind != checkin.UNRECOGNISED:
+        checkin.skeleton(root, record.date, refresh=True, now=now)
     deleted = [row["path"] for row in records["included"] if row["change"] == "deleted"]
     removed = _git(root, "rm", "-q", "--cached", "--ignore-unmatch", "--", *deleted, env=env) if deleted else None
     if removed is not None and removed.returncode != 0:

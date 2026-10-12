@@ -1,9 +1,11 @@
 # Pull the data
 
-The window runs from the last check-in to today, leaving out workouts the
-last record already covered: normally about a week. **Deep tier:** for
-the trend analysis, extend the lookback to the last deep check-in
-(about six weeks): one week can't show a trend. **Adherence and the
+The window runs from the day after the newest review (a Check-in
+record) to today, so it leaves out workouts that review already covered:
+normally about a week. Before the first review it starts at the earliest
+overlay, else the program start. **Deep tier:** for the trend
+analysis, extend the lookback to the last deep check-in (about six
+weeks): one week can't show a trend. **Adherence and the
 hard-week count** need more history: read the check-in records and logs
 back as far as analyze.md needs.
 

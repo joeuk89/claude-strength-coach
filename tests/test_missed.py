@@ -224,6 +224,13 @@ class ApplyTest(MissedCase):
         self.assertEqual(current["overlay_id"], MIDWEEK)
         self.assertEqual(self.coach("check", "--only", "annotations_valid,overlay_arithmetic")["data"]["summary"]["fail"], 0)
 
+    def test_lines_reach_the_newest_record_even_when_its_title_is_malformed(self):
+        path = self.root / "check-ins" / "2026-10-11.md"
+        path.write_text(self.newest_record().replace("# Check-in — ", "# Check-in ", 1), encoding="utf-8")
+        data = self.apply("--tag", "sleep")
+        self.assertEqual(data["record"], "check-ins/2026-10-11.md")
+        self.assertEqual(mid_week_section(self.newest_record()), RECORD_LINES)
+
     def test_an_untagged_miss_says_so(self):
         data = self.apply()
         self.assertEqual(data["record_lines"][0], "- Missed Wed 14 Oct Session B (untagged).")

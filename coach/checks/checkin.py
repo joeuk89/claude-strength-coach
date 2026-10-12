@@ -21,17 +21,19 @@ def checkin_records(ctx):
         title = checkin.parse_title(checkin.first_line(path))
         if title is None:
             results.append(Result("warn", (
-                f"{rel}: the first line is not '# Check-in — YYYY-MM-DD (weekly|deep|catch-up)', so the record "
-                "counts as deep; fix the title line"), rel))
-        elif title[0].isoformat() != path.stem:
-            results.append(Result("warn", f"{rel}: the title is dated {title[0]}, the file name {path.stem}", rel))
+                f"{rel}: the first line is not a Check-in or Program start title; "
+                "the record is excluded from review timing; fix the title line"), rel))
+        elif title.date.isoformat() != path.stem:
+            results.append(Result("warn", (
+                f"{rel}: the title is dated {title.date}, the file name {path.stem}; "
+                "the record is excluded from review timing"), rel))
     return results
 
 
 @check(id="checkin_record_words", owner=OWNER)
 def checkin_record_words(ctx):
     results = []
-    for record in checkin.records(ctx.root):
+    for record in checkin.reviews(ctx.root):
         text = (ctx.root / record.path).read_text(encoding="utf-8")
         if not checkin.has_review(text):
             continue
