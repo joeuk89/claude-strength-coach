@@ -1090,9 +1090,13 @@ for every non-GET request, success or failure, once its retries are over.
   `overlay build` stores it as UTC and exits 1, at
   `$.sessions[i].start`, when it falls on another date than the
   session's (judged in the text's own offset when that is not UTC, else
-  in `[athlete] timezone`). Every mode keeps both: a proposal's
-  finalize and rebuild, a one-off draft and a missed-day rule's copy (a
-  shifted session drops its `start`, which belonged to the old date).
+  in `[athlete] timezone`). A stored C7 timestamp has lost its travel
+  offset, so it reads back when any real offset (-12:00 to +14:00) puts
+  it on the session's date. The draft schema takes `schema_version` 5 or
+  6, so a proposal drafted before v6 still builds, untimed. Every mode
+  keeps both: a proposal's finalize and rebuild, a one-off draft and a
+  missed-day rule's copy (a shifted session drops its `start`, which
+  belonged to the old date).
   `overlay build` replaces the overlay's interference flags with the
   rules' judgement of its sessions (C51).
 

@@ -155,6 +155,15 @@ class ParseStartTest(unittest.TestCase):
             with self.subTest(text=text), self.assertRaises(ValueError):
                 timing.parse_start(text, day, LONDON)
 
+    def test_a_travel_start_reads_back_from_its_stored_utc_timestamp(self):
+        for text in ("2026-10-15T20:00-04:00", "2026-10-15T08:00+09:00"):
+            with self.subTest(text=text):
+                stored = utc_text(timing.parse_start(text, "2026-10-15", LONDON))
+                self.assertEqual(utc_text(timing.parse_start(stored, "2026-10-15", LONDON)), stored)
+        for stored in ("2026-10-16T13:00:00Z", "2026-10-14T09:00:00Z"):
+            with self.subTest(stored=stored), self.assertRaises(ValueError):
+                timing.parse_start(stored, "2026-10-15", LONDON)
+
 
 class Case(unittest.TestCase):
     base = INTERFERENCE
@@ -260,6 +269,21 @@ class ProposalTimingTest(Case):
                 session = next(s for s in shown["sessions"] if s["session_id"] == "session-b")
                 self.assertEqual(session["start"], "2026-10-15T18:00:00Z")
 
+    def test_a_travel_start_on_another_utc_date_survives_time_rebuild_and_finalize(self):
+        for text, stored in (("2026-10-15T20:00-04:00", "2026-10-16T00:00:00Z"),
+                             ("2026-10-15T08:00+09:00", "2026-10-14T23:00:00Z")):
+            with self.subTest(text=text):
+                proposal = self.propose()
+                timed = self.data("propose", "time", "--proposal", proposal, "--session", "session-b", "--start", text)
+                self.assertEqual(timed["start"], stored)
+                rebuilt = self.data("propose", "rebuild", "--proposal", proposal)["overlay"]
+                session = next(s for s in rebuilt["sessions"] if s["session_id"] == "session-b")
+                self.assertEqual((session["date"], session["start"]), ("2026-10-15", stored))
+                finalized = self.data("propose", "finalize", "--proposal", proposal)
+                written = json.loads((self.root / finalized["path"]).read_text(encoding="utf-8"))
+                session = next(s for s in written["sessions"] if s["session_id"] == "session-b")
+                self.assertEqual((session["date"], session["start"]), ("2026-10-15", stored))
+
     def test_clearing_a_start_goes_back_to_the_untimed_warning(self):
         self.retime_tempo("07:00")
         proposal = self.propose()
@@ -336,6 +360,23 @@ class OverlayMigrationTest(Case):
         self.assertEqual(after["sessions"], before["sessions"])
         self.assertEqual({(s["start"], s["duration_minutes"]) for s in after["sessions"]}, {(None, None)})
         self.assertTrue(self.data("overlay", "validate", "2026-10-12-weekly")["results"][0]["valid"])
+
+    def test_an_open_v5_proposal_draft_still_times_and_finalizes(self):
+        proposal = self.data("propose", "week", "--week", "2026-W42")["overlay"]["id"]
+        for path in (self.root / ".coach" / "proposals").glob(f"{proposal}*.json"):
+            if path.name.endswith(".meta.json"):
+                continue
+            doc = json.loads(path.read_text(encoding="utf-8"))
+            doc["schema_version"] = 5
+            for session in doc["sessions"]:
+                session.pop("start", None)
+                session.pop("duration_minutes", None)
+            path.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
+        self.data("propose", "time", "--proposal", proposal, "--session", "session-a", "--start", "18:00")
+        finalized = self.data("propose", "finalize", "--proposal", proposal)
+        written = json.loads((self.root / finalized["path"]).read_text(encoding="utf-8"))
+        session = next(s for s in written["sessions"] if s["session_id"] == "session-a")
+        self.assertEqual((written["schema_version"], session["start"]), (6, "2026-10-12T18:00:00Z"))
 
 
 class ManualWorkoutStartTest(Case):
