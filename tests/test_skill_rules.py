@@ -219,8 +219,9 @@ class ClaudeMdTest(unittest.TestCase):
 
     def test_manual_logging_asks_for_observations_and_needs_no_separate_sync(self):
         text = flat(self.text)
-        for needle in ("`ask` lists", "actual reps for a range", "stays null, never the target",
-                       '"as written" confirms fixed reps and loads only', "show its summary and warnings"):
+        for needle in ("`ask` lists", "actual reps for a range", 'the load used for "choose the load"',
+                       "stays null, never the target", '"as written" confirms only what was prefilled',
+                       "show its summary and warnings"):
             with self.subTest(needle=needle):
                 self.assertIn(needle, text)
         self.assertNotIn("apply only the differences", text)

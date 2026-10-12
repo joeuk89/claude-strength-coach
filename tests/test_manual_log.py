@@ -386,9 +386,45 @@ class ObservedNotPrescribedTest(NoHevyCase):
         self.assertEqual(squat_effort["prescribed"], 7)
         self.assertIn("never the target", squat_effort["message"])
         [as_written] = self.asks(data, "bb_back_squat", "as_written")
-        self.assertEqual(as_written["sets"], [1, 2, 3])
-        self.assertEqual(self.asks(data, "db_bench_press", "as_written"), [])
+        self.assertEqual((as_written["sets"], as_written["prescribed"]), ([1, 2, 3], ["reps", "load"]))
+        [bench_load] = self.asks(data, "db_bench_press", "as_written")
+        self.assertEqual((bench_load["sets"], bench_load["prescribed"]), ([1, 2, 3], ["load"]))
         self.assertEqual(self.asks(data, "bb_back_squat", "reps"), [])
+        self.assertEqual([a for a in data["ask"] if a["field"] == "value"], [])
+
+    def choose_the_squat_load(self):
+        path = self.root / "data" / "overlays" / f"{WEEKLY}.json"
+        doc = read_json(path)
+        session = next(s for s in doc["sessions"] if s["session_id"] == "session-a")
+        squat = next(e for e in session["exercises"] if e["exercise_id"] == "bb_back_squat")
+        for set_ in squat["sets"]:
+            if set_["type"] != "warmup":
+                set_["load"] = None
+        write_json(path, doc)
+
+    def test_a_choose_the_load_set_asks_for_the_load_instead_of_claiming_it_is_prefilled(self):
+        self.choose_the_squat_load()
+        data = self.prefill_data()
+        self.assertEqual([(s["reps"], s["value"]) for s in self.squat(data["draft"])["sets"]], [(5, None)] * 3)
+        [load] = self.asks(data, "bb_back_squat", "value")
+        self.assertEqual((load["sets"], load["prescribed"]), ([1, 2, 3], None))
+        self.assertIn("choose the load", load["message"])
+        [as_written] = self.asks(data, "bb_back_squat", "as_written")
+        self.assertEqual(as_written["prescribed"], ["reps"])
+        self.assertNotIn("load", as_written["message"])
+
+    def test_a_loaded_set_logged_without_a_load_is_accepted_with_a_warning(self):
+        self.choose_the_squat_load()
+        envelope = self.add(self.filled())
+        self.assertTrue(envelope["data"]["written"])
+        [warning] = [w for w in envelope["warnings"] if w.startswith("load_unknown")]
+        self.assertIn("Back Squat", warning)
+        self.assertIn("sets 1–3", warning)
+        filled = self.filled()
+        for set_ in self.squat(filled)["sets"]:
+            set_["value"] = 90
+        envelope = self.add(filled, "--again")
+        self.assertEqual([w for w in envelope["warnings"] if w.startswith("load_unknown")], [])
 
     def test_an_unchanged_ranged_draft_cannot_be_recorded(self):
         before = (self.root / LOG).read_bytes()
@@ -461,6 +497,20 @@ class ImmediateStatusTest(NoHevyCase):
         self.assertTrue(self.dashboard_row().endswith("| ✔ |"))
         week, _ = self.block_week()
         self.assertEqual((week["planned"], week["trained"]), (2, 1))
+
+    def test_the_sunday_review_reads_the_logged_session_without_a_separate_sync(self):
+        def sunday_card():
+            envelope = self.coach("checkin", "prepare", now=SUNDAY)
+            card = envelope["data"]["card"]
+            return card["sessions"]["trained_core"], card["unsynced"], envelope["warnings"]
+
+        trained, _, _ = sunday_card()
+        self.log_monday()
+        trained_after, unsynced, warnings = sunday_card()
+        self.assertEqual((trained_after, unsynced), (trained + 1, 0))
+        self.assertFalse(any("history sync" in w for w in warnings), warnings)
+        week, _ = self.block_week()
+        self.assertEqual(week["trained"], 1)
 
     def test_the_live_check_in_read_agrees_with_the_stored_read(self):
         self.log_monday()

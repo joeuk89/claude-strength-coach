@@ -63,6 +63,7 @@ class SheetsRenderTest(NoHevyCase):
         self.assertIn("- **Back Squat (Barbell)**: Cues: brace · knees out", text)
         self.assertIn("Focus: pause 1 s on the chest", text)
         self.assertIn("reply to the coach with what you did: the reps of every set with a range", text)
+        self.assertIn('the load you used where it says "choose the load"', text)
         self.assertIn("how hard each exercise felt (RPE) if you can say", text)
         self.assertIn('"As written" covers fixed reps and loads only', text)
         self.assertNotIn("differences only", text)

@@ -46,7 +46,8 @@ def rebuild(args, ctx):
     args=(arg("--since", metavar="D", help="first date, YYYY-MM-DD"),
           arg("--until", metavar="D", help="last date, YYYY-MM-DD"),
           arg("--include-unsynced", action="store_true",
-              help="also resolve cached workouts not yet synced, in memory (nothing is written)")),
+              help="also apply source changes not yet synced (new, changed and removed workouts), in memory; "
+                   "nothing is written")),
 )
 def show(args, ctx):
     found = history.workouts(ctx.root, _date(args.since, "--since"), _date(args.until, "--until"),

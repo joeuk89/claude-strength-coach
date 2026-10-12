@@ -3,7 +3,8 @@ from coach.commands import arg, command
 from coach.errors import UsageError
 
 _UNSYNCED = arg("--include-unsynced", action="store_true",
-                help="also resolve cached workouts not yet synced, in memory (nothing is written)")
+                help="also apply source changes not yet synced (new, changed and removed workouts), in memory; "
+                     "nothing is written")
 
 
 def _span(text):

@@ -6773,9 +6773,12 @@ corrections are a `void` line plus a new entry:
   exercise, field and prescribed value: `{"exercise_id", "field",
   "sets", "prescribed", "message"}`, `sets` one-based over working sets.
   `field` is `reps` for ranged sets (`prescribed` the `rep_range`: ask
-  for the reps done), `as_written` for sets whose reps and load are
-  prefilled (`prescribed` null: keep them only when the athlete confirms
-  them, as "as written" does), and `rpe` for every working set
+  for the reps done), `value` for sets on a loaded mode (C10) with no
+  prescribed load, "choose the load" (`prescribed` null: ask for the load
+  used), `as_written` for sets with prefilled fields (`prescribed` the
+  list of them, out of `reps`, `load`, `duration` and `distance`: keep
+  them only when the athlete confirms them, as "as written" does; a range
+  or a missing load is never in it), and `rpe` for every working set
   (`prescribed` the target or null: ask for the RPE, and leave it null
   when the athlete cannot say).
 - `log add --input FILE [--again] [--dry-run]` validates and appends one
@@ -6794,11 +6797,15 @@ corrections are a `void` line plus a new entry:
   (a workout with no session is never refused). Warning
   `looks_like_total` when a `per_hand_x2` `value` equals the `hevy_total`
   of a prescribed working set (and no prescribed per-hand load), so the
-  athlete gave the pair as one number. Warning `rpe_unknown`, one per
+  athlete gave the pair as one number. Warning `load_unknown`, one per
+  exercise, when working sets on a loaded mode other than `bodyweight`
+  carry a null `value`: the workout is still accepted with no load
+  recorded. Warning `rpe_unknown`, one per
   exercise, when working sets carry a null `rpe`: the workout is still
   accepted, its effort stays unknown, and the prescribed target is named
   as not assumed. Warnings in the envelope start with their code
-  (`looks_like_total: ...`, `rpe_unknown: ...`, `hevy_enabled: ...`).
+  (`looks_like_total: ...`, `load_unknown: ...`, `rpe_unknown: ...`,
+  `hevy_enabled: ...`).
   Returns `id`, `line`, `summary` (one line printed with
   `units.format_load(..., show_hevy=False)`) and `history`.
 - After appending, `log add` and `log void` run `history sync` (C17), so

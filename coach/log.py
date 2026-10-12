@@ -136,26 +136,47 @@ def _grouped(pairs):
     return list(groups.items())
 
 
+def _prefilled(mode, set_, ranged):
+    """The fields `_draft_set` fills from one prescribed working set, as a reader names them."""
+    fields = []
+    if not ranged and mode not in NO_REPS_MODES and set_.get("reps") is not None:
+        fields.append("reps")
+    if set_.get("load") is not None:
+        fields.append("load")
+    if set_.get("duration_seconds") is not None:
+        fields.append("duration")
+    if set_.get("distance_meters") is not None:
+        fields.append("distance")
+    return tuple(fields)
+
+
 def _asks(name, line, working):
     """What the athlete must tell the coach about one prefilled exercise before `log add` (C46 `ask`)."""
     found = []
+    mode = line["load_mode"]
 
     def ask(field, numbers, prescribed, message):
         found.append({"exercise_id": line["exercise_id"], "field": field, "sets": numbers,
                       "prescribed": prescribed, "message": f"{name} {_set_numbers(numbers)}: {message}"})
 
     ranged = {n: s["rep_range"] for n, s in enumerate(working, 1)
-              if line["load_mode"] not in NO_REPS_MODES and s.get("rep_range") is not None}
+              if mode not in NO_REPS_MODES and s.get("rep_range") is not None}
     for (start, end), numbers in _grouped(((r["start"], r["end"]), n) for n, r in ranged.items()):
         rep_range = {"start": start, "end": end}
         ask("reps", numbers, rep_range,
             f"ask for the reps done in each set; the plan is a range ({_range_text(rep_range)}), which is not a "
-            "count, so reps stay null until the athlete gives them (the load is prefilled as written)")
-    fixed = [n for n in range(1, len(working) + 1) if n not in ranged]
-    if fixed:
-        ask("as_written", fixed, None,
-            "reps and load are prefilled as written; keep them only when the athlete confirms they did exactly "
-            "that, otherwise ask what they did")
+            "count, so reps stay null until the athlete gives them")
+    unloaded = [n for n, s in enumerate(working, 1) if mode in units.LOADED_MODES and s.get("load") is None]
+    if unloaded:
+        ask("value", unloaded, None,
+            f"no load was prescribed ({render.CHOOSE_THE_LOAD}), so value stays null until the athlete says "
+            "what they used; ask for it")
+    for fields, numbers in _grouped((_prefilled(mode, s, n in ranged), n) for n, s in enumerate(working, 1)):
+        if fields:
+            ask("as_written", numbers, list(fields),
+                f"{' and '.join(fields)} {'is' if len(fields) == 1 else 'are'} prefilled as written; keep "
+                f"{'it' if len(fields) == 1 else 'them'} only when the athlete confirms they did exactly that, "
+                "otherwise ask what they did")
     for target, numbers in _grouped((s.get("rpe"), n) for n, s in enumerate(working, 1)):
         aim = f"the target was {units.json_number(target)}" if target is not None else "no RPE target was set"
         ask("rpe", numbers, target,
@@ -253,6 +274,20 @@ def _unknown_effort(line, slots, library):
                    if targets else "")
         found.append(f"rpe_unknown: {_name(library, exercise['exercise_id'])} {_set_numbers(numbers)} logged "
                      f"without an RPE, so effort was not recorded{assumed}")
+    return found
+
+
+def _unknown_load(line, library):
+    """Warnings for working sets on a loaded mode logged without a load (bodyweight alone needs none)."""
+    found = []
+    for exercise in line["exercises"]:
+        if exercise["load_mode"] not in units.LOADED_MODES or exercise["load_mode"] == "bodyweight":
+            continue
+        numbers = [n for n, s in enumerate(exercise["sets"], 1) if s["type"] != "warmup" and s["value"] is None]
+        if numbers:
+            found.append(f"load_unknown: {_name(library, exercise['exercise_id'])} {_set_numbers(numbers)} logged "
+                         f"without a load on a {exercise['load_mode']} exercise, so the load was not recorded; "
+                         "ask what they used (a correction is a void plus a new entry)")
     return found
 
 
@@ -389,7 +424,8 @@ def add(root, config, library, draft, today, now, again=False, dry_run=False):
         if twin:
             raise RefusedError(f"{twin['id']} already logs {line['session_id']} on {line['date']}; void it and add "
                                "the corrected workout, or pass --again for a second workout that day")
-    warnings = _looks_like_total(line, slots) + _unknown_effort(line, slots, library)
+    warnings = (_looks_like_total(line, slots) + _unknown_load(line, library)
+                + _unknown_effort(line, slots, library))
     if config.hevy.enabled:
         warnings.append("hevy_enabled: Hevy is on ([hevy] enabled = true); if this workout is also in Hevy, "
                         "history counts it twice, so void this entry")
