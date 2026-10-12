@@ -488,7 +488,9 @@ _QTY = re.compile(rf"(\d+\s+\d+/\d+|\d+/\d+|(?:{_THOUSANDS}|{_DECIMAL})\s*[½¼�
 _MULTIPLIER = re.compile(r"^[x×]\s*\d", re.I)
 _COMPOUND_QTY = re.compile(r"(?:\b(?:and|or|plus)\b|[&+;,])\s*(?:\d|[½¼¾⅓⅔])", re.I)
 _PREP_CLAUSE = (r"(?:(?:finely|roughly|thinly|thickly) )?"
-                r"(?:chopped|diced|sliced|crushed|minced|grated|halved|quartered|peeled|deseeded)")
+                r"(?:chopped|diced|sliced|crushed|minced|grated|halved|quartered|peeled|deseeded|drained|rinsed"
+                r"|beaten|trimmed|cubed|zested|juiced|divided)"
+                r"(?: (?:finely|roughly|thinly|thickly))?")
 _PREPARATION = re.compile(rf"{_PREP_CLAUSE}(?: and {_PREP_CLAUSE})*")
 _UNITS = {
     "g": ("g", 1), "gr": ("g", 1), "gram": ("g", 1), "grams": ("g", 1),
@@ -581,7 +583,7 @@ def parse_ingredient(line):
     qty = _qty_value(match.group(1))
     rest = text[match.end():].lstrip()
     if (re.match(r"^(?:-|–|to\s)\s*\d", rest) or _MULTIPLIER.match(rest)
-            or _COMPOUND_QTY.search(rest)):
+            or _COMPOUND_QTY.search(rest) or re.match(r"^each\b", rest, re.I)):
         return None
     unit, container = "each", None
     word = re.match(r"^([A-Za-z]+)\.?(?=\s|\(|$)", rest)
@@ -754,14 +756,23 @@ def _grams(value):
     return _tidy_number(round(number, 1))
 
 
-def _collect_ingredients(lines):
-    """Parse source lines, summing same item and unit; return (ingredients, unparsed, guessed, mixed_lines).
+@dataclass(frozen=True)
+class _Collected:
+    """Ingredient lines parsed, with lines of the same item and unit summed.
 
-    mixed_lines maps each item that appears in more than one unit to its source lines.
+    `summed_lines` maps each item summed from several lines in one unit to those lines; `mixed_lines`
+    maps each item left in more than one unit to its lines.
     """
+    ingredients: list
+    unparsed: list
+    guessed: list
+    summed_lines: dict
+    mixed_lines: dict
+
+
+def _collect_ingredients(lines):
     by_key, unparsed, guessed, source_lines = {}, [], [], {}
-    for line in lines:
-        text = _clean(line)
+    for text in lines:
         ingredient, matched = ingredient_with_aisle(text)
         if ingredient is None:
             unparsed.append(text)
@@ -776,7 +787,9 @@ def _collect_ingredients(lines):
             guessed.append(key[0])
     unit_counts = Counter(item for item, _ in by_key)
     mixed_lines = {item: source_lines[item] for item, count in unit_counts.items() if count > 1}
-    return list(by_key.values()), unparsed, guessed, mixed_lines
+    summed_lines = {item: item_lines for item, item_lines in source_lines.items()
+                    if len(item_lines) > 1 and item not in mixed_lines}
+    return _Collected(list(by_key.values()), unparsed, guessed, summed_lines, mixed_lines)
 
 
 def import_jsonld(page_html, url=None):
@@ -857,21 +870,21 @@ def import_jsonld(page_html, url=None):
         flags.append({"code": "per_serving_doubt", "message": f"the yield is ambiguous ({recipe.get('recipeYield')!r})"})
 
     lines = recipe.get("recipeIngredient") or recipe.get("ingredients") or []
-    ingredients, unparsed, guessed, mixed_lines = _collect_ingredients(lines if isinstance(lines, list) else [lines])
-    if ingredients:
-        draft["ingredients"] = ingredients
-    if mixed_lines:
-        flags.append({"code": "incompatible_ingredient_units", "items": list(mixed_lines),
-                      "lines": [line for lines in mixed_lines.values() for line in lines],
+    collected = _collect_ingredients([_clean(line) for line in (lines if isinstance(lines, list) else [lines])])
+    if collected.ingredients:
+        draft["ingredients"] = collected.ingredients
+    if collected.mixed_lines:
+        flags.append({"code": "incompatible_ingredient_units", "items": list(collected.mixed_lines),
+                      "lines": [line for item_lines in collected.mixed_lines.values() for line in item_lines],
                       "message": "same-food quantities use incompatible units and remain separate; reconcile "
                                  "them into one exact unit per item before validating the card"})
-    if unparsed:
+    if collected.unparsed:
         flags.append({"code": "unparsed_ingredients",
-                      "message": f"{len(unparsed)} ingredient line(s) need an exact qty, unit and item",
-                      "lines": unparsed})
-    if guessed:
+                      "message": f"{len(collected.unparsed)} ingredient line(s) need an exact qty, unit and item",
+                      "lines": collected.unparsed})
+    if collected.guessed:
         flags.append({"code": "aisle_guessed", "message": f"no aisle keyword matched; {DEFAULT_AISLE_GUESS} is a guess",
-                      "items": guessed})
+                      "items": collected.guessed})
     return draft, flags
 
 
@@ -1039,13 +1052,14 @@ def convert_yaml_card(text, slug=None):
             continue
         bullets = [line.strip() for line in chunk.splitlines()[1:] if re.match(r"^\s*[-*]\s", line)]
         if heading.lower() == "ingredients":
-            for line in bullets:
-                ingredient, matched = ingredient_with_aisle(line)
-                if ingredient is None:
-                    unparsed.append(re.sub(r"^[-*]\s*", "", line))
-                    continue
-                ingredients.append(ingredient)
-                guessed_aisles.append({"item": ingredient["item"], "aisle": ingredient["aisle"], "matched": matched})
+            collected = _collect_ingredients([re.sub(r"^[-*]\s*", "", line) for line in bullets])
+            ingredients, unparsed = collected.ingredients, collected.unparsed
+            guessed_aisles = [{"item": i["item"], "aisle": i["aisle"], "matched": i["item"] not in collected.guessed}
+                              for i in ingredients]
+            notes += [f"{item}: {len(item_lines)} lines summed into one quantity ({'; '.join(item_lines)})"
+                      for item, item_lines in collected.summed_lines.items()]
+            notes += [f"{item} is in more than one unit ({'; '.join(item_lines)}); reconcile to one unit"
+                      for item, item_lines in collected.mixed_lines.items()]
         elif heading.lower() == "variations":
             for line in bullets:
                 variation, note = _variation_from_line(line)

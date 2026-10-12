@@ -211,11 +211,11 @@ Import is an offline draft: save the page, pass `--html`, and keep its
 The original compound ingredient line stays in `unparsed_ingredients`
 when quantities cannot be read exactly; enter each food and quantity
 explicitly. The importer strips supported comma-delimited preparation
-clauses such as `crushed`, `thinly sliced` and `deseeded and finely
-chopped`, while retaining identity
-such as red/yellow and cooked/raw.
+clauses such as `crushed`, `thinly sliced`, `drained and rinsed` and
+`deseeded and finely chopped`, while retaining identity such as
+red/yellow and cooked/raw.
 
-Duplicate quantities add only for the same normalized item and unit
+Duplicate quantities add only for the same normalised item and unit
 (including supported kg-to-g and litre-to-ml conversions). Incompatible
 units stay as separate entries with `incompatible_ingredient_units`;
 reconcile them to one exact unit per item before validation. Do not add
@@ -241,7 +241,9 @@ fail `recipes validate`. To convert a bank:
    card plus a review table: title, macros, ingredient count, ingredient
    lines it could not read, the aisle it guessed for each ingredient, the
    variations whose `changes` need filling in, and notes (front matter it
-   could not read, for one). It also reads the old index's slot notes
+   could not read, for one). Ingredient lines follow the import rules in
+   "Reviewing an import": lines for the same item and unit are summed and
+   noted, and an item in two units is noted for you to reconcile. It also reads the old index's slot notes
    (the prose under each slot heading) and returns them as
    `slot_notes_toml`, listed under the card table. It writes nothing.
 2. Walk the table with the athlete: add the unread ingredients exactly,

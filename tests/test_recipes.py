@@ -319,6 +319,13 @@ class IngredientParseTest(unittest.TestCase):
             "1 chilli, deseeded and finely chopped": (1, "each", "chilli"),
             "1 red onion, peeled, halved and thinly sliced": (1, "each", "red onion"),
             "100 g chicken breast, cooked and sliced": (100, "g", "chicken breast, cooked and sliced"),
+            "1 tin chickpeas, drained and rinsed": (1, "each", "chickpeas tin"),
+            "2 eggs, beaten": (2, "each", "eggs"),
+            "1 lemon, zested and juiced": (1, "each", "lemon"),
+            "3 tbsp olive oil, divided": (3, "tbsp", "olive oil"),
+            "1 red chilli, sliced finely": (1, "each", "red chilli"),
+            "200 g green beans, trimmed": (200, "g", "green beans"),
+            "300 g potatoes, cubed": (300, "g", "potatoes"),
             "1,000 g flour": (1000, "g", "flour"),
             "1,250g beef mince": (1250, "g", "beef mince"),
             "12,5 g butter": (12.5, "g", "butter"),
@@ -331,7 +338,8 @@ class IngredientParseTest(unittest.TestCase):
         for line in ("Salt and pepper, to taste", "1-2 tbsp honey", "2 to 3 eggs", "a handful of spinach", "0 g x",
                      "2 x 400g tins chopped tomatoes", "2x400g tins chopped tomatoes", "3 × 25 g sachets oats", "2 red and 2 yellow peppers",
                      "2 red & 2 yellow peppers", "2 red peppers or 3 green peppers",
-                     "2 red peppers, 2 yellow peppers", "2 tbsp oil plus 1 tbsp butter"):
+                     "2 red peppers, 2 yellow peppers", "2 tbsp oil plus 1 tbsp butter",
+                     "2 each red and yellow peppers"):
             with self.subTest(line=line):
                 self.assertIsNone(recipes.parse_ingredient(line))
 
@@ -469,10 +477,19 @@ class ImportTest(RoundTripMixin, unittest.TestCase):
                     self.assertEqual(flag["source_times"], usable)
 
     def test_recipe_sources_explains_every_import_flag(self):
-        codes = set(re.findall(r'"code": "([a-z_]+)"', (REPO_ROOT / "coach" / "recipes.py").read_text()))
+        pages = [
+            {"@type": "Recipe", "name": "Bare", "recipeIngredient": [
+                "2 red and 2 yellow peppers", "4 tbsp olive oil", "100 ml olive oil", "10 g zaatar"]},
+            {"@type": "Recipe", "name": "Doubtful", "recipeCategory": "Dinner", "recipeYield": "2 or 4 servings",
+             "prepTime": "PT15M", "nutrition": {"calories": "900 kcal", "proteinContent": "10 g",
+                                                "carbohydrateContent": "10 g", "fatContent": "10 g"}},
+        ]
+        raised = {flag["code"] for page in pages for flag in recipes.import_jsonld(
+            '<script type="application/ld+json">' + json.dumps(page) + "</script>")[1]}
+        written = set(re.findall(r'"code": "([a-z_]+)"', (REPO_ROOT / "coach" / "recipes.py").read_text()))
+        self.assertLessEqual(written, raised)
         guide = (REPO_ROOT / "reference" / "recipe-sources.md").read_text()
-        self.assertIn("active_time_uncertain", codes)
-        for code in sorted(codes):
+        for code in sorted(raised):
             with self.subTest(code=code):
                 self.assertIn(f"`{code}`", guide)
 
@@ -547,6 +564,28 @@ class ConvertTest(RoundTripMixin, unittest.TestCase):
                                     {"heading": "Treats", "note": "Weekends only."}])
         rendered = (MENU / "index.md").read_text(encoding="utf-8")
         self.assertEqual(recipes.legacy_slot_notes(rendered, ["lunch"]), ({}, []))
+
+    OLD_CARD = "---\nname: mince\nslot: [dinner]\nkcal: 500\nprotein: 40\ncarbs: 40\nfat: 20\n---\n\n# Mince\n\n"
+
+    def test_lines_differing_only_by_preparation_sum_into_one_valid_item(self):
+        text = self.OLD_CARD + "## Ingredients\n- 1 onion, chopped\n- 1 onion, sliced\n- 400 g beef mince\n"
+        draft, row = recipes.convert_yaml_card(text)
+        self.assertEqual([(i["item"], i["qty"], i["unit"]) for i in draft["ingredients"]],
+                         [("onion", 2, "each"), ("beef mince", 400, "g")])
+        self.assertEqual(row["ingredients"], 2)
+        self.assertEqual([a["item"] for a in row["guessed_aisles"]], ["onion", "beef mince"])
+        self.assertTrue(any("1 onion, chopped" in note and "1 onion, sliced" in note for note in row["notes"]),
+                        row["notes"])
+        failures = [r for r in recipes.validate_card(card_with(draft), config_from()) if r.status == "fail"]
+        self.assertEqual(failures, [])
+
+    def test_one_food_in_two_units_stays_separate_and_is_noted(self):
+        text = self.OLD_CARD + "## Ingredients\n- 1 tbsp olive oil\n- 100 ml olive oil\n- 400 g beef mince\n"
+        draft, row = recipes.convert_yaml_card(text)
+        self.assertEqual([(i["item"], i["qty"], i["unit"]) for i in draft["ingredients"]],
+                         [("olive oil", 1, "tbsp"), ("olive oil", 100, "ml"), ("beef mince", 400, "g")])
+        self.assertTrue(any("1 tbsp olive oil" in note and "100 ml olive oil" in note and "unit" in note
+                            for note in row["notes"]), row["notes"])
 
     def test_needs_front_matter(self):
         with self.assertRaises(recipes.ValidationError):

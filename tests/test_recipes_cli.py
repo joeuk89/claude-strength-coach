@@ -373,6 +373,17 @@ class ConvertCommandTest(CliMixin, unittest.TestCase):
             again = self.run_code(1, root, "recipes", "convert", "--apply", "--input", str(input_file), env=NOW)
             self.assertIn("not an old YAML card", again["error"]["message"])
 
+    def test_apply_accepts_a_card_whose_lines_differ_only_by_preparation(self):
+        with InstanceCopy(YAML_CARDS) as root:
+            (menu(root) / "mince.md").write_text(
+                "---\nname: mince\nslot: [dinner]\nkcal: 500\nprotein: 40\ncarbs: 40\nfat: 20\n---\n\n# Mince\n\n"
+                "## Ingredients\n- 1 onion, chopped\n- 1 onion, sliced\n- 400 g beef mince\n", encoding="utf-8")
+            data = reviewed(self.run_ok(root, "recipes", "convert", "--parse")["data"])
+            input_file = root / "reviewed.json"
+            input_file.write_text(json.dumps(data), encoding="utf-8")
+            self.run_ok(root, "recipes", "convert", "--apply", "--input", str(input_file), env=NOW)
+            self.assertIn('qty = 2\nunit = "each"\nitem = "onion"\n', recipes.read_text(menu(root) / "mince.md"))
+
     def test_apply_refuses_a_failing_card_and_writes_nothing(self):
         with InstanceCopy(YAML_CARDS) as root:
             data = reviewed(self.run_ok(root, "recipes", "convert", "--parse")["data"])

@@ -41,9 +41,10 @@ no-method cards skip it.
      set the real active minutes; totalTime is elapsed time, not active.
    - `time_missing`: the page gives no time. Set active minutes from the
      method.
-   - `incompatible_ingredient_units`: one food appears in units that
-     cannot be summed (`items`, with source `lines`). Merge them into one
-     exact unit per item; the card fails validation until you do.
+   - `incompatible_ingredient_units`: one food appears in units the
+     importer does not add together, such as tbsp and ml, or tsp and tbsp
+     (`items`, with source `lines`). Convert them into one exact unit per
+     item; the card fails validation until you do.
    - `slot_guessed`, `servings_missing`, `aisle_guessed`: fields it had
      to guess. Check each one.
    `reference/recipe-cards.md` ("Reviewing an import") explains what the
