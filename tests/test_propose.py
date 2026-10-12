@@ -906,7 +906,7 @@ class SkillWiringTest(unittest.TestCase):
 
     def test_program_week_computes_with_propose(self):
         compute, others = self.compute_and_other_steps()
-        for command in ("propose week", "propose override", "propose resolve", "propose finalize"):
+        for command in ("propose week", "propose override", "propose note", "propose resolve", "propose finalize"):
             with self.subTest(command=command):
                 self.assertIn(f"python3 -m coach {command}", compute)
         self.assertNotIn("propose ", others)

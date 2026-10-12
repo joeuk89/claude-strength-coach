@@ -54,13 +54,13 @@ class SheetsRenderTest(NoHevyCase):
         self.assertIn("|  | 3×8–10 | 25/hand | 8 | 120 s |  |", text)
         self.assertNotIn("Hevy", text)
 
-    def test_every_exercise_has_sets_load_rpe_rest_cues_and_an_empty_done_column(self):
+    def test_every_exercise_has_sets_load_rpe_rest_notes_cues_and_an_empty_done_column(self):
         self.render()
         text = self.text()
         self.assertEqual(text.count("| Exercise | Sets × reps | Load | RPE | Rest | Done |"), 2)
         self.assertIn("|  | 3×5 | 100 | 7 | 180 s |  |", text)
         self.assertIn("| Pull Up | 3×8 | BW | 8 | 120 s |  |", text)
-        self.assertIn("- **Back Squat (Barbell)**: Cues: brace · knees out", text)
+        self.assertIn("- **Back Squat (Barbell)**: Note: add 2.5 from last week · Cues: brace · knees out", text)
         self.assertIn("Focus: pause 1 s on the chest", text)
         self.assertIn("reply to the coach with what you did: the reps of every set with a range or a +", text)
         self.assertIn('the load you used where it says "choose the load"', text)

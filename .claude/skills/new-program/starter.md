@@ -23,8 +23,9 @@ a tested one than design one from scratch.
 3. **Ask once whether they know their working weights** for those
    priority lifts. Any they give become start loads, in their units and
    per hand for dumbbells. Every other loaded line runs a calibration
-   week with no load: its note asks them to choose a load they could
-   lift for the target reps at the target RPE.
+   week with no load: the proposal's note on it asks them to pick a load
+   they expect to lift for the target reps within the RPE shown, then
+   adjust after the first working set. Guess no number for them.
 4. **Draft:** run the same command without `--dry-run`, adding
    `--start-load <exercise id>=<load>` for each known weight, by the
    ids in the preview's `program.priority`. It writes

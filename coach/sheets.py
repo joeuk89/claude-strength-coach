@@ -28,6 +28,11 @@ HOW_TO_LOG = ('To log a session, reply to the coach with what you did: the reps 
               'RPE 8; bench 10, 9, 8 at RPE 9").')
 REP_OUT = ("A + set (5+) asks for at least those reps, then as many more as you can until the next rep would pass "
            "its RPE stop; it is not a set to failure. Log the reps you did.")
+RPE_KEY = ("RPE is your own estimate of how many more good reps you could have done, not a precise measure: "
+           "RPE 10 ≈ 0 reps left, RPE 9 ≈ 1 rep left, RPE 8 ≈ 2 reps left, RPE 7 ≈ 3 reps left.")
+RANGE_KEY = ("A rep range such as {start}–{end} means any count from {start} to {end} is on plan; within it, the "
+             "set's RPE target or stop decides where the set ends.")
+_GUIDANCE = (("Focus", "focus"), ("Note", "target_note"), ("Cues", "cues"))
 _SET_LABELS = {"warmup": "warm-up", "dropset": "drop set", "failure": "to failure"}
 
 
@@ -122,12 +127,23 @@ def _rows(line, name):
 
 
 def _notes(line, name):
-    parts = []
-    if line.get("focus"):
-        parts.append(f"Focus: {line['focus']}")
-    if line.get("cues"):
-        parts.append(f"Cues: {line['cues']}")
+    """Focus, note and cues, a note repeating the focus or cues left out."""
+    repeated = line.get("target_note") in (line.get("focus"), line.get("cues"))
+    parts = [f"{label}: {line[field]}" for label, field in _GUIDANCE
+             if line.get(field) and not (field == "target_note" and repeated)]
     return f"- **{name}**: " + " · ".join(parts) if parts else None
+
+
+def _beginner_key(doc):
+    """The RPE and rep-range key a beginner's sheets end with, for what the week prescribes."""
+    sets = [s for session in doc["sessions"] for line in session["exercises"] for s in line["sets"]
+            if overlay.is_working(s)]
+    key = [RPE_KEY] if any(s.get("rpe") is not None for s in sets) else []
+    ranges = [s["rep_range"] for s in sets if s.get("rep_range")]
+    found = next((r for r in ranges if r["start"] < r["end"]), None)
+    if found is not None:
+        key.append(RANGE_KEY.format(**found))
+    return key
 
 
 def render_sheets(root, overlay_id):
@@ -140,7 +156,8 @@ def render_sheets(root, overlay_id):
         return entry["name"] if entry else exercise_id
 
     span = doc["span"]
-    unit = config_module.load(root).athlete.units
+    athlete = config_module.load(root).athlete
+    unit = athlete.units
     lines = [header(doc["id"]), f"# Session sheets · week of {render.short_date(span['start'])}", "",
              f"Overlay `{doc['id']}` ({doc['kind'].replace('_', ' ')}) · {render.day_label(span['start'])} – "
              f"{render.day_label(span['end'])} · loads in {unit}"]
@@ -163,6 +180,8 @@ def render_sheets(root, overlay_id):
     if any(set_.get("rep_out") for session in doc["sessions"] for line in session["exercises"]
            for set_ in line["sets"]):
         lines += [REP_OUT, ""]
+    if athlete.experience == "beginner":
+        lines += [part for text in _beginner_key(doc) for part in (text, "")]
     lines.append(HOW_TO_LOG)
     return "\n".join(lines) + "\n"
 

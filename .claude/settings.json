@@ -99,6 +99,7 @@
       "Bash(python3 -m coach propose show:*)",
       "Bash(python3 -m coach propose week:*)",
       "Bash(python3 -m coach propose override:*)",
+      "Bash(python3 -m coach propose note:*)",
       "Bash(python3 -m coach propose resolve:*)",
       "Bash(python3 -m coach propose restore:*)",
       "Bash(python3 -m coach propose time:*)",

@@ -16,7 +16,7 @@ Overlay `2026-10-12-weekly` (weekly) · Mon 12 Oct – Sun 18 Oct · loads in kg
 | Bench Press (Dumbbell) | 1×10 warm-up | 12.5/hand |  |  |  |
 |  | 3×8–10 | 25/hand | 8 | 120 s |  |
 
-- **Back Squat (Barbell)**: Cues: brace · knees out
+- **Back Squat (Barbell)**: Note: add 2.5 from last week · Cues: brace · knees out
 - **Bench Press (Dumbbell)**: Focus: pause 1 s on the chest · Cues: elbows tucked · feet planted
 
 <a id="session-b"></a>
