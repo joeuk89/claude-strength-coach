@@ -135,8 +135,7 @@ _Avoid_: training goal (the profile's words), phase (reserved for bulk/cut/maint
 **Ordinary week**:
 A week adherence is judged on: not a deload or other light week, not a
 one-off, minimum or planned break week, and not inside a layoff of 11+
-days. Adherence
-looks at the last four, reaching back at most 12 weeks.
+days. Adherence looks at the last four, reaching back at most 12 weeks.
 _Avoid_: regular week, counted week
 
 **Planned session**:

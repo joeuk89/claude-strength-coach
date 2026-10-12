@@ -159,7 +159,7 @@ def questions(rotation, food, untagged=True, on_break=False):
         if on_break:
             gap += " Sessions on the planned break need no tag."
     else:
-        gap = f"The planned break covers every session not trained, so none needs a tag. {ill}"
+        gap = f"The planned break covers the remaining sessions not trained, so none needs a tag. {ill}"
     now = "Anything hurting, or different about kit, travel or schedule?"
     next_week = "Which days can you train next week?" + (f" {rotation}" if rotation else "")
     found = [("gap", QUESTION_LABELS["gap"], None, gap), ("now", QUESTION_LABELS["now"], None, now)]
@@ -248,15 +248,15 @@ def build(inst, card, window, end, today, now, live, workouts, food):
     rows, covered = planned(inst, window, card["sessions"]["rows"], workouts, today, card["sessions"]["on_break"])
     missed = [{"date": r["date"], "session_id": r["session_id"], "title": r["title"], "tag": r["tag"]}
               for r in rows if r["tier"] == "core" and r["status"] == "missed"]
-    rested = [{"date": r["date"], "session_id": r["session_id"], "title": r["title"], "break_id": r["break_id"]}
-              for r in rows if r["tier"] == "core" and r["status"] == stats.ON_BREAK]
+    on_break = [{"date": r["date"], "session_id": r["session_id"], "title": r["title"], "break_id": r["break_id"]}
+                for r in rows if r["tier"] == "core" and r["status"] == stats.ON_BREAK]
     found = {
         "layoff_days": card["days_since_last"],
         "summary": summary(inst, window, rows, covered, workouts, card["sessions"]["external"]),
         "missed": missed,
-        "on_break": rested,
+        "on_break": on_break,
         "questions": questions(rotation_text(inst, end), food, any(m["tag"] == "untagged" for m in missed),
-                               bool(rested)),
+                               bool(on_break)),
         "return_week": None, "return_week_problem": None, "write_line": None,
     }
     if live:
@@ -347,14 +347,14 @@ def summary_table(card):
     catch_up = card["catch_up"]
     external = bool(card["sessions"]["external"])
     optional = any(row["optional_trained"] for row in catch_up["summary"])
-    rested = any(row["on_break"] for row in catch_up["summary"])
-    head = ["Week of", "Core trained", "Missed"] + (["Planned break"] if rested else []) \
+    any_on_break = any(row["on_break"] for row in catch_up["summary"])
+    head = ["Week of", "Core trained", "Missed"] + (["Planned break"] if any_on_break else []) \
         + (["Optional"] if optional else []) + (["Coach-led done"] if external else []) + ["Workouts"]
     lines = ["| " + " | ".join(head) + " |", "| " + " | ".join("---" for _ in head) + " |"]
     for row in catch_up["summary"]:
         missed = ", ".join(f"{tag} {n}" for tag, n in row["missed_by_tag"].items()) or "none"
         cells = [render.short_date(row["start"]), f"{row['trained_core']} of {row['planned_core']}", missed]
-        if rested:
+        if any_on_break:
             cells.append(row["on_break"])
         if optional:
             cells.append(row["optional_trained"])

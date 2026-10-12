@@ -63,7 +63,7 @@ def problems(doc):
     for index, row in enumerate(doc["days"]):
         path = f"$.days[{index}]"
         if row["no_training"] and row["kind"] not in BREAK_KINDS:
-            errors.append(Error(f"{path}.no_training", f"a {row['kind']} row cannot be a planned break"))
+            errors.append(Error(f"{path}.no_training", f"{row['kind']} rows cannot be planned breaks"))
         if row["id"] in seen:
             errors.append(Error(f"{path}.id", f"{row['id']} appears twice"))
         seen.add(row["id"])

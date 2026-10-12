@@ -324,12 +324,12 @@ def _light_decision(inst, span):
     return False
 
 
-def _break_week(inst, span):
+def _break_week(inst, span, off=None):
     """True when a planned break covers a day of the week and every core and coach-led session the week plans.
 
     Overlays play no part beyond saying what was planned, so the same break counts the same with or without one.
     """
-    off = statusdays.break_days(inst.root, span)
+    off = statusdays.break_days(inst.root, span) if off is None else off
     if not off:
         return False
     planned = [dates.parse_date(session["date"]) for _, session in _planned_pairs(inst, span)
@@ -339,12 +339,14 @@ def _break_week(inst, span):
 
 
 def _kind(inst, span, activity, until):
-    if _break_week(inst, span):
+    off = statusdays.break_days(inst.root, span)
+    if _break_week(inst, span, off):
         return "break"
     kinds = set()
     for day in span.days():
         found = overlay.pick_in_force(inst.overlays, day)
-        if found:
+        # A one-off in force only on break days represents the break, so the days left keep ordinary accounting.
+        if found and not (found[0]["kind"] == "one_off" and day in off):
             kinds.add(found[0]["kind"])
     if "deload" in kinds or _light_decision(inst, span):
         return "light"
@@ -425,8 +427,8 @@ def _report(inst, span, rows, extra, sessions_by_key, workouts, on_break=()):
     sessions, planned_dose_, delivered, bonus, by_session, raised = [], {}, {}, {}, {}, []
     counted_planned = counted_trained = 0
     logged = []
-    skipped = [{"session_id": r["session_id"], "date": r["date"], "tier": inst.tier(r["session_id"]),
-                "break_id": r["break_id"]} for r in on_break]
+    break_rows = [{"session_id": r["session_id"], "date": r["date"], "tier": inst.tier(r["session_id"]),
+                   "break_id": r["break_id"]} for r in on_break]
     for row in rows:
         tier = inst.tier(row["session_id"])
         sessions.append(_session_row(row, tier, sessions_by_key[(row["date"], row["session_id"])]))
@@ -455,8 +457,8 @@ def _report(inst, span, rows, extra, sessions_by_key, workouts, on_break=()):
         logged.append((item["session_id"], item["date"], workout, muscles))
     for external in _external_rows(inst, span):
         if external["status"] == stats.ON_BREAK:
-            skipped.append({"external_id": external["external_id"], "date": external["date"],
-                            "break_id": external["break_id"]})
+            break_rows.append({"external_id": external["external_id"], "date": external["date"],
+                               "break_id": external["break_id"]})
             continue
         sessions.append(external)
         if external["status"] in ("done", "not_done"):
@@ -485,9 +487,9 @@ def _report(inst, span, rows, extra, sessions_by_key, workouts, on_break=()):
     muscles = {m: {"target": target.get(m), "planned": _round(planned_dose_.get(m, 0.0)),
                    "delivered": _round(delivered.get(m, 0.0)), "bonus": _round(bonus.get(m, 0.0))} for m in names}
     sessions.sort(key=lambda s: (s["date"], s.get("session_id") or s.get("external_id")))
-    skipped.sort(key=lambda s: (s["date"], s.get("session_id") or s.get("external_id")))
+    break_rows.sort(key=lambda s: (s["date"], s.get("session_id") or s.get("external_id")))
     return {"week": span.start.isoformat(), "label": span.label(), "span": span.to_json(), "kind": None,
-            "sessions": sessions, "planned": counted_planned, "trained": counted_trained, "on_break": skipped,
+            "sessions": sessions, "planned": counted_planned, "trained": counted_trained, "on_break": break_rows,
             "muscles": muscles, "by_session": by_session, "flags": raised}
 
 

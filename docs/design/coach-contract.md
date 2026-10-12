@@ -5608,7 +5608,11 @@ coach.structure.ordinary_weeks(root, until, n=4, reach=12) -> list[str]
   minimum plan file for the week, C40), `one_off`, `layoff`. A **break
   week** has a day a planned break covers (C50) and every core and
   coach-led session it plans on such a day, whatever overlay is or is not
-  in force, so the same break classes the same with or without one.
+  in force, so the same break classes the same with or without one. A
+  `one_off` overlay counts toward kind `one_off` only on days no planned
+  break covers: one in force only on break days represents the break, so
+  a partly covered week keeps ordinary accounting for the sessions left,
+  while one that also plans the days left still makes the week `one_off`.
   Session `status` from C18 adherence; external `status` `done`,
   `not_done`, `unconfirmed`.
 - `on_break` lists the sessions a planned break takes out of the week:
@@ -5939,7 +5943,9 @@ Flags (registered in `coach/flags/block.py`; rows in C20):
 - **Classes**, in order: `break`, `light`, `minimum` and `one_off` from
   `coach.structure.week` `kind` (`break`, `minimum` and `one_off` neither
   count nor reset; a break week is judged on planned-break coverage alone,
-  never on whether an overlay was written for it); `return` when a
+  never on whether an overlay was written for it, and a one-off in force
+  only on break days leaves a partly covered week to the classes below);
+  `return` when a
   session of the overlay in force carries a line decay past `0-10` and the last lifting workout before the first such
   session is more than 10 days back (R-02: a return week follows a
   layoff of 11+ days, so one stale lift rotated back in never ends a

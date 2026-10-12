@@ -39,14 +39,14 @@ def overlay_status(ctx):
                  if day >= today and day not in off and not overlay_module.pick_in_force(docs, day)]
     if uncovered and any(day in off for day in coming.days()) and _is_break_week(ctx, coming, today):
         uncovered = []
-    resting = today in off or (not uncovered and any(day in off for day in coming.days()))
+    on_break = today in off or (not uncovered and any(day in off for day in coming.days()))
     summary = _summary(ctx.root, shown, audit, hevy_on, off) if shown else None
 
     if current:
         head = f"Overlay in force today: {_describe(summary)}."
     elif upcoming:
         head = f"No overlay is in force today; the next is {_describe(summary, with_first=True)}."
-    elif resting:
+    elif on_break:
         head = "No overlay is in force today and none is needed: the athlete agreed a planned break."
     else:
         head = "No overlay is in force today and none is planned; plan the week with /program-week."
@@ -59,7 +59,7 @@ def overlay_status(ctx):
     if uncovered:
         lines.append(f"No overlay covers {_days(uncovered)} in the coming week; plan it with /program-week.")
 
-    attention = bool(uncovered) or (shown is None and not resting) or (
+    attention = bool(uncovered) or (shown is None and not on_break) or (
         shown is not None and summary["state"] not in _SETTLED)
     data = {
         "in_force": summary if current else None,

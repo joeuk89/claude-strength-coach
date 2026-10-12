@@ -185,7 +185,7 @@ class CatchUpTest(BreakCase):
         self.assertEqual([(row["planned_core"], row["missed_by_tag"], row["on_break"]) for row in catch_up["summary"]],
                          [(0, {}, 2), (0, {}, 2)])
         gap = next(q for q in catch_up["questions"] if q["id"] == "gap")["ask"]
-        self.assertTrue(gap.startswith("The planned break covers every session not trained, so none needs a tag."))
+        self.assertTrue(gap.startswith("The planned break covers the remaining sessions not trained, so none needs a tag."))
         tagged = self.data("checkin", "tag-gap", "--tag", "other", now=CLOSE_DAY)
         self.assertEqual(tagged["annotations"], [])
 
@@ -255,6 +255,27 @@ class BlockCloseTest(BreakCase):
         closed = self.close("2026-W43", now="2026-10-25T18:00:00Z")
         self.assertEqual([(w["class"], w["planned"], w["on_break"], w["count_after"]) for w in closed["weeks"]],
                          [("hard", 1, 2, 5)])
+
+    def test_a_one_off_overlay_over_only_the_break_days_leaves_a_partial_break_counted_as_usual(self):
+        self.add_break("--kind", "travel", "--from", "2026-10-19", "--to", "2026-10-20", "--note", "Away",
+                       "--no-training")
+        self.write_overlay("2026-10-19-one-off", "one_off", {"start": "2026-10-19", "end": "2026-10-20"},
+                           ["2026-10-19"])
+        self.copy_workout("2026-10-15", "2026-10-22")
+        report = structure.week(self.root, "2026-10-19", today=date(2026, 10, 25))
+        self.assertEqual((report["kind"], report["planned"], report["trained"]), ("ordinary", 1, 1))
+        closed = self.close("2026-W43", now="2026-10-25T18:00:00Z")
+        self.assertEqual([(w["class"], w["planned"], w["on_break"], w["count_after"]) for w in closed["weeks"]],
+                         [("hard", 1, 2, 5)])
+
+    def test_a_one_off_overlay_planning_the_days_left_still_pauses_a_partial_break(self):
+        self.add_break("--kind", "travel", "--from", "2026-10-19", "--to", "2026-10-20", "--note", "Away",
+                       "--no-training")
+        self.write_overlay("2026-10-19-one-off", "one_off", {"start": "2026-10-19", "end": "2026-10-25"},
+                           ["2026-10-19", "2026-10-22"])
+        self.copy_workout("2026-10-15", "2026-10-22")
+        closed = self.close("2026-W43", now="2026-10-25T18:00:00Z")
+        self.assertEqual([(w["class"], w["count_after"]) for w in closed["weeks"]], [("one_off", 4)])
 
     def test_a_partial_break_still_counts_a_missed_remaining_session(self):
         self.add_break("--kind", "travel", "--from", "2026-10-19", "--to", "2026-10-20", "--note", "Away",
