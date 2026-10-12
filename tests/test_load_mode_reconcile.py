@@ -55,10 +55,21 @@ class Case(unittest.TestCase):
         self.assertEqual(found, code, (argv, envelope, stderr))
         return envelope
 
+    def confirm_table(self, root, corrections=None):
+        """Setup's load-mode table: every unconfirmed row recorded with set-mode, applying the athlete's corrections."""
+        corrections = corrections or {}
+        modes = {line["exercise_id"]: line["load_mode"]
+                 for session in read(root / DRAFT)["program"]["sessions"] for line in session["exercises"]}
+        report = self.ok(root, "program", "adopt", "--input", str(root / DRAFT), "--dry-run")["data"]
+        for entry in report["unconfirmed"]:
+            exercise_id = entry["exercise_id"]
+            self.ok(root, "library", "set-mode", exercise_id, corrections.get(exercise_id, modes[exercise_id]))
+
     def adopted_ppl(self):
-        """The push/pull/legs starter adopted with cable fly at 20, before its load mode was confirmed."""
+        """The push/pull/legs starter adopted with cable fly at 20 and its load-mode table confirmed as drafted."""
         root = instance(self, EMPTY)
         self.ok(root, "starters", "draft", "push-pull-legs", "--start-load", "cable_fly=20")
+        self.confirm_table(root)
         self.ok(root, "program", "adopt", "--input", str(root / DRAFT))
         return root
 
@@ -248,7 +259,7 @@ class BeforeAdoptionTest(Case):
     def test_a_corrected_row_is_reconciled_in_the_draft_and_then_adopts(self):
         root = instance(self, EMPTY)
         self.ok(root, "starters", "draft", "push-pull-legs", "--start-load", "cable_fly=20")
-        self.ok(root, "library", "set-mode", "cable_fly", "per_hand_x2")
+        self.confirm_table(root, {"cable_fly": "per_hand_x2"})
 
         error = self.fails(root, "program", "adopt", "--input", str(root / DRAFT), "--dry-run")["error"]
         self.assertEqual([d["path"] for d in error["details"]], ["$.program.sessions[0].exercises[4].load_mode"])
