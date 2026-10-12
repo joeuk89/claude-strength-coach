@@ -873,6 +873,11 @@ def import_jsonld(page_html, url=None):
     collected = _collect_ingredients([_clean(line) for line in (lines if isinstance(lines, list) else [lines])])
     if collected.ingredients:
         draft["ingredients"] = collected.ingredients
+    if collected.summed_lines:
+        flags.append({"code": "summed_ingredient_lines", "items": list(collected.summed_lines),
+                      "lines": [line for item_lines in collected.summed_lines.values() for line in item_lines],
+                      "message": "lines for the same food and unit were added into one quantity; check each "
+                                 "line buys the same product"})
     if collected.mixed_lines:
         flags.append({"code": "incompatible_ingredient_units", "items": list(collected.mixed_lines),
                       "lines": [line for item_lines in collected.mixed_lines.values() for line in item_lines],
@@ -1046,20 +1051,13 @@ def convert_yaml_card(text, slug=None):
     notes += [f"front matter key {key} is not carried over" for key in meta if key not in _LEGACY_KEYS]
     draft["per_serving"] = {k: (0 if v is None else v) for k, v in draft["per_serving"].items()}
 
-    ingredients, unparsed, guessed_aisles, variations = [], [], [], []
+    ingredient_lines, variations = [], []
     for heading, chunk in _sections(body):
         if heading is None:
             continue
         bullets = [line.strip() for line in chunk.splitlines()[1:] if re.match(r"^\s*[-*]\s", line)]
         if heading.lower() == "ingredients":
-            collected = _collect_ingredients([re.sub(r"^[-*]\s*", "", line) for line in bullets])
-            ingredients, unparsed = collected.ingredients, collected.unparsed
-            guessed_aisles = [{"item": i["item"], "aisle": i["aisle"], "matched": i["item"] not in collected.guessed}
-                              for i in ingredients]
-            notes += [f"{item}: {len(item_lines)} lines summed into one quantity ({'; '.join(item_lines)})"
-                      for item, item_lines in collected.summed_lines.items()]
-            notes += [f"{item} is in more than one unit ({'; '.join(item_lines)}); reconcile to one unit"
-                      for item, item_lines in collected.mixed_lines.items()]
+            ingredient_lines += [re.sub(r"^[-*]\s*", "", line) for line in bullets]
         elif heading.lower() == "variations":
             for line in bullets:
                 variation, note = _variation_from_line(line)
@@ -1069,6 +1067,14 @@ def convert_yaml_card(text, slug=None):
                 variations.append(variation)
                 if note:
                     notes.append(note)
+    collected = _collect_ingredients(ingredient_lines)
+    ingredients, unparsed = collected.ingredients, collected.unparsed
+    guessed_aisles = [{"item": i["item"], "aisle": i["aisle"], "matched": i["item"] not in collected.guessed}
+                      for i in ingredients]
+    notes += [f"{item}: {len(item_lines)} lines summed into one quantity ({'; '.join(item_lines)})"
+              for item, item_lines in collected.summed_lines.items()]
+    notes += [f"{item} is in more than one unit ({'; '.join(item_lines)}); reconcile to one unit"
+              for item, item_lines in collected.mixed_lines.items()]
     if ingredients:
         draft["ingredients"] = ingredients
     if variations:

@@ -216,12 +216,14 @@ clauses such as `crushed`, `thinly sliced`, `drained and rinsed` and
 red/yellow and cooked/raw.
 
 Duplicate quantities add only for the same normalised item and unit
-(including supported kg-to-g and litre-to-ml conversions). Incompatible
-units stay as separate entries with `incompatible_ingredient_units`;
-reconcile them to one exact unit per item before validation. Do not add
-millilitres to tablespoons as if they were equal. `aisle_guessed` names
-items whose aisle needs checking; supported food phrases such as egg
-noodles take precedence over misleading tokens.
+(including supported kg-to-g and litre-to-ml conversions), and
+`summed_ingredient_lines` names each summed item with its source lines.
+Incompatible units stay as separate entries with
+`incompatible_ingredient_units`; reconcile them to one exact unit per
+item before validation. Do not add millilitres to tablespoons as if they
+were equal. `aisle_guessed` names items whose aisle needs checking;
+supported food phrases such as egg noodles take precedence over
+misleading tokens.
 
 `time_min` is always **active minutes**. JSON-LD `totalTime` is elapsed
 time, and `prepTime` does not establish how much cooking is active. The
@@ -241,11 +243,12 @@ fail `recipes validate`. To convert a bank:
    card plus a review table: title, macros, ingredient count, ingredient
    lines it could not read, the aisle it guessed for each ingredient, the
    variations whose `changes` need filling in, and notes (front matter it
-   could not read, for one). Ingredient lines follow the import rules in
-   "Reviewing an import": lines for the same item and unit are summed and
-   noted, and an item in two units is noted for you to reconcile. It also reads the old index's slot notes
-   (the prose under each slot heading) and returns them as
-   `slot_notes_toml`, listed under the card table. It writes nothing.
+   could not read, for one). Ingredient lines, from every
+   `## Ingredients` section, follow the import rules in "Reviewing an
+   import": lines for the same item and unit are summed and noted, and an
+   item in two units is noted for you to reconcile. It also reads the old
+   index's slot notes (the prose under each slot heading) and returns them
+   as `slot_notes_toml`, listed under the card table. It writes nothing.
 2. Walk the table with the athlete: add the unread ingredients exactly,
    correct the aisles, and give each variation its `changes`. Save the
    corrected drafts as `{"cards": [{"slug": ..., "card": {...}}]}`.

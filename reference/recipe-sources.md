@@ -45,6 +45,10 @@ no-method cards skip it.
      importer does not add together, such as tbsp and ml, or tsp and tbsp
      (`items`, with source `lines`). Convert them into one exact unit per
      item; the card fails validation until you do.
+   - `summed_ingredient_lines`: lines for the same food and unit were
+     added into one quantity (`items`, with source `lines`). Check the
+     lines buy the same product: "beef, diced" and "beef, minced" do not,
+     so split them into two items.
    - `slot_guessed`, `servings_missing`, `aisle_guessed`: fields it had
      to guess. Check each one.
    `reference/recipe-cards.md` ("Reviewing an import") explains what the

@@ -3469,9 +3469,10 @@ the block after TOML parsing):
   Flag codes: `unparsed_ingredients` (with `lines`), `missing_nutrition`,
   `per_serving_doubt`, `macro_sum` (with `severity`), `slot_guessed`,
   `servings_missing`, `time_missing`, `active_time_uncertain` (with raw
-  `source_times`), `aisle_guessed`, `incompatible_ingredient_units` (with
-  `items` and source `lines`). Resolve flags before athlete approval and
-  writing a card. Ingredient rules, shared with `recipes convert`:
+  `source_times`), `aisle_guessed`, `incompatible_ingredient_units` and
+  `summed_ingredient_lines` (each with `items` and source `lines`).
+  Resolve flags before athlete approval and writing a card. Ingredient
+  rules, shared with `recipes convert`:
   - Compound quantities that cannot be read exactly stay in
     `unparsed_ingredients`.
   - Supported preparation clauses, alone or joined by "and", are removed
@@ -3493,9 +3494,11 @@ the block after TOML parsing):
   (count), `variations_to_fill` (names; none on eat-out cards), `notes`
   (including every front-matter line it could not read, every key it
   does not carry over, each item summed from several lines and each item
-  left in more than one unit, with its source lines). `slot_notes` maps each configured slot to the prose
-  under its heading in the old hand-kept index; `slot_notes_toml` is that
-  map as a `[nutrition.bank.slot_notes]` table for the coach to add to
+  left in more than one unit, with its source lines). Ingredient lines
+  come from every `## Ingredients` section. `slot_notes` maps each
+  configured slot to the prose under its heading in the old hand-kept
+  index; `slot_notes_toml` is that map as a
+  `[nutrition.bank.slot_notes]` table for the coach to add to
   `config.toml`; `slot_notes_unplaced` lists `{heading, note}` for prose
   under no slot heading. The table lists the slot notes after the cards.
   `--apply --input FILE` takes `{cards: [{slug, card}]}`, refuses (exit 1,
