@@ -16,6 +16,7 @@ from coach import program as program_module
 from coach.activity.store import ActivityStore
 from coach.activity import associations
 from coach.cardio_matching import QUALITY_WORDS, resolve
+from coach.config_tables.cardio import CARDIO
 
 CITES = ("rn:running-load.1", "rn:running-load.2", "rn:running-load.3", "rn:running-load.4")
 PLAN_TIERS = ("review", "program")
@@ -121,7 +122,8 @@ def quality_of(activity, planned, rpe_min):
     return False, "none"
 
 
-def match(planned, logged, move_days, today=None, associations=None, quality_rpe_min=7):
+def match(planned, logged, move_days, today=None, associations=None,
+          quality_rpe_min=CARDIO.keys["quality_rpe_min"].default):
     """Match only mutually unique identities; unresolved candidates never supply inferred quality."""
     plans = sorted(planned, key=lambda p: (p["date"], p["id"]))
     acts = sorted(logged, key=lambda a: (a["local_date"], a["start"], a["id"]))
@@ -136,12 +138,16 @@ def match(planned, logged, move_days, today=None, associations=None, quality_rpe
         else:
             moved = None
             status = "upcoming" if today is not None and dates.parse_date(plan["date"]) >= today else "missed"
-        if pi in plan_review:
+        reason = plan_review.get(pi)
+        twin = None if act or reason else _twin(pi, plans, pairs)
+        if reason:
             status = "ambiguous"
+        elif twin:
+            status, reason = "duplicate", f"duplicates {twin}, planned by another source and matched"
         item = _item(status, plan, act, moved)
-        item.update(match_basis=basis.get(pi, []), review_reason=plan_review.get(pi),
+        item.update(match_basis=basis.get(pi, []), review_reason=reason,
                     candidate_ids=sorted(acts[ai]["id"] for p, ai in candidates if p == pi)
-                    if pi in plan_review else [])
+                    if status == "ambiguous" else [])
         items.append(item)
     for ai, act in enumerate(acts):
         if ai not in pairs.values():
@@ -156,6 +162,17 @@ def match(planned, logged, move_days, today=None, associations=None, quality_rpe
     return sorted(items, key=lambda i: (i["date"], i["planned_id"] or "", i["activity_id"] or ""))
 
 
+def _twin(pi, plans, pairs):
+    """The matched plan another source made for the same day, kind and quality as this one."""
+    plan = plans[pi]
+    for other in sorted(pairs):
+        twin = plans[other]
+        if (twin.get("source") != plan.get("source") and (twin["date"], twin["kind"]) == (plan["date"], plan["kind"])
+                and bool(twin["quality"]) == bool(plan["quality"])):
+            return twin["id"]
+    return None
+
+
 def _item(status, plan, act, moved):
     target = (plan or {}).get("target") or {}
     actual = {"distance_meters": act.get("distance_meters") if act else None,
@@ -167,7 +184,7 @@ def _item(status, plan, act, moved):
         "date": plan["date"] if plan else act["local_date"], "activity_date": act["local_date"] if act else None,
         "moved_days": moved if status == "moved" else None, "kind": (plan or act)["kind"],
         "title": plan["title"] if plan else act.get("name"), "target": plan.get("target") if plan else None,
-        "actual": actual, "delta": delta, "quality": bool(plan["quality"]) if plan else None,
+        "actual": actual, "delta": delta, "quality": bool(plan["quality"]) if plan else None, "quality_basis": None,
         "_planned": plan, "_activity": act,
     }
 
@@ -253,7 +270,7 @@ class _Week:
         which already counts.
         """
         return [_planned_bout(i["_planned"]) for i in self.items
-                if i["_planned"] and not i["_activity"] and self._still_ahead(i)
+                if i["_planned"] and not i["_activity"] and i["status"] != "duplicate" and self._still_ahead(i)
                 and self.span.contains(dates.parse_date(i["date"]))
                 and (self.today is None or dates.parse_date(i["date"]) >= self.today)]
 

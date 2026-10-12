@@ -386,6 +386,44 @@ class IdentityTest(CardioCase):
         self.assertEqual([(b.date.isoformat(), b.source, b.ref, b.quality) for b in found if b.kind == "run"],
                          [("2026-10-12", "planned", "manual:mon", True)])
 
+    def test_a_tempo_planned_by_two_sources_and_run_on_the_day_counts_once_as_quality(self):
+        from coach import config as config_module
+
+        tempo = [dict(plan(f"{source}:t1", "2026-10-06", 8000, True, title="Tempo"), source=source)
+                 for source in ("manual", "runna")]
+        self.set_records(tempo, [activity("manual:r", "2026-10-06", 8050, name="Outdoor Run")])
+        expected = [("done", "manual:t1", "manual:r", True, "planned"), ("duplicate", "runna:t1", None, True, None)]
+        span = dates.parse_week("2026-W41", "monday")
+        for now in (NOW, "2026-10-06T18:00:00Z"):
+            with self.subTest(now=now):
+                rows = self.coach("cardio", "reconcile", "--week", "2026-W41", now=now)["data"]["items"]
+                self.assertEqual([(i["status"], i["planned_id"], i["activity_id"], i["quality"], i["quality_basis"])
+                                  for i in rows], expected)
+                self.assertIn("manual:t1", rows[1]["review_reason"])
+                today = dates.parse_date(now[:10])
+                found = cardio.flag_bouts(self.root, config_module.load(self.root), span, today)
+                self.assertEqual([(b.source, b.ref, b.quality) for b in found if b.kind == "run"],
+                                 [("logged", "manual:r", True)])
+        week = self.data("cardio", "week", "--week", "2026-W41")
+        bout = next(b for b in week["bouts"] if b["ref"] == "manual:r")
+        self.assertEqual((week["run"]["quality"], bout["planned_id"], bout["srpe"]),
+                         (1, "manual:t1", {"rpe": 7, "load": 210, "method": "planned"}))
+        self.assertEqual(cardio.match(tempo, [activity("manual:r", "2026-10-06", 8050)], 3),
+                         cardio.match(list(reversed(tempo)), [activity("manual:r", "2026-10-06", 8050)], 3))
+
+    def test_a_double_day_from_one_source_with_one_run_leaves_the_other_missed(self):
+        plans = [plan("manual:am", "2026-10-06", 5000), plan("manual:pm", "2026-10-06", 5000)]
+        rows = cardio.match(plans, [activity("manual:r", "2026-10-06", 5000)], 3)
+        self.assertEqual([(i["status"], i["planned_id"], i["activity_id"]) for i in rows],
+                         [("done", "manual:am", "manual:r"), ("missed", "manual:pm", None)])
+
+    def test_every_reconcile_row_has_one_shape(self):
+        self.set_records([plan("manual:p", "2026-10-06", 5000), plan("manual:q", "2026-10-10", 5000, True)],
+                         [activity("manual:a", "2026-10-06", 5000)])
+        rows = self.reconcile()
+        self.assertEqual(len({tuple(sorted(i)) for i in rows}), 1)
+        self.assertEqual([(i["status"], i["quality_basis"]) for i in rows], [("done", "planned"), ("missed", None)])
+
     def test_associate_rejections_write_nothing(self):
         self.set_records([plan("manual:p", "2026-10-06", 10000), plan("manual:far", "2026-10-11", 10000),
                           dict(plan("manual:ride", "2026-10-06", None), kind="ride"),

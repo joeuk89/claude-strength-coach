@@ -68,9 +68,10 @@ def _nearest(choices, basis, gaps):
 def _choose(remaining, evidence, plans, gaps):
     """Each plan's and each activity's preferred edges for one round of mutual matching.
 
-    An activity tied between plans of one quality takes the nearest date: no quality can transfer.
-    A plan whose candidates all identify with its quality pool, and fit in it, also takes the
-    nearest date, so distance noise cannot pull identical plans onto each other's runs.
+    An activity tied between plans of one quality takes the nearest date, and among plans on that
+    one date the lowest ID: no quality can transfer. A plan whose candidates all identify with its
+    quality pool, and fit in it, also takes the nearest date, so distance noise cannot pull
+    identical plans onto each other's runs.
     """
     by_plan, by_activity = {}, {}
     for edge in remaining:
@@ -81,6 +82,8 @@ def _choose(remaining, evidence, plans, gaps):
     for ai, (choices, basis) in identified.items():
         if len({_planned_quality(plans[pi]) for pi, _ in choices}) == 1:
             choices, basis = _nearest(choices, basis, gaps)
+            if len({plans[pi]["date"] for pi, _ in choices}) == 1:
+                choices = {min(choices, key=lambda edge: plans[edge[0]]["id"])}
         activity_choices[ai] = choices, basis
     plan_choices = {}
     for pi, edges in by_plan.items():

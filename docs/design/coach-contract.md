@@ -6392,34 +6392,40 @@ for both.
   A unique candidate can match a shorter or longer completion.
 - Date proximity then settles what identity leaves tied, where no quality
   can transfer: an activity tied between plans of one quality takes the
-  unique nearest plan; a plan whose candidate activities each identify only
-  with plans of its quality, no more activities than those plans, takes
-  the unique nearest activity. So identical plans run on their days are
-  `done` despite small distance differences. A tie between plans of
-  different quality, or an equal date gap, remains ambiguous. Conditioning
-  retains C48's kind precedence in matching: it is quality regardless of a
-  plan's quality flag, low logged RPE or easy wording. Matches are
-  one-to-one and input-order independent.
+  unique nearest plan, or the lowest plan ID among nearest plans sharing
+  one date; a plan whose candidate activities each identify only with
+  plans of its quality, no more activities than those plans, takes the
+  unique nearest activity. So identical plans run on their days are `done`
+  despite small distance differences. A tie between plans of different
+  quality, or an equal date gap to different dates, remains ambiguous.
+  Conditioning retains C48's kind precedence in matching: it is quality
+  regardless of a plan's quality flag, low logged RPE or easy wording.
+  Matches are one-to-one and input-order independent.
 - A matched local date is `done`; a different date is `moved`, with
   `moved_days`. Unmatched plans before today are `missed`, otherwise
-  `upcoming`; unmatched activities are `extra`. Tied or conflicting
-  candidates are `ambiguous`, with separate plan and activity rows,
-  `candidate_ids` and `review_reason`. These activities inherit no plan's
-  quality or estimated effort. Duplicate plans are not silently consumed.
+  `upcoming`; unmatched activities are `extra`. An unmatched plan from
+  another source for the same day, kind and quality as a matched plan is
+  `duplicate` (C30): it is neither missed nor a planned bout, and its
+  `review_reason` names the matched plan. Tied or conflicting candidates
+  are `ambiguous`, with separate plan and activity rows, `candidate_ids`
+  and `review_reason`. These activities inherit no plan's quality or
+  estimated effort.
 - Matching resolves the whole live store before selecting a week's rows:
   a move across a week boundary has the same identity in either week.
   Weekly totals still count only activities logged inside that week.
 - Each item: `{status, planned_id, activity_id, date, activity_date,
-  moved_days, kind, title, target, actual, delta, quality, match_basis,
-  candidate_ids, review_reason}`. `actual` and `delta` contain
+  moved_days, kind, title, target, actual, delta, quality, quality_basis,
+  match_basis, candidate_ids, review_reason}`. `actual` and `delta` contain
   `distance_meters` and `duration_seconds`; deltas are actual minus target
   where both exist. Rendering converts the magnitude then applies the
   sign, leaving actual-distance validation nonnegative. A matched or
   unmatched activity's `quality` and `quality_basis` follow C48, including
-  logged RPE precedence; a plan-only row retains its intended quality.
-  `match_basis` identifies the independent evidence or explicit link;
-  weekly bout JSON also carries `planned_id` and `match_basis` beside
-  sRPE's estimation method. `summary` counts each status.
+  logged RPE precedence; a plan-only row retains its intended quality, with
+  `quality_basis` null. `match_basis` lists what decided a match:
+  `explicit_association`, `unique_candidate`, or the measures that split a
+  tie (`name`, `quality`, `distance_meters`, `duration_seconds`, `effort`,
+  `date_proximity`); it is empty on unmatched rows. Weekly bout JSON also
+  carries `planned_id` and `match_basis` beside sRPE's estimation method. `summary` counts each status.
 - `cardio associate ACTIVITY_ID --planned-id PLANNED_ID [--dry-run]`
   stores an explicit link; `--clear` removes it. Giving neither or both
   exits 2; any rule below that refuses exits 1 and writes nothing. Both IDs must be live,

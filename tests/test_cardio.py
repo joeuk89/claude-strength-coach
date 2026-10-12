@@ -219,12 +219,12 @@ class ReconcileTest(CardioCase):
     def test_upcoming_plans_and_a_duplicate_plan(self):
         data = self.data("cardio", "reconcile", "--week", "2026-W42")
         self.assertEqual([i["status"] for i in data["items"]], ["upcoming", "upcoming"])
-        planned = [{"id": "a:1", "date": "2026-10-06", "kind": "run", "title": "x", "quality": False, "target": None},
-                   {"id": "b:1", "date": "2026-10-06", "kind": "run", "title": "x", "quality": False, "target": None}]
+        planned = [{"id": f"{s}:1", "source": s, "date": "2026-10-06", "kind": "run", "title": "x", "quality": False,
+                    "target": None} for s in ("a", "b")]
         logged = [{"id": "manual:r", "local_date": "2026-10-06", "kind": "run", "start": "2026-10-06T07:00:00Z",
                    "distance_meters": None, "duration_seconds": 1800}]
-        statuses = sorted(i["status"] for i in cardio.match(planned, logged, 3, dates.parse_date("2026-10-11")))
-        self.assertEqual(statuses, ["ambiguous", "ambiguous", "ambiguous"])
+        items = cardio.match(planned, logged, 3, dates.parse_date("2026-10-11"))
+        self.assertEqual([(i["status"], i["planned_id"]) for i in items], [("done", "a:1"), ("duplicate", "b:1")])
 
     def test_tied_activities_remain_ambiguous(self):
         planned = [{"id": "p", "date": "2026-10-08", "kind": "run", "title": "x", "quality": False, "target": None}]

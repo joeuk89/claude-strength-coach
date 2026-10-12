@@ -32,6 +32,8 @@ class CheckInSkillTest(unittest.TestCase):
         analyse = flat(step_text("check-in", "analyze.md"))
         self.assertIn("`ambiguous` reconcile row", analyse)
         self.assertIn("python3 -m coach cardio associate ACTIVITY_ID --planned-id PLANNED_ID", analyse)
+        self.assertIn("A `duplicate` row is a session another source also planned and the athlete did: "
+                      "never call it missed", analyse)
 
     def test_carries_no_e1rm_formula(self):
         self.assertIsNone(re.search(r"Epley|reps\s*/\s*30|1 \+ reps", self.text))

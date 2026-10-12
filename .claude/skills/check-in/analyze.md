@@ -27,7 +27,8 @@ athlete hit the prescribed load × reps @ RPE?
   An `ambiguous` reconcile row has no confident match and lends no plan
   its quality: show the athlete its `candidate_ids`, and once they say
   which run was which plan, run `python3 -m coach cardio associate
-  ACTIVITY_ID --planned-id PLANNED_ID`.
+  ACTIVITY_ID --planned-id PLANNED_ID`. A `duplicate` row is a session
+  another source also planned and the athlete did: never call it missed.
 - When an outside running plan or endurance event is relevant, consult
   `reference/runner-review.md` for its strength and fuelling claims,
   using the Sunday reply. Otherwise skip runner-specific research and
