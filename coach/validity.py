@@ -289,8 +289,7 @@ class _Checker:
                     self.flag("load_mode_mismatch", session, line,
                               f"{self.where(session, line)}: {'; '.join(found)}")
                 if self.library and confirmed is None:
-                    self.flag(UNCONFIRMED, session, line, unconfirmed_message(
-                        self.library, line["exercise_id"], line["load_mode"], self.where(session, line)))
+                    self.flags.append(_unconfirmed_flag(self.library, session, line))
 
     def illness(self):
         """(date, reason) of the first session back when an `ill` miss or status day falls in the gap before it."""
@@ -503,23 +502,22 @@ class _Checker:
                       f"against a {cap} min cap")
 
 
-def unconfirmed_message(library, exercise_id, mode, where):
-    """Why a line's exercise is not ready, naming the command that settles it once the athlete agrees the mode."""
-    return (f"{where}: no confirmed load mode in the library; once the athlete confirms how they load it, run "
-            f"{library.mode_repair(exercise_id, mode)}")
-
-
 def unconfirmed_flags(root, doc):
     """A `load_mode_unconfirmed` flag for each line whose exercise has no confirmed load mode.
 
     Raises ValidationError when the library cannot be read.
     """
     library = Library.load(root)
-    return [flags.make(UNCONFIRMED, session_id=session["session_id"], exercise_id=line["exercise_id"],
-                       message=unconfirmed_message(library, line["exercise_id"], line["load_mode"],
-                                                   _where(session, line)))
+    return [_unconfirmed_flag(library, session, line)
             for session in doc["sessions"] for line in session["exercises"]
             if library.effective_load_mode(line["exercise_id"]) is None]
+
+
+def _unconfirmed_flag(library, session, line):
+    exercise_id = line["exercise_id"]
+    return flags.make(UNCONFIRMED, session_id=session["session_id"], exercise_id=exercise_id, message=(
+        f"{_where(session, line)}: no confirmed load mode in the library; once the athlete confirms how they load "
+        f"it, run {library.mode_repair(exercise_id, line['load_mode'])}"))
 
 
 def _where(session, line):

@@ -1004,8 +1004,12 @@ for every non-GET request, success or failure, once its retries are over.
   untouched. It also refuses (exit 3) while any line's exercise has no
   confirmed load mode, whatever the stored flags say, listing a
   `load_mode_unconfirmed` detail per line, so an overlay is never
-  approved while `load_modes_confirmed` would fail on it. An invalid
-  library exits 1. `overlay build` warns once per such line.
+  approved while `load_modes_confirmed` would fail on it. A stored
+  unresolved `load_mode_unconfirmed` flag whose exercise is now confirmed
+  still refuses, naming `prescription check --overlay ID --write`, since
+  push refuses on stored blocks. An invalid library exits 1.
+  `overlay build` warns once per such line, and nothing when the library
+  is invalid.
 - Later versions: v2 adds line `provenance` (R-24, C21); v3 adds line
   `fold` and session `moved_from` (R-22, C37).
 
@@ -2601,7 +2605,8 @@ id follows C10. `data.lines_digest` (R-21b) is the C7 canonical hash of
   changes one line, keeps the original in the line's C10 `override.proposed_sets`,
   and records a C25 decision when standing.
 - `propose resolve --proposal ID --flag INDEX --resolution TEXT` resolves
-  one flag on the draft.
+  one flag on the draft. It refuses (exit 3) a `load_mode_unconfirmed`
+  flag, which only a confirmed load mode clears.
 - `propose restore --proposal ID --session S --reason TEXT [--dry-run]` (R-44b) puts
   a dropped conditioning session back and resolves its flag with the
   reason; finalize accepts it.

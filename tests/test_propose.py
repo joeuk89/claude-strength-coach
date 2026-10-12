@@ -627,6 +627,16 @@ class FinalizeTest(ProposeCase):
         super().setUp()
         self.propose()
 
+    def test_a_missing_load_mode_cannot_be_resolved_by_hand(self):
+        self.edit_json("data/exercises.json", lambda doc: doc["exercises"].setdefault("bb_back_squat", {}).update(
+            load_mode=None))
+        data = self.propose()
+        index = next(i for i, f in enumerate(data["overlay"]["flags"]) if f["code"] == "load_mode_unconfirmed")
+        envelope = self.coach("propose", "resolve", "--proposal", data["overlay"]["id"], "--flag", str(index),
+                              "--resolution", "the athlete knows it", expect=3)
+        self.assertIn("python3 -m coach library set-mode bb_back_squat", envelope["error"]["message"])
+        self.assertFalse(read_json(self.draft_path(data["overlay"]["id"]))["flags"][index]["resolved"])
+
     def test_an_unexplained_hand_edit_exits_1(self):
         def edit(doc):
             working(find_line(doc, "bb_back_squat"))[0]["load"] = 92.5

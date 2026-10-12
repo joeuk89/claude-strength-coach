@@ -193,6 +193,25 @@ def notes(args, ctx):
     }
 
 
+def _approval_blocks(ctx, doc):
+    """The unresolved blocks, with each missing load mode judged against the library as it is now.
+
+    A stored flag whose mode has since been confirmed still blocks: push refuses
+    on stored flags, and only a prescription re-check replaces them.
+    """
+    fresh = validity.unconfirmed_flags(ctx.root, doc)
+    fresh_lines = {(f["session_id"], f["exercise_id"]) for f in fresh}
+    blocks = []
+    for flag in overlay.unresolved_blocks(doc):
+        if flag["code"] != validity.UNCONFIRMED:
+            blocks.append(flag)
+        elif (flag["session_id"], flag["exercise_id"]) not in fresh_lines:
+            blocks.append(dict(flag, message=(
+                f"{flag['exercise_id']} now has a confirmed load mode; run python3 -m coach prescription check "
+                f"--overlay {doc['id']} --write to re-check the overlay against it")))
+    return blocks + fresh
+
+
 @command(
     "overlay approve",
     help="Stamp the athlete's approval: approved_at and the hash any later edit breaks",
@@ -205,9 +224,7 @@ def approve(args, ctx):
     if overlay.is_approved(doc):
         return {"id": args.id, "hash": doc["approval"]["hash"], "approved_at": doc["approval"]["approved_at"],
                 "already_approved": True, "written": False}
-    blocks = overlay.unresolved_blocks(doc)
-    stored = {validity.flag_key(f) for f in blocks}
-    blocks += [f for f in validity.unconfirmed_flags(ctx.root, doc) if validity.flag_key(f) not in stored]
+    blocks = _approval_blocks(ctx, doc)
     if blocks:
         raise RefusedError(
             f"Overlay {args.id} has {len(blocks)} unresolved block flag(s); resolve them before approval.",

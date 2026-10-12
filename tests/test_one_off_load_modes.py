@@ -102,6 +102,13 @@ class BeforeApprovalTest(OneOffCase):
         self.assertIn("library set-mode db_romanian_deadlift per_hand_x2", messages)
         self.assertIsNone(read_json(self.root / "data/overlays" / f"{ONE_OFF}.json")["approval"])
 
+    def test_an_invalid_library_lets_build_through_silently_but_approve_exits_1(self):
+        self.edit_json(LIBRARY, lambda doc: doc["exercises"].setdefault("push_up", {}).update(load_mode="sideways"))
+        self.assertEqual(self.build().get("warnings", []), [])
+        envelope = self.coach("overlay", "approve", ONE_OFF, expect=1)
+        self.assertIn(LIBRARY, envelope["error"]["message"])
+        self.assertIsNone(read_json(self.root / "data/overlays" / f"{ONE_OFF}.json")["approval"])
+
     def test_a_hand_resolved_flag_does_not_let_approval_through(self):
         self.build()
         self.check_overlay("--write")
@@ -129,6 +136,29 @@ class RepairTest(OneOffCase):
         self.assertEqual(self.readiness(), [])
         self.assertEqual(unconfirmed(self.check_overlay()), {})
         self.coach("check", "--only", "prescription_valid,load_modes_confirmed,overlay_library_consistency")
+
+    def test_after_check_write_then_set_mode_approve_names_the_recheck_not_set_mode_again(self):
+        self.build()
+        self.check_overlay("--write")
+        self.set_mode("push_up", "bodyweight")
+        self.set_mode("db_romanian_deadlift", "per_hand_x2")
+        self.assertEqual(self.readiness(), [])
+        envelope = self.coach("overlay", "approve", ONE_OFF, expect=3)
+        messages = " ".join(d["message"] for d in envelope["error"]["details"])
+        self.assertIn(f"python3 -m coach prescription check --overlay {ONE_OFF} --write", messages)
+        self.assertNotIn("library set-mode", messages)
+        self.check_overlay("--write")
+        self.coach("overlay", "approve", ONE_OFF)
+
+    def test_a_stale_stored_flag_and_its_fresh_copy_are_listed_once(self):
+        self.build()
+        self.check_overlay("--write")
+        self.propose("db_romanian_deadlift", "per_hand_x2")
+        envelope = self.coach("overlay", "approve", ONE_OFF, expect=3)
+        details = [d["message"] for d in envelope["error"]["details"]]
+        self.assertEqual(len(details), 2, details)
+        self.assertIn("2 unresolved block flag(s)", envelope["error"]["message"])
+        self.assertIn("library confirm db_romanian_deadlift", " ".join(details))
 
     def test_a_genuine_proposal_offers_confirm_and_confirming_leaves_the_loads_alone(self):
         self.propose("db_romanian_deadlift", "per_hand_x2")
