@@ -549,11 +549,30 @@ class SkillWiringTest(unittest.TestCase):
         self.assertNotRegex(text, r"lb ?(/|a |per )w(ee)?k")
 
     def test_goals_quotes_the_protein_and_calorie_numbers(self):
+        floor_minimums = ("1.2 g/kg for bodyweight or goal weight", "1.5 g/kg for fat-free mass")
         for step in ("protein.md", "calories.md"):
             with self.subTest(step=step):
-                text = step_text("goals", step)
+                text = " ".join(step_text("goals", step).split())
                 self.assertIn("python3 -m coach nutrition targets", text)
-                self.assertNotRegex(text, r"×|\d g/kg|Mifflin|activity.factor")
+                for named in floor_minimums:
+                    text = text.replace(named, "")
+                self.assertNotRegex(text, r"×|\d g/kg|Mifflin|activity.factor|1\.53|1\.76|2\.25")
+
+    def test_the_floor_is_explained_from_each_clamp_the_output_returns(self):
+        text = " ".join(step_text("goals", "protein.md").split())
+        for needle in ("`floor.clamped`", "`from_intake_g`", "`g_min`", "`g_per_kg_min`", "`target.g`",
+                       "`null`", '`"min"`', '`"target"`', "1.2 g/kg for bodyweight or goal weight",
+                       "1.5 g/kg for fat-free mass", "rn:protein-energy-deficit.7", "rn:protein-energy-deficit.8",
+                       "never tell the athlete to eat less protein", "never recompute"):
+            self.assertIn(needle, text)
+        self.assertNotRegex(text, r"(lower|reduce|cut) (their|your) (protein )?intake")
+
+    def test_goals_chooses_activity_from_the_whole_day(self):
+        text = " ".join(step_text("goals", "calories.md").split())
+        for needle in ("not a step count", "how long and how hard", "rn:protein-energy-deficit.15",
+                       "sedentary or lightly active", "two or three lifting sessions a week",
+                       "weight trend corrects"):
+            self.assertIn(needle, text)
 
 
 class ProteinNoteTest(unittest.TestCase):

@@ -476,8 +476,15 @@ physical activity level (PAL, daily energy as a multiple of basal rate):
 sedentary or light 1.40–1.69, active or moderately active 1.70–1.99 and
 vigorous 2.00–2.40. Its worked examples are 1.53, 1.76 and 2.25. It
 counts an hour a day of moderate exercise on top of a seated job as
-active. PAL multiplies basal rate; this note applies it to Mifflin's
-resting rate, which is close to it.
+active: that hour raises PAL from about 1.55 to 1.75. Its vigorous
+examples do strenuous work or leisure for several hours a day, such as
+"women with non-sedentary occupations who swim or dance an average of
+two hours each day". Its sedentary examples do not exercise regularly;
+this note reads two or three training sessions a week, well under half
+an hour a day on average, as still within the sedentary range, since a
+full hour a day only just crosses into active. PAL multiplies basal
+rate; this note applies it to Mifflin's resting rate, which is close to
+it.
 
 **Claim 16.** 7700 kcal per kg is the "3500 kcal per pound" rule. Hall
 (2008) shows it "approximately matches the predicted energy density of

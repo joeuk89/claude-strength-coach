@@ -165,7 +165,7 @@ and its sources.
   Both thresholds are coaching heuristics, not research cut-offs.
 - **Reachable targets** — set targets from what was delivered, not from
   what was planned, so the athlete is held to a number they can reach.
-  The protein floor starts at recent average intake plus ~15–20 g and rises only once the athlete meets it (rn:protein-energy-deficit.8, rn:protein-energy-deficit.9).
+  The protein floor starts at recent average intake plus ~15–20 g, held between the reference-mass minimum and the target, and rises only once the athlete meets it (rn:protein-energy-deficit.7, rn:protein-energy-deficit.8, rn:protein-energy-deficit.9).
   A load goes up only once the newest exposures beat the current one (rn:progression-training-age.2), and weekly sets are judged on the dose actually trained.
 - **Recovery** — sleep, protein, calories, and stress gate progress as
   much as the program; flag when they're the real bottleneck.

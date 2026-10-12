@@ -75,8 +75,7 @@ Use these six groups: 1 to 3, then 4 to 6.
 5. **Equipment, per place they train:** what each place has, benches,
    bars and supports too; plus what `config suggest`'s notes said to confirm.
 6. **Injuries and limitations:** anything that hurts or limits training
-   now or keeps coming back, and any exercise they cannot or will not
-   do.
+   now or keeps coming back, and any exercise they cannot or will not do.
 
 Defer bodyweight and recovery to `/check-in`; [profile-facts.md](profile-facts.md) handles age.
 
@@ -109,16 +108,17 @@ conversation and `[nutrition]` absent, ask once: now, or later? A later
 goes into the close-out's deferred list.
 
 Invoke the **goals** skill (`/goals`) on a yes: it asks the nutrition
-questions, sets `[nutrition]` in `config.toml` and adds the "Nutrition &
-goals" section to `profile.md`.
+questions, sets `[nutrition]`, adds "Nutrition & goals" to `profile.md`
+and republishes week one's pages (`goals/publish.md`).
 
 ## 7. Close out
 
-Recap settings, profile, program and the approved week one in a few
-lines. Name what was deferred: anything step 1 noted, any step the
-athlete postponed, and that the first `/check-in` asks bodyweight and
-recovery. State the weekly rhythm: train and log everything (coach-led
-sessions too), `/check-in` weekly. With a Hevy key, `.env` stays
-uncommitted (gitignored). If setup changed any files after step 5's
-commit, offer a separate commit using [commit.md](commit.md)'s reviewed
-path list and athlete approval.
+Run `python3 -m coach check --only pages_fresh`: a `fail` or an unpushed
+publish goes in the recap as not done, with its fix. Recap settings,
+profile, program and the approved week one in a few lines. Name what was
+deferred: anything step 1 noted, any step the athlete postponed, and that
+the first `/check-in` asks bodyweight and recovery. State the weekly
+rhythm: train and log everything (coach-led sessions too), `/check-in`
+weekly. With a Hevy key, `.env` stays uncommitted (gitignored). If setup
+changed any files after step 5's commit, offer a separate commit using
+[commit.md](commit.md)'s reviewed path list and athlete approval.

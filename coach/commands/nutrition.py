@@ -147,9 +147,13 @@ def _warn_below_resting(estimate, ctx):
         arg("--app", choices=APPS, help="the nutrition app (default: [nutrition] app); only \"none\" gets a "
             "calorie estimate"),
         arg("--age", type=float, metavar="YEARS", help="for the calorie estimate"),
-        arg("--activity", choices=tuple(calories.ACTIVITY_LEVEL), help="for the calorie estimate: sedentary (a "
-            "seated job, little activity beyond training), active (an hour or so of exercise or walking most days), "
-            "vigorous (hard physical work or several hours of sport a day)"),
+        arg("--activity", choices=tuple(calories.ACTIVITY_LEVEL), help="for the calorie estimate, the lifestyle "
+            "of a typical day judged from the job, walking and how long and how hard each session is, not from "
+            "steps alone: sedentary: sedentary or lightly active, such as a seated job with everyday walking and "
+            "two or three training sessions a week; active: active or moderately active, an on-your-feet job or "
+            "about an hour of moderate-to-vigorous exercise a day on top of a seated one; vigorous: vigorously "
+            "active, hard physical work for several hours a day, or an on-your-feet job plus about two hours of "
+            "strenuous exercise a day"),
         arg("--phase", action="append", metavar="PHASE:RATE", help="a phase and its weekly rate in bodyweight "
             "units, such as cut:-0.5; repeat for each phase (default: [nutrition] phase and target_rate_per_week)"),
     ),

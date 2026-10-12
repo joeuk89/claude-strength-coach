@@ -640,7 +640,9 @@ GIT_ENV = {"GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1", "GIT_AUT
 
 
 @unittest.skipIf(shutil.which("git") is None, "needs git")
-class PublishTest(PagesCase):
+class PublishCase(PagesCase):
+    """PagesCase in a git repository pushed to a local bare remote, with the week's overlay unapproved."""
+
     PUBLISHED = ["README.md", "check-ins/2026-10-11.md", f"data/overlays/{WEEKLY}.json", "progress.md",
                  "this-week.md"]
     MESSAGE = f"coach: publish week of 2026-10-12 ({WEEKLY})"
@@ -685,6 +687,8 @@ class PublishTest(PagesCase):
     def remote_page(self, path):
         return git(self.remote, "show", f"main:{path}", env=self.git_env)
 
+
+class PublishTest(PublishCase):
     def test_no_hevy_dry_run_lists_sheets_without_changing_files_index_or_head(self):
         self.disable_hevy()
         self.approve()
@@ -867,72 +871,86 @@ class PublishTest(PagesCase):
 
 
 @unittest.skipIf(shutil.which("git") is None, "needs git")
-class SetupPublishTest(unittest.TestCase):
+class SetupCase(unittest.TestCase):
+    """A template clone taken through /setup's reviewed setup commit to its first no-Hevy publish."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.tmp = Path(tmp.name)
+        self.root, self.remote = self.tmp / "instance", self.tmp / "remote.git"
+        self.root.mkdir()
+        self.env = {"COACH_NOW": "2026-10-11T18:00:00Z", **GIT_ENV}
+        self.git_env = dict(os.environ, **GIT_ENV)
+
+    def coach(self, *args, expect=0):
+        code, envelope, stderr = run_cli(["--root", str(self.root), *args], env=self.env)
+        self.assertEqual(code, expect, (args, envelope, stderr))
+        return envelope["data"] if expect == 0 else envelope
+
+    def local_git(self, *args):
+        return git(self.root, *args, env=self.git_env)
+
+    def remote_page(self, path):
+        return git(self.remote, "show", f"main:{path}", env=self.git_env)
+
+    def first_publish(self, settings):
+        """Clone, configure with `settings`, adopt a starter, commit setup and publish week one; the proposal id."""
+        (self.root / ".gitignore").write_text("/.coach/\n.env\n", encoding="utf-8")
+        (self.root / "notes.txt").write_text("Before setup\n", encoding="utf-8")
+        (self.root / "README.md").write_text("Template README\n", encoding="utf-8")
+        git(self.tmp, "init", "-q", "--bare", str(self.remote), env=self.git_env)
+        self.local_git("init", "-q")
+        self.local_git("symbolic-ref", "HEAD", "refs/heads/main")
+        self.local_git("add", "--", ".gitignore", "notes.txt", "README.md")
+        self.local_git("commit", "-qm", "template")
+        self.local_git("remote", "add", "origin", str(self.remote))
+        self.local_git("push", "-qu", "origin", "main")
+        (self.root / "notes.txt").write_text("Unrelated change\n", encoding="utf-8")
+        (self.root / ".env").write_text("UNUSED_TEST_VALUE=synthetic\n", encoding="utf-8")
+        config = apply((REPO_ROOT / "config.example.toml").read_text(), settings)
+        (self.root / "config.toml").write_text(config, encoding="utf-8")
+        (self.root / "profile.md").write_text("Synthetic athlete: train three days.\n", encoding="utf-8")
+        self.coach("starters", "draft", "full-body-3")
+        adopted = self.coach("program", "adopt", "--input", str(self.root / ".coach/drafts/program.json"))
+        self.assertTrue(adopted["staged"])
+        self.assertEqual(self.local_git("rev-list", "--count", "HEAD").strip(), "1")
+        program = read_json(self.root / "data/program.json")
+        modes = {line["exercise_id"]: line["load_mode"] for session in program["sessions"]
+                 for line in session["exercises"]}
+        for row in adopted["unconfirmed"]:
+            self.coach("library", "set-mode", row["exercise_id"], modes[row["exercise_id"]])
+        approved_paths = sorted(set(adopted["written"] + adopted["removed"] + adopted["archived"]
+                                    + adopted["staged"] + ["config.toml", "profile.md", "data/exercises.json"]))
+        self.assertTrue(set(self.local_git("diff", "--cached", "--name-only").splitlines()) <= set(approved_paths))
+        self.local_git("add", "--", *approved_paths)
+        self.assertEqual(sorted(self.local_git("diff", "--cached", "--name-only").splitlines()), approved_paths)
+        self.local_git("commit", "-qm", "Initial setup: settings, profile and program")
+        self.assertEqual(sorted(self.local_git("show", "--name-only", "--format=", "HEAD").splitlines()),
+                         approved_paths)
+        self.assertEqual(self.local_git("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}").strip(),
+                         "origin/main")
+        proposal = self.coach("propose", "week", "--week", "2026-W42")
+        self.coach("propose", "finalize", "--proposal", proposal["id"])
+        self.coach("overlay", "approve", proposal["id"])
+        self.coach("checkin", "skeleton", "--date", "2026-10-11", "--overlay", proposal["id"])
+        self.coach("sheets", "render", "--overlay", proposal["id"])
+        self.coach("pages", "render", "--replace-readme")
+        published = self.coach("pages", "publish", "--overlay", proposal["id"])
+        self.assertTrue(published["pushed"])
+        self.assertIn("this-week-sheets.md", published["paths"])
+        return proposal["id"]
+
+
+class SetupPublishTest(SetupCase):
     def test_starter_adoption_reviewed_commit_then_first_no_hevy_publish(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root, remote = Path(tmp) / "instance", Path(tmp) / "remote.git"
-            root.mkdir()
-            env = {"COACH_NOW": "2026-10-11T18:00:00Z", **GIT_ENV}
-            git_env = dict(os.environ, **GIT_ENV)
-
-            def coach(*args):
-                code, envelope, stderr = run_cli(["--root", str(root), *args], env=env)
-                self.assertEqual(code, 0, (args, envelope, stderr))
-                return envelope["data"]
-
-            def local_git(*args):
-                return git(root, *args, env=git_env)
-
-            (root / ".gitignore").write_text("/.coach/\n.env\n", encoding="utf-8")
-            (root / "notes.txt").write_text("Before setup\n", encoding="utf-8")
-            (root / "README.md").write_text("Template README\n", encoding="utf-8")
-            git(Path(tmp), "init", "-q", "--bare", str(remote), env=git_env)
-            local_git("init", "-q")
-            local_git("symbolic-ref", "HEAD", "refs/heads/main")
-            local_git("add", "--", ".gitignore", "notes.txt", "README.md")
-            local_git("commit", "-qm", "template")
-            local_git("remote", "add", "origin", str(remote))
-            local_git("push", "-qu", "origin", "main")
-            (root / "notes.txt").write_text("Unrelated change\n", encoding="utf-8")
-            (root / ".env").write_text("UNUSED_TEST_VALUE=synthetic\n", encoding="utf-8")
-            config = apply((REPO_ROOT / "config.example.toml").read_text(), {
-                "hevy": {"enabled": False}, "nutrition": {"enabled": False},
-                "athlete": {"available_days": ["mon", "wed", "fri"]}})
-            (root / "config.toml").write_text(config, encoding="utf-8")
-            (root / "profile.md").write_text("Synthetic athlete: train three days.\n", encoding="utf-8")
-            coach("starters", "draft", "full-body-3")
-            adopted = coach("program", "adopt", "--input", str(root / ".coach/drafts/program.json"))
-            self.assertTrue(adopted["staged"])
-            self.assertEqual(local_git("rev-list", "--count", "HEAD").strip(), "1")
-            program = read_json(root / "data/program.json")
-            modes = {line["exercise_id"]: line["load_mode"] for session in program["sessions"]
-                     for line in session["exercises"]}
-            for row in adopted["unconfirmed"]:
-                coach("library", "set-mode", row["exercise_id"], modes[row["exercise_id"]])
-            approved_paths = sorted(set(adopted["written"] + adopted["removed"] + adopted["archived"]
-                                        + adopted["staged"] + ["config.toml", "profile.md", "data/exercises.json"]))
-            self.assertTrue(set(local_git("diff", "--cached", "--name-only").splitlines()) <= set(approved_paths))
-            local_git("add", "--", *approved_paths)
-            self.assertEqual(sorted(local_git("diff", "--cached", "--name-only").splitlines()), approved_paths)
-            local_git("commit", "-qm", "Initial setup: settings, profile and program")
-            self.assertEqual(sorted(local_git("show", "--name-only", "--format=", "HEAD").splitlines()), approved_paths)
-            self.assertEqual(local_git("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}").strip(),
-                             "origin/main")
-            proposal = coach("propose", "week", "--week", "2026-W42")
-            coach("propose", "finalize", "--proposal", proposal["id"])
-            coach("overlay", "approve", proposal["id"])
-            coach("checkin", "skeleton", "--date", "2026-10-11", "--overlay", proposal["id"])
-            coach("sheets", "render", "--overlay", proposal["id"])
-            coach("pages", "render", "--replace-readme")
-            published = coach("pages", "publish", "--overlay", proposal["id"])
-            self.assertTrue(published["pushed"])
-            self.assertIn("this-week-sheets.md", published["paths"])
-            self.assertEqual(local_git("diff", "--cached", "--name-only"), "")
-            self.assertEqual(git(remote, "show", "main:notes.txt", env=git_env), "Before setup\n")
-            self.assertIn("notes.txt", local_git("diff", "--name-only"))
-            self.assertNotIn(".env", local_git("ls-files"))
-            self.assertIn(proposal["id"], git(remote, "show", "main:this-week-sheets.md", env=git_env))
-
+        overlay_id = self.first_publish({"hevy": {"enabled": False}, "nutrition": {"enabled": False},
+                                         "athlete": {"available_days": ["mon", "wed", "fri"]}})
+        self.assertEqual(self.local_git("diff", "--cached", "--name-only"), "")
+        self.assertEqual(self.remote_page("notes.txt"), "Before setup\n")
+        self.assertIn("notes.txt", self.local_git("diff", "--name-only"))
+        self.assertNotIn(".env", self.local_git("ls-files"))
+        self.assertIn(overlay_id, self.remote_page("this-week-sheets.md"))
 
 if __name__ == "__main__":
     unittest.main()

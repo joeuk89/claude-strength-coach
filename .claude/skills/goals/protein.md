@@ -28,6 +28,24 @@ When `missing` names an input, ask the athlete for it and run again.
   respecting any active protein override. Record the actual app number;
   retain floor ≤ target ≤ stretch rather than raising the floor to match it.
 
+**Explain the floor from the output.** Quote `floor.g`,
+`from_intake_g`, `g_min` and `target.g` as printed and never recompute
+them. `from_intake_g` is recent intake plus 15–20 g, the first 5 g step
+at or above intake plus 15 g (rn:protein-energy-deficit.8). The floor
+stays between two bounds, and `floor.clamped` says which one applied:
+
+- `null`: neither; the floor is `from_intake_g`.
+- `"min"`: `from_intake_g` falls short of the minimum, so the floor
+  is `g_min`, set by `g_per_kg_min`: 1.2 g/kg for bodyweight or goal
+  weight and 1.5 g/kg for fat-free mass, because muscle loss while
+  losing weight is more likely below it (rn:protein-energy-deficit.7,
+  low-confidence evidence). Say the floor asks for more than a 15–20 g
+  step and let the anchors close the gap.
+- `"target"`: `from_intake_g` passes the target, so the floor is
+  `target.g`. Intake at or above the target stays compatible with the
+  floor, so never tell the athlete to eat less protein
+  (rn:protein-energy-deficit.8).
+
 Reference selection uses the available rough body-fat, goal-gap and BMI
 cues together; a positive cue selects goal weight. A credible reading
 uses fat-free mass. Explain the reported reason as a coaching heuristic.

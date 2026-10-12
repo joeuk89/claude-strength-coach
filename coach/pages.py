@@ -662,10 +662,16 @@ def _bodyweight(view):
 RENDERERS = {BRIEF: render_brief, DASHBOARD: render_dashboard, PROGRESS: render_progress}
 
 
-def render_all(root, now, kinds=KINDS):
+def render_all(root, now, kinds=KINDS, view=None):
     """{page path: text} for the pages, all rendered as of `now` from one read of the instance."""
-    view = _View(root, now)
+    view = view or _View(root, now)
     return {PAGE_PATHS[kind]: RENDERERS[kind](root, view.as_of, view) for kind in kinds}
+
+
+def brief_overlay(view):
+    """The overlay the brief shows, as {id, approved}, or None when no overlay covers its week."""
+    found = view.week_overlay
+    return None if found is None else {"id": found["id"], "approved": overlay.is_approved(found)}
 
 
 def readme_owner_problem(root):
@@ -686,7 +692,8 @@ def write(root, now, kinds=KINDS, replace_readme=False, dry_run=False):
         if problem and not replace_readme:
             raise RefusedError(problem)
         replaced = problem is not None
-    rendered = render_all(root, now, kinds)
+    view = _View(root, now)
+    rendered = render_all(root, now, kinds, view)
     report = []
     for path, text in rendered.items():
         target = root / path
@@ -694,7 +701,8 @@ def write(root, now, kinds=KINDS, replace_readme=False, dry_run=False):
         if not dry_run:
             target.write_text(text, encoding="utf-8")
         report.append({"path": path, "changed": before != text, "written": not dry_run, "lines": text.count("\n")})
-    return {"as_of": timestamp(as_of_moment(now)), "pages": report, "replaced_readme": replaced, "dry_run": dry_run}
+    return {"as_of": timestamp(as_of_moment(now)), "pages": report, "replaced_readme": replaced,
+            "brief_overlay": brief_overlay(view), "dry_run": dry_run}
 
 
 def freshness(root):
@@ -741,6 +749,12 @@ def _upstream(root, env):
     if not remote or not merge:
         raise RefusedError(f"branch {name} has no upstream; set one with git push -u <remote> {name}, then publish")
     return name, remote, merge
+
+
+def _ahead(root, env):
+    """Commits on HEAD that the upstream's remote-tracking ref lacks, or None when that ref is unknown."""
+    counted = _git(root, "rev-list", "--count", "@{upstream}..HEAD", env=env)
+    return int(counted.stdout.strip()) if counted.returncode == 0 else None
 
 
 def publish(root, overlay_id, now, record_date=None, dry_run=False, env=None):
@@ -792,7 +806,7 @@ def publish(root, overlay_id, now, record_date=None, dry_run=False, env=None):
     message = publish_message(doc)
     report = {"overlay_id": overlay_id, "record": record.path.as_posix(), "paths": publish_paths, "message": message,
               "branch": branch, "remote": remote, "upstream": merge, "commit": None, "pushed": False,
-              "dry_run": dry_run}
+              "ahead": None, "dry_run": dry_run}
     if dry_run:
         return report
     report["rendered"] = write(root, now, KINDS)["pages"]
@@ -803,6 +817,7 @@ def publish(root, overlay_id, now, record_date=None, dry_run=False, env=None):
     if added.returncode != 0:
         raise ValidationError(f"git add failed: {added.stderr.strip()}")
     if _git(root, "diff", "--cached", "--quiet", env=env).returncode == 0:
+        report["ahead"] = _ahead(root, env)
         return report
     committed = _git(root, "commit", "-q", "-m", message, env=env)
     if committed.returncode != 0:
@@ -814,6 +829,7 @@ def publish(root, overlay_id, now, record_date=None, dry_run=False, env=None):
         reason = None if pushed.returncode == 0 else (pushed.stderr.strip().splitlines() or ["no output"])[-1]
     except subprocess.TimeoutExpired as exc:
         reason = f"no answer after {exc.timeout:g} s"
+    report["ahead"] = _ahead(root, env)
     if reason is not None:
         raise NetworkError(f"git push to {remote} failed ({reason}); the commit {report['commit'][:12]} is kept: "
                            "push it by hand with git push", data=report)
