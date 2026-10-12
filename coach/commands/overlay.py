@@ -2,7 +2,7 @@ import os
 import tempfile
 from pathlib import Path
 
-from coach import dates, jsonio, overlay, render
+from coach import dates, jsonio, overlay, render, validity
 from coach.commands import arg, command
 from coach.errors import RefusedError, UsageError, ValidationError
 from coach.validate import Error
@@ -70,6 +70,12 @@ def build(args, ctx):
                 f"Overlay {doc['id']} is approved, so it is not rebuilt; leave id out of the draft to build a new one."
             )
     jsonio.write_doc(path, doc, args.dry_run)
+    try:
+        unconfirmed = validity.unconfirmed_flags(ctx.root, doc)
+    except ValidationError:
+        unconfirmed = []
+    for flag in unconfirmed:
+        ctx.warn(flag["message"])
     return {"id": doc["id"], "path": _relative(ctx, path), "written": not args.dry_run, "overlay": doc}
 
 
@@ -187,6 +193,25 @@ def notes(args, ctx):
     }
 
 
+def _approval_blocks(ctx, doc):
+    """The unresolved blocks, with each missing load mode judged against the library as it is now.
+
+    A stored flag whose mode has since been confirmed still blocks: push refuses
+    on stored flags, and only a prescription re-check replaces them.
+    """
+    fresh = validity.unconfirmed_flags(ctx.root, doc)
+    fresh_lines = {(f["session_id"], f["exercise_id"]) for f in fresh}
+    blocks = []
+    for flag in overlay.unresolved_blocks(doc):
+        if flag["code"] != validity.UNCONFIRMED:
+            blocks.append(flag)
+        elif (flag["session_id"], flag["exercise_id"]) not in fresh_lines:
+            blocks.append(dict(flag, message=(
+                f"{flag['exercise_id']} now has a confirmed load mode; run python3 -m coach prescription check "
+                f"--overlay {doc['id']} --write to re-check the overlay against it")))
+    return blocks + fresh
+
+
 @command(
     "overlay approve",
     help="Stamp the athlete's approval: approved_at and the hash any later edit breaks",
@@ -199,7 +224,7 @@ def approve(args, ctx):
     if overlay.is_approved(doc):
         return {"id": args.id, "hash": doc["approval"]["hash"], "approved_at": doc["approval"]["approved_at"],
                 "already_approved": True, "written": False}
-    blocks = overlay.unresolved_blocks(doc)
+    blocks = _approval_blocks(ctx, doc)
     if blocks:
         raise RefusedError(
             f"Overlay {args.id} has {len(blocks)} unresolved block flag(s); resolve them before approval.",

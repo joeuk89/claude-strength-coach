@@ -116,6 +116,8 @@ names a follow-up to raise with the athlete.
 
 Keep a flag you and the athlete decide to accept with `python3 -m coach
 propose resolve --proposal <id> --flag <index> --resolution "<why>"`.
+A `load_mode_unconfirmed` flag cannot be kept: ask the athlete how they
+load the exercise, then run the command its message names.
 
 ## 5. Structural changes (normal and midweek)
 

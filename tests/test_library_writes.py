@@ -137,6 +137,8 @@ class LoadModesConfirmedCheckTest(CliMixin, unittest.TestCase):
         self.assertEqual(len(failures), 1)
         self.assertIn("db_bench_press", failures[0]["message"])
         self.assertIn("Session A", failures[0]["message"])
+        self.assertIn("library confirm db_bench_press (proposed per_hand_x2)", failures[0]["message"])
+        self.assertIn("library set-mode db_bench_press MODE", failures[0]["message"])
 
     def test_valid_fixture_passes(self):
         data = self.run_ok(VALID, "check", "--only", "load_modes_confirmed")
@@ -162,6 +164,8 @@ class LoadModesConfirmedCheckTest(CliMixin, unittest.TestCase):
         self.assertEqual(len(failures), 1)
         self.assertIn("db_curl", failures[0]["message"])
         self.assertIn("2026-10-19-weekly", failures[0]["message"])
+        self.assertIn("python3 -m coach library set-mode db_curl MODE", failures[0]["message"])
+        self.assertNotIn("library confirm", failures[0]["message"])
 
     def test_invalid_library_fails(self):
         envelope = self.run_fail(1, INVALID, "check", "--only", "load_modes_confirmed")

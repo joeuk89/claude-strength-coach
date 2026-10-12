@@ -32,6 +32,9 @@ from `overlay build --input <draft>`.
    - `load_mode_mismatch` (block): the line's load mode or load
      arithmetic disagrees with the library. Fix the line, or settle the
      load mode with the athlete (`library set-mode`).
+   - `load_mode_unconfirmed` (block): the exercise has no confirmed
+     load mode. Ask the athlete, then run the command the flag names.
+     Only confirming the mode clears it; a `resolution` never does.
    - `rpe_infeasible`, `session_over_cap` (warn): name each in the
      coach's brief, with the change you made or why it stands.
 

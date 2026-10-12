@@ -1107,6 +1107,9 @@ def resolve(root, proposal_id, index, resolution, dry_run):
     found = draft.get("flags", [])
     if not 0 <= index < len(found):
         raise ValidationError(f"Proposal {proposal_id} has {len(found)} flag(s); --flag takes 0 to {len(found) - 1}")
+    if found[index]["code"] == validity.UNCONFIRMED:
+        raise RefusedError(f"Flag {index} clears only once the library holds a confirmed load mode, not with a "
+                           f"resolution: {found[index]['message']}")
     found[index] = dict(found[index], resolved=True, resolution=resolution.strip())
     if not dry_run:
         _write_proposal(root, proposal_id, draft, None, None)
@@ -1174,8 +1177,8 @@ def finalize(root, config, proposal_id, now, today, dry_run):
     blocks = overlay.unresolved_blocks(doc)
     if blocks:
         raise RefusedError(
-            f"Proposal {proposal_id} has {len(blocks)} unresolved block flag(s); settle each, or resolve it with "
-            "propose resolve and a reason",
+            f"Proposal {proposal_id} has {len(blocks)} unresolved block flag(s); settle each as its message "
+            "says, or, where a reason can accept it, resolve it with propose resolve",
             details=[{"path": None, "message": f"{f['code']} ({f['session_id']} / {f['exercise_id']}): {f['message']}"}
                      for f in blocks])
     path = overlay.path_for(root, doc["id"])

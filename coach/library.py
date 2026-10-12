@@ -256,6 +256,28 @@ class Library:
         entry = self._entries.get(exercise_id)
         return entry["load_mode"] if entry else None
 
+    def unconfirmed(self, exercise_ids):
+        """The ids among `exercise_ids` with no confirmed load mode, each once, in first-seen order."""
+        return [i for i in dict.fromkeys(exercise_ids) if self.effective_load_mode(i) is None]
+
+    def mode_repair(self, exercise_id, mode="MODE"):
+        """The command that gives the exercise a confirmed load mode.
+
+        `library confirm` is offered only when the instance holds a proposal
+        for it to confirm; otherwise the coach records the athlete's answer.
+        An id the library lacks cannot take a mode, so it is sent to search or create.
+        """
+        set_mode = f"python3 -m coach library set-mode {exercise_id} {mode}"
+        entry = self._entries.get(exercise_id)
+        if entry is None:
+            custom_id = exercise_id if exercise_id.startswith(CUSTOM_PREFIX) else CUSTOM_PREFIX + exercise_id
+            return (f"python3 -m coach library search {exercise_id} and use the id it finds, or add it with "
+                    f"python3 -m coach library create {custom_id} --input FILE (reference/custom-exercises.md)")
+        proposed = entry["load_mode_proposed"]
+        if proposed:
+            return f"python3 -m coach library confirm {exercise_id} (proposed {proposed}), or {set_mode}"
+        return set_mode
+
     def increment(self, exercise_id, unit):
         """The entry's progression step in `unit` (per hand for per-hand modes), or None.
 

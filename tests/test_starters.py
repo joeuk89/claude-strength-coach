@@ -172,8 +172,20 @@ class AdoptedStarterTest(Case):
         root = instance(self)
         found = self.ok(root, "starters", "draft", starter_id)
         self.assertEqual(found["problems"], [])
-        self.ok(root, "program", "adopt", "--input", str(root / found["path"]))
+        adopted = self.ok(root, "program", "adopt", "--input", str(root / found["path"]))
+        modes = {line["exercise_id"]: line["load_mode"] for _, line in lines(found["draft"]["program"])}
+        for entry in adopted["unconfirmed"]:
+            self.ok(root, "library", "set-mode", entry["exercise_id"], modes[entry["exercise_id"]])
         return root, found["draft"]
+
+    def test_an_adopted_starter_blocks_its_first_week_until_the_load_modes_are_confirmed(self):
+        root = instance(self)
+        found = self.ok(root, "starters", "draft", "full-body-3")
+        adopted = self.ok(root, "program", "adopt", "--input", str(root / found["path"]))
+        self.assertTrue(adopted["unconfirmed"])
+        proposed = self.ok(root, "propose", "week", "--week", WEEK, "--dry-run")
+        codes = {f["code"] for f in proposed["overlay"]["flags"] if f["severity"] == "block"}
+        self.assertEqual(codes, {"load_mode_unconfirmed"})
 
     def test_every_starter_adopts_validates_renders_and_proposes_week_one(self):
         for starter_id in STARTER_IDS:
