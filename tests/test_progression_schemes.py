@@ -235,12 +235,45 @@ class RpeAnchoredTest(unittest.TestCase):
         proposal = run(context("rpe_anchored", {"backoff_rpe": 6.5}, sets=self.STARTER_SETS))
         self.assertEqual({s.rpe for s in proposal.sets[1:] if s.working}, {6.5})
 
+    def test_a_programmed_back_off_rpe_is_the_same_with_or_without_an_e1rm(self):
+        one_group = ({"count": 4, "type": "normal", "reps": 5, "rpe": 8},)
+        for params, sets, expected in (({}, TOP_AND_BACK_OFFS, 7), ({}, one_group, 7), (self.PARAMS, THREE_FIVES, 7),
+                                       ({"backoff_rpe": 6.5}, one_group, 6.5)):
+            with self.subTest(params=params, sets=sets):
+                for e1rm in (121.88, None):
+                    proposal = run(context("rpe_anchored", params, e1rm=e1rm, sets=sets))
+                    self.assertEqual({s.rpe for s in proposal.sets[1:] if s.working}, {expected}, e1rm)
+
     def test_with_no_e1rm_an_unprogrammed_back_off_rpe_stays_absent(self):
         no_rpe = (self.STARTER_SETS[0], {"count": 3, "type": "normal", "reps": 5})
-        for params, sets in (({}, no_rpe), (self.PARAMS, THREE_FIVES)):
+        single_top = ({"count": 1, "type": "normal", "reps": 5, "rpe": 8},)
+        for params, sets in (({}, no_rpe), ({"backoff_sets": 3}, single_top)):
             with self.subTest(params=params, sets=sets):
                 proposal = run(context("rpe_anchored", params, sets=sets))
-                self.assertEqual({s.rpe for s in proposal.sets[1:] if s.working}, {None})
+                self.assertEqual([s.rpe for s in proposal.sets[1:] if s.working], [None] * 3)
+                self.assertNotIn("at RPE", proposal.rationale)
+
+    def test_with_an_e1rm_but_no_top_set_rpe_the_back_offs_hold_and_keep_their_rpe(self):
+        sets = ({"count": 1, "type": "normal", "reps": 4}, {"count": 3, "type": "normal", "reps": 6, "rpe": 7})
+        proposal = run(context("rpe_anchored", {}, e1rm=120, sets=sets))
+        self.assertEqual([(s.load, s.reps, s.rpe) for s in proposal.sets if s.working],
+                         [(100, 4, None)] + [(90, 6, 7)] * 3)
+        self.assertIn("no top-set reps or RPE", proposal.rationale)
+        self.assertIn("RPE 7", proposal.rationale)
+        self.assertNotIn("provisional", proposal.rationale)
+
+    def test_the_hold_rationale_names_no_missing_rep_target(self):
+        proposal = run(context("rpe_anchored", {}, sets=({"count": 4, "type": "normal", "rpe": 8},)))
+        self.assertNotIn("None", proposal.rationale)
+        self.assertIn("3 back-off sets at 90 % of it at RPE 7", proposal.rationale)
+
+    def test_with_no_load_to_hold_the_rationale_leaves_the_first_loads_to_the_coach(self):
+        proposal = run(context("rpe_anchored", {}, sets=TOP_AND_BACK_OFFS, start_load=None))
+        self.assertEqual([(s.load, s.rpe) for s in proposal.sets if s.working], [(None, 8)] + [(None, 7)] * 3)
+        self.assertIn("coach picks the first loads", proposal.rationale)
+        self.assertIn("3×6 at RPE 7", proposal.rationale)
+        for absent in ("no load", "% of it", "provisional"):
+            self.assertNotIn(absent, proposal.rationale)
 
     def test_programs_only_lines_with_an_e1rm(self):
         self.assertEqual(scheme("rpe_anchored").module.LOAD_MODES, base.E1RM_MODES)

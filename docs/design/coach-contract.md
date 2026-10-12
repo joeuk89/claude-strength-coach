@@ -2475,10 +2475,12 @@ and `plugins test` runs them. Loaded with
   the rationale names the rule that set their load.
   With no e1RM, or no top-set reps or RPE, the top set holds at the last
   or start load and the back-offs sit at `backoff_pct` (0.9 when null)
-  of it. The back-offs keep a programmed RPE (the `backoff_rpe` param,
-  else the second working set group's RPE) and carry none when neither
-  sets one; `top_rpe` − 1 is never used here. With no e1RM the
-  rationale calls the loads provisional.
+  of it. When the back-offs have a programmed effort target (the
+  `backoff_rpe` param, or an RPE on any program working set after the
+  first), they carry the same `backoff_rpe` as with an e1RM; otherwise
+  they carry none. With no e1RM the rationale calls the loads
+  provisional; with no load to hold it leaves the first loads to the
+  coach.
   `round_down` is set when the e1RM sets the loads. State is empty.
   `LOAD_MODES` is `E1RM_MODES`.
 - `wave_531` params: `training_max` (null: `training_max_pct`, 0.9, of

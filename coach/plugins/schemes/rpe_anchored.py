@@ -35,8 +35,7 @@ HOLD_BACKOFF_PCT = 0.9
 
 
 def _shape(ctx):
-    """(warm-ups, top SetSpec, back-off SetSpec, back-off count, programmed back-off RPE): params first, else the
-    program's set groups; the back-off SetSpec falls back to one RPE below the top set."""
+    """(warm-ups, top SetSpec, back-off SetSpec, back-off count): params first, else the program's set groups."""
     sets = base.expand(ctx.slot.sets)
     warmups = tuple(s for s in sets if not s.working)
     program_working = base.working(sets)
@@ -48,14 +47,18 @@ def _shape(ctx):
     groups = [g for g in ctx.slot.sets if (g.get("type") or "normal") in base.WORKING_TYPES]
     program_backoff = base.SetSpec.from_dict(groups[1]) if len(groups) > 1 else base.SetSpec()
     backoff_reps = params["backoff_reps"] or program_backoff.target_reps or top_reps
-    programmed_rpe = next((r for r in (params["backoff_rpe"], program_backoff.rpe) if r is not None), None)
-    if programmed_rpe is not None:
-        backoff_rpe = programmed_rpe
-    else:
-        backoff_rpe = top_rpe - 1 if top_rpe is not None else None
+    backoff_rpe = next((r for r in (params["backoff_rpe"], program_backoff.rpe) if r is not None),
+                       top_rpe - 1 if top_rpe is not None else None)
     top = base.SetSpec(type="normal", reps=top_reps, rpe=top_rpe)
     backoff = base.SetSpec(type="normal", reps=backoff_reps, rpe=backoff_rpe)
-    return warmups, top, backoff, count, programmed_rpe
+    return warmups, top, backoff, count
+
+
+def _backoff_rpe_programmed(ctx):
+    """Whether the back-offs have an effort target to keep when no e1RM loads them: the param, or an RPE on a
+    working set after the program's first."""
+    return (ctx.params["backoff_rpe"] is not None
+            or any(s.rpe is not None for s in base.working(base.expand(ctx.slot.sets))[1:]))
 
 
 def _calibration(ctx, source):
@@ -84,23 +87,33 @@ def _share(load, pct):
     return round(load * pct, 4) if load is not None else None
 
 
+def _hold_rationale(ctx, why, load, backoff, count, share, provisional):
+    if load is None:
+        text = f"RPE-anchored: {why} and no start load, so the coach picks the first loads"
+    else:
+        text = f"RPE-anchored: {why}, so the top set holds at {base.load_words(ctx, load)}"
+    if count:
+        text += f", then {count}×{backoff.reps}" if backoff.reps is not None else f", then {count} back-off sets"
+        if load is not None:
+            text += f" at {base.number(share * 100)} % of it"
+        if backoff.rpe is not None:
+            text += f" at RPE {base.number(backoff.rpe)}"
+    if provisional and load is not None:
+        text += "; the loads are provisional until a logged top set with reps and an RPE sets the e1RM"
+    return text
+
+
 def propose(ctx):
     source = base.baseline(ctx.exposures)
-    warmups, top, backoff, count, programmed_rpe = _shape(ctx)
+    warmups, top, backoff, count = _shape(ctx)
     pct = ctx.params["backoff_pct"]
     value, words = _calibration(ctx, source)
     if value is None or top.reps is None or top.rpe is None:
         load = source.top_load if source else base.start_load(ctx)
         share = HOLD_BACKOFF_PCT if pct is None else pct
+        backoff = replace(backoff, rpe=backoff.rpe if _backoff_rpe_programmed(ctx) else None, load=_share(load, share))
         why = "no e1RM in the last 42 days" if value is None else "no top-set reps or RPE target"
-        rationale = f"RPE-anchored: {why}, so the top set holds at {base.load_words(ctx, load)}"
-        if count:
-            rationale += f", then {count}×{backoff.reps} at {base.number(share * 100)} % of it"
-            if programmed_rpe is not None:
-                rationale += f" at RPE {base.number(programmed_rpe)}"
-        if value is None:
-            rationale += "; the loads are provisional until a logged top set with reps and an RPE sets the e1RM"
-        backoff = replace(backoff, rpe=programmed_rpe, load=_share(load, share))
+        rationale = _hold_rationale(ctx, why, load, backoff, count, share, provisional=value is None)
         round_down = False
     else:
         load = _floored(load_for(value, top.reps, top.rpe), ctx.exercise.increment)
