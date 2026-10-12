@@ -1,4 +1,8 @@
-"""Runs and Sleep stated from the activity sources, and the cardio flags for the window (contract C36, C49)."""
+"""Runs and Sleep stated from the activity sources, and the cardio flags for the window (contract C36, C49).
+
+With no activity source on, Runs appears only when the activity files
+record or plan a run in the window: lifting alone never implies running.
+"""
 
 from datetime import timedelta
 
@@ -6,6 +10,7 @@ from coach import cardio, dates, render, weekflags
 from coach import config as config_module
 from coach.activity.store import ActivityStore
 from coach.checkin_parts import Contribution, Field
+from coach.errors import ValidationError
 
 FIELDS = ("runs", "sleep")
 RUNS_ASK = "Any others not logged: how many, and total distance?"
@@ -19,7 +24,7 @@ def contribute(ctx):
     week_ctx = weekflags.WeekFlagContext(ctx.root, ctx.today, ctx.window, "logged", config, None, bouts)
     card_flags = weekflags.run(week_ctx)
     if not cardio.activity_on(config):
-        return Contribution(flags=card_flags)
+        return Contribution(fields={"runs": _runs_on_file(ctx, config)}, flags=card_flags)
     numbers = cardio.week(ctx.root, ctx.window)
     missed = [i for i in cardio.reconcile(ctx.root, ctx.window, ctx.today)["items"] if i["status"] == "missed"]
     fields = {"runs": _runs(numbers, missed)}
@@ -41,6 +46,15 @@ def _runs(numbers, missed):
         lines.append("Planned, not logged: " + ", ".join(
             f"{render.day_label(dates.parse_date(i['date']))} {i['title'] or i['kind']}" for i in missed) + ".")
     return Field(prefill=" ".join(lines) or None, ask=RUNS_ASK if run["count"] else RUNS_ASK_NONE)
+
+
+def _runs_on_file(ctx, config):
+    try:
+        found = cardio.runs_on_file(ctx.root, config, ctx.window, ctx.today)
+    except ValidationError:
+        # With no source on, the activity checks skip these files, so a bad line must not stop the card.
+        return None
+    return None if found is None else _runs(found, found["missed"])
 
 
 def _sleep(ctx, config):

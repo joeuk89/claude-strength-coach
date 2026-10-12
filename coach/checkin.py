@@ -33,7 +33,7 @@ from coach.library import Library
 DEEP_AFTER_DAYS = 42
 E1RM_ROW_LIMIT = 8          # a heuristic: as many lifts as a message reads at a glance
 WORD_CEILINGS = {"weekly": 600, "deep": 1000, "catch-up": 600}    # heuristics, prose words outside regions
-CARD_VERSION = 3
+CARD_VERSION = 5
 TIERS = ("weekly", "deep", "catch-up")
 CARD_TIERS = ("weekly", "deep")
 CHECK_IN = "check-in"
@@ -53,15 +53,7 @@ WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 
 SLEEP_ASK = ("One line: average hours a night, dates covered and source "
              "(manual diary, self-reported period mean or tracker), and how it felt.")
-NUTRITION_ASK = (
-    "MacroFactor: trend weight · expenditure · targets (kcal/protein) · 7-day average (kcal/protein). "
-    "A screenshot works.\n"
-    "No MacroFactor: this week's morning weigh-ins, and roughly how eating went "
-    "(with your average daily protein if you track it).\n"
-    "Both: days logged (of 7) · anchors most days (y/n).\n"
-    "Nutrition not set up yet: one morning scale weight."
-)
-MEAL_PLAN_ASK = "What stuck, what got swapped?"
+SCALE_WEIGHT_ASK = "One morning scale weight."
 NEXT_WEEK_ASK = "Anything different: travel, schedule, kit, illness?"
 
 _RECORD_NAME = re.compile(r"^(\d{4}-\d{2}-\d{2})\.md$")
@@ -456,6 +448,30 @@ def _exercises(inst, kept, workouts):
     return rows
 
 
+def _note_text(text):
+    return " ".join((text or "").split())
+
+
+def _notes(inst, window, workouts):
+    """The athlete's own words logged in the window: each workout's description, then its exercises' notes. An
+    exercise note that repeats the workout's, or an earlier note on the same exercise, is left out."""
+    found = []
+    for workout in sorted(workouts.values(), key=lambda w: (w["date"], w["start_time"] or "", w["workout_id"])):
+        if not window.contains(dates.parse_date(workout["date"])):
+            continue
+        said = _note_text(workout["description"])
+        entries = [(None, None, said)] if said else []
+        for exercise in workout["exercises"]:
+            text = _note_text(exercise["notes"])
+            exercise_id = exercise["exercise_id"]
+            if text and text != said and all((e[0], e[2]) != (exercise_id, text) for e in entries):
+                entries.append((exercise_id, inst.name(exercise_id) if exercise_id else exercise["title"], text))
+        found += [{"date": workout["date"], "workout_id": workout["workout_id"], "session_id": workout["session_id"],
+                   "title": workout["title"], "exercise_id": exercise_id, "name": name, "text": text}
+                  for exercise_id, name, text in entries]
+    return found
+
+
 def _compound_patterns():
     try:
         return frozenset(importlib.import_module("coach.patterns").COMPOUND_PATTERNS)
@@ -601,17 +617,6 @@ def _hevy(inst, end):
     return rows, raised
 
 
-def _hevy_runs(inst, window):
-    try:
-        if not inst.config["activity"]["enabled"]:
-            return []
-        from coach.activity.store import ActivityStore
-        found = ActivityStore(inst.root, inst.config).activities(window, kinds=("run",))
-    except (KeyError, ImportError, ValidationError):
-        return []
-    return [a for a in found if a["source"].startswith("hevy")]
-
-
 def misses(root, since, until, now=None, include_unsynced=True):
     """Missed sessions by tag and by session: `miss` annotations plus untagged missed planned sessions (C18).
     An optional session skipped is not a miss, so it is never counted."""
@@ -688,7 +693,8 @@ def _build(root, today, until=None, tier=None, now=None, live=True, parts=True, 
         "tier_reasons": reasons, "deep_deferred": deferred,
         "days_since_last": (end - found[-1].date).days if found else None,
         "unsynced": sum(1 for w in workouts.values() if w["unsynced"] and window.contains(dates.parse_date(w["date"]))),
-        "sessions": sessions, "exercises": _exercises(inst, kept, workouts), "e1rm": e1rm, "e1rm_notes": e1rm_notes,
+        "sessions": sessions, "exercises": _exercises(inst, kept, workouts), "notes": _notes(inst, window, workouts),
+        "e1rm": e1rm, "e1rm_notes": e1rm_notes,
         "hevy": hevy_rows, "flags": raised, "fields": [], "facts": [], "misses": None,
         "catch_up": None,
     }
@@ -730,7 +736,7 @@ def _build(root, today, until=None, tier=None, now=None, live=True, parts=True, 
     if card["mode"] == "deep":
         card["misses"] = misses(inst.root, _misses_since(inst, found, end), end, now, live)
 
-    builtin = _builtin_fields(inst, card, _hevy_runs(inst, window) if live else [])
+    builtin = _builtin_fields(inst, card)
     builtin.update(replaced)
     numbered = []
     for field_id in FIELD_ORDER + tuple(extra_ids) + (HEVY_EDITS,):
@@ -821,15 +827,6 @@ def _coach_led_field(inst, card):
     return checkin_parts.Field(prefill=" ".join(stated) or None, ask=" ".join(asked) or None)
 
 
-def _runs_field(runs):
-    if not runs:
-        return checkin_parts.Field(ask="How many, and total distance?")
-    metres = sum(a["distance_meters"] or 0 for a in runs)
-    count = f"{len(runs)} run{'s' if len(runs) != 1 else ''}"
-    logged = f"Hevy logged {count}" + (f", {_text(metres / 1000)} km" if metres else "") + "."
-    return checkin_parts.Field(prefill=logged, ask="Any others: how many, and total distance?")
-
-
 def _hevy_edits_field(card):
     edited = [h for h in card["hevy"] if h["state"] == "edited_in_app"]
     if not edited:
@@ -840,16 +837,16 @@ def _hevy_edits_field(card):
     return checkin_parts.Field(prefill=" ".join(facts), ask=ask)
 
 
-def _builtin_fields(inst, card, runs):
+def _builtin_fields(inst, card):
+    """The fields every card asks; `runs` and `meal_plan` have no builtin, so only a part that finds a source
+    for them adds them."""
     rotation = None if card["sessions"]["external"] else checkin_catchup.rotation_text(inst, _as_date(card["date"]))
     return {
         "sessions": _sessions_field(inst, card),
         "coach_led": _coach_led_field(inst, card),
-        "runs": _runs_field(runs),
         "sleep": checkin_parts.Field(ask=SLEEP_ASK),
         "niggles": checkin_parts.Field(ask="Anything new?"),
-        "nutrition": checkin_parts.Field(ask=NUTRITION_ASK),
-        "meal_plan": checkin_parts.Field(ask=MEAL_PLAN_ASK),
+        "nutrition": checkin_parts.Field(ask=SCALE_WEIGHT_ASK, label="Bodyweight"),
         "next_week": checkin_parts.Field(prefill=rotation, ask=NEXT_WEEK_ASK),
         HEVY_EDITS: _hevy_edits_field(card),
     }
@@ -887,6 +884,12 @@ def _field_lines(field):
     return [f"{field['n']}. {field['label']}."] + [f"   {line}" for line in lines]
 
 
+def _note_line(note):
+    """`Mon 12 Oct Session A, Bench Press (Dumbbell): "…"`: one logged note with where it was logged."""
+    where = f"{render.day_label(note['date'])} {note['title']}" + (f", {note['name']}" if note["name"] else "")
+    return f'{where}: "{note["text"]}"'
+
+
 def _e1rm_notes(card):
     notes = card.get("e1rm_notes")
     return ["", "e1RM notes:"] + [f"- {note}" for note in notes] if notes else []
@@ -912,6 +915,8 @@ def card_text(card):
                            + " · ".join(_result_text(r) for r in found))
     if summary:
         lines += ["", "Results against the prescription:"] + summary
+    if card["notes"]:
+        lines += ["", "Notes logged:"] + [f"- {_note_line(note)}" for note in card["notes"]]
     if card["e1rm"]:
         lines += ["", "e1RM: " + " · ".join(f"{r['name']} {_e1rm_value(r)} ({_signed(r['delta'])})"
                                              for r in card["e1rm"])]
@@ -989,6 +994,8 @@ def _region(card, record_date):
                 result += f", RPE {_signed(row['rpe_delta'])}"
             lines.append(_row([render.day_label(row["date"]), row["exercise_id"], row["prescribed"], row["logged"],
                                result]))
+    if card["notes"]:
+        lines += ["", "**Notes logged:**", ""] + [f"- {_note_line(note)}" for note in card["notes"]]
     if card["e1rm"]:
         lines += ["", _row(["Lift", "e1RM", "Change", "Date"]), "| --- | --- | --- | --- |"]
         for row in card["e1rm"]:

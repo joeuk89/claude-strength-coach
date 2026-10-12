@@ -1,8 +1,8 @@
 """The food questions on the card, from `nutrition status` when nutrition is on (contract C36, C35).
 
 A soft dependency: with no `coach.nutrition` module, or nutrition off, the
-card keeps R-01's nutrition and meal-plan fields. Nothing here computes
-from nutrition data.
+card keeps its builtin field, one morning scale weight. Nothing here
+computes from nutrition data.
 """
 
 import importlib
@@ -34,6 +34,8 @@ def contribute(ctx):
     if not status.get("enabled"):
         return None
     lines, prefills = [], []
+    if status.get("plan"):
+        prefills.append(f"Meal plan: {status['plan']}.")
     for letter, item in zip(string.ascii_lowercase, status.get("questions") or []):
         prefill, ask = _question(item)
         if prefill:

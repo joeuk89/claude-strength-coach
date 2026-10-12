@@ -39,15 +39,23 @@ fields, always in this order:
 3. **Runs** — with an activity source, the card states the window's runs
    from `python3 -m coach cardio week` (count, distance, quality runs)
    and any planned activity `cardio reconcile` found missed, and asks
-   only for runs no source logged. Without one, ask count and total
-   distance.
+   only for runs no source logged. With no source on, it states the runs
+   the activity files record or plan in the window and asks the same;
+   with no run recorded or planned in the window, there is no Runs
+   field. Lifting alone never implies running.
 4. **Sleep** — with enough dated nightly observations, the card
    states the last seven nights (average and short nights) and asks how
    it felt. Otherwise ask, in one line: "average hours a night, dates
    covered and source (manual diary, self-reported period mean or
    tracker), and how it felt".
 5. **Niggles** — anything new? Name each open niggle-log row (`watching`
-   or `easing`) and ask whether it is quiet or still there.
+   or `easing`) and ask whether it is quiet or still there. The card
+   quotes the window's workout and exercise notes once, under "Notes
+   logged" (`data.card.notes`, with date, session and exercise), and
+   this field asks whether anything in them is a niggle to track. A note
+   is the athlete's report, not a diagnosis: the card never records a
+   niggle from a note alone. Add one with `niggles add` (act.md) only
+   once the reply confirms it.
 6. **Food** — the food questions, worded as `python3 -m coach nutrition
    status` gives them in `data.questions`, one line each:
    1. Readings: the app's numbers (trend weight · expenditure · targets
@@ -55,19 +63,20 @@ fields, always in this order:
       without an app, this week's morning weigh-ins and average daily
       protein if they track it. A dashboard screenshot is accepted.
    2. Habits: anchors most days (y/n)? Anything in the plan that didn't
-      work? The anchors ask is left out when no anchors are on file.
+      work? The anchors ask is left out when no anchors are on file, the
+      plan ask unless a meal plan is in force, which the card names.
    3. Next week: food exceptions — who cooks which nights, office-day
       changes, meals out. Asked **only when a standing weekly template
       exists** (`[nutrition.template]` in `config.toml`); `data.questions`
       leaves it out otherwise.
 
-   Nutrition not enabled (`data.enabled` is false): one morning scale
-   weight instead.
+   Nutrition not enabled (`data.enabled` is false): the field is
+   **Bodyweight**, one morning scale weight, and nothing else.
 7. **Next week** — anything different: travel, schedule, kit, illness?
 
 **Leave out a field that cannot apply** and renumber the rest from 1:
 no coach-led sessions in the window, no Coach-led field; no cardio in
-the athlete's week, no Runs field. **A fact the log already answers is
+the athlete's week, no Runs field; no meal plan, no plan question. **A fact the log already answers is
 stated for confirmation, not asked.** If the athlete's opening message
 already covers the fields, don't send the template; leave out any single
 field it already answers.
