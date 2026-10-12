@@ -844,7 +844,8 @@ def publish(root, overlay_id, now, record_date=None, dry_run=False, env=None, in
     report["rendered"] = write(root, now, KINDS)["pages"]
     if sheet_text is not None:
         (root / paths.SESSION_SHEETS).write_text(sheet_text, encoding="utf-8")
-    checkin.skeleton(root, record.date, refresh=True, now=now)
+    if record.kind != checkin.UNRECOGNISED:
+        checkin.skeleton(root, record.date, refresh=True, now=now)
     deleted = [row["path"] for row in records["included"] if row["change"] == "deleted"]
     removed = _git(root, "rm", "-q", "--cached", "--ignore-unmatch", "--", *deleted, env=env) if deleted else None
     if removed is not None and removed.returncode != 0:

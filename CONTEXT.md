@@ -412,8 +412,9 @@ was due moves to the next check-in.
 _Avoid_: long check-in, gap review
 
 **Review**:
-A completed check-in: a record in `check-ins/` titled
-`# Check-in — <date> (<tier>)` with the filename's date. Only reviews
+A completed check-in: a record in `check-ins/` with a valid Check-in
+title, `# Check-in — <date>` with or without a `(<tier>)` marker (no
+marker counts as deep), and the filename's date. Only reviews
 count for check-in timing: the next due date, the deep clock and the
 week-review window.
 _Avoid_: retrospective, any record in `check-ins/`

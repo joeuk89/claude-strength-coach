@@ -29,7 +29,7 @@ class ReviewContextTest(HistoryCase):
     def checks(self, check_id, expect=0):
         return self.coach("check", "--only", check_id, expect=expect)["data"]["results"]
 
-    def test_setup_does_not_complete_a_review_and_first_due_is_consistent(self):
+    def test_program_start_record_does_not_complete_a_review_and_first_due_is_consistent(self):
         for setup in (False, True):
             with self.subTest(setup=setup):
                 if setup:
@@ -64,7 +64,7 @@ class ReviewContextTest(HistoryCase):
                 self.assertEqual(checkin.due(self.root, date(2026, 10, 18)).due_date, date(2026, 10, 25))
                 self.assertEqual(self.status("2026-10-25")["level"], "attention")
 
-    def test_later_setup_record_cannot_postpone_adoption_due_date(self):
+    def test_later_program_start_record_cannot_postpone_adoption_due_date(self):
         config_path = self.root / "config.toml"
         config = config_path.read_text(encoding="utf-8")
         for cadence, due_day in ((7, "2026-10-18"), (14, "2026-10-25")):
@@ -80,12 +80,12 @@ class ReviewContextTest(HistoryCase):
                 self.assertEqual(self.status("2026-10-11")["level"], "info")
                 setup.unlink()
 
-    def test_setup_anchor_survives_a_later_block_start(self):
+    def test_program_start_anchor_survives_a_later_block_start(self):
         self.record("2026-10-11", "# Program start — 2026-10-11")
         self.edit_json("data/state.json", lambda doc: doc["block"].update(started="2026-11-01"))
         self.assertEqual(checkin.due(self.root, date(2026, 11, 1)).due_date, date(2026, 10, 18))
 
-    def test_earliest_ledger_start_survives_a_later_block_start_without_setup(self):
+    def test_earliest_ledger_start_survives_a_later_block_start_without_a_program_start_record(self):
         self.edit_json("data/state.json", lambda doc: doc["block"].update(started="2026-11-01"))
         write_json(self.root / "data/blocks.json", {"schema_version": 1, "blocks": [{
             "id": "b-0001", "started": "2026-10-11", "seed_hard_weeks": 0, "seed_reason": None,
@@ -135,6 +135,19 @@ class ReviewContextTest(HistoryCase):
         self.record("2026-10-11", "# Program start — 2026-10-11")
         card = self.coach("checkin", "prepare", "--until", "2026-10-18")["data"]["card"]
         self.assertEqual(card["window"], {"start": "2026-10-11", "end": "2026-10-18"})
+
+    def test_misses_command_defaults_to_the_deep_cards_tally_before_any_review(self):
+        self.record("2026-10-11", "# Program start — 2026-10-11")
+        for overlays, since in ((True, "2026-10-12"), (False, "2026-10-11")):
+            with self.subTest(overlays=overlays):
+                if not overlays:
+                    for path in (self.root / "data/overlays").glob("*.json"):
+                        path.unlink()
+                card = self.coach("checkin", "prepare", "--until", "2026-10-18")["data"]["card"]
+                command = self.coach("checkin", "misses", "--until", "2026-10-18")["data"]
+                self.assertEqual(card["mode"], "deep")
+                self.assertEqual(command, card["misses"])
+                self.assertEqual(command["since"], since)
 
     def test_an_unrecognised_record_keeps_its_week_review_region_as_archive(self):
         for day in ("2026-10-18", "2026-10-25"):

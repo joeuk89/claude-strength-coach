@@ -34,17 +34,16 @@ def prepare(args, ctx):
 
 @command(
     "checkin misses",
-    help="Missed sessions by tag and by session (default: since the last deep check-in)",
-    args=(arg("--since", metavar="D", help="first day (default: the last deep record's date)"),
+    help="Missed sessions by tag and by session (default: the deep card's tally, since the last deep check-in)",
+    args=(arg("--since", metavar="D",
+              help="first day (default: the last deep review's date, else the program's first window start)"),
           arg("--until", metavar="D", help="last day (default today)")),
 )
 def misses(args, ctx):
     until = _date(args.until, "--until") or ctx.today()
     since = _date(args.since, "--since")
     if since is None:
-        found = [r for r in checkin.reviews(ctx.root) if r.date < until]
-        deep = [r for r in found if r.tier == "deep"]
-        since = deep[-1].date if deep else (found[0].date if found else until)
+        since = checkin.misses_since(ctx.root, until)
     if since > until:
         raise UsageError(f"--since {since} is after --until {until}")
     return checkin.misses(ctx.root, since, until, ctx.now())

@@ -19,6 +19,7 @@ from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from functools import cached_property
 from pathlib import Path
+from typing import NamedTuple
 
 from coach import checkin_catchup, checkin_parts, dates, flags, history, overlay, paths, program, render, routines
 from coach import state, stats, units, validity
@@ -105,8 +106,14 @@ class Record:
         return {"date": self.date.isoformat(), "tier": self.tier, "path": self.path.as_posix()}
 
 
+class Title(NamedTuple):
+    date: date
+    tier: str | None
+    kind: str
+
+
 def parse_title(line):
-    """(date, tier or None, kind) from a record's first line, or None when it does not parse.
+    """The `Title` on a record's first line, or None when it does not parse.
 
     A legacy Check-in title and a Program start title have no tier."""
     match = _TITLE.match(line or "") or _START_TITLE.match(line or "")
@@ -117,8 +124,8 @@ def parse_title(line):
     except ValueError:
         return None
     if match.re is _START_TITLE:
-        return day, None, PROGRAM_START
-    return day, match.group(2), CHECK_IN
+        return Title(day, None, PROGRAM_START)
+    return Title(day, match.group(2), CHECK_IN)
 
 
 def first_line(path):
@@ -145,12 +152,12 @@ def records(root):
             continue
         rel = paths.CHECKINS_DIR / path.name
         title = parse_title(first_line(path))
-        if title is None or title[0] != day:
+        if title is None or title.date != day:
             found.append(Record(day, None, rel, UNRECOGNISED))
-        elif title[2] == PROGRAM_START:
+        elif title.kind == PROGRAM_START:
             found.append(Record(day, None, rel, PROGRAM_START))
         else:
-            found.append(Record(day, title[1] or "deep", rel))
+            found.append(Record(day, title.tier or "deep", rel))
     return found
 
 
@@ -366,6 +373,19 @@ def _window(inst, found, end):
     else:
         start = first_review_anchor(inst.root) or end
     return dates.Span(min(start, end), end)
+
+
+def _misses_since(inst, found, end):
+    deep = [r for r in found if r.tier == "deep"]
+    return deep[-1].date if deep else _window(inst, [], end).start
+
+
+def misses_since(root, until):
+    """First day of the deep card's missed-session tally for a card ending `until`: the newest deep review
+    before it, else the start of the program's first window."""
+    inst = _Instance.load(root)
+    until = _as_date(until)
+    return _misses_since(inst, [r for r in reviews(inst.root) if r.date < until], until)
 
 
 def _sessions(inst, window, adherence, workouts):
@@ -704,8 +724,7 @@ def _build(root, today, until=None, tier=None, now=None, live=True, parts=True, 
         return card
 
     if card["mode"] == "deep":
-        deep = [r for r in found if r.tier == "deep"]
-        card["misses"] = misses(inst.root, deep[-1].date if deep else window.start, end, now, live)
+        card["misses"] = misses(inst.root, _misses_since(inst, found, end), end, now, live)
 
     builtin = _builtin_fields(inst, card, _hevy_runs(inst, window) if live else [])
     builtin.update(replaced)
@@ -1056,11 +1075,11 @@ def skeleton(root, record_date, tier=None, overlay_id=None, refresh=False, dry_r
                                   f"--date {day.isoformat()} first")
         before = path.read_text(encoding="utf-8")
         text = before
-        title = parse_title(before.split("\n", 1)[0])
-        if title is None or title[0] != day:
+        record = next(r for r in records(root) if r.date == day)
+        if record.kind == UNRECOGNISED:
             raise ValidationError(f"{rel.as_posix()} has an invalid record title; fix it before refreshing")
-        if tier is None and title[2] == CHECK_IN:
-            tier = title[1] or "deep"
+        if tier is None and record.kind == CHECK_IN:
+            tier = record.tier
         found_reviews = reviews(root)
         newest = bool(found_reviews and found_reviews[-1].date == day)
         for region_id, start, end in reversed(render.find_regions(text, REGION_KIND)):

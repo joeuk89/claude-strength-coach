@@ -4283,6 +4283,7 @@ coach.checkin.due(root, today) -> Due
 coach.checkin.prepare(root, today, until=None, tier=None, now=None, *, deep_review_reasons=()) -> dict   # the card
 coach.checkin.card_text(card) -> str                                         # the Sunday message
 coach.checkin.misses(root, since, until, now=None) -> dict
+coach.checkin.misses_since(root, until) -> date                              # the deep card's misses start
 coach.checkin.render_week_review(root, record_date) -> str                   # C11
 coach.checkin.skeleton(root, date, tier=None, overlay_id=None, refresh=False, dry_run=False, now=None) -> dict
 coach.checkin.mode_for(found, day) -> (mode, deep_reasons)                   # R-21b; due() and prepare() share it
@@ -4296,8 +4297,9 @@ The message renderer is `card_text`, not `render_card`: the C11 sweep
 takes any top-level `render_<kind>` as the renderer of that region kind,
 and `render_card` would capture R-33b's `card` regions.
 
-- **Window**: day after the last record's date to today (`--until` sets
-  the end). No record: from the program's first overlay span start.
+- **Window**: day after the newest review's date to today (`--until`
+  sets the end). No review: from the earliest overlay span start, else
+  the first-review anchor, else the end day.
 - **Mode**: `catch_up` when `days_since > catch_up_after_days()`, the
   first return band's upper edge (C22).
   Otherwise `deep` when there is no record, the last deep record is
@@ -4404,8 +4406,10 @@ earliest overlay, else at the first-review anchor, else on the end day:
 - `flags`: C20 objects for the window: `convention_slip` (open audit
   candidates), `duration_over_cap`, `stale_routine`, plus part flags.
   Presented through `coach.flags.for_mode` (C44).
-- `misses` (deep tier only): `coach.checkin.misses(root, since=last deep
-  record date, until=window end)` →
+- `misses` (deep tier only): `coach.checkin.misses(root, since=newest deep
+  review date, else the first window's start, until=window end)` →
+  (`checkin misses` without `--since` uses the same start, from
+  `coach.checkin.misses_since(root, until)`)
   `{"by_tag": {"time": 0, "sleep": 2, "ill": 0, "family": 0, "skipped": 0, "other": 0, "untagged": 1},
     "by_session": {"session-a": 2}, "sessions_missed": 3}`, plus `since`
   and `until`. Counts each missed planned session (C18 adherence over the
@@ -4500,9 +4504,9 @@ as it was):
   and takes its tier from the record's title, so a fresh render needs
   nothing gitignored. The skeleton warns when the window holds workouts
   not yet synced. The overlay region is R-13's `overlay render`.
-- `--refresh` re-renders the week-review region only on the newest
-  record (an older one is archive, C11), and every `overlay` region in
-  the file; with `--overlay ID` it adds the collapsed prescription when
+- `--refresh` refuses an `unrecognised` record (exit 1, file unchanged).
+  It re-renders the week-review region only on the newest review (an
+  older one is archive, C11), and every `overlay` region in the file; with `--overlay ID` it adds the collapsed prescription when
   the record has no region for it, and wraps a bare region for it (one
   `overlay render --into` appended) in the `<details>` block.
 - Coach's read, Decisions and The week ahead are prose the coach writes. R-01's
@@ -4989,7 +4993,8 @@ change that snapshot.
    git repository needs an agreed remote and `git push -u <remote>
    <branch>`. Setup and weekly close-out explain this prerequisite.
 3. Renders all three pages and refreshes the record's regions
-   (`checkin skeleton --refresh`). When Hevy is off, also renders
+   (`checkin skeleton --refresh`); an `unrecognised` record (C36) is
+   committed as it stands, without the refresh. When Hevy is off, also renders
    `this-week-sheets.md` from the same approved overlay as the brief,
    refreshing missing or stale sheets. Hevy-enabled publication leaves
    existing sheets alone and does not require them.
