@@ -150,6 +150,9 @@ class NoRuleTest(RecoveryCase):
         self.assertEqual(data["record_lines"][1],
                          "- Moved by choice: Session A moved from Mon 12 Oct to Wed 14 Oct, this week only.")
         self.assertEqual(self.misses()[0]["reason"], "moved to 2026-10-14 by choice")
+        moved_flags = [f["message"] for f in overlay.load(self.root, data["overlay_id"])["flags"]
+                       if f["code"] == "missed_day_rule"]
+        self.assertEqual(moved_flags, ["Moved by choice: Session A moved from Mon 12 Oct to Wed 14 Oct, this week only."])
         before = self.snapshot()
         for choice in (("--move-to", "2026-10-14"), ("--move-to", "2026-10-16"), ("--drop",)):
             with self.subTest(choice=choice):
@@ -302,9 +305,10 @@ class NextExposureTest(RecoveryCase):
         text = flat(step_text("program-week", "midweek.md"))
         route = text[text.index("**A lift with no session left"):]
         for words in ("stats e1rm --exercise", "followups add", "--review-at", "`followup_due`",
-                      "that line's override (compute.md, step 5)"):
+                      "that line's override (compute.md, step 3)"):
             self.assertIn(words, route)
         self.assertIn("next exposure is next week's own session", route)
+        self.assertIn("## 3. Change a line", step_text("program-week", "compute.md"))
 
 
 class SkillTextTest(unittest.TestCase):

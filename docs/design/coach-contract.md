@@ -2465,8 +2465,8 @@ Reserved codes:
 | `followup_due` | info | R-27 | | An open follow-up is past its review date. |
 | `evidence_expired` | info | R-32 (module `coach/flags/research.py` added by R-23a) | | A plugin's cited research note has expired; the rationale says the evidence is under review. |
 | `stale_routine` | warn | R-21a | | A routine for an active session does not hold the newest approved overlay's content: the last pass did not write and verify it. |
-| `missed_day_rule` | info | R-22 | | A missed-day rule changed this line or session; the message names the rule. |
-| `missed_rule_unmatched` | info | R-22 | | No missed-day rule matched; reprogram the rest of the week with `propose week --kind midweek` and a coach's brief. |
+| `missed_day_rule` | info | R-22 | | A missed-day rule or the athlete's choice changed this line or session; the message names the rule or the choice. |
+| `missed_rule_unmatched` | info | R-22 | | No missed-day rule matched, or the chosen day cannot take the session; ask the athlete to move it to a free day or drop it this week. |
 | `adherence_low` | warn | R-30a | | Trailing four ordinary weeks below 70 % of planned core and coach-led sessions. |
 | `add_session_type_blocked` | warn | R-30a | yes | Adherence below 80 %: no new recurring session without a recorded override. |
 | `restructure_required` | warn | R-30a | yes | Adherence below 70 % and no decision in effect: the check-in presents a smaller schedule. |
@@ -5276,8 +5276,8 @@ changed lines and moved sessions carry `missed_day_rule` (info). It runs
   place of the program's rules. A move applies a one-off `shift` rule
   (id `move`, `action.on` = D2): a day that is not `free` leaves it
   unmatched with that day's reason, and no priority floor stands in for
-  it. A drop applies a one-off `skip` rule (id `drop`): no overlay, and a
-  priority floor (C40) still folds alongside it, kept as `floor_rule`.
+  it. A drop applies a one-off `skip` rule (id `drop`): no overlay unless
+  a priority floor (C40) folds alongside it, kept as `floor_rule`.
   `missed plan` returns `decision` (`move`, `drop` or null) and
   `destinations` (each day after the miss to the span's end: `{date,
   status, reason}`); an unmatched plan's summary lists the free days and
@@ -7687,7 +7687,7 @@ R-22's `missed` provider (order 32, `attention`) names each core session
 recovery its rule offers as of today (`coach.missed.recovery`, C37): the
 shift's day ("today, Sat 17 Oct"), the fold's target, a skip, or why no
 rule applies (move, drop or reshuffle), plus the `missed plan` command.
-At most two sessions are named, then a count. Logging the session, a
+Up to three sessions are named; with more, two are named, then a count. Logging the session, a
 `trained_unlogged` note or a recorded miss clears its line; the provider
 writes nothing.
 

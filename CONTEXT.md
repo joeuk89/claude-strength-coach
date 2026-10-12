@@ -213,8 +213,9 @@ _Avoid_: weekly plan, week's targets, weekly overlay
 The program's standing answer to one missed session, agreed before the
 week starts: fold some of its exercises into a later session, shift the
 whole session to a free day, or skip it. It is applied as a mid-week
-overlay once the athlete says go; a miss no rule covers goes back to the
-coach to reprogram.
+overlay once the athlete says go. Rules are optional: for a miss no rule
+covers, the athlete chooses to move the session to a free day, reshuffle
+the week, or drop it.
 _Avoid_: make-up rule, catch-up plan
 
 **Fold**:

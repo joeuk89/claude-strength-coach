@@ -173,6 +173,25 @@ class FloorFoldTest(FloorCase):
         self.assertEqual(doc["sessions"][0]["exercises"][-1]["fold"]["rule_id"], FLOOR_ID)
         self.data("overlay", "validate", data["overlay_id"])
 
+    def test_a_chosen_drop_still_folds_the_floor_and_records_both(self):
+        argv = ("missed", "plan", "--session", "session-a", "--date", "2026-10-12", "--drop")
+        planned = self.data(*argv)
+        self.assertEqual((planned["matched"], planned["decision"], planned["floor_rule"]["id"]),
+                         (True, "drop", FLOOR_ID))
+        self.assertEqual([(s["date"], s["session_id"]) for s in planned["draft"]["sessions"]],
+                         [("2026-10-15", "session-b")])
+        data = self.data("missed", "apply", *argv[2:], "--tag", "time")
+        self.assertEqual(data["record_lines"][1],
+                         f"- Dropped by choice, with the priority floor {FLOOR_ID}: Back Squat (Barbell) 2×5 @ 100 kg "
+                         "added to Thu 15 Oct Session B, this week only.")
+        self.assertEqual(data["overlay_id"], "2026-10-15-midweek")
+        last = overlay.load(self.root, data["overlay_id"])["sessions"][0]["exercises"][-1]
+        self.assertEqual((last["exercise_id"], last["fold"]["rule_id"]), (SQUAT, FLOOR_ID))
+        self.assertEqual(len([s for s in last["sets"] if overlay.is_working(s)]), 2)
+        miss = next(a for a in read_json(self.root / "data" / "history" / "annotations.json")["annotations"]
+                    if a["kind"] == "miss")
+        self.assertEqual(miss["reason"], "dropped this week by choice")
+
     def test_a_pending_floor_raises_nothing_and_a_trained_one_counts_as_replaced(self):
         self.data("missed", "apply", "--session", "session-a", "--date", "2026-10-12")
         week = self.priority()["lifts"][0]["weeks"][-1]

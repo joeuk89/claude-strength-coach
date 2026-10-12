@@ -30,7 +30,7 @@ the athlete chooses that. Show `missed plan`'s `reason` and its
 `elapsed` or `unavailable`), and offer:
 
 - **Move it** to a free day: `missed plan --session <id> --date <date>
-  --move-to <day>`, presented like a matched rule (summary, write line).
+  --move-to <date>`, presented like a matched rule (summary, write line).
 - **Reshuffle**, when the move needs other sessions moved too: one-off.md's
   reshuffle mode. Record the miss with `python3 -m coach history annotate
   --kind miss --date <date> --session <id> --tag <tag> --reason
@@ -38,7 +38,7 @@ the athlete chooses that. Show `missed plan`'s `reason` and its
 - **Drop it**: `missed plan ... --drop`; the rest of the week stays as
   planned.
 
-After "go", run `missed apply` with the same `--move-to <day>` or `--drop`
+After "go", run `missed apply` with the same `--move-to <date>` or `--drop`
 and the athlete's `--tag`; it records the choice with the miss, and a
 second apply of the same miss is refused. An `unavailable` day is the
 athlete's `[athlete] available_days` speaking: ask whether that day is
@@ -54,7 +54,7 @@ and record it with `python3 -m coach followups add --text "<lift>:
 <agreed change>, from <latest exposure>" --review-at <the day next week
 is planned> --source "mid-week request <date>"`. The next weekly
 proposal raises it as `followup_due`: check its line against the latest
-exposure again, apply it as that line's override (compute.md, step 5),
+exposure again, apply it as that line's override (compute.md, step 3),
 then `followups resolve` it.
 
 After a matched rule's or a move's push, verify and close out as

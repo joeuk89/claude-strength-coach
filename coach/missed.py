@@ -279,8 +279,9 @@ def _shift(doc, missed, day, rule, config, today):
         moved = dict(copy.deepcopy(missed), date=candidate.isoformat(), moved_from=missed["date"])
         later = copy.deepcopy(_later_sessions(doc, day)) + [moved]
         later.sort(key=lambda s: s["date"])
+        label = "Moved by choice" if action.get("on") else f"Rule {rule['id']}"
         flag = flags.make("missed_day_rule", session_id=missed["session_id"], message=(
-            f"Rule {rule['id']}: {missed['title']} moved from {render.day_label(missed['date'])} to "
+            f"{label}: {missed['title']} moved from {render.day_label(missed['date'])} to "
             f"{render.day_label(candidate)}, this week only."))
         return later, [flag]
     if action.get("on"):
