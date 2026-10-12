@@ -20,7 +20,7 @@ from pathlib import Path
 from coach import block as block_module
 from coach import bodyweight
 from coach import checkin, closeout, dates, history, overlay, page_parts, paths, program, render, sheets, state, stats
-from coach import statusdays, units
+from coach import statusdays, structure, units
 from coach import config as config_module
 from coach import flags as flags_module
 from coach.config_tables import coaching
@@ -225,6 +225,14 @@ class _View:
     def breaks(self):
         """Planned breaks (C50) overlapping the brief's week."""
         return statusdays.breaks(self.root, self.week)
+
+    @cached_property
+    def is_break_week(self):
+        """Every planned session of the week on a break day (C41 kind `break`), so no day of it needs an overlay."""
+        try:
+            return structure.is_break_week(self.root, self.week.start, today=self.today)
+        except ValidationError:
+            return False
 
     def break_focus(self):
         lines = []
@@ -530,7 +538,7 @@ def render_brief(root, as_of, view=None):
     breaks = view.break_focus()
     if view.week_overlay:
         focus = [view.week_overlay["focus"]] + breaks
-    elif breaks and all(any(statusdays.span_of(row).contains(day) for row in view.breaks) for day in view.week.days()):
+    elif breaks and view.is_break_week:
         focus = breaks
     elif breaks:
         focus = breaks + ["No overlay covers the rest of this week yet; the next programming pass writes one."]

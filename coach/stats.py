@@ -21,7 +21,6 @@ EASY_RPE = 5
 CITES = ("rn:autoregulation.5", "rn:proximity-to-failure.5")
 BODYWEIGHT_WINDOW_DAYS = 14
 SERIES_MODES = ("total", "per_hand_x2", "single_implement")
-BREAK = "on_break"
 BODYWEIGHT_MODES = ("bodyweight", "assisted")
 TOTAL_SYSTEM = "total_system"
 LOAD_BASIS = "load"
@@ -366,6 +365,9 @@ def _nearest(items, day, key):
     return min(items, key=lambda item: (abs((dates.parse_date(key(item)) - day).days), key(item)), default=None)
 
 
+ON_BREAK = "on_break"
+
+
 def adherence(root, overlay_id=None, span=None, include_unsynced=False, today=None, now=None, as_of=None):
     """Planned sessions against logged workouts, per session and exercise (C18 adherence per overlay).
 
@@ -448,7 +450,7 @@ def adherence_of(root, planned, window, include_unsynced=False, today=None, now=
                                      "sets_prescribed": sum(1 for s in line["sets"] if overlay.is_working(s)),
                                      "sets_logged": None, "rpe_delta": None} for line in session["exercises"]]
         elif day in off:
-            row.update(status=BREAK, break_id=off[day])
+            row.update(status=ON_BREAK, break_id=off[day])
         elif day > today:
             row["status"] = "upcoming"
         else:
@@ -465,8 +467,8 @@ def adherence_of(root, planned, window, include_unsynced=False, today=None, now=
             tagged.add(position)
             used_misses.add(miss_id)
     on_break = [{key: row[key] for key in ("session_id", "date", "title", "overlay_id", "break_id")}
-                for row in sessions if row["status"] == BREAK]
-    sessions = [row for row in sessions if row["status"] != BREAK]
+                for row in sessions if row["status"] == ON_BREAK]
+    sessions = [row for row in sessions if row["status"] != ON_BREAK]
 
     extra = [{"workout_id": w["workout_id"], "date": w["date"], "title": w["title"], "session_id": w["session_id"],
               "unsynced": w["unsynced"]}
@@ -485,7 +487,8 @@ def adherence_of(root, planned, window, include_unsynced=False, today=None, now=
         for line in row["exercises"]:
             summary["exercises"][line["status"]] += 1
     return {"overlay_id": None, "span": window.to_json(), "today": today.isoformat(), "sessions": sessions,
-            "on_break": on_break, "extra": sorted(extra, key=lambda w: (w["date"], w["workout_id"])), "summary": summary}
+            "on_break": on_break, "extra": sorted(extra, key=lambda w: (w["date"], w["workout_id"])),
+            "summary": summary}
 
 
 def _week_label(span):

@@ -1868,7 +1868,9 @@ skip when there is no `data/program.json` (`state_schema`: no
   report should carry (R-24 lists the overlays that lose their approval)
   and `creates(before, after) -> {path: doc}` for documents the step
   brings into being (R-31's state step seeds `data/blocks.json`). A
-  created file is validated against the owned document whose `FILES`
+  created file is first migrated from the version its step wrote to the
+  owned document's current version by that document's own steps, then
+  validated against the owned document whose `FILES`
   match its path, written with the migrated files only where no file
   exists yet, staged with them, and listed in the report's `created`.
   The runner sets `schema_version` to `TO` after each step. The target
@@ -5044,9 +5046,11 @@ these headings:
   (C36 `due`).
 - Focus: the overlay's `focus`, then one line per planned break (C50)
   overlapping the week: its days, note and the day training resumes.
-  With no overlay, a break covering the whole week is the Focus on its
-  own; one covering part of it adds "No overlay covers the rest of this
-  week yet; the next programming pass writes one."
+  With no overlay, a break week (C41 kind `break`: every core and
+  coach-led session the week plans falls on the break) is the Focus on
+  its own; a break covering only some of the week's sessions adds "No
+  overlay covers the rest of this week yet; the next programming pass
+  writes one."
 - Sessions: every session of the overlay in force on each day of the
   week, by date (C18 adherence over the week's span, as of); Tier from
   the program (`core` for a session the program lacks); Key = first
@@ -7128,7 +7132,7 @@ Providers R-26b ships:
 | `instance` | uninitialised (no `config.toml` or no `profile.md`): "run /setup"; files behind their schema version: "run python3 -m coach migrate run" |
 | `checks` | the `coach check` summary and the ids of any `fail` or `warn` |
 | `hevy` | cache age against `[hevy] cache_max_age_hours`; skipped when Hevy is disabled |
-| `overlay` | the overlay in force today (id, kind, span), else the next to start with its first session; whether it is approved, pushed and verified (a routine counts as verified when its latest `verify` line for the overlay's id and approval hash says so; Hevy off: approved only); the next one or two planned sessions (none on a planned-break day); each planned break (C50) overlapping today to the end of the coming week, with the day training resumes; and the days of the coming week neither an overlay nor a planned break covers. With no overlay, a day on a break (today, or a coming week with no uncovered day) says none is needed rather than asking for /program-week. The coming week is the week holding tomorrow (`[athlete] week_starts`), from today on: the rest of this week, or all of next week on its last day. Invalid overlays are skipped (`checks` names them) |
+| `overlay` | the overlay in force today (id, kind, span), else the next to start with its first session not on a planned-break day; whether it is approved, pushed and verified (a routine counts as verified when its latest `verify` line for the overlay's id and approval hash says so; Hevy off: approved only); the next one or two planned sessions (none on a planned-break day); each planned break (C50) overlapping today to the end of the coming week, with the day training resumes; and the days of the coming week neither an overlay nor a planned break covers, none when the coming week is a break week (C41 kind `break`), whose other days plan no session. With no overlay, a day on a break (today, or a coming week with no uncovered day) says none is needed rather than asking for /program-week. The coming week is the week holding tomorrow (`[athlete] week_starts`), from today on: the rest of this week, or all of next week on its last day. Invalid overlays are skipped (`checks` names them) |
 | `program` | rotation position and whether it is confirmed (R-25's `header_facts`), the confirmation date (`state.json`); the block status line (`coach.block.status_line`, C43) and `light_week` (`state.json`); `attention` when the position is unconfirmed or the light week is `proposed` or `agreed` |
 | `checkin` | last check-in, days since, due date, tier and mode (`first`, `weekly`, `deep`, `catch_up`) from R-25's `header_facts` (its `data` is `header_facts`' `checkin`); `attention` when the due date is today or past, including the first review |
 

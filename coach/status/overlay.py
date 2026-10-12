@@ -1,10 +1,10 @@
 """The overlay in force, its push state, the next sessions and any uncovered day (contract C10, C52)."""
 
 import json
-from datetime import date, timedelta
+from datetime import timedelta
 from pathlib import Path
 
-from coach import dates, paths, routines, statusdays
+from coach import dates, paths, routines, statusdays, structure
 from coach import overlay as overlay_module
 from coach import program as program_module
 from coach.errors import ValidationError
@@ -30,14 +30,17 @@ def overlay_status(ctx):
     current = found[0] if found else None
     upcoming = None if current else _next_to_start(docs, today)
     shown = current or upcoming
-    summary = _summary(ctx.root, shown, audit, hevy_on) if shown else None
 
     coming = _coming_week(ctx, today)
+    last = max([coming.end] + [dates.parse_date(s["date"]) for doc in docs for s in doc["sessions"]])
+    off = _break_days(ctx.root, dates.Span(today, last))
     rows = _breaks(ctx.root, dates.Span(today, coming.end))
-    off = {day for day in dates.Span(today, coming.end).days() if any(_covers(row, day) for row in rows)}
     uncovered = [day for day in coming.days()
                  if day >= today and day not in off and not overlay_module.pick_in_force(docs, day)]
+    if uncovered and any(day in off for day in coming.days()) and _is_break_week(ctx, coming, today):
+        uncovered = []
     resting = today in off or (not uncovered and any(day in off for day in coming.days()))
+    summary = _summary(ctx.root, shown, audit, hevy_on, off) if shown else None
 
     if current:
         head = f"Overlay in force today: {_describe(summary)}."
@@ -49,7 +52,7 @@ def overlay_status(ctx):
         head = "No overlay is in force today and none is planned; plan the week with /program-week."
     lines = [head] + [_break_line(row) for row in rows]
 
-    next_sessions = _next_sessions(docs, today, _breaks(ctx.root, dates.Span(today, date.max)))
+    next_sessions = _next_sessions(docs, today, off)
     if next_sessions:
         lines.append(_next_line(next_sessions))
 
@@ -78,8 +81,19 @@ def _breaks(root, span):
         return []
 
 
-def _covers(row, day):
-    return statusdays.span_of(row).contains(day)
+def _break_days(root, span):
+    try:
+        return statusdays.break_days(root, span)
+    except ValidationError:
+        return {}
+
+
+def _is_break_week(ctx, week, today):
+    """A break week's days off the break hold no planned session, so they need no overlay (C41 kind `break`)."""
+    try:
+        return structure.is_break_week(ctx.root, week.start, today=today)
+    except ValidationError:
+        return False
 
 
 def _break_line(row):
@@ -153,7 +167,7 @@ def _push_state(root, doc, audit):
     return (UNVERIFIED if written or latest else NOT_PUSHED), 0, len(routine_ids)
 
 
-def _summary(root, doc, audit, hevy_on):
+def _summary(root, doc, audit, hevy_on, off):
     verified = total = None
     if overlay_module.is_approved(doc):
         if hevy_on:
@@ -162,7 +176,8 @@ def _summary(root, doc, audit, hevy_on):
             state = APPROVED
     else:
         state = EDITED if doc.get("approval") else NOT_APPROVED
-    first = min(doc["sessions"], key=lambda s: s["date"]) if doc["sessions"] else None
+    training = [s for s in doc["sessions"] if dates.parse_date(s["date"]) not in off]
+    first = min(training, key=lambda s: s["date"]) if training else None
     return {
         "id": doc["id"], "kind": doc["kind"], "span": doc["span"], "approved": state not in (NOT_APPROVED, EDITED),
         "state": state, "routines_verified": verified, "routines": total,
@@ -190,11 +205,11 @@ def _describe(summary, with_first=False):
     return text
 
 
-def _next_sessions(docs, today, breaks=(), limit=2):
+def _next_sessions(docs, today, off, limit=2):
     found = []
     session_dates = sorted({s["date"] for doc in docs for s in doc["sessions"] if s["date"] >= today.isoformat()})
     for day in session_dates:
-        if any(_covers(row, dates.parse_date(day)) for row in breaks):
+        if dates.parse_date(day) in off:
             continue
         picked = overlay_module.pick_in_force(docs, day)
         if not picked:

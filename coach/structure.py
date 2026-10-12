@@ -18,7 +18,8 @@ from functools import cached_property
 from pathlib import Path
 
 from coach import config as config_module
-from coach import dates, decisions, flags, history, jsonio, overlay, paths, plugins, program, state, stats, statusdays, validity
+from coach import dates, decisions, flags, history, jsonio, overlay, paths, plugins, program, state, stats, statusdays
+from coach import validity
 from coach.config_tables.sessions import cap_minutes
 from coach.errors import ValidationError
 from coach.library import Library
@@ -257,9 +258,8 @@ def _planned_pairs(inst, span):
 
 
 def _external_rows(inst, span):
-    """Coach-led sessions in a span: placed on their weekday, or on the dates their annotations name when they have none.
-
-    One with no annotation on a planned-break day (C50) is `on_break`, not upcoming or unconfirmed.
+    """Coach-led sessions in a span: placed on their weekday, or on the dates their annotations name when they
+    have none. One with no annotation on a planned-break day (C50) is `on_break`, not upcoming or unconfirmed.
     """
     notes = [a for a in history.annotations(inst.root, "external") if span.contains(dates.parse_date(a["date"]))]
     off = statusdays.break_days(inst.root, span)
@@ -283,13 +283,13 @@ def _external_rows(inst, span):
             if note is not None:
                 status = "done" if note["done"] else "not_done"
             elif day in off:
-                status = stats.BREAK
+                status = stats.ON_BREAK
             else:
                 status = "upcoming" if day > inst.today else "unconfirmed"
             row = {"external_id": external["id"], "title": external["title"], "date": day.isoformat(),
                    "status": status,
                    "estimated_sets": {m: float(v) for m, v in sorted(external["estimated_sets"].items())}}
-            if status == stats.BREAK:
+            if status == stats.ON_BREAK:
                 row["break_id"] = off[day]
             rows.append(row)
     return sorted(rows, key=lambda r: (r["date"], r["external_id"]))
@@ -454,7 +454,7 @@ def _report(inst, span, rows, extra, sessions_by_key, workouts, on_break=()):
         _add(bonus, muscles)
         logged.append((item["session_id"], item["date"], workout, muscles))
     for external in _external_rows(inst, span):
-        if external["status"] == stats.BREAK:
+        if external["status"] == stats.ON_BREAK:
             skipped.append({"external_id": external["external_id"], "date": external["date"],
                             "break_id": external["break_id"]})
             continue
@@ -499,6 +499,12 @@ def week(root, week_start, *, today=None, now=None):
     until = max(inst.today, span.end)
     report["kind"] = _kind(inst, span, _activity_dates(inst, until), until)
     return report
+
+
+def is_break_week(root, week_start, *, today=None, now=None):
+    """Whether the week holding `week_start` is a planned break week (C41 kind `break`). Reads only."""
+    inst = _Instance.load(root, today, now)
+    return _break_week(inst, inst.week(_as_date(week_start)))
 
 
 def ordinary_weeks(root, until, n=WINDOW_WEEKS, reach=REACH_WEEKS, *, today=None, now=None):
@@ -997,7 +1003,8 @@ def _priority_weeks(inst, lifts, since, until):
     window = dates.Span(spans[0].start, spans[-1].end)
     matched = stats.adherence_of(inst.root, pairs, window, today=inst.today, now=inst.now)
     status = {(r["date"], r["session_id"]): r["status"] for r in matched["sessions"]}
-    sessions_by_key = {(s["date"], s["session_id"]): s for _, s in pairs}
+    rested = {(r["date"], r["session_id"]) for r in matched["on_break"]}
+    sessions_by_key = {(s["date"], s["session_id"]): s for _, s in pairs if (s["date"], s["session_id"]) not in rested}
     trained_on = {}
     for workout in inst.workouts():
         if workout["conditioning"]:

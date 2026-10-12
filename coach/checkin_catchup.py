@@ -65,7 +65,7 @@ def planned(inst, window, overlay_rows, workouts, today, overlay_breaks=()):
     covered = _covered(inst, window)
     off = statusdays.break_days(inst.root, window)
     rows = [dict(row, planned_from="overlay") for row in overlay_rows]
-    rows += [dict(row, status=stats.BREAK, tag=None, workout_id=None, planned_from="overlay")
+    rows += [dict(row, status=stats.ON_BREAK, tag=None, workout_id=None, planned_from="overlay")
              for row in overlay_breaks]
     open_days = {day for day in window.days() if day not in covered and inst.schedules_on(day)}
     plan = schedule_plan(inst, window, today) if open_days else None
@@ -110,7 +110,7 @@ def planned(inst, window, overlay_rows, workouts, today, overlay_breaks=()):
         elif session["tier"] == "optional":
             continue
         elif day in off:
-            row.update(status=stats.BREAK, break_id=off[day])
+            row.update(status=stats.ON_BREAK, break_id=off[day])
         else:
             note = nearest(misses, day, sid)
             row["tag"] = (note.get("tag") if note else None) or "untagged"
@@ -128,7 +128,7 @@ def summary(inst, window, rows, covered, workouts, external):
         week = dates.week_span(start, week_starts)
         span = dates.Span(max(week.start, window.start), min(week.end, window.end))
         inside = [r for r in rows if span.contains(_day(r["date"]))]
-        core = [r for r in inside if r["tier"] == "core" and r["status"] != stats.BREAK]
+        core = [r for r in inside if r["tier"] == "core" and r["status"] != stats.ON_BREAK]
         missed = {}
         for tag in history.MISS_TAGS + ("untagged",):
             count = sum(1 for r in core if r["status"] == "missed" and (r["tag"] or "untagged") == tag)
@@ -141,7 +141,7 @@ def summary(inst, window, rows, covered, workouts, external):
             "week": week.label(), "start": week.start.isoformat(),
             "planned_core": len(core), "trained_core": sum(1 for r in core if r["status"] == "trained"),
             "missed_by_tag": missed,
-            "on_break": sum(1 for r in inside if r["tier"] == "core" and r["status"] == stats.BREAK),
+            "on_break": sum(1 for r in inside if r["tier"] == "core" and r["status"] == stats.ON_BREAK),
             "optional_trained": sum(1 for r in inside if r["tier"] == "optional" and r["status"] == "trained"),
             "external_done": sum(1 for e in recorded if e["done"]) if recorded else None,
             "workouts": sum(1 for w in workouts if span.contains(_day(w["date"]))),
@@ -249,7 +249,7 @@ def build(inst, card, window, end, today, now, live, workouts, food):
     missed = [{"date": r["date"], "session_id": r["session_id"], "title": r["title"], "tag": r["tag"]}
               for r in rows if r["tier"] == "core" and r["status"] == "missed"]
     rested = [{"date": r["date"], "session_id": r["session_id"], "title": r["title"], "break_id": r["break_id"]}
-              for r in rows if r["tier"] == "core" and r["status"] == stats.BREAK]
+              for r in rows if r["tier"] == "core" and r["status"] == stats.ON_BREAK]
     found = {
         "layoff_days": card["days_since_last"],
         "summary": summary(inst, window, rows, covered, workouts, card["sessions"]["external"]),

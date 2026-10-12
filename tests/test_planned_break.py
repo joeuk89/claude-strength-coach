@@ -4,7 +4,7 @@ import copy
 import unittest
 from datetime import date
 
-from coach import jsonio, migrate, research, statusdays, structure
+from coach import checkin, jsonio, migrate, research, statusdays, structure
 from tests.support import REPO_ROOT, VALID
 from tests.support.config_edit import set_key
 from tests.support.history import read_json, write_json
@@ -101,14 +101,31 @@ class StatusTest(BreakCase):
         self.data("status-days", "withdraw", "s-0001", "--reason", "trip cancelled", now=MIDWEEK)
         self.assertIn(PLAN_PROMPT, text(self.overlay_section()))
 
+    def test_the_next_sessions_and_the_first_session_skip_break_days(self):
+        self.add_break(*BREAK, "--no-training")
+        self.write_overlay("2026-10-19-one-off", "one_off", {"start": "2026-10-19", "end": "2026-11-08"},
+                           ["2026-10-19", "2026-11-02", "2026-11-05"])
+        section = self.overlay_section(SUNDAY_BEFORE)
+        self.assertEqual([(s["date"], s["title"]) for s in section["data"]["next_sessions"]],
+                         [("2026-11-02", "Session B"), ("2026-11-05", "Session A")])
+        self.assertIn("first session Session B on Mon 2026-11-02.", section["lines"][0])
+
+    def test_a_break_week_with_nothing_planned_on_its_other_days_asks_for_no_programming(self):
+        self.add_break("--kind", "travel", "--from", "2026-10-19", "--to", "2026-10-23", "--note", "Away",
+                       "--no-training")
+        section = self.overlay_section(SUNDAY_BEFORE)
+        self.assertNotIn("/program-week", text(section))
+        self.assertEqual((section["level"], section["data"]["uncovered"]), ("info", []))
+
     def test_ending_an_ongoing_break_brings_the_prompt_back_after_its_last_day(self):
         self.add_break("--kind", "injured", "--from", "2026-10-19", "--note", "Rest the calf", "--no-training")
         section = self.overlay_section()
         self.assertNotIn(PLAN_PROMPT, text(section))
         self.assertIn("until it is ended (status-days end s-0001)", text(section))
-        self.data("status-days", "end", "s-0001", "--date", "2026-10-22", now=MIDWEEK)
-        self.assertEqual(self.overlay_section()["data"]["uncovered"],
-                         ["2026-10-23", "2026-10-24", "2026-10-25"])
+        self.data("status-days", "end", "s-0001", "--date", "2026-10-21", now=MIDWEEK)
+        section = self.overlay_section()
+        self.assertEqual(section["data"]["uncovered"], ["2026-10-22", "2026-10-23", "2026-10-24", "2026-10-25"])
+        self.assertIn(PLAN_PROMPT, text(section))
 
 
 class BriefTest(BreakCase):
@@ -125,6 +142,36 @@ class BriefTest(BreakCase):
         page = self.brief(now=SUNDAY_BEFORE.replace("10-18", "10-25"))
         self.assertIn("Planned break Mon 26 Oct to Tue 27 Oct (Away)", page)
         self.assertIn("No overlay covers the rest of this week yet", page)
+
+    def test_with_an_overlay_the_focus_is_its_focus_then_the_break(self):
+        self.add_break(*BREAK, "--no-training")
+        self.write_one_off()
+        page = self.brief()
+        focus = page.index("Travel")
+        self.assertLess(focus, page.index("Planned break Mon 19 Oct to Sun 1 Nov (Holiday, no gym)"))
+        self.assertNotIn("No overlay covers", page)
+
+    def test_a_break_week_with_nothing_planned_on_its_other_days_needs_no_overlay(self):
+        self.add_break("--kind", "travel", "--from", "2026-10-19", "--to", "2026-10-23", "--note", "Away",
+                       "--no-training")
+        page = self.brief(now=SUNDAY_BEFORE)
+        self.assertIn("Planned break Mon 19 Oct to Fri 23 Oct (Away): no training.", page)
+        self.assertNotIn("No overlay covers", page)
+
+
+class MissesTest(BreakCase):
+    def misses_with_a_note_on_the_break(self, *argv):
+        self.add_break(*BREAK, *argv)
+        self.write_one_off()
+        self.data("history", "annotate", "--kind", "miss", "--date", "2026-10-19", "--session", "session-a",
+                  "--tag", "other", now=CLOSE_DAY)
+        return checkin.misses(self.root, "2026-10-19", "2026-11-01", now=CLOSE_DAY)["sessions_missed"]
+
+    def test_a_miss_note_on_a_break_day_is_not_a_miss(self):
+        self.assertEqual(self.misses_with_a_note_on_the_break("--no-training"), 0)
+
+    def test_without_the_intent_the_noted_session_is_one_miss(self):
+        self.assertEqual(self.misses_with_a_note_on_the_break(), 1)
 
 
 class CatchUpTest(BreakCase):
@@ -214,6 +261,27 @@ class BlockCloseTest(BreakCase):
                        "--no-training")
         closed = self.close("2026-W43", now="2026-10-25T18:00:00Z")
         self.assertEqual([(w["class"], w["planned"], w["trained"]) for w in closed["weeks"]], [("low", 1, 0)])
+
+    def test_the_ledger_counts_only_core_and_coach_led_sessions_on_the_break(self):
+        def optional_b(doc):
+            next(s for s in doc["sessions"] if s["id"] == "session-b")["tier"] = "optional"
+
+        self.edit("data/program.json", optional_b)
+        self.add_break(*BREAK, "--no-training")
+        closed = self.close("2026-W44", now=CLOSE_DAY)
+        self.assertEqual([w["on_break"] for w in closed["weeks"]], [2, 2])
+
+    def test_priority_rows_leave_out_sessions_on_the_break(self):
+        def squat_priority(doc):
+            doc["priority"] = [{"exercise_id": "bb_back_squat", "kpi": {"kind": "e1rm", "target": None, "by": None},
+                                "floor": {"sets": 2, "rpe": None}}]
+
+        self.edit("data/program.json", squat_priority)
+        self.add_break(*BREAK, "--no-training")
+        found = structure.priority(self.root, "2026-10-19", today=date(2026, 11, 1))
+        self.assertEqual([(w["label"], w["planned"], w["missed"]) for w in found["lifts"][0]["weeks"]],
+                         [("2026-W43", 0, 0), ("2026-W44", 0, 0)])
+        self.assertEqual(found["flags"], [])
 
     def test_a_covered_week_skips_adherence_with_its_reason(self):
         self.add_break(*BREAK, "--no-training")

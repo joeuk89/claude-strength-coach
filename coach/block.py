@@ -262,7 +262,7 @@ def _facts(inst, span):
     else:
         found = "partial"
     return {"class": found, "planned": planned, "trained": trained, "as_prescribed": as_prescribed,
-            "on_break": len(report["on_break"]), "ill": ill}
+            "on_break": sum(1 for row in report["on_break"] if row.get("tier", "core") == "core"), "ill": ill}
 
 
 def classify(root, week_start, *, today=None, now=None):
