@@ -1,6 +1,6 @@
 import os
 
-from coach import dates, pages
+from coach import closeout, dates, pages
 from coach.commands import arg, command
 from coach.errors import UsageError
 
@@ -37,7 +37,11 @@ def show(args, ctx):
     "pages publish",
     help="Re-render the pages, then commit them with the approved overlay and the newest record, and push",
     args=(arg("--overlay", required=True, metavar="ID", help="the approved overlay of the programming pass"),
-          arg("--record", metavar="D", help="the check-in record's date (default: the newest record)")),
+          arg("--record", metavar="D", help="the check-in record's date (default: the newest record)"),
+          arg("--include", action="append", default=[], metavar="PATH",
+              help="a training-record file the approved brief's commit plan named; repeat for each"),
+          arg("--structural", action="store_true",
+              help="allow data/program.json, when the brief's approved structural change named it")),
     writes=True,
     git_write=True,
 )
@@ -50,4 +54,28 @@ def publish(args, ctx):
             raise UsageError(f"--record: {exc}") from None
     env = dict(os.environ)
     env.update(ctx.env)
-    return pages.publish(ctx.root, args.overlay, ctx.now(), record, args.dry_run, env)
+    return pages.publish(ctx.root, args.overlay, ctx.now(), record, args.dry_run, env, args.include,
+                         args.structural)
+
+
+@command(
+    "pages plan",
+    help="The training records a programming pass's brief names for commit with the pages: changed now, or "
+         "written by the steps its \"go\" approves",
+    args=(arg("--structural", action="store_true",
+              help="a structural change: data/program.json and routine/program.md"),
+          arg("--session", action="append", default=[], metavar="ID",
+              help="with --structural: a session it edits, adds or removes (its routine/ page); repeat for each"),
+          arg("--light-week", action="store_true",
+              help="block decide records a light week: data/blocks.json, data/decisions.json, data/state.json, "
+                   "routine/program.md"),
+          arg("--one-off", action="store_true",
+              help="a one-off week is set, or an ended one cleared: data/state.json"),
+          arg("--create-routines", action="store_true", help="routines create records new ids: data/state.json"),
+          arg("--missed", action="store_true",
+              help="missed apply records a matched miss: data/history/annotations.json")),
+)
+def plan(args, ctx):
+    steps = [step for step in closeout.STEP_WRITES if getattr(args, step)]
+    pages.require_work_tree(ctx.root)
+    return closeout.plan(ctx.root, args.structural, args.session, steps)

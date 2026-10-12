@@ -47,6 +47,21 @@ first, tables second. Every mode uses the same brief.
 
    `Reply "go" to train this. Nothing goes to Hevy (<reason>).`
 
+7. **The commit plan** ends the write line, `missed plan`'s too, but
+   not a `skip` rule's (midweek.md). Run `python3 -m coach pages plan`
+   with a flag for each step "go" will run, so the plan also names what
+   those steps write: `--structural` with `--session <id>` for each
+   session the change edits, adds or removes; `--light-week` when
+   write.md step 6 will run `block decide`; `--one-off` for a one-off
+   week, or when `state show` has a `one_off` that ended;
+   `--create-routines` when `routines diff` named sessions with no
+   routine; `--missed` for a matched missed-day rule. `include` lists
+   each record to commit, changed now or `planned`. Append
+   ` Commit: <each path in full>.`, or ` Commit: no training records.`
+   when there are none. Config, profile, `.env` and other files never
+   join it. When `program_changed` is true without a structural change
+   in the brief, say `data/program.json` stays local.
+
 ## Hold-steady week: the short brief
 
 Only a normal-mode pass started by `/check-in` at the **weekly tier**
@@ -80,7 +95,9 @@ tables and the write line again; it approves nothing.
 
 Stop and wait for the athlete's reply. Never present and write in the
 same turn: the brief is a proposal, not a notification, and that holds
-on a hold-steady week too. **"go" (or a clear yes) approves the span
-and every write the line names**: don't ask again before writing to
-Hevy. Anything else is a tweak: revise, and present the brief again,
-write line included. Iterate until they would train it.
+on a hold-steady week too. **"go" (or a clear yes) approves the span,
+every write the line names and its commit plan**: don't ask again before
+writing to Hevy or committing those records. A yes that keeps the
+records local ("go, but don't commit") approves the rest: drop the
+commit plan. Anything else is a tweak: revise, and present the brief
+again, write line included. Iterate until they would train it.

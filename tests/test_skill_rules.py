@@ -17,6 +17,7 @@ MODES = ("normal", "midweek", "light", "minimum", "constrained", "reshuffle")
 APPROVAL_TEMPLATE = 'Reply "go" to train this and write: <routines> (Hevy) · <structural files>.'
 NO_HEVY_VARIANT = 'Reply "go" to train this and write: <structural files>. Nothing goes to Hevy (no Hevy).'
 NOTHING_TO_WRITE_VARIANT = 'Reply "go" to train this. Nothing goes to Hevy (<reason>).'
+COMMIT_CLAUSES = (" Commit: <each path in full>.", " Commit: no training records.")
 SCRIPT_RULE = ("Never compute, convert or call Hevy by hand: run `python3 -m coach` and quote its output. "
                "If a command fails, say so and quote the error.")
 OLD_SKILL = "one-off" + "-week"
@@ -118,6 +119,45 @@ class ProgramWeekModesTest(unittest.TestCase):
         for sentence in (APPROVAL_TEMPLATE, NO_HEVY_VARIANT, NOTHING_TO_WRITE_VARIANT):
             with self.subTest(sentence=sentence):
                 self.assertEqual(self.text.count(sentence), 1)
+
+    def test_every_write_line_ends_with_the_commit_plan_from_pages_plan(self):
+        brief = flat(step_text("program-week", "brief.md"))
+        plan = brief[brief.index("**The commit plan**"):]
+        self.assertIn("`missed plan`'s too", plan)
+        self.assertIn("python3 -m coach pages plan", plan)
+        for flag in ("`--structural`", "`--session <id>`", "`--light-week`", "`--one-off`", "`--create-routines`",
+                     "`--missed`"):
+            with self.subTest(flag=flag):
+                self.assertIn(flag, plan)
+        self.assertIn("changed now or `planned`", plan)
+        for clause in COMMIT_CLAUSES:
+            with self.subTest(clause=clause):
+                self.assertIn(f"`{clause}`", plan)
+        stop = brief[brief.index("## Then stop"):]
+        self.assertIn("every write the line names and its commit plan", stop)
+        self.assertIn("don't ask again before writing to Hevy or committing those records", stop)
+        self.assertIn("drop the commit plan", stop)
+        midweek = flat(step_text("program-week", "midweek.md"))
+        self.assertIn("`write_line` and the commit plan (brief.md, step 7, with `--missed`)", midweek)
+
+    def test_a_skip_rule_has_no_commit_plan_and_says_the_miss_stays_local(self):
+        brief = flat(step_text("program-week", "brief.md"))
+        self.assertIn("not a `skip` rule's (midweek.md)", brief)
+        midweek = flat(step_text("program-week", "midweek.md"))
+        skip = midweek[midweek.index("A `skip` rule"):midweek.index("When it reports `matched: false`")]
+        self.assertIn("its write line has no commit plan", skip)
+        self.assertIn("stays only on this computer (uncommitted)", skip)
+        self.assertIn("`data/history/annotations.json`", skip)
+
+    def test_close_out_commits_the_approved_plan_and_names_what_stays_local(self):
+        write = flat(step_text("program-week", "write.md"))
+        close = write[write.index("## Close out"):]
+        publish = close.index("pages publish --overlay <id>` with `--include <path>`")
+        self.assertLess(publish, close.index("`--dry-run` first"))
+        self.assertIn("include them only after the athlete's yes", close)
+        self.assertIn("The approved plan itself needs no second question", close)
+        self.assertIn("no `--include` when the athlete kept the records local", close)
+        self.assertIn("`records.local`", close[close.index("Recap"):])
 
     def test_the_description_carries_the_one_off_triggers(self):
         description = self.main.split("description:", 1)[1].split("\n", 1)[0]

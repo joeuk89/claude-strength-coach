@@ -341,10 +341,21 @@ _Avoid_: perfect week, full week, completed hard week (the block's count)
 **Publish**:
 After the athlete's "go", commit and push exactly the brief, the
 dashboard, the progress page, the week's overlay and the newest check-in
-record, plus the current session sheets when Hevy is off, so the phone
-shows the week. `/goals` publishes the approved week again after a
-nutrition change. The only push the coach makes without being asked.
+record, plus the current session sheets when Hevy is off and the
+records of the commit plan, so the phone shows the week. `/goals`
+publishes the approved week again after a nutrition change. The only
+push the coach makes without being asked.
 _Avoid_: deploy, sync (Hevy sync and framework sync are other things)
+
+**Commit plan**:
+The training records the brief's write line names for commit with the
+week, file by file: those already changed and those the approved write
+steps will write. They are the manual log, state, decisions, block
+ledger, history and routine pages, and the program only for a structural
+change the same brief names. The athlete's "go" approves each named
+record as it stands at publish; a changed record the plan did not name
+stays local until they agree.
+_Avoid_: backup, auto-commit
 
 **Sunday message**:
 The one message the coach sends at check-in about the week just

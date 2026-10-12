@@ -18,7 +18,7 @@ from functools import cached_property
 from pathlib import Path
 
 from coach import block as block_module
-from coach import checkin, dates, history, overlay, page_parts, paths, program, render, sheets, state, stats, units
+from coach import checkin, closeout, dates, history, overlay, page_parts, paths, program, render, sheets, state, stats, units
 from coach import config as config_module
 from coach import flags as flags_module
 from coach.config_tables import coaching
@@ -743,8 +743,14 @@ def publish_message(doc):
     return f"coach: publish week of {doc['span']['start']} ({doc['id']})"
 
 
-def _git(root, *argv, env=None):
-    return subprocess.run(["git", "-C", str(root), *argv], capture_output=True, text=True, env=env, timeout=120)
+_git = closeout.git
+
+
+def require_work_tree(root, env=None):
+    if shutil.which("git") is None:
+        raise ConfigError("git is not installed, so the pages cannot be committed and pushed")
+    if _git(root, "rev-parse", "--is-inside-work-tree", env=env).stdout.strip() != "true":
+        raise RefusedError(f"{root} is not a git working tree, so there is nothing to publish to")
 
 
 def _upstream(root, env):
@@ -765,10 +771,12 @@ def _ahead(root, env):
     return int(counted.stdout.strip()) if counted.returncode == 0 else None
 
 
-def publish(root, overlay_id, now, record_date=None, dry_run=False, env=None):
-    """Render and publish the pages, applicable session sheets, overlay and record (C38 publishing).
+def publish(root, overlay_id, now, record_date=None, dry_run=False, env=None, include=(), structural=False):
+    """Render and publish the pages, applicable session sheets, overlay, record and approved training records (C38).
 
-    Every refusal (exit 3) comes before anything is written. A rejected push exits 4 and keeps the commit.
+    `include` names the training-record files the brief's commit plan listed; `structural` admits
+    data/program.json. Every refusal (exit 3) comes before anything is written. A rejected push
+    exits 4 and keeps the commit.
     """
     root = Path(root)
     doc = overlay.load(root, overlay_id)
@@ -787,10 +795,7 @@ def publish(root, overlay_id, now, record_date=None, dry_run=False, env=None):
         record = next((r for r in found if r.date == day), None)
         if record is None:
             raise ValidationError(f"there is no check-in record check-ins/{day.isoformat()}.md")
-    if shutil.which("git") is None:
-        raise ConfigError("git is not installed, so the pages cannot be committed and pushed")
-    if _git(root, "rev-parse", "--is-inside-work-tree", env=env).stdout.strip() != "true":
-        raise RefusedError(f"{root} is not a git working tree, so there is nothing to publish to")
+    require_work_tree(root, env)
     branch, remote, merge = _upstream(root, env)
     publish_paths = [PAGE_PATHS[BRIEF], PAGE_PATHS[DASHBOARD], PAGE_PATHS[PROGRESS],
                      (paths.OVERLAYS_DIR / f"{overlay_id}.json").as_posix(), record.path.as_posix()]
@@ -798,7 +803,9 @@ def publish(root, overlay_id, now, record_date=None, dry_run=False, env=None):
     include_sheets = not view.config.hevy.enabled
     if include_sheets:
         publish_paths.append(paths.SESSION_SHEETS.as_posix())
-    staged = _git(root, "diff", "--cached", "--name-only", "-z", env=env).stdout.split("\0")
+    records = closeout.select(root, include, structural, env)
+    publish_paths += [row["path"] for row in records["included"]]
+    staged = _git(root, "diff", "--cached", "--name-only", "--no-renames", "-z", env=env).stdout.split("\0")
     others = sorted(p for p in staged if p and p not in publish_paths)
     if others:
         raise RefusedError("the git index already holds staged changes to other files, which a publish would "
@@ -813,15 +820,19 @@ def publish(root, overlay_id, now, record_date=None, dry_run=False, env=None):
     sheet_text = sheets.render_sheets(root, overlay_id) if include_sheets else None
     message = publish_message(doc)
     report = {"overlay_id": overlay_id, "record": record.path.as_posix(), "paths": publish_paths, "message": message,
-              "branch": branch, "remote": remote, "upstream": merge, "commit": None, "pushed": False,
-              "ahead": None, "dry_run": dry_run}
+              "records": records, "branch": branch, "remote": remote, "upstream": merge, "commit": None,
+              "pushed": False, "ahead": None, "dry_run": dry_run}
     if dry_run:
         return report
     report["rendered"] = write(root, now, KINDS)["pages"]
     if sheet_text is not None:
         (root / paths.SESSION_SHEETS).write_text(sheet_text, encoding="utf-8")
     checkin.skeleton(root, record.date, refresh=True, now=now)
-    added = _git(root, "add", "--", *publish_paths, env=env)
+    deleted = [row["path"] for row in records["included"] if row["change"] == "deleted"]
+    removed = _git(root, "rm", "-q", "--cached", "--ignore-unmatch", "--", *deleted, env=env) if deleted else None
+    if removed is not None and removed.returncode != 0:
+        raise ValidationError(f"git rm failed: {removed.stderr.strip()}")
+    added = _git(root, "add", "--", *(p for p in publish_paths if p not in deleted), env=env)
     if added.returncode != 0:
         raise ValidationError(f"git add failed: {added.stderr.strip()}")
     if _git(root, "diff", "--cached", "--quiet", env=env).returncode == 0:

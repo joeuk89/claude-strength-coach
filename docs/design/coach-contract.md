@@ -68,6 +68,7 @@ coach/                       # framework: synced to instances
   checkin_parts/<topic>.py   # one module per item that adds card fields                 (each item)
   missed.py                  # missed-day rule matching and application                  (R-22)
   pages.py                   # brief, dashboard, progress renderers, publish             (R-25)
+  closeout.py                # training-record commit plan for publish (C38)             (R-25)
   page_parts/__init__.py     # page part discovery                                       (R-25)
   page_parts/<topic>.py      # one module per item that adds page items                  (each item)
   status/__init__.py         # status provider registry + auto-discovery                 (R-26b)
@@ -217,7 +218,8 @@ Phase 2 to 4 command inventory. No command here writes to Hevy.
 | `missed apply --session S --date D [--tag T]` | R-22 | W |
 | `pages show KIND` | R-25 | |
 | `pages render [--only brief\|dashboard\|progress] [--replace-readme]` | R-25 | W |
-| `pages publish --overlay ID [--record D]` | R-25 | W, G |
+| `pages plan [--structural [--session ID]...] [--light-week] [--one-off] [--create-routines] [--missed]` | R-25 | |
+| `pages publish --overlay ID [--record D] [--include PATH]... [--structural]` | R-25 | W, G |
 | `status` | R-26b | |
 | `hooks sessionstart`, `hooks posttooluse` | R-26b | |
 | `research status [--area AREA] [--kind template\|local] [--expired]`, `research show REF`, `research cites [--unresolved]`, `research validate` | R-32a | |
@@ -4667,13 +4669,16 @@ context only reads overlays created and approved by `as_of`, and
 recovery decisions made by then; later decision withdrawals cannot
 change that snapshot.
 
-**Publishing** (roadmap decision 1). `pages publish --overlay ID [--record D]`:
+**Publishing** (roadmap decision 1). `pages publish --overlay ID [--record D]
+[--include PATH]... [--structural]`:
 
 1. Refuses (exit 3) unless the overlay is approved with a matching hash
    (C10).
 2. Refuses (exit 3) outside a git work tree, on a branch with no upstream
    (or a detached HEAD), when the git index already holds staged changes
-   to any other path (naming them), and when `README.md` is not coach's
+   to any path outside step 4's paths and the `--include` paths (naming
+   them), when an `--include` path is not an eligible training-record
+   file (below), and when `README.md` is not coach's
    (README ownership). Every refusal comes before anything is written.
    The selected overlay must also be the brief's coming-week overlay;
    a mismatch refuses before writes, so an older approval cannot publish
@@ -4691,7 +4696,8 @@ change that snapshot.
    existing sheets alone and does not require them.
 4. Stages exactly `this-week.md`, `README.md`, `progress.md`,
    `data/overlays/<ID>.json` and `check-ins/<D>.md` (D defaults to the
-   newest record), plus `this-week-sheets.md` when Hevy is off, commits
+   newest record), plus `this-week-sheets.md` when Hevy is off, plus
+   each `--include` path with an uncommitted change, commits
    with the message
    `coach: publish week of <span.start> (<ID>)`, and pushes `HEAD` to the
    current branch's upstream (never `--force`). A failed commit exits 1. A
@@ -4703,6 +4709,50 @@ change that snapshot.
    dry run).
 5. `--dry-run` reports the paths and message and changes nothing.
 
+The report's `records` holds `included` (`{path, change}` committed with
+the pages; a deletion is staged with `git rm --cached`), `unchanged`
+(named but with nothing to commit) and `local` (eligible records with
+uncommitted changes that were not named, which stay out of the commit).
+The staged-changes refusal and `pages plan` both read git with rename
+detection off, so a staged rename is its deleted source plus its added
+destination, and committing it needs both paths named.
+
+**The commit plan** (`coach/closeout.py`). The training records eligible
+for close-out are `data/state.json`, `data/decisions.json`,
+`data/blocks.json` and files under `data/log/`, `data/history/` and
+`routine/`, plus `data/program.json` only with `--structural`. The
+directories define eligibility; each record is named and staged as one
+file, with literal pathspecs, so a pattern or directory never stages
+anything unreviewed. An `--include` that is absolute, contains `..`,
+names a directory or an ineligible file (config, profile, `.env`, other
+data), or names `data/program.json` without `--structural`, exits 3
+before anything is written. `pages plan` is read-only: it reads `git
+status` with optional locks off, so even the index's stat cache is left
+alone. `records` lists each eligible path with an uncommitted change (`added`, `modified` or
+`deleted`, untracked files included) from `git status`, plus each path
+the approved write steps will write, flagged by the caller, as
+`planned` when it has not changed yet:
+
+| Flag | Step that "go" runs | Planned paths |
+|---|---|---|
+| `--structural` | the program edit and `program render` | `data/program.json`, `routine/program.md` |
+| `--session ID` (with `--structural`) | a session the change edits, adds or removes | `routine/<ID>.md` |
+| `--light-week` | `block decide --outcome adopted` | `data/blocks.json`, `data/decisions.json`, `data/state.json`, `routine/program.md` |
+| `--one-off` | setting or clearing `one_off` | `data/state.json` |
+| `--create-routines` | `routines create` | `data/state.json` |
+| `--missed` | `missed apply` | `data/history/annotations.json` |
+
+`include` lists the same paths, `planned` the flagged ones,
+`structural` echoes the flag and `program_changed` says whether
+`data/program.json` changed. The coach's brief names `include` at the
+end of its write line (`/program-week` brief.md), so one "go" approves
+the week, its writes and the commit; a yes that keeps the records local
+publishes with no `--include`. Approval is per path: a named record is
+committed as it stands at publish, and a changed record the plan did
+not name shows in `records.local` and is included only once the athlete
+agrees. `overlay approve` stays the only approval the publisher checks;
+the commit plan rides on it and adds no stored state.
+
 `pages render` reports `brief_overlay`: `{id, approved}` for the overlay
 the brief shows, or null when none covers its week. After approved
 nutrition edits, `/goals` validates the config, renders, publishes that
@@ -4712,7 +4762,8 @@ unapproved overlay, a refusal, a failed push, or a publish with nothing
 new that leaves `ahead` above 0 or null is reported as not done. It
 never stages `config.toml` or `profile.md`.
 
-Metadata: `writes`, `git_write`. It is allowlisted (C2).
+Metadata: `writes`, `git_write`. It is allowlisted (C2), and so is the
+read-only `pages plan`.
 
 ## C39. Removed: scheduled run, not built
 

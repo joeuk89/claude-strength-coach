@@ -207,16 +207,16 @@ suspected injury, still recommend a qualified professional.
   **Explain the rationale and trade-offs**, with before/after. Routines must be **concrete enough
   to train directly**: exercises, sets, reps, intensity, rest and a progression scheme.
 - **One approval per programming pass.** The coach's brief ends with one line naming exactly what
-  will be written: each Hevy routine, and `data/program.json` for a structural change. "go" (or a
-  clear yes) approves the week and those writes together; anything else gets a revised brief.
+  will be written: each Hevy routine, `data/program.json` for a structural change, and the training
+  records to commit. "go" (or a clear yes) approves them all; anything else gets a revised brief.
   Presenting and writing never happen in the same turn.
 - **Confirm before editing `data/program.json`**; "go" to a brief confirms the edits it names.
   Other git-tracked records (check-in and overlay records, `data/state.json`) need no confirmation.
   **Ask first** for a Hevy write outside an approved brief, a `profile.md` change to stats, goals
   or Coach's notes, or a file outside the standard locations (dated records in `check-ins/` and
-  `nutrition/`, recipe cards) or a restructure. `pages publish` commits each pass's pages and
-  records, `/framework-sync` its sync; commit anything else only when the athlete agrees. Keep
-  `profile.md` current with their confirmation; patterns go in **Coach's notes**.
+  `nutrition/`, recipe cards) or a restructure. `pages publish` commits each pass's pages and the
+  records its brief named, `/framework-sync` its sync; commit others only on the athlete's yes.
+  Keep `profile.md` current with their confirmation; patterns go in **Coach's notes**.
 
 ## Safety & scope
 
