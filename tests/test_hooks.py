@@ -276,7 +276,10 @@ class PostToolUseTest(unittest.TestCase):
     def test_other_equipment_at_a_dumbbell_only_movement_does_not_block(self):
         for text, blocked in (("barbell lunges 40 kg", False), ("Smith machine lunges 40 kg", False),
                               ("cable hammer curls 20 kg", False), ("barbell step-ups 40 kg", False),
-                              ("dumbbell lunges 16 kg", True), ("lunges 16 kg", True)):
+                              ("lunges with a barbell 40 kg", False), ("lunges on the Smith machine 40 kg", False),
+                              ("step-ups with a barbell 40 kg", False), ("hammer curls on the cable 20 kg", False),
+                              ("dumbbell lunges 16 kg", True), ("lunges 16 kg", True),
+                              ("lunges with dumbbells 16 kg", True), ("lunges 40 kg (barbell)", True)):
             with self.subTest(text=text):
                 root = copy_of(self, VALID)
                 profile = root / "profile.md"

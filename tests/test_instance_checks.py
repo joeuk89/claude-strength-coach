@@ -519,12 +519,20 @@ class BareHevyValuesTest(unittest.TestCase):
             for text in ("barbell lunges 40 kg", "barbell lunge 40 kg", "Smith machine lunges 40 kg",
                          "Barbell reverse lunges 3x8 at 40 kg", "barbell walking lunges 40 kg",
                          "kettlebell lunges 16 kg", "landmine lunges 20 kg", "cable hammer curls 20 kg",
-                         "barbell step-ups 40 kg", "trap bar lunges 60 kg", "EZ bar hammer curls 20 kg"):
+                         "barbell step-ups 40 kg", "trap bar lunges 60 kg", "EZ bar hammer curls 20 kg",
+                         "lunges (barbell) 40 kg", "hammer curls (cable) 20 kg", "lunges with a barbell 40 kg",
+                         "lunges on the Smith machine 40 kg", "lunge on the smith machine 40 kg",
+                         "step-ups with a barbell 40 kg", "step ups using a barbell 40 kg",
+                         "walking lunges with a barbell 40 kg", "hammer curls on the cable 20 kg",
+                         "hammer curls with a rope 20 kg", "rope hammer curls 20 kg", "rope hammer curl 20 kg"):
                 with self.subTest(text=text):
                     self.assertEqual(self.flagged(tmp, text), [])
             for text, exercise in (("dumbbell lunges 16 kg", "db_lunge"), ("lunges 16 kg", "db_lunge"),
                                    ("hammer curls 14 kg", "db_hammer_curl"),
-                                   ("barbell lunges 40 kg, then hammer curls 14 kg", "db_hammer_curl")):
+                                   ("barbell lunges 40 kg, then hammer curls 14 kg", "db_hammer_curl"),
+                                   ("lunges (dumbbell) 16 kg", "db_lunge"), ("lunges with dumbbells 16 kg", "db_lunge"),
+                                   ("lunges with a dumbbell 16 kg", "db_lunge"), ("lunges 40 kg (barbell)", "db_lunge"),
+                                   ("Pair the barbell with lunges 16 kg", "db_lunge")):
                 with self.subTest(text=text):
                     [(_, found)] = self.flagged(tmp, text)
                     self.assertEqual(found, exercise)

@@ -175,15 +175,15 @@ class Mentions:
     _SPELLINGS = {"dumbbell": r"(?:dumbbells?|dbs?)", "barbell": r"(?:barbells?|bb)",
                   "kettlebell": r"(?:kettlebells?|kb)", "cable": r"cables?"}
     _KINDS = {"smith": "smith_machine", "smith machine": "smith_machine", "trap bar": "trap_bar",
-              "hex bar": "trap_bar", "ez bar": "ez_bar", "bands": "band"}
-    _EQUIPMENT_WORD = (r"(?:dumbbells?|dbs?|barbells?|bb|kettlebells?|kb|cables?|smith(?:[\s-]+machine)?|machine"
-                       r"|bands?|bodyweight|landmine|(?:trap|hex|ez)[\s-]+bar)")
+              "hex bar": "trap_bar", "ez bar": "ez_bar", "bands": "band", "rope": "cable", "ropes": "cable"}
+    _EQUIPMENT_WORD = (r"(?:dumbbells?|dbs?|barbells?|bb|kettlebells?|kb|cables?|ropes?|smith(?:[\s-]+machine)?"
+                       r"|machine|bands?|bodyweight|landmine|(?:trap|hex|ez)[\s-]+bar)")
     _BEFORE_EQUIPMENT = re.compile(
         rf"\b({_EQUIPMENT_WORD})(?:-based)?\s+(?:for\s+)?"
-        r"(?:(?!(?:and|but|or|then|plus|while|whereas)\b)[a-z]+\s+){0,2}$", re.IGNORECASE,
+        r"(?:(?!(?:and|but|or|then|plus|while|whereas|with|after|before|from)\b)[a-z]+\s+){0,2}$", re.IGNORECASE,
     )
     _AFTER_EQUIPMENT = re.compile(
-        rf"(?:\b(?:on|using|with)\s+(?:the\s+)?(?:\d+(?:\.\d+)?\s*(?:kg|lb)s?\s*)?|\(\s*)"
+        rf"(?:\b(?:on|using|with)\s+(?:(?:the|an?)\s+)?(?:\d+(?:\.\d+)?\s*(?:kg|lb)s?\s*)?|\(\s*)"
         rf"({_EQUIPMENT_WORD})\b", re.IGNORECASE,
     )
     _EQUIPMENT_STEP = re.compile(rf"\b({_EQUIPMENT_WORD})\s+(?:step|increment)\b", re.IGNORECASE)
@@ -278,14 +278,17 @@ class Mentions:
         return cls._KINDS.get(word, cls._EQUIPMENT.get(word, word))
 
     def _equipment(self, text, match, end, measurements, ambiguous):
-        """(attached, describing): equipment written onto the mention, and all equipment describing it."""
+        """(attached, describing): equipment written onto the mention, and all equipment describing it.
+
+        A modifier after the mention is written onto it only when it comes before the mention's first load.
+        """
         named = self._named_equipment(match)
         if named:
             return set(), named
         before = self._BEFORE_EQUIPMENT.search(text[:match.start()])
         modifiers = [(before, 0, True)] if before else []
         after = text[match.end():end]
-        modifiers += [(m, match.end(), m.group(0).startswith("(") and not after[:m.start()].strip())
+        modifiers += [(m, match.end(), not any(f.unit or f.two_number for f in _figures(after[:m.start()])))
                       for m in self._AFTER_EQUIPMENT.finditer(after) if m.group(1).lower() != "bodyweight"]
         if ambiguous:
             modifiers += [(m, match.end(), False) for m in self._EQUIPMENT_STEP.finditer(after)]

@@ -1396,11 +1396,12 @@ library knows resolves through it (`DB row` is a single implement). A dumbbell w
 movement after it (`dumbbells up to 30 kg`) names no exercise.
 Equipment modifiers attached to the exercise (`cable lateral raise`,
 `lateral raise on the cable machine`) select the matching variant.
-Equipment written onto the movement, up to two words before it or in a
-parenthesis right after it, that no variant uses makes the mention
-ambiguous, so it is not checked (`barbell lunges 40 kg`, `Smith machine
-lunges`, `cable hammer curls`). A later modifier that matches no variant
-leaves the owner in place (`Arnold press 20 kg on the machine days`).
+Equipment written onto the movement, up to two words before it or after
+it but before its first load, that no variant uses makes the mention
+ambiguous, so it is not checked (`barbell lunges 40 kg`, `lunges with a
+barbell 40 kg`, `hammer curls (cable)`, `rope hammer curls`). A modifier
+after the load that matches no variant leaves the owner in place
+(`Arnold press 20 kg on the machine days`, `lunges 40 kg (barbell)`).
 Equipment words belonging to another exercise or a bodyweight
 measurement do not change its mode. A mention the library cannot
 resolve to one mode is not checked. No library load modes are changed
