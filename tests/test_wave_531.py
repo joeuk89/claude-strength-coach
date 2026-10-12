@@ -31,14 +31,16 @@ def wave_sets(week, training_max=100, rep_out=True):
     return tuple(found)
 
 
-def trained(day, week, training_max=100, reps=None, rpes=None, logged_sets=3, workout_id=None, **fields):
-    """An exposure prescribed `week` of the wave at `training_max`, logged at the prescribed loads with `reps`
-    (default: the prescribed reps, two more on the rep-out set) and `rpes`."""
+def trained(day, week, training_max=100, reps=None, rpes=None, loads=None, logged_sets=3, workout_id=None,
+            **fields):
+    """An exposure prescribed `week` of the wave at `training_max`, logged with `loads` (default: the prescribed
+    loads), `reps` (default: the prescribed reps, two more on the rep-out set) and `rpes`."""
     prescribed = wave_sets(week, training_max)
     reps = reps or [s.reps + (2 if s.rep_out else 0) for s in prescribed]
     rpes = rpes or [None] * len(prescribed)
-    logged = tuple(base.LoggedSet(index=i, type="normal", reps=r, rpe=rpe, load=s.load)
-                   for i, (s, r, rpe) in enumerate(zip(prescribed, reps, rpes)))[:logged_sets]
+    loads = loads or [s.load for s in prescribed]
+    logged = tuple(base.LoggedSet(index=i, type="normal", reps=r, rpe=rpe, load=load)
+                   for i, (r, rpe, load) in enumerate(zip(reps, rpes, loads)))[:logged_sets]
     found = base.Exposure(date=day, workout_id=workout_id or f"w-{day.isoformat()}", session_id="session-a",
                           exercise_id=SQUAT.id, load_mode="total", sets=logged, prescribed=prescribed,
                           week_kind="weekly")
@@ -151,11 +153,42 @@ class TrainedWorkTest(unittest.TestCase):
         self.assertEqual(proposal.state["completed_weeks"], 0)
         self.assertIn("logged RPE 10, past its cap of 9", proposal.flags[0]["message"])
 
-    def test_missing_wave_sets_repeat_the_week_without_judging_the_reps(self):
+    def test_missing_wave_sets_repeat_the_week_as_incomplete(self):
         partial = trained(date(2026, 10, 5), 1, logged_sets=2)
         proposal = run(wave(exposures=(partial,)))
         self.assertEqual(proposal.state["completed_weeks"], 0)
         self.assertEqual(flag_codes(proposal), ["incomplete_exposure"])
+
+    def test_a_short_set_among_missing_ones_holds_for_review(self):
+        partial = trained(date(2026, 10, 5), 1, reps=[5, 3, 5], logged_sets=2)
+        proposal = run(wave(exposures=(partial,)))
+        self.assertEqual(proposal.state["completed_weeks"], 0)
+        self.assertEqual(flag_codes(proposal), ["wave_review"])
+        message = proposal.flags[0]["message"]
+        self.assertIn("wave set 2 (5) logged 3 reps", message)
+        self.assertIn("2 of its 3 wave sets logged", message)
+
+    def test_a_lighter_logged_load_repeats_the_week_for_review(self):
+        lighter = trained(date(2026, 10, 19), 3, training_max=100, loads=[75, 85, 85])
+        proposal = run(wave(state(2), exposures=(lighter,)))
+        self.assertEqual((proposal.state["completed_weeks"], proposal.state["training_max"]), (2, 100))
+        self.assertEqual(flag_codes(proposal), ["wave_review"])
+        self.assertIn("wave set 3 (1+) logged at 85, under its prescribed 95", proposal.flags[0]["message"])
+        self.assertIn("training max holds for review", proposal.rationale)
+
+    def test_a_wave_logged_far_lighter_throughout_never_moves_or_raises(self):
+        logs = tuple(trained(date(2026, 10, 5 + 7 * (week - 1)), week, loads=[40, 40, 40]) for week in (1, 2, 3))
+        proposal = run(wave(exposures=logs))
+        self.assertEqual(proposal.state["completed_weeks"], 0)
+        self.assertEqual(proposal.state["training_max"], 100)
+        self.assertEqual(set(flag_codes(proposal)), {"wave_review"})
+
+    def test_a_heavier_unknown_or_within_tolerance_load_still_completes_the_week(self):
+        for loads in ([70, 80, 90], [None, None, None], [62.5, 72.5, 82.5]):
+            with self.subTest(loads=loads):
+                proposal = run(wave(exposures=(trained(date(2026, 10, 5), 1, loads=loads),)))
+                self.assertEqual(proposal.state["completed_weeks"], 1)
+                self.assertEqual(flag_codes(proposal), [])
 
     def test_completing_the_wave_at_its_reps_and_caps_raises_the_increment_once(self):
         logs = (trained(date(2026, 10, 5), 1), trained(date(2026, 10, 12), 2), trained(date(2026, 10, 19), 3))
@@ -320,9 +353,19 @@ class MigrationTest(unittest.TestCase):
         doc = {"id": "2026-10-12-weekly", "approval": None, "sessions": [{"exercises": [line, other, overridden]}]}
         after = step.migrate(copy.deepcopy(doc))
         wave_line, linear_line, overridden = after["sessions"][0]["exercises"]
-        self.assertEqual(wave_line["sets"][1], {"type": "normal", "reps": 5, "rep_out": True})
+        self.assertEqual(wave_line["sets"][1], {"type": "normal", "reps": 5, "rep_out": True,
+                                                "rpe": base.REP_OUT_RPE_CAP})
         self.assertEqual(linear_line["sets"][0]["type"], "failure")
         self.assertEqual(overridden["sets"][1]["type"], "failure")
+        self.assertIn("stop at RPE 9", step.notes(doc, after)[0])
+
+    def test_overlay_keeps_a_wave_failure_set_s_own_rpe(self):
+        step = self.step("overlay.0004_rep_out_sets")
+        line = {"provenance": {"scheme": "wave_531"}, "override": None,
+                "sets": [{"type": "failure", "reps": 1, "rpe": 8}]}
+        doc = {"id": "2026-10-12-weekly", "approval": None, "sessions": [{"exercises": [line]}]}
+        after = step.migrate(copy.deepcopy(doc))
+        self.assertEqual(after["sessions"][0]["exercises"][0]["sets"][0]["rpe"], 8)
 
 
 def squat(doc):

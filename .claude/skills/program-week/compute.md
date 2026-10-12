@@ -96,7 +96,7 @@ rotation position, and settle its flags:
 - `load_cut_held` (the kit cannot make a reset, return or deload cut, so the
   load holds; the rationale gives target and actual): at warn nothing else was
   cut, so agree holding it or the lighter load it names (step 3).
-- `wave_review` (a wave week short of its reps or past its RPE cap): the week
+- `wave_review` (a wave week short of its reps or load, or past its cap): it
   repeats and the training max holds; review it with the athlete. To change it,
   show them `python3 -m coach state set-training-max --session <s> --exercise
   <e> --value <n> --reason "<why>" --dry-run`, and run it without on their yes.

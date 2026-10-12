@@ -5,7 +5,7 @@ per-wave increments are the published 5/3/1 program's (Wendler), a
 program spec rather than research findings. The rep-out set's RPE 9 cap,
 the load tolerance that matches a logged session to its wave week and the
 rule that a week counts only when its wave sets were logged at their
-reps within their caps are coaching heuristics.
+reps and loads within their caps are coaching heuristics.
 """
 
 from dataclasses import replace
@@ -147,26 +147,35 @@ def _trains_week(ctx, exposure, week, training_max):
                for spec, (pct, reps) in zip(main, WEEKS[week]))
 
 
-def _shortfalls(exposure):
-    """What kept a matching exposure's wave sets from counting: missing sets, short reps, a passed RPE cap."""
+def _shortfalls(ctx, exposure, training_max):
+    """What kept a matching exposure's wave sets from counting: a short set (reps, or a load lighter than its
+    prescription past the matching tolerance), a passed RPE cap, or missing sets. A heavier or unrecorded load is
+    no shortfall."""
     main = base.working(exposure.prescribed)[:WAVE_SETS]
     logged = base.working(exposure.sets)[:WAVE_SETS]
-    if len(logged) < WAVE_SETS:
-        return "incomplete", f"{len(logged)} of its {WAVE_SETS} wave sets logged"
-    found = []
+    tolerance = _tolerance(ctx, training_max)
+    short = []
     for number, (spec, got) in enumerate(zip(main, logged), start=1):
         name = f"wave set {number} ({spec.reps}{'+' if spec.rep_out else ''})"
         if (got.reps or 0) < spec.reps:
-            found.append(f"{name} logged {got.reps or 0} reps")
+            short.append(f"{name} logged {got.reps or 0} reps")
+        elif got.load is not None and spec.load - got.load > tolerance:
+            short.append(f"{name} logged at {base.load_words(ctx, got.load)}, under its prescribed "
+                         f"{base.load_words(ctx, spec.load)}")
         elif spec.rpe is not None and got.rpe is not None and got.rpe > spec.rpe:
-            found.append(f"{name} logged RPE {base.number(got.rpe)}, past its cap of {base.number(spec.rpe)}")
-    return ("review", "; ".join(found)) if found else (None, None)
+            short.append(f"{name} logged RPE {base.number(got.rpe)}, past its cap of {base.number(spec.rpe)}")
+    missing = f"{len(logged)} of its {WAVE_SETS} wave sets logged" if len(logged) < WAVE_SETS else None
+    if short:
+        return "review", "; ".join(short + ([missing] if missing else []))
+    if missing:
+        return "incomplete", missing
+    return None, None
 
 
 def _judge(ctx, completed, training_max, through):
     """Move the wave on through the usable exposures after `through`, oldest first: each that trained the next wave
-    week with every wave set at its reps within its cap completes that week, and a completed third week raises the
-    training max once. Returns (completed, training max, through, words, flags)."""
+    week with every wave set at its reps and load within its cap completes that week, and a completed third week
+    raises the training max once. Returns (completed, training max, through, words, flags)."""
     words, flags = [], []
     unmatched = None
     for exposure in reversed(ctx.exposures):
@@ -179,7 +188,7 @@ def _judge(ctx, completed, training_max, through):
         if not _trains_week(ctx, exposure, week, training_max):
             unmatched = exposure
             continue
-        kind, detail = _shortfalls(exposure)
+        kind, detail = _shortfalls(ctx, exposure, training_max)
         day = exposure.date.isoformat()
         if kind == "incomplete":
             words.append(f"week {week} on {day} had {detail}, so it repeats")

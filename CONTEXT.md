@@ -260,8 +260,8 @@ _Avoid_: conditioning progression, density progression, finisher
 **Training max**:
 The load a wave's percentages are taken from: 90 % of the e1RM by
 default, or a load the program sets. It rises by a fixed increment once
-the athlete completes a whole wave, every wave set at its reps within
-its cap; untrained or short weeks repeat. A return week lowers only
+the athlete completes a whole wave, every wave set at its reps and
+prescribed load within its cap; untrained or short weeks repeat. A return week lowers only
 that week's loads, and only an explicit change the athlete agrees
 (`state set-training-max`) lowers it for good. It is kept in the
 exercise's scheme state, never in the program.

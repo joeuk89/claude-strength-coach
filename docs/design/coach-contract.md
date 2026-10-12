@@ -1070,8 +1070,9 @@ for every non-GET request, success or failure, once its retries are over.
 - Later versions: v2 adds line `provenance` (R-24, C21); v3 adds line
   `fold` and session `moved_from` (R-22, C37); v5 adds a set's `rep_out`
   (C23). Its migration turns the `failure` set of each wave line
-  (`provenance.scheme` `wave_531`, no `override`) into a rep-out set, as
-  earlier versions wrote a wave's rep-out set that way.
+  (`provenance.scheme` `wave_531`, no `override`) into a rep-out set,
+  with `rpe` 9 when it had none, as earlier versions wrote a wave's
+  rep-out set that way.
 
 ## C11. Rendered markdown markers (R-13, R-16, R-17a; later renderers follow it)
 
@@ -2420,7 +2421,7 @@ Reserved codes:
 | `incomplete_exposure` | warn | R-23a | | Fewer working sets logged than prescribed and none fell short: linear counts no miss and holds the load, or still resets it when the misses already counted reach the limit (a coaching heuristic); below the limit, confirm whether the sets were skipped or failed. |
 | `linear_below_start` | info | R-23a | | Linear reset fell below the starting load; review progression without automatic adjustment. |
 | `load_cut_held` | info, warn | R-23a | | A reset, return-band or deload load cut that the kit cannot make holds the load, and the rationale gives the target and actual cut. Info when the line's set or effort cuts still apply; warn when nothing is cut, naming the next lighter load the kit makes so the coach chooses, or when the kit makes nothing that light and the load rises. |
-| `wave_review` | warn | R-23a | | A 5/3/1 wave week was trained but a wave set fell short of its reps or past its RPE cap: the week repeats and no training-max raise is earned; review the training max with the athlete (a coaching heuristic). |
+| `wave_review` | warn | R-23a | | A 5/3/1 wave week was trained but a wave set fell short of its reps or its load, or past its RPE cap: the week repeats and no training-max raise is earned; review the training max with the athlete (a coaching heuristic). |
 | `rpe_drift` | warn | R-23a | | Compound or recovery-capped exercise: logged RPE at least 1 over target on two or more working sets of the last exposure. |
 | `range_effort_mismatch` | warn | R-23a | | Double progression held a load whose derived-from exposure had a working set below its set group's rep range or 2 or more RPE over target; review a lighter load or a different rep range. |
 | `return_week` | info | R-23a | | Decay applied; names the band and days off. A lifting line's flag adds the load change (`loads × 0.9`, or `assistance held` on an `assisted` line), the set change and any RPE cap. |
@@ -3086,10 +3087,13 @@ and `plugins test` runs them. Loaded with
   each load within one increment or 2.5 % of the training max of its
   target, a matching tolerance) and it is neither a `deload` week's nor
   `decayed`. Its first three logged working sets must each reach their
-  reps, with no logged RPE over a set's cap. Fewer than three logged
-  sets repeat the week with `incomplete_exposure`; a short set or a
-  passed cap repeats it with `wave_review` (warn), holding the training
-  max for the coach's review. A completed third week raises the training
+  reps at a load no lighter than their prescribed load by more than that
+  tolerance (a heavier or unrecorded load passes), with no logged RPE
+  over a set's cap. A short set (reps or load) or a passed cap repeats
+  the week with `wave_review` (warn), naming the logged and prescribed
+  values and holding the training max for the coach's review; fewer
+  than three logged sets with none short repeat it with
+  `incomplete_exposure`. A completed third week raises the training
   max by the region's increment once and starts the next wave at week 1.
   Anything else (an unknown or other prescription, a second session of
   a week already completed) is judged and earns nothing, so approvals,
