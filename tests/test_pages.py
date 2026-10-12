@@ -213,13 +213,14 @@ class RenderTest(PagesCase):
             "- and 1 more in the check-in",
         ])
 
-    def test_the_reason_is_an_override_then_the_target_note_then_days_off_then_the_rationale(self):
+    def test_the_reason_is_an_override_then_days_off_then_the_rationale_then_the_target_note(self):
         doc = self.overlay_doc()
         squat, bench = doc["sessions"][0]["exercises"]
         row = doc["sessions"][1]["exercises"][0]
+        bench["target_note"] = "Warm up first"
         bench["provenance"] = {"scheme": "double_progression", "derived_from": None, "inferred": False,
                                "decay": None, "rationale": "hit 3×10 at RPE 8"}
-        row.update(change="30 → 28", target_note=None, provenance={
+        row.update(change="30 → 28", target_note="Rung 1 of 4: band", provenance={
             "scheme": "double_progression", "derived_from": None, "inferred": False, "rationale": "Double progression",
             "decay": {"days_off": 12, "band": "11-21", "load_factor": 0.95, "set_delta": -1, "rpe_cap": None}})
         self.write_overlay(doc)

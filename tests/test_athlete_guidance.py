@@ -269,6 +269,34 @@ class WeekFocusTest(RebuildCase):
         self.assertIsNone(draft["sessions"][0]["exercises"][0]["target_note"])
 
 
+class ChangedReasonTest(RebuildCase):
+    """Guidance on a progressing line stays on the sheet; the brief's Changed bullet explains the load change."""
+
+    def changed_squat(self):
+        self.run_coach("propose", "finalize", "--proposal", W43)
+        self.run_coach("overlay", "approve", W43)
+        self.run_coach("pages", "render")
+        brief = (self.root / "this-week.md").read_text(encoding="utf-8")
+        changed = brief[brief.index("## Changed"):].split("\n## ")[0]
+        return next(row for row in changed.splitlines() if row.startswith("- Back Squat"))
+
+    def test_a_coach_note_is_not_the_reason_for_a_progression(self):
+        self.run_coach("propose", "week", "--week", "2026-W43")
+        self.run_coach("propose", "note", "--proposal", W43, "--session", "session-a", "--exercise", "bb_back_squat",
+                       "--target-note", ADJUST)
+        squat = self.changed_squat()
+        self.assertTrue(squat.startswith("- Back Squat 100 → 102.5: Double progression: "), squat)
+        self.assertNotIn(ADJUST, squat)
+
+    def test_a_beginner_ramp_note_is_not_the_reason_for_a_progression(self):
+        set_experience(self.root, "beginner")
+        proposed = self.run_coach("propose", "week", "--week", "2026-W43")["overlay"]
+        self.assertIn(propose.RAMP_NOTE, line(proposed, "bb_back_squat")["target_note"])
+        squat = self.changed_squat()
+        self.assertTrue(squat.startswith("- Back Squat 100 → 102.5: Double progression: "), squat)
+        self.assertNotIn(propose.RAMP_NOTE, squat)
+
+
 MIDWEEK = "2026-10-20-midweek"
 CAP, HANG = "stop at RPE 9", "pause with the chin over the bar"
 

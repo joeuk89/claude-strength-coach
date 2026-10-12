@@ -5696,12 +5696,13 @@ these headings:
   per change, each naming its days. Each reads `<page name>[ (<days>)]
   <change>: <reason>`. Reason, in athlete words: in a light, deload or
   return week (`coach.overlay.recovery_intent`), `light week`, `deload
-  week` or `return week`, even over a `target_note` the week's transform
-  kept from the scheme; else `agreed with your coach` for an override,
-  even over the `target_note` it kept from the scheme, its `reason` being
-  the coach's audit record that never reaches the page; else
-  `target_note`; else `eased back after <n> days off` for a decayed
-  line; else `provenance.rationale` (C21). A `per_hand_x2`
+  week` or `return week`; else `agreed with your coach` for an override,
+  its `reason` being the coach's audit record that never reaches the
+  page; else `eased back after <n> days off` for a decayed line; else
+  `provenance.rationale` (C21); else `target_note`. The note comes last
+  because it also carries the coach's guidance and the warm-up and
+  calibration notes (C10), which say how to train the line, not why it
+  changed; it stays on the sheet. A `per_hand_x2`
   change that ends on the bare per-hand load (`22.5 → 25/hand`) gets the
   Hevy value appended (`22.5 → 25/hand (Hevy: 50)`).
 - Watch: at most three items by priority: unresolved `block` flags
