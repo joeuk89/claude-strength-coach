@@ -2088,7 +2088,9 @@ coach.history.exposures(root, exercise_id, before=None) -> list[Exposure]       
 #           discounted, convention_unknown (which of the two), overlay_id
 # Read workouts and their sets carry discounted, convention_unknown and repaired (the fields a
 # repair replaced); each workout carries unsynced and conditioning (C17 conditioning rule).
-coach.history.last_lifting_date(root, before) -> date | None                    # any workout with a lifting exercise
+coach.history.last_lifting_date(root, before) -> date | None                    # any workout with a lifting exercise, or a
+#   coach-led lifting session marked done (the newest `external` annotation for its date and id decides)
+coach.history.coach_led_lifting(root) -> set[str]   # external ids whose estimated_sets name a muscle besides cardio
 coach.history.annotations(root, kind=None) -> list[dict]
 ```
 
@@ -2407,7 +2409,8 @@ Reserved codes:
 | `rpe_drift` | warn | R-23a | | Compound or recovery-capped exercise: logged RPE at least 1 over target on two or more working sets of the last exposure. |
 | `range_effort_mismatch` | warn | R-23a | | Double progression held a load whose derived-from exposure had a working set below its set group's rep range or 2 or more RPE over target; review a lighter load or a different rep range. |
 | `return_week` | info | R-23a | | Decay applied; names the band and days off. A lifting line's flag adds the load change (`loads × 0.9`, or `assistance held` on an `assisted` line), the set change and any RPE cap. |
-| `return_after_illness` | warn | R-23a | | An `ill` miss or status day in the gap: confirm `SYMPTOM_FREE_HOURS` (48) hours symptom-free; first session capped at RPE `ILLNESS_RPE_CAP` (7). |
+| `return_after_illness` | block | R-23a | | An `ill` miss or status day in the gap: the coach resolves it only once the athlete confirms `SYMPTOM_FREE_HOURS` (48) hours symptom-free, and ending the ill status day does not; first session capped at RPE `ILLNESS_RPE_CAP` (7). Overlays written before it blocked keep their `warn`. |
+| `ill_day_excluded` | info | R-23a | | An `ill` status day covers a session's date, so the proposal leaves the session out; the message names the session, date and row. |
 | `constraint_applied` | info | R-23a | | A cap, a slot constraint or a niggle constraint changed the proposal. |
 | `override_standing` | info | R-23a | | A standing override was applied again instead of the scheme's proposal. |
 | `scheme_reset` | warn | R-23a | | A slot's scheme changed; its state restarted. |
@@ -2500,9 +2503,10 @@ SYMPTOM_FREE_HOURS = 48    # R-21b; R-02's illness rule
 
 coach.validity.band_for(days_off) -> Band
 coach.validity.interval_days(exposures) -> int     # median of the last ≤4 gaps, clamped 7..14; 7 with <2 gaps
-coach.validity.days_off(root, exercise_id, session_date) -> int | None
-#   = max(layoff_days, exposure_age − interval_days), never below 0; None with no lifting workout and no exposure
-#   layoff_days  = session_date − last_lifting_date(before=session_date)   (R-02: any lifting workout)
+coach.validity.days_off(root, exercise_id, session_date, first_back=None) -> int | None
+#   = max(layoff_days, exposure_age − interval_days), never below 0; None with no lifting and no exposure
+#   layoff_days  = back − last_lifting_date(before=back)   (R-02: any lifting, solo or coach-led), where back is
+#                  first_back, the span's first session back, when it is on or before session_date, else session_date
 #   exposure_age = session_date − date of the newest non-excluded exposure of the exercise (any slot; suspect counts)
 coach.validity.window_ok(exposure_age, interval) -> bool   # exposure_age ≤ interval_days + GRACE_DAYS
 coach.validity.check_overlay(root, doc) -> list[flag]
@@ -2528,7 +2532,10 @@ coach.validity.estimate_minutes(root, session) -> int
   A decayed line of an exercise that has exposures is stale when its
   `derived_from` is null, names a workout the history doesn't hold, or
   names a `suspect` exposure (C17): its load and sets can't be checked.
-- Days off are measured to the line's session date. The band's set and
+- The layoff is measured to the first session of the overlay or
+  proposal (the first session back), so every session of a span shares
+  it; the exposure age is measured to the line's own session date, so a
+  lift overdue past its usual gap still decays. The band's set and
   RPE parts are checked as well as the load: at most `max(1, n +
   set_delta)` working sets, `n` being the derived-from exposure's
   working sets, and every working set at or under `rpe_cap` when the
@@ -2545,9 +2552,15 @@ coach.validity.estimate_minutes(root, session) -> int
   on each line of that session with a working set over the cap or
   without an RPE. Text the athlete reads takes the 48 hours and the cap
   from `SYMPTOM_FREE_HOURS` and `ILLNESS_RPE_CAP`, never a literal. The
-  gap runs from the day after the last lifting workout to the day before
-  that session.
-  R-24 reads `coach.statusdays` only once R-43 has added it.
+  gap runs from the day after the last lifting to the day before
+  that session. A proposal plans no session on a day an `ill` status day
+  covers (`coach.statusdays.ill_days`): it leaves each such session out
+  with `ill_day_excluded`, and refuses (exit 3) when that leaves none, as
+  an open-ended row does for every later day. `return_after_illness` is
+  `block`: ending the row records the last ill day, not the athlete's
+  48 hours symptom-free, so the coach resolves the flag (`propose
+  resolve`) only on that confirmation, and finalize refuses until then.
+  The first-session cap and the qualified-professional boundary stay.
 - **Feasibility** uses C18's `implied_rpe` with the best e1RM point in
   the 42 days before the session date (none older), using comparable
   normal work, chosen by `coach.stats.capacity_evidence` (C18): newer
@@ -2721,6 +2734,7 @@ class SchemeContext:
     last_override: dict | None    # C25
     days_off: int                 # C22
     constraints: tuple[dict, ...] # active C26 constraints, for information; the core enforces them
+    last_ordinary_prescription: dict | None  # as last_prescription, skipping deload, light and return lines
 
 @dataclass(frozen=True)
 class Proposal:
@@ -2839,7 +2853,10 @@ and `plugins test` runs them. Loaded with
 - The `Exposure` a plugin sees is `coach.plugins.base.Exposure`: C17's
   fields with every load as the coaching number, plus `prescribed` (the
   working sets the overlay in force that day asked for; empty when unknown)
-  and `week_kind` (that overlay's kind). Logged sets retain reps, duration
+  and `week_kind` (that overlay's kind, or `return` for return work:
+  a line with a return-band cut, or a week an adopted `light_week`
+  decision of type `return` covers; `coach.capacity.line_kind` is the
+  shared rule). Logged sets retain reps, duration
   and distance as well as load and RPE. Unknown historical prescriptions
   are never filled from today's program: linear and ladder hold, double
   progression holds load, and `prescription_unknown` makes the uncertainty
@@ -2856,7 +2873,10 @@ and `plugins test` runs them. Loaded with
   matched work. Missing metrics or a changed load mode/set count cannot
   establish a stall. A final advancing load suppresses the warning.
   `base.baseline(exposures)` is the exposure loads derive from: the
-  newest neither excluded, `suspect` nor trained in a `deload` week. The
+  newest neither excluded, `suspect` nor trained in a `deload` week. A
+  return week is not a deload: its logged loads are the next week's
+  baseline (R-02), while an ordinary deload never advances one. The
+  stall heuristic skips return exposures as well as deload ones. The
   core refuses a proposal derived from an excluded or suspect exposure.
 - `linear` state `{misses, through}`: `misses` counts the missed
   exposures running through `through`. A count at `misses_before_reset`
@@ -2884,7 +2904,14 @@ and `plugins test` runs them. Loaded with
   limit still resets the load, and the rationale names the misses
   already counted, not a miss on the incomplete exposure.
 - `last_prescription` is `{overlay_id, session_id, date, exercise_id,
-  load_mode, sets, override}` with `sets` as `base.SetSpec`s.
+  load_mode, sets, override, recovery}` with `sets` as `base.SetSpec`s;
+  `recovery` is `deload`, `light` or `return` for recovery work (by
+  `coach.capacity.line_kind`), else null.
+- `hold` repeats `last_prescription` when it is ordinary. After recovery
+  work it holds `last_ordinary_prescription` again, so the sets a deload
+  or return week removed come back; after a logged return week its loads
+  scale down to the top load that week logged (never up, and assistance
+  is never cut), and the rationale names that exposure.
 - A scheme may define `LOAD_MODES`, a tuple of the load modes it can
   program (absent: every mode). `program validate` refuses a slot whose
   `load_mode` it leaves out, at `$.sessions[i].exercises[j].scheme.name`,
@@ -3164,11 +3191,16 @@ constrained mode) stay coach-built through `overlay build`.
 
 - Default span: the week holding tomorrow. `--kind midweek` starts the
   span at today when today falls inside the week. A run that plans no
-  active session exits 1.
+  active session exits 1; one whose every session falls on an `ill`
+  status day exits 3, and one with only some leaves those out (C22).
+  Every line's layoff runs to the span's first session back (C22).
 - `--kind deload` writes overlay kind `deload` whose sessions keep their
   program session ids, are `temporary: true` (so R-14b gives them
   temporary routines, as `program-week`'s light mode expects) and are titled
-  `Deload — <session title>`. `--transform NAME` applies that transform
+  `Deload — <session title>`, or `Return — <session title>` with
+  `--transform return`, whose focus reads `Return week of <start>`: a
+  return week's logged loads are the next week's baseline, a deload's are
+  not (C23). `--transform NAME` applies that transform
   to any kind; a deload with none uses the program's `deload_rule`.
 - The `--plan FILE` shape is `schedule plan`'s output:
   `{"sessions": [{"date", "session_id"}], "flags": [...]}`; other keys
@@ -4826,16 +4858,19 @@ as it was):
   nothing untagged is left and a break covered sessions, the gap
   question says no tag is needed; otherwise it adds that sessions on the
   break need none.
-- `return_week`: `propose week --dry-run` for the week holding tomorrow
-  (R-23a's default span; `week` names it), which applies C22 decay.
-  `days_off` = first session date − last lifting workout; `band` and its
+- `return_week`: `propose week --dry-run` for the return span, which
+  applies C22 decay: the week holding tomorrow (R-23a's default span)
+  from tomorrow on, or the week after when that plans no session from
+  tomorrow, so no session is in the past. `span` is that span and `week`
+  labels the week holding it.
+  `days_off` = first session date − last lifting (C17); `band` and its
   numbers from `band_for(days_off)`. Each session's `rpe_cap` is the
   band's cap, or `ILLNESS_RPE_CAP` on the first session when the
   proposal raised `return_after_illness`. `names` maps the week's
   exercise and session ids to names, for the flags line. `lines_digest` =
   C7 canonical hash of `data.lines`; `propose week` and `propose show`
   return the same `lines_digest`. After "ok", the real `propose week
-  --week <week>` must give the same digest; if not, the coach presents
+  --span <span.start>..<span.end>` must give the same digest; if not, the coach presents
   again. When the proposal fails (an invalid program, no session
   planned), `return_week` and `write_line` are null,
   `return_week_problem` holds the message, `checkin prepare` warns, and
@@ -4855,7 +4890,9 @@ as it was):
   else the builtin Bodyweight field; a part mapping it to None leaves
   the question out and the rest renumbered.
 - The card ends with the write line (R-03's shape) and "Reply ok to accept
-  all of this, or answer any of 1–<n>.", `n` the number of questions.
+  all of this, or answer any of 1–<n>.", `n` the number of questions;
+  while the return week holds an unresolved `return_after_illness`, a
+  bare "ok" confirms nothing, so it ends "Answer any of 1–<n>.".
   "ok" alone means: misses stay untagged, nothing new to report, no
   food readings supplied, the return week as shown, written to Hevy.
 - Parts contribute `facts` in catch-up mode; of their fields only
@@ -5985,7 +6022,8 @@ Rules (R-02's prose, scripted; the prose stays the human copy):
 - **Type**: ceiling reached, or two triggers including RPE drift or an
   aggravated niggle → `deload` (the program's `deload_rule`); two triggers
   from readiness and sleep only → `light`; a closed week under 50 % with an
-  `ill` miss tag → `return`. The coach may choose another type with a
+  `ill` miss tag and more than 10 days off to the next first session back
+  → `return`. The coach may choose another type with a
   recorded reason. `propose week --kind deload --transform <type>` builds
   it (C23 transforms).
 - Closing a light, return or low week ends the block; the next block
@@ -6072,7 +6110,16 @@ Flags (registered in `coach/flags/block.py`; rows in C20):
   (C49): None, so `unknown`, without an activity source.
 - **Illness**: a `low` week with an `ill` miss proposes a `return` week
   with reason `illness` (C42's reason enum gains `illness`), whatever
-  the count.
+  the count, only when the days off pass the first return band (C22):
+  from the last lifting (C17) to the first session back, the first
+  session the schedule plans in the following week from today on that no
+  `ill` status day covers (that week's first day, or today when later,
+  when none is planned or the program cannot be planned). Unknown days
+  off (no lifting on record, or illness covering every session left)
+  still propose it. With 10 days or fewer the illness rule's first-session
+  cap is the whole return (rn:detraining-return.3,
+  rn:detraining-return.4).
+  `coach.block.outcome_for(class, count, fired, ceiling, ill, days_off)`.
 - **Light-week state after a close**: an `agreed` week later than the
   closed week is kept; so is a `declined` state, with its
   `decision_id`, when the close re-closes the same week and still
@@ -6931,6 +6978,8 @@ absent. No freshness check: the block is a snapshot.
 - `coach.statusdays.active(root, span) -> list[dict]` (rows not
   withdrawn whose days overlap the span; an ongoing row runs on),
   `coach.statusdays.ill_in(root, span) -> bool`,
+  `coach.statusdays.ill_days(root, span) -> {date: row id}` (days a live
+  `ill` row covers),
   `coach.statusdays.breaks(root, span) -> list[dict]` (live `no_training`
   rows overlapping the span) and `coach.statusdays.break_days(root, span)
   -> {date: row id}` are the readers other items call.
@@ -6951,7 +7000,8 @@ absent. No freshness check: the block is a snapshot.
 - Return rule: an `ill` status day overlapping the gap before a session
   counts exactly like an `ill` miss annotation for C22 and
   `return_after_illness`. Travel only explains the gap. Days off stay days
-  off.
+  off. No proposal plans a session on a day an `ill` row covers (C22,
+  C24); an ongoing row covers every day from its start.
 - Check `status_days_valid`: schema, unique ids, `start ≤ end`, at most one
   open-ended row per kind, no `no_training` on an `ill` row.
 

@@ -20,9 +20,9 @@ Run `python3 -m coach history sync`, then the proposal for the mode:
   the standard rule keeps two thirds of each line's working sets, takes 10 % off the
   current working loads (a target before the kit rounds it) and caps every set at RPE 6
   (rn:deloads.9); these numbers are a coaching heuristic. It cuts bodyweight work by
-  sets and takes it further from failure. Its sessions are temporary (`"temporary":
-  true`, titled "Deload — <session title>") and keep their program session ids. Keep the
-  program's priority protocols alive at a reduced dose (ladders resumed, not restarted).
+  sets and takes it further from failure. Its sessions are temporary (`"temporary": true`,
+  titled "Deload — <title>", or "Return — <title>" in a return week) and keep their program
+  session ids. Keep priority protocols alive at a reduced dose (ladders resumed, not restarted).
   Remind the athlete to tell any coach or PT it's a deload week, and deload whatever the
   profile says moves with the lifting (conditioning and the like). A week back after
   illness follows the return rule in `CLAUDE.md` "Coaching principles": its illness
@@ -65,15 +65,15 @@ and the rotation position, and settle its flags:
   stands (step 4).
 - `convention_slip`: an exact 2× jump at unchanged reps and RPE is a
   convention slip, not progress. Raise it with the athlete.
-- `return_week`, `return_after_illness`: in a return week the matching
-  return band sets this week's loads, set counts and any RPE cap instead
-  of the progression scheme, measured from the pre-layoff working loads;
-  with illness, the first session back carries the illness cap. Name
-  the band in the week focus; with illness, ask whether the symptoms
-  stayed above the neck and confirm 48 hours symptom-free
-  (rn:detraining-return.4); whole-body symptoms mean a qualified
-  professional first. The next pass progresses from what the return
-  week logged.
+- `return_week`, `return_after_illness`, `ill_day_excluded`: in a return week the
+  matching return band sets this week's loads, set counts and any RPE cap instead of
+  the progression scheme, measured from the pre-layoff working loads; with illness,
+  the first session back carries the illness cap. Name the band in the week focus;
+  with illness, ask whether the symptoms stayed above the neck and confirm 48 hours
+  symptom-free (rn:detraining-return.4); whole-body symptoms mean a qualified
+  professional first; resolve the `return_after_illness` block (step 4) only on that
+  confirmation, never on the ill status day ending. Ill days plan no session (exit 3
+  while an open row covers them all). The next pass progresses from the return week.
 - `collision` (an interference rule: a quality activity on a lifting
   day, or in the 24 hours before a heavy squat or hinge session; the
   message names the rule, both bouts and the gap): the script never

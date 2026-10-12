@@ -123,6 +123,17 @@ class BlockCase(unittest.TestCase):
         return read_json(self.root / "data" / "state.json")["block"]
 
 
+def ill_week(case, pt_done=False):
+    """W41 with both sessions missed, Monday tagged ill; the coach-led session the day after done or not."""
+    case.drop_workout("2026-10-05")
+    case.drop_workout("2026-10-08")
+    case.data("history", "annotate", "--kind", "miss", "--date", "2026-10-05", "--session", "session-a",
+              "--tag", "ill")
+    if not pt_done:
+        case.data("history", "annotate", "--kind", "external", "--external", "pt-tue", "--date", "2026-10-06",
+                  "--not-done")
+
+
 class CeilingTest(BlockCase):
     def test_w41_closes_six_hard_weeks_and_proposes_a_deload_at_the_ceiling(self):
         data = self.close("2026-W41", "--readiness", "ok", "--sleep", "ok")
@@ -353,16 +364,35 @@ class TriggerTest(BlockCase):
         week = self.close("2026-W41")["weeks"][-1]
         self.assertEqual((week["signals"]["sleep"], week["signals"]["sleep_source"]), ("unknown", "none"))
 
-    def test_an_ill_week_under_half_proposes_a_return_week(self):
-        self.drop_workout("2026-10-05")
-        self.drop_workout("2026-10-08")
-        self.data("history", "annotate", "--kind", "miss", "--date", "2026-10-05", "--session", "session-a",
-                  "--tag", "ill")
+    def test_an_ill_week_under_half_after_eleven_days_off_proposes_a_return_week(self):
+        ill_week(self)
         data = self.close()
         self.assertEqual(data["weeks"][-1]["class"], "low")
         self.assertEqual(data["block"]["light_week"]["type"], "return")
         self.assertEqual(data["block"]["light_week"]["reason"], "illness")
         self.assertTrue(data["status_line"].endswith("proposed for wk of 12 Oct (return, illness)"))
+
+    def test_an_ill_week_with_nine_days_off_proposes_no_return_week(self):
+        ill_week(self)
+        self.edit_workout("2026-10-01", lambda w: w.update(date="2026-10-03", start_time="2026-10-03T10:00:00Z",
+                                                            end_time="2026-10-03T11:00:00Z"))
+        data = self.close()
+        self.assertEqual(data["weeks"][-1]["class"], "low")
+        self.assertEqual(data["block"]["light_week"]["status"], "not_due")
+
+    def test_illness_over_every_session_left_keeps_the_return_week_with_nine_days_off(self):
+        ill_week(self)
+        self.edit_workout("2026-10-01", lambda w: w.update(date="2026-10-03", start_time="2026-10-03T10:00:00Z",
+                                                            end_time="2026-10-03T11:00:00Z"))
+        self.data("status-days", "add", "--kind", "ill", "--from", "2026-10-11", "--note", "Head cold")
+        light = self.close()["block"]["light_week"]
+        self.assertEqual((light["status"], light["type"], light["reason"]), ("proposed", "return", "illness"))
+
+    def test_a_coach_led_session_done_shortens_the_illness_gap(self):
+        ill_week(self, pt_done=True)
+        data = self.close()
+        self.assertEqual(data["weeks"][-1]["class"], "low")
+        self.assertEqual(data["block"]["light_week"]["status"], "not_due")
 
 
 class SleepSourceTest(BlockCase):
@@ -671,10 +701,7 @@ class RecloseTest(BlockCase):
     def test_reclosing_after_a_decline_proposes_again_when_the_proposal_changes(self):
         self.close()
         self.data("block", "decide", "--outcome", "declined", "--reason", "competition week")
-        self.drop_workout("2026-10-05")
-        self.drop_workout("2026-10-08")
-        self.data("history", "annotate", "--kind", "miss", "--date", "2026-10-05", "--session", "session-a",
-                  "--tag", "ill")
+        ill_week(self)
         light = self.close()["block"]["light_week"]
         self.assertEqual((light["status"], light["type"], light["decision_id"]), ("proposed", "return", None))
 

@@ -108,6 +108,18 @@ def ill_in(root, span):
     return any(row["kind"] == "ill" for row in active(root, span))
 
 
+def ill_days(root, span):
+    """{day: row id} for each day in the span an `ill` row covers: no session is planned on them (C22)."""
+    found = {}
+    for row in active(root, span):
+        if row["kind"] == "ill":
+            covered = span_of(row)
+            for day in span.days():
+                if covered.contains(day):
+                    found.setdefault(day, row["id"])
+    return found
+
+
 def breaks(root, span):
     """Live `no_training` rows overlapping the span, oldest first: planned breaks the athlete agreed."""
     return [row for row in active(root, span) if row["no_training"]]

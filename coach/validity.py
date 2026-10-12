@@ -131,10 +131,14 @@ class _History:
             self._workouts = history.workouts(self.root)
         return self._workouts
 
-    def gap_facts(self, exercise_id, session_date):
-        """Days off and how they were measured, for one exercise before one session date."""
-        layoff_from = self.last_lifting(session_date)
-        layoff = (session_date - layoff_from).days if layoff_from else None
+    def gap_facts(self, exercise_id, session_date, first_back=None):
+        """Days off and how they were measured, for one exercise before one session date.
+
+        The layoff runs to `first_back`, the span's first session back, when it falls on or before the session.
+        """
+        back = first_back if first_back is not None and first_back <= session_date else session_date
+        layoff_from = self.last_lifting(back)
+        layoff = (back - layoff_from).days if layoff_from else None
         found = self.usable(exercise_id, session_date)
         newest = found[0] if found else None
         age = (session_date - dates.parse_date(newest["date"])).days if newest else None
@@ -145,12 +149,14 @@ class _History:
                 "exposure_age": age, "interval_days": interval, "newest": newest, "baseline": baseline}
 
 
-def days_off(root, exercise_id, session_date):
+def days_off(root, exercise_id, session_date, first_back=None):
     """Days off for an exercise before a session: the longer of the layoff and its exposure age past its usual gap.
 
-    None when there is no lifting workout and no exposure to measure from.
+    The layoff is measured to `first_back`, the first session back in the span, when given. None when there is
+    no lifting and no exposure to measure from.
     """
-    return _History(root).gap_facts(exercise_id, _day(session_date))["days_off"]
+    first_back = _day(first_back) if first_back is not None else None
+    return _History(root).gap_facts(exercise_id, _day(session_date), first_back)["days_off"]
 
 
 def _rest_by_exercise(session):
@@ -325,10 +331,11 @@ class _Checker:
     def run(self):
         self.mismatches()
         illness = self.illness()
+        first_back = min((dates.parse_date(s["date"]) for s in self.doc["sessions"]), default=None)
         for session in self.doc["sessions"]:
             session_date = dates.parse_date(session["date"])
             for line in session["exercises"]:
-                self.check_line(session, session_date, line, illness)
+                self.check_line(session, session_date, line, illness, first_back)
             self.check_duration(session)
         return {"flags": self.flags, "lines": self.lines}
 
@@ -376,8 +383,8 @@ class _Checker:
         found = self.history.baselines(line["exercise_id"], before)
         return ({"date": found[0]["date"], "workout_id": found[0]["workout_id"]} if found else None), True
 
-    def check_line(self, session, session_date, line, illness):
-        facts = self.history.gap_facts(line["exercise_id"], session_date)
+    def check_line(self, session, session_date, line, illness, first_back):
+        facts = self.history.gap_facts(line["exercise_id"], session_date, first_back)
         band = band_for(facts["days_off"]) if facts["days_off"] is not None else None
         derived, inferred = self.derived_from(session_date, line)
         evidence = self.history.evidence(line["exercise_id"], session_date)

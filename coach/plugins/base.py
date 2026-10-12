@@ -98,7 +98,8 @@ class Exposure:
 
     `prescribed` holds the working sets the overlay in force that day asked
     for, or is empty when the historical prescription is unknown.
-    `week_kind` is that overlay's kind, or None.
+    `week_kind` is that overlay's kind, `return` for return work (a return-band cut or a week agreed as a
+    return week), or None.
     """
 
     date: date
@@ -172,6 +173,7 @@ class SchemeContext:
     constraints: tuple
     scheme: str = ""
     scheme_deload: Optional[Callable] = None
+    last_ordinary_prescription: Optional[dict] = None
 
 
 @dataclass(frozen=True)

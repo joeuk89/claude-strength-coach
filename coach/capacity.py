@@ -17,15 +17,29 @@ class Context:
                          and (as_of is None or (dates.parse_timestamp(doc["created_at"]) <= as_of
                               and dates.parse_timestamp(doc["approval"]["approved_at"]) <= as_of))]
 
-    def for_exposure(self, exposure):
-        context = {"kind": "normal", "overlay_id": None, "decision_id": None}
-        day = dates.parse_date(exposure["date"])
+    def light_week(self, day, exposure=None):
+        """The adopted light-week decision whose week holds `day` and that applied then (to `exposure`), or None."""
+        found = None
         for decision in self.decisions:
-            if decision["kind"] != "light_week" or not self.applies(decision, exposure):
+            if decision["kind"] != "light_week":
+                continue
+            if not (self.applies(decision, exposure) if exposure is not None else decision["status"] != "withdrawn"):
                 continue
             start = dates.parse_date(decision["details"]["week"])
             if start <= day < start + timedelta(days=7):
-                context.update(kind=decision["details"]["type"], decision_id=decision["id"])
+                found = decision
+        return found
+
+    def line_kind(self, doc, session, line):
+        """`normal`, `deload`, `light` or `return` for one line of an approved overlay, as `for_exposure` reads it."""
+        decision = self.light_week(dates.parse_date(session["date"]))
+        return line_kind(doc, line, decision["details"]["type"] if decision else None)
+
+    def for_exposure(self, exposure):
+        context = {"kind": "normal", "overlay_id": None, "decision_id": None}
+        decision = self.light_week(dates.parse_date(exposure["date"]), exposure)
+        if decision is not None:
+            context.update(kind=decision["details"]["type"], decision_id=decision["id"])
         if exposure.get("overlay_id"):
             doc = next((d for d in self.overlays if d["id"] == exposure["overlay_id"]), None)
         else:
@@ -42,11 +56,7 @@ class Context:
         if line is None:
             return context
         context["overlay_id"] = doc["id"]
-        if doc["kind"] == "deload":
-            context["kind"] = "deload"
-        decay = (line.get("provenance") or {}).get("decay")
-        if decay and (decay["load_factor"] < 1 or decay["set_delta"] < 0 or decay["rpe_cap"] is not None):
-            context["kind"] = "return"
+        context["kind"] = line_kind(doc, line, None if context["kind"] == "normal" else context["kind"])
         approved_at = dates.parse_timestamp(doc["approval"]["approved_at"])
         overrides = [d for d in self.decisions if d["kind"] == "override"
                      and d["scope"] == {"session_id": exposure["session_id"], "exercise_id": exposure["exercise_id"]}
@@ -71,6 +81,20 @@ class Context:
         if exposure.get("start_time"):
             return moment <= dates.parse_timestamp(exposure["start_time"])
         return moment.astimezone(self.tz).date().isoformat() < exposure["date"]
+
+
+def line_kind(doc, line, light_type=None):
+    """What an overlay line was for: `return` when it carries a return-band cut, else the light-week type the
+    week was agreed as, else `deload` in a deload overlay, else `normal`.
+
+    A `return` week's logged loads are the next week's progression baseline; a deload's or light week's are not.
+    """
+    decay = (line.get("provenance") or {}).get("decay")
+    if decay and (decay["load_factor"] < 1 or decay["set_delta"] < 0 or decay["rpe_cap"] is not None):
+        return "return"
+    if light_type is not None:
+        return light_type
+    return "deload" if doc["kind"] == "deload" else "normal"
 
 
 def _reduced(decision, load_mode):
