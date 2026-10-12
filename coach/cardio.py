@@ -442,6 +442,30 @@ def sleep_debt(root, span):
     return sleep_judgement(ActivityStore(root, config), _settings(config), span.end)[2]
 
 
+def sleep_evidence(root, span):
+    """The `sleep_debt` rule's reading of the 7 nights ending on `span.end`, with the nights it read; None with no
+    activity source.
+
+    Tracker and diary nights count alike; a period mean counts for no night and is listed by id.
+    """
+    config = config_module.load(root)
+    if not activity_on(config):
+        return None
+    settings = _settings(config)
+    store = ActivityStore(root, config)
+    short, nights, debt = sleep_judgement(store, settings, span.end)
+    window = dates.Span(span.end - timedelta(days=NIGHTS - 1), span.end)
+    days = store.asleep_days(window)
+    return {"debt": debt, "short_nights": short, "nights": nights, "window": window.to_json(),
+            "short_hours": settings["sleep_short_hours"], "debt_nights": settings["sleep_debt_nights"],
+            "min_nights": settings["sleep_min_nights"],
+            "nightly": [{"date": day["date"], "asleep_hours": day["asleep_hours"],
+                         "source": day["provenance"]["source"]}
+                        for day in days if day["provenance"]["kind"] == "nightly"],
+            "period_means": sorted({day["provenance"]["id"] for day in days
+                                    if day["provenance"]["kind"] != "nightly"})}
+
+
 def evaluation_date(ctx):
     """The last night the sleep rule judges: the span's last day, or today for a proposal or a span ending later."""
     return ctx.today if ctx.mode == "proposal" else min(ctx.span.end, ctx.today)
@@ -579,7 +603,9 @@ def _spike_flags(store, bouts, settings):
             found.append(flags.make("run_volume_spike", severity, message=(
                 f"{what} on {run.date.isoformat()} is {size}, more than {ratio:g} × the longest run in the "
                 f"{lookback} days before it ({reference}). In one observational cohort, single runs this far "
-                "past the recent longest had more overuse injuries.")))
+                "past the recent longest had more overuse injuries. Review it with the athlete (any symptoms, how "
+                "they recovered, the next long run) and record the agreed action as a follow-up; it is not a "
+                "fatigue trigger and sets no load cut.")))
     return found, skipped
 
 

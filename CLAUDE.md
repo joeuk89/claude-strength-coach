@@ -112,10 +112,9 @@ and its sources.
   - **Ceiling:** propose a light week when the count reaches the program's ceiling: default 6 completed hard weeks, settable from 4 to 8 in the program's `blocks.hard_weeks_ceiling` (rn:deloads.3).
     At the ceiling it is proposed whatever else is true; if the athlete declines, record the reason and propose it again at the next check-in.
   - **Fatigue triggers:** poor readiness the athlete reports; RPE drift
-    on a compound lift in two sessions running (rn:autoregulation.4); a
-    niggle aggravated under load; poor sleep for most of the week. Two in
-    the same week → propose a light week. One → record it as a watch
-    (rn:deloads.5).
+    on a compound lift in two sessions running, each set judged against its own prescription, after an earlier session at the prescription that did not drift (rn:autoregulation.4);
+    a niggle aggravated under load at any point in the week; poor sleep for most of the week, measured from tracker or diary nights (how the athlete felt is readiness).
+    Two in the same week → propose a light week. One → record it as a watch (rn:deloads.5). A run spike gets a review with the athlete, never a trigger.
   - **Skip rule:** below three completed hard weeks, no light week is
     scheduled, even on two triggers; the status line records it as
     `light week: skipped (<n> hard weeks)` (rn:deloads.4).

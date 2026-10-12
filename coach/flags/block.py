@@ -17,3 +17,9 @@ register("effort_above_target", owner=OWNER, severities=("info",),
          summary="A logged line's mean RPE is more than 1.5 over its targets; review the loads and recovery.")
 register("reps_missed", owner=OWNER, severities=("info",),
          summary="A logged working set fell short of its prescribed reps; names each line and its logged reps.")
+register("drift_calibration", owner=OWNER, severities=("info",),
+         summary="A lift's two newest exposures ran over target RPE with no earlier at-prescription exposure that did "
+                 "not drift: calibration, not a fatigue trigger.")
+register("recovery_ceiling_exceeded", owner=OWNER, severities=("warn",),
+         summary="Logged deload, light or return work, or a line under an RPE cap, went over its RPE ceiling; not a "
+                 "fatigue trigger.")

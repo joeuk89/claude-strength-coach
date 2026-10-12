@@ -4,7 +4,7 @@
   "required": ["schema_version", "blocks"],
   "additionalProperties": false,
   "properties": {
-    "schema_version": {"const": 2},
+    "schema_version": {"const": 3},
     "blocks": {
       "type": "array",
       "items": {
@@ -38,12 +38,13 @@
         "on_break": {"type": "integer", "minimum": 0},
         "signals": {
           "type": "object",
-          "required": ["readiness", "sleep", "sleep_source", "rpe_drift", "niggle"],
+          "required": ["readiness", "sleep", "sleep_source", "sleep_reason", "rpe_drift", "niggle"],
           "additionalProperties": false,
           "properties": {
             "readiness": {"enum": ["poor", "ok", "unknown"]},
             "sleep": {"enum": ["poor", "ok", "unknown"]},
-            "sleep_source": {"enum": ["athlete", "sleep_debt", "none"]},
+            "sleep_source": {"enum": ["override", "athlete", "sleep_debt", "none"]},
+            "sleep_reason": {"type": ["string", "null"], "pattern": "\\S"},
             "rpe_drift": {"type": "boolean"},
             "niggle": {"type": "boolean"}
           }

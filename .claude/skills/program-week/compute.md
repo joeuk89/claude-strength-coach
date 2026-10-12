@@ -45,10 +45,10 @@ cap, constraints, caps and kit, and writes the draft `.coach/proposals/<id>.json
 Read each line against the athlete's notes on how sets felt, niggles and the
 rotation position, and settle its flags:
 
-- `rpe_drift` (logged RPE 1 or more over target on 2 or more working sets of a
-  compound lift or a set carrying a **recovery cap**): hold or back off. RPE
-  drift alone never holds back isolation work: it progresses on reps as the
-  scheme says, unless the athlete's notes report pain or form breakdown.
+- `rpe_drift` (logged RPE 1+ over its own target on 2+ working sets, none
+  extra or harder than prescribed, of a compound lift or a set under a
+  **recovery cap**): hold or back off. Drift alone never holds back isolation
+  work: it progresses on reps unless the athlete's notes report pain or bad form.
 - `range_effort_mismatch` (a held double-progression line whose last exposure
   fell below the rep range or 2 or more RPE over target): agree a lighter load
   or a different rep range with the athlete and override the line, or resolve
