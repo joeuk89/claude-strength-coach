@@ -43,8 +43,10 @@ Run a **deep** check-in when any of these is true, otherwise run
 - **6+ weeks** since the last deep check-in (rn:deloads.12). A review
   whose title has no tier counts as deep; a Program start record is not
   a review. The first check-in ever runs deep.
-- **A light week is being proposed** (the hard-week count reached the
-  ceiling, or two fatigue triggers fired).
+- **A light week is newly proposed** (the hard-week count reached the
+  ceiling, or two fatigue triggers fired). The same proposal made again
+  after the athlete declined it, with no new pair of triggers, or a
+  one-trigger watch, stays weekly; `deep_review.repeat_of` names the decline.
 - **The adherence trigger fires** (under 70 %).
 - The athlete asks for one.
 

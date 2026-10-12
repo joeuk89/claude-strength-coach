@@ -563,6 +563,53 @@ class DeepReviewTest(BlockCase):
         self.assertEqual(deep["reasons"], ["six_weeks", "catch_up_deferred"])
         self.assertEqual(deep["last_deep_review"], "2026-08-02")
 
+    def declined_then_w42(self, *extra, deep=True):
+        """Close W41 at the ceiling (deep on 11 Oct unless `deep` is false), decline it, train W42 and close it."""
+        self.close("2026-W41", *(("--deep",) if deep else ()))
+        decision = self.data("block", "decide", "--outcome", "declined", "--reason", "competition week")["decision"]
+        self.train_week("2026-10-12")
+        return decision, self.close("2026-W42", *extra, now=NEXT_SUNDAY)
+
+    def test_a_declined_ceiling_week_proposed_again_is_due_but_not_deep(self):
+        decision, data = self.declined_then_w42()
+        self.assertEqual((data["block"]["light_week"]["status"], data["block"]["light_week"]["reason"]),
+                         ("proposed", "ceiling"))
+        self.assertIn("light_week_due", codes(data))
+        due = next(f for f in data["flags"] if f["code"] == "light_week_due")
+        self.assertIn(f"proposed again after {decision['id']} declined it (competition week), which alone does not "
+                      "make the check-in deep", due["message"])
+        self.assertEqual(data["deep_review"], {"due": False, "reasons": [], "last_deep_review": "2026-10-11",
+                                               "repeat_of": decision["id"]})
+        self.assertNotIn("deep_review_due", codes(data))
+        status = self.data("block", "status", now=NEXT_SUNDAY)
+        self.assertEqual((status["deep_review"]["due"], status["deep_review"]["repeat_of"]), (False, decision["id"]))
+        again = self.close("2026-W42", now=NEXT_SUNDAY)
+        self.assertEqual((again["deep_review"], again["flags"]), (data["deep_review"], data["flags"]))
+
+    def test_a_changed_fatigue_reason_makes_the_repeat_deep(self):
+        _, data = self.declined_then_w42("--readiness", "poor", "--sleep", "poor")
+        self.assertEqual(data["deep_review"]["reasons"], ["light_week_proposed"])
+        self.assertIsNone(data["deep_review"]["repeat_of"])
+
+    def test_an_independent_deep_reason_still_applies_to_a_repeat(self):
+        flag = flags.make("restructure_required", message="58 %")
+        with mock.patch("coach.structure.adherence", return_value={"flags": [flag]}):
+            _, data = self.declined_then_w42()
+        self.assertEqual(data["deep_review"]["reasons"], ["restructure_required"])
+        self.assertTrue(data["deep_review"]["due"])
+
+    def test_the_42_day_clock_still_runs_through_a_repeat(self):
+        self.edit("data/state.json", lambda doc: doc["block"].update(last_deep_review="2026-09-01"))
+        _, data = self.declined_then_w42(deep=False)
+        self.assertEqual(data["deep_review"]["reasons"], ["six_weeks"])
+
+    def test_a_watch_does_not_make_the_check_in_deep(self):
+        self.init(2)
+        data = self.close("2026-W41", "--readiness", "poor", "--sleep", "ok")
+        self.assertIn("fatigue_watch", codes(data))
+        self.assertEqual(data["block"]["light_week"]["status"], "watch")
+        self.assertNotIn("light_week_proposed", data["deep_review"]["reasons"])
+
     def test_a_deep_close_records_the_review(self):
         self.edit("data/state.json", lambda doc: doc["block"].update(last_deep_review=None))
         self.init(1)
@@ -805,6 +852,31 @@ class RegistryTest(unittest.TestCase):
         doc = read_json(BLOCK / "data" / "blocks.json")
         doc["blocks"].append(dict(doc["blocks"][0], id="b-0002"))
         self.assertIn("$.blocks[0].ended", [e.path for e in block.problems(doc)])
+
+    def test_a_repeat_is_the_same_proposal_after_a_decline_in_this_block(self):
+        state = {"started": "2026-08-31", "last_closed_week": "2026-10-12",
+                 "light_week": {"status": "proposed", "type": "deload", "reason": "ceiling", "week": "2026-10-19",
+                                "decision_id": None}}
+        declined = {"id": "d-0001", "kind": "light_week", "made_at": "2026-10-11T18:00:00Z", "outcome": "declined",
+                    "status": "active", "reason": "competition week",
+                    "details": {"type": "deload", "week": "2026-10-12", "reason": "ceiling", "triggers": [],
+                                "hard_weeks": 6}}
+        entry = {"week": "2026-10-12", "triggers": ["sleep"]}
+
+        def repeat(state=state, entry=entry, *changes):
+            found = copy.deepcopy(declined)
+            for change in changes:
+                change(found)
+            return block.repeated_decline(state, entry, {"decisions": [found]})
+        self.assertEqual(repeat()["id"], "d-0001")
+        self.assertIsNone(repeat(state, {"week": "2026-10-12", "triggers": ["readiness", "sleep"]}))
+        self.assertIsNone(repeat(dict(state, started="2026-10-19")))
+        self.assertIsNone(repeat(state, entry, lambda d: d.update(outcome="adopted")))
+        self.assertIsNone(repeat(state, entry, lambda d: d.update(status="withdrawn")))
+        self.assertIsNone(repeat(state, entry, lambda d: d["details"].update(reason="triggers")))
+        self.assertIsNone(repeat(state, entry, lambda d: d["details"].update(type="light")))
+        self.assertIsNone(repeat(state, entry, lambda d: d["details"].update(week="2026-10-19")))
+        self.assertIsNone(block.repeated_decline(state, entry, {"decisions": []}))
 
     def test_outcome_rules(self):
         self.assertEqual(block.outcome_for("hard", 6, [], 6), ("due", "deload", "ceiling"))

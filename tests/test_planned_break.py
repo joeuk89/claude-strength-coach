@@ -56,10 +56,12 @@ class BreakCase(BlockCase):
         self.write_record("2026-10-18")
         return self.data("checkin", "prepare", now=now)["card"]["catch_up"]
 
-    def write_overlay(self, overlay_id, kind, span, days):
-        """An overlay over `span` whose sessions (A then B, alternating) fall on `days`."""
+    def write_overlay(self, overlay_id, kind, span, days, temporary=False):
+        """An overlay over `span` whose sessions (A then B, alternating) fall on `days`, temporary in constrained
+        mode."""
         doc = read_json(VALID / "data" / "overlays" / "2026-10-12-weekly.json")
-        sessions = [dict(copy.deepcopy(doc["sessions"][n % 2]), date=day) for n, day in enumerate(days)]
+        sessions = [dict(copy.deepcopy(doc["sessions"][n % 2]), date=day, temporary=temporary)
+                    for n, day in enumerate(days)]
         doc.update(id=overlay_id, kind=kind, created_at="2026-10-18T18:00:00Z", span=span, supersedes=None,
                    approval=None, flags=[], sessions=sessions, focus="Travel")
         write_json(self.root / "data" / "overlays" / f"{overlay_id}.json", doc)
@@ -279,7 +281,7 @@ class BlockCloseTest(BreakCase):
         self.add_break("--kind", "travel", "--from", "2026-10-19", "--to", "2026-10-20", "--note", "Away",
                        "--no-training")
         self.write_overlay("2026-10-19-one-off", "one_off", {"start": "2026-10-19", "end": "2026-10-25"},
-                           ["2026-10-19", "2026-10-22"])
+                           ["2026-10-19", "2026-10-22"], temporary=True)
         self.copy_workout("2026-10-15", "2026-10-22")
         closed = self.close("2026-W43", now="2026-10-25T18:00:00Z")
         self.assertEqual([(w["class"], w["count_after"]) for w in closed["weeks"]], [("one_off", 4)])

@@ -13,7 +13,9 @@ adjacent sessions, no same-pattern sessions on back-to-back days, and
 weekly balance including coach-led sessions and cardio. Each moved
 session keeps its lines from the overlay in force
 (`data/overlays/<id>.json`), re-dated. Its routines already carry those
-lines, so `routines diff` lists no change and nothing goes to Hevy.
+lines, so `routines diff` lists no change and nothing goes to Hevy. A
+reshuffle week stays an ordinary week: adherence and the hard-week count
+judge its sessions like any other week's, and a missed one counts.
 
 **Constrained:** the prescriptions change for travel kit, no equipment,
 or a time-starved or run-down week. A short design conversation (what
@@ -25,7 +27,9 @@ against is no plan at all: sporadic, maximal, improvised sessions.
 Name the place's kit as an `[equipment.locations.*]` table in
 `config.toml` when it differs from home, so caps and loads use it.
 
-Every temporary session must be concrete enough to train directly:
+Each session a constrained week changes is a temporary session: a
+`temporary` session is what takes the week out of adherence and pauses the
+hard-week count. Every temporary session must be concrete enough to train directly:
 exercises, sets × reps, load or RPE, rest. Unfamiliar dumbbells (a
 hotel rack, a different increment) are exactly when a doubled entry
 slips in unnoticed, so take each load from that place's kit: a listed

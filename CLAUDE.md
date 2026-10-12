@@ -52,7 +52,7 @@ The weekly schedule lives in `profile.md`: **never assume a shape**. Always:
 `/setup`, `/new-program`, `/check-in`, `/program-week`, `/goals`, `/meal-plan`, `/recipes`,
 `/hevy-sync` and `/framework-sync`; each skill's description says when it applies.
 - **`/check-in`** is weekly, and deep when the last deep review is 6+ weeks old (rn:deloads.12), a
-  light week is proposed or adherence drops. Suggest one when the newest record is over a week old.
+  light week is newly proposed or adherence drops. Suggest one when the newest record is over a week old.
 
 ## Hevy
 
@@ -103,8 +103,8 @@ and its sources.
 - **Fatigue management & deloads** — light weeks are triggered by
   fatigue, with a ceiling on how long a block runs without one
   (rn:deloads.1). Count **completed hard weeks**, not calendar weeks:
-  - A **completed hard week** is a normal program week in which at least 75 % of planned sessions, coach-led ones included, were trained as prescribed (rn:deloads.2).
-    A session is trained as prescribed when at least two thirds of its prescribed working sets were logged and its mean logged RPE was no more than 1.5 below target; a coach-led session counts when it happened (rn:deloads.11).
+  - A **completed hard week** is a normal program week in which at least 75 % of planned sessions, coach-led ones included, passed the hard-week session gate (rn:deloads.2).
+    A session passes when at least two thirds of its prescribed working sets were logged and its mean logged RPE was no more than 1.5 below target, a coach-led one when it happened (rn:deloads.11): a fatigue count, not proof the prescription was met.
   - **Reset:** a deload or other light week, a return week (see return after a layoff below), or any week with under 50 % of planned sessions trained sets the count back to zero (rn:deloads.2).
     The check-in that closes such a week ends the block, and the next block starts at zero.
     `/program-week` leaves the count alone when it plans a light week: the count resets, and the block number moves on, only when the check-in closes that week.
@@ -120,7 +120,7 @@ and its sources.
     scheduled, even on two triggers; the status line records it as
     `light week: skipped (<n> hard weeks)` (rn:deloads.4).
   - These rules are coaching heuristics, not research cut-offs.
-    They are the 75 % and 50 % lines (rn:deloads.2), the trained-as-prescribed rule (rn:deloads.11) and the ceiling counted in completed hard weeks (rn:deloads.3).
+    They are the 75 % and 50 % lines (rn:deloads.2), the hard-week session gate (rn:deloads.11) and the ceiling counted in completed hard weeks (rn:deloads.3).
     They also include the four fatigue triggers with the two-trigger rule (rn:autoregulation.4, rn:deloads.5), the three-week skip rule (rn:deloads.4) and the weeks that pause the count (rn:deloads.13).
     `/check-in` keeps the count in `block` in `data/state.json` and shows it in each record's status line.
 - **Minimum and maintenance dose** — when time is short, cut sets, not

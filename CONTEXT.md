@@ -134,9 +134,18 @@ _Avoid_: training goal (the profile's words), phase (reserved for bulk/cut/maint
 
 **Ordinary week**:
 A week adherence is judged on: not a deload or other light week, not a
-one-off, minimum or planned break week, and not inside a layoff of 11+
-days. Adherence looks at the last four, reaching back at most 12 weeks.
+constrained one-off, minimum or planned break week, not inside a layoff
+of 11+ days, and not an illness week. Adherence looks at the last four,
+reaching back at most 12 weeks. A reshuffle, which only moves program
+sessions to other days, stays ordinary and its misses count.
 _Avoid_: regular week, counted week
+
+**Illness week**:
+A week that lost planned training to illness: a session missed and
+tagged `ill`, or missed on a day an `ill` status day covers. Adherence
+leaves it out with its reason; the block still counts the training it
+had. Illness on days that plan nothing leaves the week ordinary.
+_Avoid_: sick week, ill week (alone)
 
 **Planned session**:
 A session the program expected on a date, which adherence counts as
@@ -154,8 +163,10 @@ _Avoid_: mesocycle, cycle, phase (reserved for bulk/cut/maintain)
 
 **Completed hard week**:
 A program week in which at least three quarters of the planned core and
-coach-led sessions were trained as prescribed: most of the prescribed
-working sets logged, at about the target effort. It adds one to the
+coach-led sessions passed the hard-week session gate: most of the
+prescribed working sets logged, not far under the target effort. The
+gate counts fatigue, not a completed prescription: missed reps or a grind
+past the target still pass, and `block close` reports them apart. It adds one to the
 block's count; a light week, a return week or a week under half trained
 ends the block. A one-off, minimum or planned break week neither adds to
 nor ends it.

@@ -9,6 +9,8 @@ only; `SESSION_CEILING` is the per-session ceiling (rn:volume-frequency.3).
 `MINIMUM_SHARE` compares ordinary programmed dose as application policy
 (rn:minimum-effective-dose.6). `COVERAGE` is a product choice of muscles every
 balance report shows, not a claim that each needs its own exercise.
+Leaving illness weeks out of adherence and keeping reshuffles in it are
+application decisions the maintainer approved, not research findings.
 """
 
 from dataclasses import dataclass, field
@@ -180,6 +182,10 @@ class _Instance:
         return self._workouts
 
     @cached_property
+    def status_days(self):
+        return statusdays.load(self.root)
+
+    @cached_property
     def adopted(self):
         """The first day the current program plans sessions from its schedule rule and coach-led sessions."""
         return state.adopted(self.root, self.state, self.overlays)
@@ -320,8 +326,8 @@ def _light_decision(inst, span):
     for decision in inst.decisions["decisions"]:
         if (decision["kind"] == "light_week" and decision["outcome"] == "adopted"
                 and decision["status"] != "withdrawn" and span.contains(dates.parse_date(decision["details"]["week"]))):
-            return True
-    return False
+            return decision
+    return None
 
 
 def _break_week(inst, span, off=None):
@@ -338,25 +344,84 @@ def _break_week(inst, span, off=None):
     return all(day in off for day in planned)
 
 
-def _kind(inst, span, activity, until):
+def _classify(inst, span, activity, until):
+    """(kind, reason) from the week's plan alone; `_with_illness` then reads what happened to it.
+
+    A one-off overlay pauses the week only when it plans a temporary session (constrained mode). One that only
+    re-dates program sessions is a reshuffle, so the week keeps ordinary accounting and its misses count.
+    """
     off = statusdays.break_days(inst.root, span)
     if _break_week(inst, span, off):
-        return "break"
-    kinds = set()
+        return "break", f"planned break {', '.join(sorted(set(off.values())))} covers every planned session"
+    in_force, temporary = {}, set()
     for day in span.days():
         found = overlay.pick_in_force(inst.overlays, day)
         # A one-off in force only on break days represents the break, so the days left keep ordinary accounting.
-        if found and not (found[0]["kind"] == "one_off" and day in off):
-            kinds.add(found[0]["kind"])
-    if "deload" in kinds or _light_decision(inst, span):
-        return "light"
-    if (inst.root / minimum_plan_path(span.start)).exists():
-        return "minimum"
-    if "one_off" in kinds:
-        return "one_off"
+        if not found or (found[0]["kind"] == "one_off" and day in off):
+            continue
+        in_force.setdefault(found[0]["kind"], found[0]["id"])
+        if found[0]["kind"] == "one_off":
+            temporary |= {s["session_id"] for s in overlay.sessions_on(found[0], day) if s["temporary"]}
+    if "deload" in in_force:
+        return "light", f"deload overlay {in_force['deload']}"
+    decision = _light_decision(inst, span)
+    if decision is not None:
+        return "light", f"light week adopted in {decision['id']}"
+    plan = minimum_plan_path(span.start)
+    if (inst.root / plan).exists():
+        return "minimum", f"minimum week plan {plan.as_posix()}"
+    if temporary:
+        return "one_off", f"constrained one-off week: temporary sessions {', '.join(sorted(temporary))}"
     if _in_layoff(span, activity, until):
-        return "layoff"
-    return "ordinary"
+        return "layoff", f"no training in the week, inside a gap of more than {LAYOFF_AFTER_DAYS} days"
+    return "ordinary", None
+
+
+def _ill_days(inst, span):
+    """{ISO day: status-day id} for each day of the span a live `ill` row covers."""
+    found = {}
+    for row in inst.status_days["days"]:
+        if row["kind"] != "ill" or not statusdays.is_live(row):
+            continue
+        covered = statusdays.span_of(row)
+        for day in span.days():
+            if covered.contains(day):
+                found.setdefault(day.isoformat(), row["id"])
+    return found
+
+
+def illness_misses(inst, span, report):
+    """Planned sessions the week lost to illness: a core miss tagged `ill`, or a core miss or coach-led session not
+    done on a day an `ill` status day covers. Each is `{session_id or external_id, date, tag, status_day}`."""
+    ill = _ill_days(inst, span)
+    found = []
+    for row in report["sessions"]:
+        day = row["date"]
+        if "external_id" in row:
+            if row["status"] == "not_done" and day in ill:
+                found.append({"external_id": row["external_id"], "date": day, "tag": None, "status_day": ill[day]})
+        elif row["tier"] == "core" and row["status"] == "missed" and (row.get("tag") == "ill" or day in ill):
+            found.append({"session_id": row["session_id"], "date": day, "tag": row.get("tag"),
+                          "status_day": ill.get(day)})
+    return found
+
+
+def _illness_text(missed):
+    parts = []
+    for row in missed:
+        how = [w for w in ("tagged ill" if row["tag"] == "ill" else None,
+                           f"status day {row['status_day']}" if row["status_day"] else None) if w]
+        parts.append(f"{row.get('session_id') or row.get('external_id')} on {row['date']} ({', '.join(how)})")
+    return "illness: planned training missed while ill, " + "; ".join(parts)
+
+
+def _with_illness(inst, span, kind, reason, report):
+    """An ordinary week that lost planned training to illness is an `illness` week: adherence leaves it out of its
+    thresholds, while its sessions, dose and block class stay as trained."""
+    if kind != "ordinary":
+        return kind, reason
+    missed = illness_misses(inst, span, report)
+    return ("illness", _illness_text(missed)) if missed else (kind, reason)
 
 
 def _program_week(inst, span):
@@ -380,8 +445,15 @@ def _closed_weeks(inst, until, reach):
 
 
 def _scan(inst, until, reach=REACH_WEEKS):
+    """[(span, kind, reason)] newest first, and {span: report} for each of those weeks."""
     activity = _activity_dates(inst, until)
-    return [(span, _kind(inst, span, activity, until)) for span in _closed_weeks(inst, until, reach)]
+    spans = _closed_weeks(inst, until, reach)
+    reports = _week_reports(inst, spans)
+    found = []
+    for span in spans:
+        kind, reason = _classify(inst, span, activity, until)
+        found.append((span, *_with_illness(inst, span, kind, reason, reports[span])))
+    return found, reports
 
 
 def _week_reports(inst, spans):
@@ -489,7 +561,7 @@ def _report(inst, span, rows, extra, sessions_by_key, workouts, on_break=()):
     sessions.sort(key=lambda s: (s["date"], s.get("session_id") or s.get("external_id")))
     break_rows.sort(key=lambda s: (s["date"], s.get("session_id") or s.get("external_id")))
     return {"week": span.start.isoformat(), "label": span.label(), "span": span.to_json(), "kind": None,
-            "sessions": sessions, "planned": counted_planned, "trained": counted_trained, "on_break": break_rows,
+            "kind_reason": None, "sessions": sessions, "planned": counted_planned, "trained": counted_trained, "on_break": break_rows,
             "muscles": muscles, "by_session": by_session, "flags": raised}
 
 
@@ -499,7 +571,8 @@ def week(root, week_start, *, today=None, now=None):
     span = inst.week(_as_date(week_start.start if isinstance(week_start, dates.Span) else week_start))
     report = _week_reports(inst, [span])[span]
     until = max(inst.today, span.end)
-    report["kind"] = _kind(inst, span, _activity_dates(inst, until), until)
+    kind, reason = _classify(inst, span, _activity_dates(inst, until), until)
+    report["kind"], report["kind_reason"] = _with_illness(inst, span, kind, reason, report)
     return report
 
 
@@ -513,14 +586,14 @@ def ordinary_weeks(root, until, n=WINDOW_WEEKS, reach=REACH_WEEKS, *, today=None
     """Start dates of the last `n` ordinary weeks ending on or before `until`, oldest first, within `reach` weeks."""
     inst = _Instance.load(root, today, now)
     until = _as_date(until) or inst.today
-    found = [span for span, kind in _scan(inst, until, reach) if kind == "ordinary"][:n]
+    found = [span for span, kind, _ in _scan(inst, until, reach)[0] if kind == "ordinary"][:n]
     return [span.start.isoformat() for span in reversed(found)]
 
 
 def _ordinary_closed_since(inst, made_on, until):
     """How many ordinary weeks started after `made_on` and ended on or before `until`."""
     weeks = (until - made_on).days // 7 + 1
-    return sum(1 for span, kind in _scan(inst, until, weeks) if kind == "ordinary" and span.start > made_on)
+    return sum(1 for span, kind, _ in _scan(inst, until, weeks)[0] if kind == "ordinary" and span.start > made_on)
 
 
 def _in_effect(inst, decision, until):
@@ -555,12 +628,13 @@ def _decision_in_effect(inst, until):
 
 
 def _adherence(inst, until):
-    scanned = _scan(inst, until)
-    chosen = [span for span, kind in scanned if kind == "ordinary"][:WINDOW_WEEKS]
-    reports = _week_reports(inst, chosen)
+    scanned, reports = _scan(inst, until)
+    chosen = [span for span, kind, _ in scanned if kind == "ordinary"][:WINDOW_WEEKS]
     oldest = chosen[-1].start if len(chosen) == WINDOW_WEEKS else None
-    skipped = [{"week": span.start.isoformat(), "label": span.label(), "kind": kind}
-               for span, kind in reversed(scanned) if kind != "ordinary" and (oldest is None or span.start > oldest)]
+    skipped = [{"week": span.start.isoformat(), "label": span.label(), "kind": kind, "reason": reason,
+                "planned": reports[span]["planned"], "trained": reports[span]["trained"]}
+               for span, kind, reason in reversed(scanned)
+               if kind != "ordinary" and (oldest is None or span.start > oldest)]
     weeks = [dict(reports[span], kind="ordinary") for span in reversed(chosen)]
     planned = sum(r["planned"] for r in weeks)
     trained = sum(r["trained"] for r in weeks)
