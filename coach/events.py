@@ -337,7 +337,7 @@ def _window_text(row):
     if window is None:
         return None
     if window["start"] is None:
-        return "agreed: no taper or review window"
+        return "agreed: no event window"
     return f"agreed window {window['start']} to {window['end']}"
 
 
@@ -351,7 +351,7 @@ def line(shown, unit="km"):
     when = "is today" if days == 0 else f"{days} day{'s' if days != 1 else ''} to go"
     text = f"{head}: {when}"
     if PENDING_WINDOW in shown["pending"]:
-        text += (f"; no taper or review window agreed: agree one with its rationale, or record none "
+        text += (f"; no event window agreed: agree one with its rationale, or record none "
                  f"(python3 -m coach events window {shown['id']})")
     else:
         text += f"; {_window_text(shown)}"
@@ -374,12 +374,11 @@ def proposal_flags(root, overlay, span, today):
     library, params = None, None
     found = []
     for row in active(doc):
-        day = dates.parse_date(row["date"])
-        if day < span.start:
+        if dates.parse_date(row["date"]) < max(span.start, today):
             continue
-        if row["window"] is None:
+        if PENDING_WINDOW in pending(row, today):
             found.append(flags.make("event_window_pending", message=(
-                f"Event {label(row, unit)} on {row['date']} has no agreed taper or review window, so none is "
+                f"Event {label(row, unit)} on {row['date']} has no agreed event window, so none is "
                 "assumed. Agree one with the athlete and its rationale, or record none: python3 -m coach events "
                 f"window {row['id']} (--from D --to D | --none) --rationale TEXT.")))
             continue

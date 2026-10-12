@@ -1,10 +1,13 @@
 """Goal events: the document, the commands, status, the card, proposal review flags and planned-activity links (contract C55)."""
 
 import json
+import shutil
+import tempfile
 import unittest
+from pathlib import Path
 
 from coach import events, flags, migrate, paths, status
-from tests.support import REPO_ROOT
+from tests.support import INSTANCES, REPO_ROOT, run_cli
 from tests.support.skills import skill_text
 from tests.test_cardio import CardioCase
 
@@ -38,7 +41,7 @@ class AddAndShowTest(EventCase):
         section = self.section()
         self.assertEqual(section["level"], "attention")
         [line] = section["lines"]
-        for words in ("Autumn 10K", "(A, run 10 km)", "2026-10-21", "10 days to go", "no taper or review window"):
+        for words in ("Autumn 10K", "(A, run 10 km)", "2026-10-21", "10 days to go", "no event window"):
             self.assertIn(words, line)
         card = self.card("--tier", "weekly")
         self.assertIn(line, card["facts"])
@@ -60,8 +63,18 @@ class AddAndShowTest(EventCase):
         self.data(*RACE)
         event = self.data("events", "window", "autumn-10k", "--none", "--rationale", "a C-style tune-up")["event"]
         self.assertEqual((event["window"]["start"], event["window"]["end"], event["pending"]), (None, None, []))
-        self.assertIn("agreed: no taper or review window", self.section()["lines"][0])
+        self.assertIn("agreed: no event window", self.section()["lines"][0])
         self.assertEqual(self.event_flags("2026-W43"), [])
+
+    def test_the_check_skips_without_the_file_and_passes_after_the_commands_write_it(self):
+        self.assertEqual([r["status"] for r in self.data("check", "--only", "events_valid")["results"]], ["skip"])
+        self.data(*RACE)
+        self.data(*WINDOW)
+        self.data("events", "add", "--id", "parkrun", "--title", "Parkrun", "--date", "2026-10-03", "--priority", "C")
+        self.data("events", "complete", "parkrun", "--result", "24:10")
+        self.data("events", "add", "--id", "club-5k", "--title", "Club 5K", "--date", "2026-11-01", "--priority", "B")
+        self.data("events", "cancel", "club-5k", "--reason", "clash")
+        self.assertEqual([r["status"] for r in self.data("check", "--only", "events_valid")["results"]], ["pass"])
 
     def test_dry_run_writes_nothing(self):
         self.data(*RACE, "--dry-run")
@@ -127,6 +140,13 @@ class WindowReviewTest(EventCase):
             self.assertEqual((flag["code"], flag["severity"], flag["session_id"]),
                              ("event_window_pending", "info", None))
             self.assertIn("none is assumed", flag["message"])
+
+    def test_an_event_already_past_in_a_midweek_reprogram_gets_no_window_prompt(self):
+        self.data("events", "add", "--id", "club-5k", "--title", "Club 5K", "--date", "2026-10-13", "--priority", "C")
+        found = self.coach("propose", "week", "--week", "2026-W42", "--dry-run", now="2026-10-14T07:00:00Z")["data"]
+        messages = [f["message"] for f in found["overlay"]["flags"] if f["code"] == "event_window_pending"]
+        self.assertEqual(len(messages), 1)
+        self.assertIn("Autumn 10K", messages[0])
 
     def test_flags_and_reads_leave_the_prescriptions_alone(self):
         def lines(data):
@@ -243,6 +263,16 @@ class LinkTest(EventCase):
                                                                  "[activity]\nenabled = false"), encoding="utf-8")
         self.coach(*RACE, "--planned-id", self.plan, expect=5)
 
+    def test_a_linked_event_keeps_its_other_edits_once_the_activity_source_is_off(self):
+        self.data(*RACE, "--planned-id", self.plan)
+        path = self.root / "config.toml"
+        path.write_text(path.read_text(encoding="utf-8").replace("[activity]\nenabled = true",
+                                                                 "[activity]\nenabled = false"), encoding="utf-8")
+        event = self.data("events", "update", "autumn-10k", "--title", "Autumn 10K (club)")["event"]
+        self.assertEqual((event["title"], event["planned_id"]), ("Autumn 10K (club)", self.plan))
+        self.data(*WINDOW)
+        self.coach("events", "update", "autumn-10k", "--activity", "ride", expect=5)
+
 
 class ManyEventsTest(EventCase):
     def test_each_event_is_shown_in_date_order_with_its_own_priority_and_window(self):
@@ -252,7 +282,7 @@ class ManyEventsTest(EventCase):
                   "--activity", "run", "--distance-km", "5")
         lines = self.section()["lines"]
         self.assertEqual(len(lines), 2)
-        self.assertIn('"Parkrun" (C, run 5 km) on 2026-10-17: 6 days to go; no taper', lines[0])
+        self.assertIn('"Parkrun" (C, run 5 km) on 2026-10-17: 6 days to go; no event window', lines[0])
         self.assertIn('"Autumn 10K" (A, run 10 km) on 2026-10-21: 10 days to go; agreed window', lines[1])
         found = self.event_flags("2026-W43")
         self.assertEqual([f["code"] for f in found], ["event_window_heavy_lower"])
@@ -276,6 +306,32 @@ class BlockTest(EventCase):
         self.data(*RACE)
         self.data(*WINDOW)
         self.assertEqual(self.data("block", "status"), before)
+
+
+class CheckTest(unittest.TestCase):
+    def check(self, root):
+        code, envelope, _ = run_cli(["--root", str(root), "check", "--only", "events_valid"])
+        return code, envelope["data"]["results"]
+
+    def test_the_failing_fixture_names_each_problem_and_its_repair_passes(self):
+        code, results = self.check(INSTANCES / "valid")
+        self.assertEqual((code, [r["status"] for r in results]), (0, ["skip"]))
+        code, results = self.check(INSTANCES / "events-invalid")
+        self.assertEqual((code, [r["status"] for r in results]), (1, ["fail", "fail"]))
+        messages = " ".join(r["message"] for r in results)
+        self.assertIn("$.events[0].window.end: ends (2026-10-22) after the event (2026-10-21)", messages)
+        self.assertIn("$.events[1].result: a completed event has a result", messages)
+        self.assertEqual({r["path"] for r in results}, {"data/events.json"})
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "instance"
+            shutil.copytree(INSTANCES / "events-invalid", root)
+            path = root / paths.EVENTS
+            doc = json.loads(path.read_text(encoding="utf-8"))
+            doc["events"][0]["window"]["end"] = "2026-10-20"
+            doc["events"][1]["result"] = {"text": "24:10", "recorded_at": "2026-10-04T12:00:00Z"}
+            path.write_text(json.dumps(doc), encoding="utf-8")
+            code, results = self.check(root)
+        self.assertEqual((code, [r["status"] for r in results]), (0, ["pass"]))
 
 
 class RegistryTest(unittest.TestCase):

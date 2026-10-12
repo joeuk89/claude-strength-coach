@@ -1504,6 +1504,7 @@ Unless stated, each is a copy of `valid/` plus what is listed.
 | `hevy-stale/` | R-12 | the same with the last pull at 2026-10-09T12:00:00Z (54 hours) |
 | `cardio/` | R-43 | see C50 |
 | `cardio-invalid/` | R-43 | not a copy of `valid/`: its config with `[cardio] spike_ratio = 1.0` and `sleep_debt_nights = 8`, and a `data/status-days.json` with a row ending before it starts and two open-ended `injured` rows |
+| `events-invalid/` | R-47 | not a copy of `valid/`: a config with only `[athlete] units`, and a `data/events.json` whose active `autumn-10k` (2026-10-21) has a window ending 2026-10-22, after the event, and whose completed `club-5k` has no result |
 | `activity-bad-record/` | R-42a | not a copy of `valid/`: the valid config and an `activities.jsonl` whose line 2 has an unknown field `heart_zone` |
 | `activity-wellness-misplaced/` | R-42a | not a copy of `valid/`: the valid config (`wellness_in_git` left false) and the wellness file at `data/activity/wellness.jsonl` |
 | `research-bad/` | R-32a | not a copy of `valid/`: the valid config; `fixture-dose` with a hand-edited claims table; `fixture-broken` with two claims numbered 1; `fixture-old` expired 2026-10-01 (area `sleep`); `reference/fixture-guide.md` citing a missing claim |
@@ -2420,7 +2421,7 @@ Reserved codes:
 | `niggle_link` | warn | R-43 | | Activity of a kind an active niggle applies to. |
 | `conditioning_dropped` | info, warn | R-44b | | An optional conditioning session was dropped from the proposal (info), or a core one would have been (warn). |
 | `event_window_heavy_lower` | warn | R-47 | | A heavy squat or hinge session falls inside a goal event's agreed window; review it with the athlete. |
-| `event_window_pending` | info | R-47 | | An upcoming goal event has no agreed taper or review window; agree one or record none. |
+| `event_window_pending` | info | R-47 | | An upcoming goal event has no agreed event window; agree one or record none. |
 
 ## C21. Overlay v2: line provenance (R-24 bumps; R-23a fills; R-21a, R-22, R-25 read)
 
@@ -7077,6 +7078,7 @@ rule (hooks run outside the permission layer); `status` gets one. R-15's
   | `profile.md` | `bare_hevy_values`, `research_citations` |
   | `data/hevy/writes.jsonl` | `schema_versions` |
   | `data/activity/*.jsonl`, `data/activity/sync.json`, `data/activity/associations.json`, `.coach/activity/wellness.jsonl` | `activity_records_valid`, `activity_wellness_location` |
+  | `data/events.json` | `events_valid` |
   | `data/nutrition/readings.json` | `nutrition_readings` |
   | `data/nutrition/plans/*.json` | `meal_plans`, `meal_plan_render_fresh` |
   | `nutrition/plans/*.md` | `meal_plan_render_fresh` |
@@ -7212,8 +7214,9 @@ set-avoid ID --clear` (W, `--dry-run`), `library list --avoided`.
   the event's date, of the event's kind when one is set; one plan links
   at most one active event. The event adds no bout: the plan and the
   activity that reconciles with it (C49) are the training, so a linked
-  race logged as a run counts once. Linking needs `[activity] enabled`
-  (exit 5 otherwise).
+  race logged as a run counts once. Setting a link, or changing a linked
+  event's date or activity, needs `[activity] enabled` (exit 5
+  otherwise); other edits of a linked event do not.
 - **Pending decisions** (`coach.events.pending(row, today)`): `result`
   once an active event's date has passed, else `window` while `window`
   is null.
@@ -7243,8 +7246,8 @@ set-avoid ID --clear` (W, `--dry-run`), `library list --avoided`.
   cards included), an `Events` field asking for each pending decision,
   and a fact for each event completed in the window.
 - Week-flag provider `events` (C49), proposal mode only: for each active
-  event dated on or after the span start, `event_window_pending` (info)
-  when its window is null, and `event_window_heavy_lower` (warn,
+  event dated on or after both the span start and today,
+  `event_window_pending` (info) while its window decision is pending, and `event_window_heavy_lower` (warn,
   `session_id` the session) for each draft session in the agreed window
   that is heavy lower. Heavy lower is C51's definition with the
   program's `quality_before_heavy_lower` thresholds, else 7 and 6

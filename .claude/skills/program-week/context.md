@@ -63,6 +63,23 @@ principles", matching band and all. An `ill` miss tag or illness in the
 gap adds that rule's illness conditions; standalone, ask whether
 illness caused the gap.
 
+## Goal events
+
+`python3 -m coach events list` shows each active goal event with its
+countdown and any pending decision. A window before an event is always
+one the athlete agreed; none is ever assumed. The proposal raises two
+flags for compute.md step 2:
+
+- `event_window_heavy_lower` (heavy squat or hinge work inside an
+  event's agreed window; the message names the event, its date, the
+  window and the session): keep it and resolve the flag with the reason
+  (compute.md step 4), or change the line (step 3). Loads, sessions and
+  the block count stay as the scheme set them unless the athlete agrees
+  a change.
+- `event_window_pending` (an upcoming event with no window decision):
+  ask whether to agree one, with dates and why, or none, and record it
+  with `python3 -m coach events window`.
+
 ## Hevy freshness (Hevy users)
 
 With an overlay in force, run `python3 -m coach routines verify

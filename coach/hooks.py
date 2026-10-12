@@ -44,6 +44,7 @@ PATH_MAP = (
     ("data/activity/associations.json", _ACTIVITY_CHECKS),
     ("data/activity/wellness.jsonl", _ACTIVITY_CHECKS),
     (".coach/activity/wellness.jsonl", _ACTIVITY_CHECKS),
+    ("data/events.json", ("events_valid",)),
     ("data/nutrition/readings.json", ("nutrition_readings",)),
     ("data/nutrition/plans/*.json", ("meal_plans", "meal_plan_render_fresh")),
     ("nutrition/plans/*.md", ("meal_plan_render_fresh",)),

@@ -8,4 +8,4 @@ register("event_window_heavy_lower", owner=OWNER, severities=("warn",),
          summary="A heavy squat or hinge session falls inside a goal event's agreed window; review it with the "
                  "athlete.")
 register("event_window_pending", owner=OWNER, severities=("info",),
-         summary="An upcoming goal event has no agreed taper or review window; agree one or record none.")
+         summary="An upcoming goal event has no agreed event window; agree one or record none.")

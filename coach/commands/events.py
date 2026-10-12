@@ -23,8 +23,9 @@ def _written(ctx, row, dry_run, **extra):
     return {"event": shown, "path": paths.EVENTS.as_posix(), "written": not dry_run, **extra}
 
 
-def _save(ctx, doc, row, dry_run):
-    if row["planned_id"] is not None:
+def _save(ctx, doc, row, dry_run, before=None):
+    linked = ("planned_id", "date", "activity")
+    if row["planned_id"] is not None and (before is None or any(row[k] != before[k] for k in linked)):
         events.check_link(actions.store_for(ctx), doc, row)
     events.save(ctx.root, doc, dry_run)
 
@@ -82,8 +83,9 @@ def update(args, ctx):
         fields["planned_id"] = None
     if not fields:
         raise UsageError("give at least one field to change")
-    doc, row, cleared = events.update(events.load(ctx.root), args.id, fields, args.reason, utc_text(ctx.now()))
-    _save(ctx, doc, row, args.dry_run)
+    current = events.load(ctx.root)
+    doc, row, cleared = events.update(current, args.id, fields, args.reason, utc_text(ctx.now()))
+    _save(ctx, doc, row, args.dry_run, before=events.find(current, args.id))
     return _written(ctx, row, args.dry_run, cleared=cleared)
 
 
