@@ -38,8 +38,11 @@ a tested one than design one from scratch.
    it, and edit the draft. When the athlete confirms a missing bench,
    bar or support (`[equipment] apparatus`) or shows they can do a skill
    exercise (`[athlete] demonstrated_exercises`), update `config.toml`
-   and draft again. Swaps can move the weekly dose: the balance picture
-   after adoption shows any gap to agree.
+   and draft again. Swaps can move the weekly dose: run `python3 -m coach
+   structure balance --program .coach/drafts/program.json` and settle its
+   flags as design.md step 4 sets out. The starters program no direct
+   abdominal work, so expect that coverage gap. The starter's own targets
+   stay as they are unless you and the athlete review them.
 6. **Adopt:** run `python3 -m coach program adopt --input
    .coach/drafts/program.json --dry-run`, then without `--dry-run`, as
    SKILL.md step 2 sets out; then Path B step 5 (design.md) for the

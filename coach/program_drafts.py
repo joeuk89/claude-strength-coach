@@ -351,8 +351,16 @@ def _under(prefix, path):
     return prefix + path[1:]
 
 
-def _draft_errors(draft, config, library, root):
-    """Every problem with a draft, as Errors with JSONPaths from the draft's root."""
+_WRAPPER_KEYS = ("program", "source", "hevy_routines")
+
+
+def is_draft(doc):
+    """True for a draft wrapper, even one missing its `program`; False for a bare program."""
+    return isinstance(doc, dict) and "sessions" not in doc and any(key in doc for key in _WRAPPER_KEYS)
+
+
+def validate(draft, config, library, root):
+    """Every problem `program adopt` would report for a draft, as Errors with JSONPaths from the draft's root."""
     if not isinstance(draft, dict):
         return [Error("$", "a program draft is a JSON object")]
     schema = jsonio.load_schema(SCHEMA)
@@ -550,7 +558,7 @@ def adopt(root, draft, replace=False, position=None, dry_run=False, today=None, 
     today = _as_date(today)
     config = config if config is not None else config_module.load(root, today=today)
     library = Library.load(root)
-    errors = _draft_errors(draft, config, library, root)
+    errors = validate(draft, config, library, root)
     if errors:
         raise ValidationError(f"The program draft is not valid ({len(errors)} problem(s))",
                               details=[error.to_json() for error in errors])
@@ -617,5 +625,5 @@ def draft_problems(draft, root, config=None):
     """The adopt-time problems of a draft's program other than its schedule, for the import's report."""
     root = Path(root)
     config = config if config is not None else config_module.load(root)
-    errors = _draft_errors(draft, config, Library.load(root), root)
+    errors = validate(draft, config, Library.load(root), root)
     return [e.to_json() for e in errors if not e.path.startswith("$.program.schedule")]

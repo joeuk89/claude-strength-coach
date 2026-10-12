@@ -3,10 +3,12 @@
 Planned and delivered dose count sets the same way (`coach.stats.set_weights`
 and the same hard-set rule), so the two compare like for like. The 70 % and
 80 % adherence thresholds and the three-of-four undershoot rule are coaching
-heuristics (R-02), not research cut-offs. `DEFAULT_TARGET` is the low end
-of the weekly range (rn:volume-frequency.1); `SESSION_CEILING` is the
-per-session ceiling (rn:volume-frequency.3). `MINIMUM_SHARE` compares ordinary
-programmed dose as application policy (rn:minimum-effective-dose.6).
+heuristics (R-02), not research cut-offs. `FALLBACK_TARGET` is the low end
+of the weekly range (rn:volume-frequency.1), a hypertrophy starting fallback
+only; `SESSION_CEILING` is the per-session ceiling (rn:volume-frequency.3).
+`MINIMUM_SHARE` compares ordinary programmed dose as application policy
+(rn:minimum-effective-dose.6). `COVERAGE` is a product choice of muscles every
+balance report shows, not a claim that each needs its own exercise.
 """
 
 from dataclasses import dataclass, field
@@ -21,7 +23,11 @@ from coach.errors import ValidationError
 from coach.library import Library
 from coach.plugins import base
 
-DEFAULT_TARGET = 10
+FALLBACK_TARGET = 10
+HYPERTROPHY = "hypertrophy"
+COVERAGE = ("chest", "lats", "upper_back", "front_delts", "side_delts", "rear_delts", "biceps", "triceps",
+            "abdominals", "quadriceps", "hamstrings", "glutes", "calves")
+OLDER_LIFTER_AGE = 60
 SESSION_CEILING = 11.0
 LOW_PCT = 70
 ADD_SESSION_PCT = 80
@@ -91,20 +97,36 @@ def planned_dose(root, sessions):
     return _rounded(totals)
 
 
-def targets(program_doc, library=None):
-    """The effective weekly dose targets: the program's `dose_targets`, else 10 for each primary muscle of a core exercise.
+def dose_goal(program_doc):
+    """The lifting-dose goal the design conversation recorded in `dose_intent`, or None when none was."""
+    intent = program_doc.get("dose_intent")
+    return intent["goal"] if intent else None
 
-    Only active core sessions supply the default; a muscle no such exercise trains as a primary muscle has no target.
-    """
-    library = library or Library()
-    found = {}
+
+def _uses_fallback(program_doc):
+    return dose_goal(program_doc) in (None, HYPERTROPHY)
+
+
+def _core_primary_muscles(program_doc, library):
+    found = set()
     for session in program_doc["sessions"]:
         if session["tier"] != "core" or session["status"] != "active" or session["kind"] != "lifting":
             continue
         for line in session["exercises"]:
             entry = library.get(line["exercise_id"])
-            for muscle in entry["muscles"]["primary"] if entry else ():
-                found[muscle] = DEFAULT_TARGET
+            found.update(entry["muscles"]["primary"] if entry else ())
+    return found
+
+
+def targets(program_doc, library=None):
+    """The effective weekly dose targets: the program's `dose_targets`, plus the hypertrophy starting fallback.
+
+    The fallback gives 10 to each primary muscle of an exercise in an active core session, and only when
+    `dose_intent` records no goal or hypertrophy; any other goal has no target until one is agreed.
+    """
+    library = library or Library()
+    found = dict.fromkeys(_core_primary_muscles(program_doc, library), FALLBACK_TARGET) \
+        if _uses_fallback(program_doc) else {}
     found.update(program_doc.get("dose_targets") or {})
     return {muscle: found[muscle] for muscle in sorted(found)}
 
@@ -133,12 +155,13 @@ class _Instance:
     _workouts: list = field(default=None, repr=False)
 
     @classmethod
-    def load(cls, root, today=None, now=None, program_doc=None):
+    def load(cls, root, today=None, now=None, program_doc=None, require_program=True):
         root = Path(root)
         config = config_module.load(root)
         today = _as_date(today) or stats._today(config, now)
-        return cls(root=root, today=today, now=now, config=config,
-                   program=program_doc if program_doc is not None else program.load(root),
+        if program_doc is None and (require_program or program.exists(root)):
+            program_doc = program.load(root)
+        return cls(root=root, today=today, now=now, config=config, program=program_doc,
                    state=history.load_optional(state, root), library=Library.load(root),
                    overlays=overlay.list(root), decisions=decisions.load(root))
 
@@ -564,26 +587,108 @@ def _new_sessions(current, candidate):
             + [e["id"] for e in candidate["external_sessions"] if e["id"] not in externals])
 
 
+def _muscle_rows(program_doc, library, average, effective):
+    """{muscle: {target, average, met, source, baseline, reason}} for each muscle balance reports.
+
+    `effective` is `targets()`. `source`: `explicit` (in `dose_targets`), `omitted` (an explicit 0 with a recorded
+    reason), `fallback` (the hypertrophy starting fallback), `pending` (another goal, no agreed target yet) or null
+    (no target).
+    """
+    intent = program_doc.get("dose_intent") or {}
+    explicit = program_doc.get("dose_targets") or {}
+    baseline, reasons = intent.get("baseline") or {}, intent.get("reasons") or {}
+    trained = _core_primary_muscles(program_doc, library)
+    fallback = _uses_fallback(program_doc)
+    names = sorted(set(effective) | trained | set(COVERAGE) | {m for m, v in average.items() if v})
+    rows = {}
+    for muscle in names:
+        planned = _round(average.get(muscle, 0.0))
+        target = effective.get(muscle)
+        if muscle in explicit:
+            source = "omitted" if explicit[muscle] == 0 and muscle in reasons else "explicit"
+        elif target is not None:
+            source = "fallback"
+        elif not fallback and (muscle in trained or muscle in COVERAGE):
+            source = "pending"
+        else:
+            source = None
+        rows[muscle] = {"target": target, "average": planned, "met": None if target is None else planned >= target,
+                        "source": source, "baseline": baseline.get(muscle), "reason": reasons.get(muscle)}
+    return rows
+
+
+def _muscle_flags(program_doc, muscles):
+    """The volume_undershoot, dose_coverage_gap and dose_target_pending flags for the muscle rows."""
+    goal = dose_goal(program_doc)
+    baseline = (program_doc.get("dose_intent") or {}).get("baseline") or {}
+    raised = []
+    for muscle, row in muscles.items():
+        planned, target, source = row["average"], row["target"], row["source"]
+        if row["met"] is False:
+            below = "the hypertrophy starting fallback of" if source == "fallback" else "its target of"
+            raised.append(flags.make("volume_undershoot", message=(
+                f"{muscle}: planned {planned} fractional sets a week on core and coach-led sessions, below {below} "
+                f"{_round(target)}")))
+        elif muscle in COVERAGE and not planned and source != "omitted":
+            raised.append(flags.make("dose_coverage_gap", message=(
+                f"{muscle}: target 0 with no reason recorded; record why in dose_intent.reasons, or agree a target"
+                if source == "explicit" else
+                f"{muscle}: no hard sets planned on core or coach-led sessions and no agreed target; agree a target, "
+                "or set it to 0 with a reason in dose_intent.reasons (dose_intent needs a goal)")))
+        elif source == "pending" and planned:
+            if muscle in baseline:
+                basis = f"; agree one from the ordinary baseline of {_round(baseline[muscle])} recorded"
+            elif goal == "maintenance":
+                basis = "; record the ordinary baseline in dose_intent.baseline and agree a target from it"
+            else:
+                basis = "; agree one with the athlete"
+            raised.append(flags.make("dose_target_pending", message=(
+                f"{muscle}: planned {planned} fractional sets a week with no agreed {goal} target{basis}")))
+    return raised
+
+
+def _balance_notes(inst, program_doc, muscles, conditioning):
+    notes = []
+    if any(row["source"] == "fallback" for row in muscles.values()):
+        notes.append(f"A fallback target is the hypertrophy starting fallback of {FALLBACK_TARGET} fractional sets a "
+                     "week (rn:volume-frequency.1); for a strength or maintenance goal, record dose_intent and agree "
+                     "each target with the athlete.")
+    if conditioning:
+        notes.append("Conditioning sessions add training stress and recovery cost but count no resistance sets; weigh "
+                     "them when agreeing dose targets and record the reason in dose_intent.reasons.")
+    age = config_module.approximate_age(inst.config, inst.today)
+    if dose_goal(program_doc) == "maintenance" and age and age["years"] >= OLDER_LIFTER_AGE:
+        notes.append(f"The athlete is about {age['years']}: lifters aged about 60 and over need more than a third of "
+                     "their usual weekly sets to keep muscle size (rn:minimum-effective-dose.2), so agree "
+                     "maintenance targets nearer the ordinary baseline.")
+    return notes
+
+
 def _balance(inst, program_doc, candidate):
     reference = inst.week(inst.today + timedelta(days=1))
     external = _week_external(program_doc, reference)
-    positions, totals = [], {}
+    positions, totals, conditioning_counts = [], {}, {}
     for position, planned in _cycle(inst, program_doc, reference):
         rows = [{"date": day.isoformat(), "session_id": session_id,
                  "tier": inst.program_session(session_id, program_doc)["tier"]} for day, session_id in planned]
+        for _, session_id in planned:
+            if not inst.is_lifting(session_id, program_doc):
+                conditioning_counts[session_id] = conditioning_counts.get(session_id, 0) + 1
         dose = _ordinary_dose(inst, program_doc, planned, external)
         _add(totals, dose)
         positions.append({"position": position, "sessions": rows,
                           "external": [e["id"] for e in program_doc["external_sessions"]], "muscles": _rounded(dose)})
     average = {m: v / len(positions) for m, v in totals.items()}
     target = targets(program_doc, inst.library)
-    names = sorted(set(target) | {m for m, v in average.items() if v})
-    muscles = {m: {"target": target.get(m), "average": _round(average.get(m, 0.0)),
-                   "met": None if m not in target else _round(average.get(m, 0.0)) >= target[m]} for m in names}
-    raised = [flags.make("volume_undershoot", message=(
-                f"{m}: planned {muscles[m]['average']} fractional sets a week on core and coach-led sessions, below "
-                f"its target of {_round(target[m])}"))
-              for m in names if muscles[m]["met"] is False]
+    muscles = _muscle_rows(program_doc, inst.library, average, target)
+    raised = _muscle_flags(program_doc, muscles)
+    coverage = {m: "planned" if muscles[m]["average"] else "omitted" if muscles[m]["source"] == "omitted" else "gap"
+                for m in COVERAGE}
+    conditioning = []
+    for session_id, count in sorted(conditioning_counts.items()):
+        session = inst.program_session(session_id, program_doc)
+        conditioning.append({"session_id": session_id, "title": session["title"], "tier": session["tier"],
+                             "per_week": _round(count / len(positions))})
     sessions = {}
     for session in program_doc["sessions"]:
         if session["status"] != "active" or session["kind"] != "lifting":
@@ -597,13 +702,14 @@ def _balance(inst, program_doc, candidate):
                 message=f"{session['id']}: {_ceiling_text(over)} fractional sets planned in one session, above "
                         f"about {_round(SESSION_CEILING)}; move the excess to another session"))
     result = {"reference_week": reference.label(), "positions": positions, "average": _rounded(average),
-              "targets": target, "muscles": muscles, "by_session": sessions, "added": [], "adherence": None,
-              "flags": raised}
-    if candidate:
+              "goal": dose_goal(program_doc), "targets": target, "muscles": muscles, "coverage": coverage,
+              "conditioning": conditioning, "notes": _balance_notes(inst, program_doc, muscles, conditioning),
+              "by_session": sessions, "compared_with": None, "added": [], "adherence": None, "flags": raised}
+    if candidate and inst.program is not None:
         added = _new_sessions(inst.program, program_doc)
         report, _ = _adherence(inst, inst.today)
-        result.update(added=added, adherence={k: report[k] for k in ("pct", "planned", "trained",
-                                                                       "insufficient_weeks")})
+        result.update(compared_with=paths.PROGRAM.as_posix(), added=added,
+                      adherence={k: report[k] for k in ("pct", "planned", "trained", "insufficient_weeks")})
         blocked = (added and not report["insufficient_weeks"] and report["pct"] is not None
                    and 100 * report["trained"] / report["planned"] < ADD_SESSION_PCT)
         override = _newest([d for d in _triggers(inst, inst.today, "add_session") if _in_effect(inst, d, inst.today)])
@@ -620,12 +726,13 @@ def _balance(inst, program_doc, candidate):
 def balance(root, program=None, variant=None, *, today=None, now=None):
     """Static weekly balance on core sessions plus coach-led estimates; with `program`, a candidate is checked too.
 
-    With `variant` "minimum", the program's minimum week is checked instead (C40); the report's `passed` says
-    whether it holds and `reasons` why not.
+    A candidate needs no adopted program: without one it gets the static balance alone, with no added sessions or
+    adherence. With `variant` "minimum", the program's minimum week is checked instead (C40); the report's
+    `passed` says whether it holds and `reasons` why not.
     """
     if variant is not None and variant not in VARIANTS:
         raise ValidationError(f"variant must be one of {', '.join(VARIANTS)}")
-    inst = _Instance.load(root, today, now)
+    inst = _Instance.load(root, today, now, require_program=program is None)
     doc = program if program is not None else inst.program
     if variant == "minimum":
         return _minimum_balance(inst, doc)

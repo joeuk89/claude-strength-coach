@@ -110,10 +110,19 @@ _Avoid_: volume (ambiguous between planned and delivered)
 
 **Dose target**:
 The weekly dose a program aims each muscle at, in fractional hard sets
-(an indirect set counts as half). The program declares it; a muscle with
-none declared defaults to 10 when a core session trains it as a primary
-muscle.
+(an indirect set counts as half). The program declares it. Without one, a
+muscle a core session trains as a primary muscle takes the hypertrophy
+starting fallback of 10, unless the dose intent records a strength or
+maintenance goal: then its target is pending until the coach agrees one.
 _Avoid_: volume target, set goal, MEV
+
+**Dose intent**:
+The lifting-dose goal the design conversation agreed (hypertrophy,
+strength or maintenance), with the athlete's ordinary baseline per muscle
+and the reason for each agreed target. A target of 0 with a reason is a
+deliberate omission; a major muscle with no sets and no agreed target is
+a coverage gap.
+_Avoid_: training goal (the profile's words), phase (reserved for bulk/cut/maintain)
 
 **Ordinary week**:
 A week adherence is judged on: not a deload or other light week, not a

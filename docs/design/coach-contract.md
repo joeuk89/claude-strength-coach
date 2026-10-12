@@ -1794,11 +1794,13 @@ program to v5 (`interference`, C51). R-30b took program to v6
 fold's `rule_id` may be a priority floor rule's id, C40). R-44b took
 program to v7 (session `scheme`, C51), and program v8 adds the minimum
 week's retained coach-led sessions (`minimum_week.external_sessions`, C40).
+Program v9 adds the optional `dose_intent` (goal, ordinary baseline and
+target reasons, C40).
 Every later bump takes the next free version when it merges and adds one
 step to the R-17a migration chain, so the chain stays linear.
 Program bumps: R-22 (executable `missed_day_rules`, C37), R-30b (`priority`, `minimum_week`, C40), R-44a
 (`interference`, C51), R-44b (session `scheme`, C51), v8
-(`minimum_week.external_sessions`, C40). State bump: R-31
+(`minimum_week.external_sessions`, C40), v9 (`dose_intent`, C40). State bump: R-31
 took state to v4 (`block`, C42). Overlay: R-24 takes it to v2 (C21), R-22 to v3 (C37) and R-30b to v4 (C40). A
 brief or section that names a version number means the next free one.
 
@@ -2254,6 +2256,8 @@ Reserved codes:
 | `restructure_required` | warn | R-30a | yes | Adherence below 70 % and no decision in effect: the check-in presents a smaller schedule. |
 | `volume_undershoot` | warn | R-30a | yes | A muscle below its dose target, planned on core plus coach-led, or delivered in three of four ordinary weeks. |
 | `session_volume_high` | warn, info | R-30a | yes | More than 11 fractional sets for one muscle in one session (warn planned, info logged) (rn:volume-frequency.3). |
+| `dose_coverage_gap` | warn | R-30a | yes | A major muscle with no planned hard sets and no agreed target, or a target of 0 without a recorded reason. |
+| `dose_target_pending` | warn | R-30a | yes | A strength or maintenance program trains a muscle with no agreed target; the coach agrees one instead of a default. |
 | `priority_exposures_missed` | warn | R-30b | | A priority lift missed its planned exposure in a week and no floor dose replaced it. |
 | `light_week_due` | warn | R-31 | | Ceiling reached, or two fatigue triggers with three or more hard weeks; names the reason and proposed type. |
 | `light_week_skipped` | info | R-31 | | Two triggers fired below three hard weeks; light week skipped with the count. |
@@ -4853,18 +4857,52 @@ an optional top-level object; migration adds `{}`:
 ```
 
 - Keys are R-11 muscle names; values are fractional hard sets per week,
-  0 to 40. A muscle with no key gets the default 10 (rn:volume-frequency.1)
-  when it is a primary muscle of any exercise in an active core session,
-  and no target otherwise.
+  0 to 40. A muscle with no key gets the hypertrophy starting fallback of
+  10 (rn:volume-frequency.1) when it is a primary muscle of any exercise in
+  an active core session and the program records no goal, or the
+  hypertrophy goal, in `dose_intent`; otherwise it has no target.
 - `coach.structure.targets(program, library=None) -> dict[muscle, float]`
   returns the effective targets (`library` None: the catalogue alone).
-  Nothing else applies the default. A "core session" here is an active
+  Nothing else applies the fallback. A "core session" here is an active
   `lifting` session of tier `core`.
 - `program.load` fills an absent `dose_targets` with `{}`. `program
   validate` reports a key that is not an R-11 muscle (`key not allowed
   here`) and a value outside 0 to 40, at `$.dose_targets.<key>`.
 - Targets are what weekly balance is judged on. They are coaching numbers,
   set when the program is designed and changed only by a program edit.
+
+**Dose intent** (program v9; migration `0008_dose_intent` changes only the
+version, and `program.load` reads an absent `dose_intent` as null).
+The design or import conversation records the lifting-dose goal it agreed
+with the athlete, so balance never infers one from the nutrition phase or
+from profile prose:
+
+```json
+"dose_targets": {"chest": 4, "lats": 4, "hamstrings": 0},
+"dose_intent": {"goal": "maintenance",
+                "baseline": {"chest": 12, "lats": 12},
+                "reasons": {"chest": "a third of the athlete's own 12 sets while travelling",
+                            "hamstrings": "no hinge kit while travelling; restore it next block"}}
+```
+
+- `goal`: `hypertrophy`, `strength` or `maintenance`; any other value
+  fails validation. `null` or `hypertrophy` keeps the starting fallback of
+  10; `strength` and `maintenance` take no fallback, and a muscle without
+  an agreed target is pending.
+- `baseline` (optional, default `{}`): the athlete's ordinary planned
+  weekly fractional sets per muscle that maintenance targets are agreed
+  from, in the `dose_targets` shape. It is reported, never divided: no
+  tool turns it, or the fallback, into a third (rn:minimum-effective-dose.1).
+  A minimum week is a separate variant checked against the ordinary
+  program (`minimum_week` below), not a target.
+- `reasons` (optional, default `{}`): why each agreed target was chosen,
+  such as a strength priority or a runner's recovery. A reason needs the
+  muscle's `dose_targets` key (`program validate` reports it at
+  `$.dose_intent.reasons.<muscle>`); a target of 0 with a reason is a
+  deliberate omission.
+- Programs without `dose_intent` keep their explicit `dose_targets` as
+  before. Running and other conditioning add no resistance sets and no
+  target adjustment; balance lists them as context.
 
 **Priority lifts and the minimum week** (R-30b). R-30b's program bump adds
 two top-level members; migration adds `priority: []` and `minimum_week:
@@ -4991,7 +5029,7 @@ null`:
   minimum plan records it separately from the self-programmed sessions.
 - `structure balance --variant minimum` returns `variant`,
   `reference_week` (the week holding tomorrow), `sessions`, `schedule`,
-  `targets` (general dose targets, informational only), `positions`,
+  `targets` (the effective dose targets, informational only), `positions`,
   `passed`, `reasons` and `flags` (empty). Each comparison gives `position`
   (minimum schedule), `reference_position` (ordinary schedule),
   `reference_sessions` and `reference_external` (ordinary dose sources),
@@ -5127,14 +5165,17 @@ weeks ending on or before D (default today). `decision` is the newest
 
 **`structure balance [--program FILE]`** → per position of the schedule
 cycle: planned dose per muscle on core sessions plus external estimates,
-the cycle average, the targets, and `session_volume_high` (warn) per
-planned session. A target is met when the cycle average meets it. Raises
-the planned form of `volume_undershoot`. With FILE (a candidate program
-compared with `data/program.json`), a new active session (any kind or
-tier) or external session under 80 % adherence raises
+the cycle average, the targets, major-muscle coverage, and
+`session_volume_high` (warn) per planned session. A target is met when the
+cycle average meets it. Raises the planned form of `volume_undershoot`,
+`dose_coverage_gap` and `dose_target_pending`. FILE is a program draft
+(C45, `.coach/drafts/program.json`) or a bare program. With an adopted
+`data/program.json`, FILE is compared with it: a new active session (any
+kind or tier) or external session under 80 % adherence raises
 `add_session_type_blocked`, unless an `adherence_trigger` decision with
 rule `add_session` and outcome `adopted` was made in the last 28 days.
-Exercise swaps are not affected.
+Exercise swaps are not affected. Without one (first setup), FILE gets the
+static balance alone. The command only reads: it never adopts FILE.
 
 - `session_volume_high`: more than 11.0 fractional sets for one muscle in
   one session, the per-session figure (rn:volume-frequency.3). Warn on a
@@ -5148,8 +5189,8 @@ Exercise swaps are not affected.
   `data/program.json`.
 - R-30a's flags are registered in `coach/flags/structure.py` (C20).
   The `structure week`, `structure adherence` and `structure balance`
-  commands route their flags through `coach.flags.for_mode` (C44); the
-  `coach.structure` functions and the `program_balance` check keep the
+  commands and the `program_balance` check route their flags through
+  `coach.flags.for_mode` (C44); the `coach.structure` functions keep the
   registered severities.
 
 **Built with R-30a** (details the sections above leave open):
@@ -5216,18 +5257,49 @@ Exercise swaps are not affected.
   of the schedule rule (`positions(params)`, or one pass when it has
   none), with the rotation set to that position. Every coach-led session
   counts once per position. Output: `reference_week`, `positions`
-  (`{position, sessions, external, muscles}`), `average`, `targets`,
-  `muscles` (`{target, average, met}`; `met` null without a target),
-  `by_session` (each active lifting session's planned dose, either tier,
-  which `session_volume_high` judges), `added`, `adherence` (with FILE:
-  `pct`, `planned`, `trained`, `insufficient_weeks`) and `flags`. FILE is
-  validated like `program validate` (exit 1). `added` lists sessions
-  active in FILE but not active in `data/program.json`, then new
-  coach-led ids; `add_session_type_blocked` names each in `session_id`.
-  It is not raised with fewer than four ordinary weeks.
-- Check `program_balance` warns once per flag, as `<code>: <message>`;
-  it skips with no program, or one the balance cannot be worked out for
-  (`program_schema` reports why).
+  (`{position, sessions, external, muscles}`), `average`,
+  `goal` (`dose_intent.goal` or null), `targets`, `muscles` (`{target,
+  average, met, source, baseline, reason}`; `met` null without a target),
+  `coverage`, `conditioning`, `notes`, `by_session` (each active lifting
+  session's planned dose, either tier, which `session_volume_high`
+  judges), `compared_with`, `added`, `adherence` and `flags`.
+- `muscles` lists every muscle with a target, a primary muscle of a core
+  exercise, any non-zero average, and every coverage muscle: `chest`,
+  `lats`, `upper_back`, `front_delts`, `side_delts`, `rear_delts`,
+  `biceps`, `triceps`, `abdominals`, `quadriceps`, `hamstrings`, `glutes`
+  and `calves` (`coach.structure.COVERAGE`). The list is a product
+  choice for review, not a claim that each muscle needs its own exercise.
+  Secondary sets count half, so a muscle trained only as a secondary
+  keeps its credit. `source` is `explicit` (a `dose_targets` key),
+  `omitted` (an explicit 0 with a reason), `fallback` (the hypertrophy
+  starting fallback), `pending` (a strength or maintenance goal, no agreed
+  target) or null; `baseline` and `reason` come from `dose_intent`.
+- `coverage` maps each coverage muscle to `planned` (non-zero average),
+  `omitted` or `gap`. `dose_coverage_gap` names a coverage muscle with a
+  zero average and no target, or a target of 0 without a reason; an
+  explicit target above 0 raises `volume_undershoot` instead.
+  `dose_target_pending` names a `pending` muscle with a non-zero average,
+  with the recorded baseline when there is one.
+- `conditioning` lists the active conditioning sessions the cycle plans
+  (`{session_id, title, tier, per_week}`); they add no sets to any muscle.
+  `notes` explain the fallback when a target uses it, the conditioning
+  context, and, for a maintenance goal with `[athlete] birth_year` making
+  the athlete about 60 or older, the older-lifter caveat
+  (rn:minimum-effective-dose.2).
+- FILE as a draft is validated like `program adopt` (C45), with JSONPaths
+  from the draft's root; a bare program like `program validate` (exit 1
+  either way). With an adopted program, `compared_with` is
+  `data/program.json`, `adherence` is `pct`, `planned`, `trained` and
+  `insufficient_weeks`, and `added` lists sessions active in FILE but not
+  active in `data/program.json`, then new coach-led ids;
+  `add_session_type_blocked` names each in `session_id`. It is not raised
+  with fewer than four ordinary weeks. Without an adopted program, or
+  without FILE, `compared_with` and `adherence` are null and `added` is
+  empty.
+- Check `program_balance` reports once per flag, as `<code>: <message>`,
+  after `coach.flags.for_mode`: `warn`, or `pass` for a flag run mode shows
+  at `info`. It skips with no program, or one the balance cannot be worked
+  out for (`program_schema` reports why).
 
 ## C42. Block ledger and state (R-31; R-21a, R-25, R-26 read)
 
@@ -5477,7 +5549,8 @@ mode = "coach"            # "coach" | "run"
   card is built; the brief and the dashboard apply it to the week's
   overlay flags before keeping `block` and `warn` (so a structural flag
   drops out of Watch and the open-flag count); the three `structure`
-  report commands apply it to their `flags` (C41).
+  report commands apply it to their `flags`, and the `program_balance`
+  check reports a flag it shows at `info` as `pass` (C41).
 - The brief's and the dashboard's header line add `run mode` after the
   phase in run mode.
 - In run mode `block close` and `block status` leave

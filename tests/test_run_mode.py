@@ -24,7 +24,8 @@ from tests.test_propose import ProposeCase
 DOSE = INSTANCES / "dose"
 DOSE_NOW = "2026-10-11T18:00:00Z"
 RUN = '\n[coaching]\nmode = "run"\n'
-STRUCTURAL = ("add_session_type_blocked", "restructure_required", "volume_undershoot", "session_volume_high")
+STRUCTURAL = ("add_session_type_blocked", "restructure_required", "volume_undershoot", "session_volume_high",
+              "dose_coverage_gap", "dose_target_pending")
 
 
 def run_mode(root):

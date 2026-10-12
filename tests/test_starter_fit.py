@@ -215,7 +215,11 @@ class BeginnerKitTest(Case):
         self.assertTrue(all(0 < value <= 6 for value in others.values()), others)
         self.ok(self.root, "program", "adopt", "--input", str(self.root / result["path"]))
         balance = self.ok(self.root, "structure", "balance")
-        self.assertEqual({flag["code"] for flag in balance["flags"]} - {"volume_undershoot"}, set())
+        self.assertEqual({flag["code"] for flag in balance["flags"]} - {"volume_undershoot", "dose_coverage_gap"}, set())
+        for flag in balance["flags"]:
+            if flag["code"] == "dose_coverage_gap":
+                muscle = flag["message"].split(":")[0]
+                self.assertEqual((balance["coverage"][muscle], balance["muscles"][muscle]["target"]), ("gap", None))
         for muscle in others:
             self.assertTrue(balance["muscles"][muscle]["met"], muscle)
         for muscle in MAJOR_MUSCLES:

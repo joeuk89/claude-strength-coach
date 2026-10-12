@@ -154,6 +154,10 @@ for older lifters.
   dose, keeping the age and evidence limits above visible.
 - For an athlete in their 60s or older, keep maintenance nearer normal
   training: about 2 sessions a week and 2–3 sets per exercise.
+- Agree a maintenance target from the athlete's own ordinary baseline for
+  each muscle, never as a third of a generic hypertrophy target such as the
+  starting fallback of 10 sets: Bickel reduced each participant's own
+  preceding dose, and the older group lost size even so.
 - When time is very short, one hard set per main lift, 2–3 times a week,
   still moves strength forward.
 - When a missed session's exercise moves into a later session, give it 2

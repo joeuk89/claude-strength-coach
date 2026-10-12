@@ -1,7 +1,8 @@
 """The program's static weekly balance: dose targets met and no session over the per-session ceiling (contract C41)."""
 
-from coach import paths, program, structure
+from coach import flags, paths, program, structure
 from coach.checks import Result, check
+from coach.config_tables import coaching
 from coach.errors import ValidationError
 from coach.plugins import PluginError
 
@@ -16,4 +17,6 @@ def program_balance(ctx):
         report = structure.balance(ctx.root, today=ctx.today(), now=ctx.now())
     except (ValidationError, PluginError) as exc:
         return [Result("skip", f"the balance cannot be worked out ({exc}); see program_schema", _PROGRAM)]
-    return [Result("warn", f"{flag['code']}: {flag['message']}", _PROGRAM) for flag in report["flags"]]
+    shown = flags.for_mode(report["flags"], coaching.mode(ctx.config))
+    return [Result("pass" if flag["severity"] == "info" else "warn", f"{flag['code']}: {flag['message']}", _PROGRAM)
+            for flag in shown]

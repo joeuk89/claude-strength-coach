@@ -66,8 +66,11 @@ until the athlete agrees an edit. Run mode still applies every safety check.
 7. **Adopt:** run `python3 -m coach program adopt --input
    .coach/drafts/program.json --dry-run`, then without `--dry-run`, as
    SKILL.md step 2 sets out.
-8. **Review with a coaching eye:** now assess it — weekly balance gaps,
-   missing progression scheme, junk volume, recovery clashes between
-   adjacent days. **Propose improvements; don't force them.** Small fixes
+8. **Review with a coaching eye:** run `python3 -m coach structure balance
+   --program .coach/drafts/program.json` (the draft, before or after
+   adopting) and agree `dose_targets` and `dose_intent` as design.md step
+   4 sets out, keeping the athlete's own numbers as the ordinary baseline.
+   Then assess it — weekly balance gaps, missing progression scheme, junk
+   volume, recovery clashes between adjacent days. **Propose improvements; don't force them.** Small fixes
    can land now (with approval); big ones can wait for a `/check-in` or a
    redesign. In run mode, mention them as information only.
