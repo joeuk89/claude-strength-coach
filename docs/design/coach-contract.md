@@ -5694,9 +5694,10 @@ these headings:
   change on several days is one item naming the days (`Back Squat (Mon,
   Thu) 100 → 102.5`); an exercise with different changes gets an item
   per change, each naming its days. Each reads `<page name>[ (<days>)]
-  <change>: <reason>`. Reason, in athlete words: `target_note`; else, in a
-  light, deload or return week (`coach.overlay.recovery_intent`), `light
-  week`, `deload week` or `return week`; else `agreed with your coach`
+  <change>: <reason>`. Reason, in athlete words: in a light, deload or
+  return week (`coach.overlay.recovery_intent`), `light week`, `deload
+  week` or `return week`, even over a `target_note` the week's transform
+  kept from the scheme; else `target_note`; else `agreed with your coach`
   for an override, whose `reason` is the coach's audit record and never
   reaches the page; else `eased back after <n> days off` for a decayed
   line; else `provenance.rationale` (C21). A `per_hand_x2`
@@ -5712,7 +5713,8 @@ these headings:
   word for word, or sharing one of its keys (`niggle:<id>`, `sleep`,
   `light_week`: a `niggle_*` flag carries its niggle's key, `sleep_debt`
   carries `sleep`), is left out, so an overlay flag and the live item it
-  matches show once.
+  matches show once. A `sleep_debt` flag replaces the `sleep` part item
+  whatever their priorities.
 - If you miss a day: R-22's `missed` part fills the slot with one line
   per `program.missed_day_rules` entry, in `describe`'s words; with no
   rules, one line saying so.
@@ -5741,7 +5743,8 @@ these headings:
 **Dashboard** (`README.md`): first, a status block of at most six lines
 (the brief's header line; the block status line from
 `coach.block.status_line` (C43); last check-in date, tier and link; open flag
-count (unresolved `warn` and `block` flags on the week's overlays); the
+count (unresolved `warn` and `block` flags on the week's overlays, less
+the niggle flags Watch retires); the
 page's as-of time as "Updated <day> <HH:MM> (<zone>)", then part lines up
 to six), then the Sessions table, then a progress summary of at most
 five lines (three e1RM bests, the first naming `stats.E1RM_LABEL`;
@@ -5822,8 +5825,8 @@ each item keyed so an equivalent overlay flag shows once:
   stay.
 - the block's state now (`coach.block.watch_facts`, C43): a fatigue
   watch whose trigger fired in the state's last closed week (27; key
-  `sleep` and 31 for a sleep trigger, so this week's `sleep_debt` flag
-  shows in its place), a proposed light week with its week, type and
+  `sleep` for a sleep trigger, so this week's `sleep_debt` flag shows in
+  its place), a proposed light week with its week, type and
   reason (24), a declined one with its decision's reason and,
   at the ceiling, that it is proposed again (28), or a skipped one with
   its triggers (35); key `light_week`. A later close that changes the

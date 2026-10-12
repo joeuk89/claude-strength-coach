@@ -4,8 +4,9 @@ Coach-led sessions are placed as structure accounting places them (C41) and
 take the status of their `external` annotation (C17). Activities take the
 cardio reconcile's status (C49), which reads plans only at `[cardio] tier`
 review or program, so a page, adherence and cardio give one answer. The
-recovery items read niggles (C27) as they stand on the page's date and the
-block state (C43) as it stands now.
+recovery items read niggles (C27) as they stand on the page's date, except
+what each applies to, which has no history, and the block state (C43) as it
+stands now.
 """
 
 import re
@@ -22,10 +23,11 @@ NIGGLE_FLAGS = ("niggle_link", "niggle_escalate")
 SLEEP_FLAGS = ("sleep_debt",)
 SLEEP_KEY = "sleep"
 LIGHT_WEEK_KEY = "light_week"
-# Lower sorts first: overlay `block` flags are 20 and `warn` flags 30 (C38). A sleep watch from the last closed
-# week sorts after them, so this week's own `sleep_debt` reading shows in its place.
+# Lower sorts first: overlay `block` flags are 20 and `warn` flags 30 (C38).
 PRIORITY = {"aggravated": 22, "light_week_proposed": 24, "watching": 26, "easing": 26, "fatigue_watch": 27,
-            "light_week_declined": 28, "sleep_watch": 31, "light_week_skipped": 35, "chronic": 45}
+            "light_week_declined": 28, "light_week_skipped": 35, "chronic": 45}
+# This week's own `sleep_debt` reading replaces the sleep watch from the last closed week, whatever their order.
+FLAG_FIRST_KEYS = (SLEEP_KEY,)
 TRIGGER_WORDS = {"readiness": "poor readiness", "rpe_drift": "RPE drift on a compound lift",
                  "niggle": "an aggravated niggle", "sleep": "poor sleep"}
 PROPOSED_BECAUSE = {"ceiling": "{hard_weeks} completed hard weeks reach the ceiling",
@@ -146,7 +148,7 @@ def niggle_watch(root, today):
             continue
         since = _status_since(row, today)
         text = f"{row['area'].capitalize()} niggle ({status} since {render.short_date(since)})"
-        reason = niggles.escalation(row)
+        reason = niggles.escalation(dict(row, status=status, history=_history_to(row, today)))
         if reason:
             text += (f": {reason}. Have it assessed by a qualified professional (a doctor or physiotherapist); "
                      "the program works around it meanwhile")
@@ -158,8 +160,12 @@ def niggle_watch(root, today):
     return found
 
 
+def _history_to(row, today):
+    return [e for e in row["history"] if e["date"] <= today.isoformat()]
+
+
 def _status_since(row, today):
-    entries = [e for e in row["history"] if e["date"] <= today.isoformat()]
+    entries = _history_to(row, today)
     since = entries[-1]["date"]
     for entry in reversed(entries):
         if entry["status"] != entries[-1]["status"]:
@@ -193,7 +199,7 @@ def block_watch(root):
         sleep = triggers[0] == "sleep"
         found.append((SLEEP_KEY if sleep else "fatigue_watch",
                       f"Fatigue watch: {words}{week}. Tell the coach how you recover this week.",
-                      PRIORITY["sleep_watch" if sleep else "fatigue_watch"]))
+                      PRIORITY["fatigue_watch"]))
     elif light["status"] == "proposed":
         when = f" for the week of {render.short_date(light['week'])}" if light["week"] else ""
         because = PROPOSED_BECAUSE.get(light["reason"], "").format(hard_weeks=facts["hard_weeks"])

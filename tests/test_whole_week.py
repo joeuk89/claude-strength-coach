@@ -152,6 +152,8 @@ class WatchTest(WeekCase):
         self.close_week("2026-10-05", [], sleep="ok")
         self.set_light_week(status="not_due")
         self.assertEqual(section(self.brief(MONDAY), "Watch"), ["- Nothing flagged."])
+        dashboard = self.coach("pages", "show", "dashboard", now=MONDAY)["data"]["text"]
+        self.assertIn("- Open flags: none", dashboard)
         history = read_json(self.root / "data" / "niggles.json")["niggles"][0]["history"]
         self.assertEqual([e["status"] for e in history], ["watching", "resolved"])
         self.assertEqual((self.read("data/niggles.json"), self.read(f"data/overlays/{WEEKLY}.json")),
@@ -171,17 +173,30 @@ class WatchTest(WeekCase):
         self.assertIn("Left knee niggle (watching since 11 Oct)", watch[0])
         self.assertIn("- 4 of the 7 nights to 2026-10-11 were under 7 h asleep.", watch)
 
+    def test_three_unrelated_warnings_do_not_push_out_the_sleep_watch(self):
+        self.close_week("2026-10-05", ["sleep"], sleep="poor")
+        self.set_light_week(status="watch")
+        others = [dict(niggle_link(), code="collision", message=f"Warning {n}.") for n in range(3)]
+        self.edit(f"data/overlays/{WEEKLY}.json", lambda doc: doc["flags"].extend(others))
+        watch = section(self.brief(), "Watch")
+        self.assertIn("- Fatigue watch: poor sleep in the week of 5 Oct. Tell the coach how you recover this week.",
+                      watch)
+
     def test_a_chronic_niggle_keeps_its_current_flag_on_watch(self):
         self.coach("niggles", "update", "n-0001", "--status", "chronic", "--date", "2026-10-12", now=MONDAY)
         flag = dict(niggle_link(), message=niggle_link()["message"].replace("watching", "chronic"))
         self.edit(f"data/overlays/{WEEKLY}.json", lambda doc: doc["flags"].append(flag))
         self.assertEqual(section(self.brief(MONDAY), "Watch"), [f"- {flag['message']}"])
 
-    def test_a_chronic_niggle_whose_limits_apply_shows_once_beside_its_flag(self):
+    def test_a_chronic_niggle_shows_while_its_limits_apply_and_once_beside_its_flag(self):
         self.coach("niggles", "update", "n-0001", "--status", "chronic", "--pattern", "squat", "--constraint",
                    "rpe_cap=7", "--date", "2026-10-12", now=MONDAY)
         self.assertEqual(section(self.brief(MONDAY), "Watch"),
                          ["- Left knee niggle (chronic): its limits apply to this week's loads."])
+        flag = dict(niggle_link(), message=niggle_link()["message"].replace("watching", "chronic"))
+        self.edit(f"data/overlays/{WEEKLY}.json", lambda doc: doc["flags"].append(flag))
+        self.assertEqual(section(self.brief(MONDAY), "Watch"), [f"- {flag['message']}"])
+        self.edit(f"data/overlays/{WEEKLY}.json", lambda doc: doc["flags"].remove(flag))
         self.coach("niggles", "update", "n-0001", "--clear-constraints", "--date", "2026-10-12", now=MONDAY)
         self.assertEqual(section(self.brief(MONDAY), "Watch"), ["- Nothing flagged."])
 
@@ -198,6 +213,12 @@ class WatchTest(WeekCase):
                          "- Left knee niggle (aggravated since 12 Oct): worse: watching to aggravated. Have it assessed "
                          "by a qualified professional (a doctor or physiotherapist); the program works around it "
                          "meanwhile.")
+
+    def test_a_page_dated_before_a_niggle_worsened_does_not_say_it_worsened(self):
+        self.coach("niggles", "update", "n-0001", "--status", "aggravated", "--date", "2026-10-13",
+                   now="2026-10-13T20:00:00Z")
+        self.assertEqual(section(self.brief(MONDAY), "Watch")[0],
+                         "- Left knee niggle (watching since 11 Oct): tell the coach how it responds to runs.")
 
     def test_a_proposed_light_week_names_its_week_type_and_reason(self):
         self.edit("data/state.json", lambda doc: doc["block"].update(hard_weeks_completed=6))

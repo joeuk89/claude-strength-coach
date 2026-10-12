@@ -176,11 +176,12 @@ def _change_text(line, show_hevy=True):
 
 def _change_reason(line, intent=None):
     """What the athlete reads after a change. An override's reason is the coach's audit record, so it stays off the
-    page; a recovery week's lines say what the week is for rather than the scheme's own working."""
-    if line.get("target_note"):
-        return line["target_note"]
+    page. A recovery week's lines say what the week is for: a light transform keeps the scheme's note, which then
+    describes an ordinary week."""
     if intent:
         return f"{intent} week"
+    if line.get("target_note"):
+        return line["target_note"]
     if line.get("override"):
         return "agreed with your coach"
     provenance = line.get("provenance") or {}
@@ -546,17 +547,20 @@ class _View:
         return [d for i in ids for d in self.overlays if d["id"] == i]
 
     def open_flags(self):
+        """Unresolved `block` and `warn` flags on the week's overlays, less niggle flags the page's date retires."""
         found = flags_module.for_mode([f for doc in self.week_docs() for f in doc["flags"]], self.coaching_mode)
-        return [f for f in found if not f["resolved"] and f["severity"] in ("block", "warn")]
+        open_ids = week_view.open_niggle_ids(self.root, self.today)
+        return [f for f in found if not f["resolved"] and f["severity"] in ("block", "warn")
+                and week_view.is_current(f, open_ids)]
 
     def watch(self):
-        """Overlay flags still current, then part items, by priority; an item repeating one already shown, word for
-        word or by what it is about, is left out."""
-        open_ids = week_view.open_niggle_ids(self.root, self.today)
-        items = [Item(f["message"], PRIORITY[f["severity"]], week_view.flag_keys(f)) for f in self.open_flags()
-                 if week_view.is_current(f, open_ids)]
+        """Overlay flags, then part items, by priority; an item repeating one already shown, word for word or by what
+        it is about, is left out."""
+        items = [Item(f["message"], PRIORITY[f["severity"]], week_view.flag_keys(f)) for f in self.open_flags()]
+        flagged = {key for item in items for key in item.keys if key in week_view.FLAG_FIRST_KEYS}
+        parts = [item for item in self.slot("brief.watch") if not flagged & set(item.keys)]
         shown, texts, keys = [], set(), set()
-        for item in sorted(items + self.slot("brief.watch"), key=lambda item: item.priority):
+        for item in sorted(items + parts, key=lambda item: item.priority):
             if item.text in texts or keys & set(item.keys):
                 continue
             shown.append(item.text)
