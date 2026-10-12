@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from coach import first_loads, units
+from coach import first_loads, propose, units
 from tests.support import INSTANCES, run_cli
 from tests.support.skills import flat, step_text
 
@@ -74,7 +74,9 @@ class RetireTest(FirstLoadCase):
         [flag] = self.first_loads(self.override("--load", "60")["flags"])
         self.assertEqual((flag["resolved"], flag["resolution"]),
                          (True, f"first load set: 60 on {MONDAY}, not yet trained"))
-        self.assertEqual(self.draft()["sessions"][0]["exercises"][0]["target_note"], note)
+        self.assertIn(propose.CALIBRATION_NOTE, note)
+        self.assertEqual(self.draft()["sessions"][0]["exercises"][0]["target_note"],
+                         note.replace(propose.CALIBRATION_NOTE, propose.CALIBRATION_SET_NOTE))
         squat = next(r for r in self.run_coach("propose", "show", WEEKLY)["lines"]
                      if r["exercise_id"] == "bb_back_squat")
         self.assertNotIn("no_data", squat["flags"])

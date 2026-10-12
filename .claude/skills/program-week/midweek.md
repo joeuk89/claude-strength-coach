@@ -47,6 +47,14 @@ really free, and change the list only on their confirmed answer. Once
 the miss is recorded, a change to the sessions left is compute.md's
 proposal with `--kind midweek`, then the steps after it.
 
+**Agreed guidance.** A `--kind midweek` proposal keeps the week focus
+and the line notes, focus and cues agreed for the days left
+(`approved_guidance.kept`). It copies nothing it cannot tell from
+scheme text: for each `approved_guidance.review` row, and a `focus`
+with `kept: false`, ask whether that guidance still holds after this
+week's change, and set what does as athlete guidance (compute.md step
+3) before finalizing.
+
 **A lift with no session left this week** ("bump my squat" the day after
 its only session): its next exposure is next week's own session, so the
 change goes to the next proposal. Read the lift's latest exposure with

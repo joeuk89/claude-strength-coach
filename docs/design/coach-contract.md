@@ -215,7 +215,7 @@ Phase 2 to 4 command inventory. No command here writes to Hevy.
 | `plugins list`, `plugins show NAME`, `plugins validate` | R-23a | |
 | `plugins test` | R-23a | runs instance plugin tests; never allowlisted |
 | `schedule plan --week W`, `decisions list`, `propose show ID` | R-23a | |
-| `schedule confirm --position P`, `propose week`, `propose override`, `propose resolve`, `propose finalize`, `propose rebuild`, `propose discard`, `decisions withdraw ID` | R-23a | W |
+| `schedule confirm --position P`, `propose week`, `propose override`, `propose note`, `propose resolve`, `propose finalize`, `propose rebuild`, `propose discard`, `decisions withdraw ID` | R-23a | W |
 | `propose restore --proposal ID --session S --reason TEXT [--dry-run]` | R-44b | W |
 | `propose time --proposal ID --session S [--date D] (--start TIME [--duration-min N] \| --clear) [--dry-run]` | R-44a | W |
 | `followups list`, `followups render`, `niggles list`, `niggles constraints` | R-27 | |
@@ -1195,7 +1195,13 @@ Cues: <cues>
   `format_load` gives it.
 - The Target line is absolute. It never carries `target_note` or `change`:
   relative wording ("add 2.5 from last week") goes stale in the app. Those
-  fields appear in the brief and the check-in only.
+  fields appear in the brief, the check-in and the session sheets (C46).
+- Athlete guidance is the line's `focus`, `target_note` and `cues`, and
+  the week `focus`. The week-ahead region's Notes cell holds the line's
+  focus, then its `target_note` (once when the two are equal). It never
+  prints `override.reason`: that is the coach's audit of the change,
+  kept in the overlay, the draft and the decision log, not an
+  instruction to the athlete.
 - A working set with a null load on a loaded mode (C10) prints the sets,
   reps and RPE followed by ` · choose the load`:
   `Target: 3×8–10 @ RPE 7 · choose the load`. The suffix appears once, at
@@ -3302,7 +3308,18 @@ propose week  ──►  .coach/proposals/<id>.json (+ .proposed.json)  ──�
    delivers. Without one, an override on the session's line in the
    approved overlay in force on its date (C25) is kept the same way. A
    scheme defining `final_note` then names the line's `target_note` from
-   those final sets.
+   those final sets. A line still waiting for its first load (a working
+   set on a loaded mode with a null load, the `no_data` case) adds
+   `propose.CALIBRATION_NOTE` after any scheme note, joined by ` · `: pick
+   a load expected to fit the target reps within the RPE shown, then
+   adjust after the first working set. It names no number. A line that
+   keeps an override (C25) for a lift with no logged exposure in its load
+   mode adds `propose.CALIBRATION_SET_NOTE` the same way. For an athlete
+   whose `[athlete] experience` is `beginner`, each session's first line
+   in `total`, `per_hand_x2` or `single_implement` mode that has no
+   warm-up sets adds `propose.RAMP_NOTE`, a qualitative ramp with no
+   loads, reps or percentages; warm-up sets in the program stand in for
+   it and stay out of the working sets.
    A `model_hold` proposal with no decay, transform or cut whose
    rounded load C22's `judge_set` puts beyond failure at the line's
    model evidence holds the heaviest lighter load the derived-from
@@ -3338,7 +3355,12 @@ flags}` with `text` from `units.format_load` for the coach's brief and
 `flags` the codes of the line's open flags (a first-load flag only on its
 own date). The overlay
 id follows C10. `data.lines_digest` (R-21b) is the C7 canonical hash of
-`data.lines`; `propose show` returns it too.
+`data.lines`; `propose show` returns it too. `data.approved_guidance` is
+null except for a `--kind midweek` run, where it reports the guidance
+carried from the approved overlay in force (C25): `kept` rows
+(`session_id`, `date`, `exercise_id`, `overlay_id`, `fields`), `review`
+rows (the same ids and `approved`, each field with the overlay's text)
+and `focus` (`overlay_id`, `text`, `kept`, or null).
 
 - `propose override --proposal ID --session S --exercise E (--sets SPEC | --load N) --reason TEXT [--date D | --standing [--until D]]`
   changes the slot's line on every date, or with `--date` only that
@@ -3348,6 +3370,21 @@ id follows C10. `data.lines_digest` (R-21b) is the C7 canonical hash of
   the proposal it replaces, and records a C25 decision when standing. For a `per_hand_x2` line,
   its reason must pass C13 load-statement validation before any proposal
   or decision artifact changes; ambiguous load prose exits 1.
+  When the override chooses every working load of a line carrying
+  `CALIBRATION_NOTE`, that part of its `target_note` becomes
+  `CALIBRATION_SET_NOTE` (adjust after the first working set; still no
+  number), and back if a load is null again; other note text stays.
+- `propose note --proposal ID [--week-focus TEXT] [--session S --exercise E [--target-note TEXT] [--focus TEXT] [--cues TEXT]] [--dry-run]`
+  sets the draft's week `focus`, athlete guidance on every line of one
+  slot, or both in one call (exit 2 with neither, or unless a line
+  field, `--session` and `--exercise` come together); an empty line
+  field clears it to null. Text is one line; on a
+  `per_hand_x2` line it passes C13 load-statement validation (exit 1).
+  Output: `id`, `focus`, `lines` (`session_id`, `date`, `exercise_id`,
+  `target_note`, `focus`, `cues`) and `written`. Guidance is not a
+  prescription: finalize's unexplained-change check ignores `target_note`,
+  `focus` and `cues`, so a hand edit of them needs no override reason
+  either.
 - **Flag references.** `propose week`, `show` and `rebuild` return
   `data.flags`, the draft's flags each with a `ref`; `override` and
   `restore` return theirs the same way. A ref is `<code>:<6 hex>`,
@@ -3397,7 +3434,8 @@ id follows C10. `data.lines_digest` (R-21b) is the C7 canonical hash of
   reason; finalize accepts it.
 - `propose finalize --proposal ID [--dry-run]` re-runs step 5, judging
   the interference rules on the draft's sessions as they now are. It exits
-  1 if any line differs from `.proposed.json` without `override.reason`,
+  1 if any line's prescription (every field but the guidance fields)
+  differs from `.proposed.json` without `override.reason`,
   and exits 3 if a `block` flag is unresolved (a detail per flag, led by
   its ref), if the draft is stale
   (below) or if its sessions no longer hold the program's exercises (as
@@ -3422,11 +3460,15 @@ id follows C10. `data.lines_digest` (R-21b) is the C7 canonical hash of
   it is now (a `--plan` run keeps its dated sessions). Each line edit the
   draft explained with `override.reason` goes onto the same session,
   date and exercise, with the new scheme sets as `proposed_sets`; one
-  whose line is gone is listed in `lost`. Flag resolutions carry to
-  identical flags, and each session's planned `start` and
-  `duration_minutes` carry to the same session and date. An unapproved
-  overlay finalized from the old draft is removed, so only a new
-  finalize reaches approval. A midweek draft
+  whose line is gone is listed in `lost`. An edited week `focus` carries
+  over, and so does each guidance field (`target_note`, `focus`, `cues`)
+  edited on any other line, including one whose override was kept from
+  a standing decision or the overlay in force: `guidance_kept` and
+  `guidance_lost` list those lines (`session_id`, `date`,
+  `exercise_id`, `fields`). Flag resolutions carry to identical flags,
+  and each session's planned `start` and `duration_minutes` carry to the
+  same session and date. An unapproved overlay finalized from the old
+  draft is removed, so only a new finalize reaches approval. A midweek draft
   keeps its span and id, and leaves out each session trained from the
   span start through today, so a rebuild the next day never plans a
   session trained the day before. It exits 3 for an approved overlay of
@@ -3583,7 +3625,17 @@ constrained mode) stay coach-built through `overlay build`.
   steps they have not had: decay when the approved line had none, and a
   run's transform unless the approved overlay was a `deload`; a deload
   overlay's override is kept only by a run with a transform. The line
-  raises `override_kept`.
+  raises `override_kept`. The same run keeps the coach's athlete
+  guidance from that overlay, with or without an override: each guidance
+  field of the line that differs from the overlay's untouched proposal
+  (`.proposed.json`, C24; an override's calibration rewording counts as
+  the proposal's text), and the week focus when the coach changed it. It
+  goes onto the same session, date and exercise of the draft only, so
+  a rebuild carries it as an edit and a note the coach cleared stays
+  cleared. Without that proposal file, or under a transform, nothing is
+  copied: guidance that differs from the new line, and a focus that is
+  not one `propose week` writes, go to `approved_guidance.review` for
+  the coach to re-apply with `propose note`.
 - Standing overrides need an `until` date, default four weeks after
   `made_at`, at most eight. Renewing one is another `propose override
   --standing`: the newest active decision for a scope wins.
@@ -6961,7 +7013,8 @@ R-14b's `routines create`; adopt itself never calls Hevy.
   `dose_targets` and a `minimum_week` (C40); `structure balance --variant
   minimum` must pass on it.
 - Calibration lines (no data, no start load) carry `load: null` on a
-  loaded mode with a `no_data` flag (C10).
+  loaded mode with a `no_data` flag (C10), and C24's calibration
+  `target_note`, which the session sheets print.
 - `starters list [--days N] [--equipment E,...] [--location NAME]`
   returns id, title, summary, level, days, minutes, required equipment
   and how the starter fits the kit.
@@ -7197,13 +7250,20 @@ it. One section per session in date order, anchored by session id
 focus, then one row per run of equal sets
 `| Exercise | Sets × reps | Load | RPE | Rest | Done |` with warm-ups on
 their own row and the exercise name on its first row, then one bullet
-per exercise with its focus and cues. Loads print with
+per exercise with its guidance: `Focus: …`, `Note: <target_note>`,
+`Cues: …`, joined by ` · `, a note equal to the focus or cues left out. Loads print with
 `format_load(load, show_hevy=False)`; a null load on a loaded mode
 prints "choose the load". An unapproved overlay renders with a "Not
 approved yet" line and a warning. A rep-out set prints `N×5+` with
 `stop at 9` in its RPE cell (C12), and the footer then first explains
 the `+` set: at least those reps, more until the next would pass its
-RPE stop, not a set to failure. A footer says how to log: reply with
+RPE stop, not a set to failure. When `[athlete] experience` is
+`beginner`, the footer then gives a short key: RPE as the athlete's
+estimate of reps left (RPE 10 ≈ 0 … RPE 8 ≈ 2 reps left, from the
+RPE/RIR scale of rn:autoregulation.1), not a precise measure, when any
+working set has an RPE; and, when any has a rep range, that any count in
+the range is on plan with the set's RPE target or stop deciding where it
+ends. Other athletes get no key. A footer says how to log: reply with
 the reps of every ranged or `+` set, the load used where a set says
 "choose the load", the RPE when the athlete can say, and anything else
 that differed; "as written" covers fixed reps and loads only. Check

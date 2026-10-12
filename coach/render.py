@@ -149,10 +149,8 @@ def _exercise_rows(exercise, name=_exercise_id, show_hevy=True):
     notes = []
     if exercise.get("focus"):
         notes.append(f"Focus: {exercise['focus']}")
-    if exercise.get("target_note"):
+    if exercise.get("target_note") and exercise["target_note"] != exercise.get("focus"):
         notes.append(exercise["target_note"])
-    if exercise.get("override"):
-        notes.append(f"Override: {exercise['override']['reason']}")
     rows = []
     for index, (count, set_) in enumerate(_groups(exercise["sets"])):
         sets = f"{count}×{_reps(set_)}"

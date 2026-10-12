@@ -15,11 +15,14 @@ and `config.toml` (units, equipment and its increments).
    progression is a sensible default; RPE targets; the light-week
    policy — a hard-week ceiling and the fatigue triggers from
    `CLAUDE.md` "Coaching principles", the ceiling set for this athlete
-   within the allowed range; warm-up protocol), then each session, every
+   within the allowed range; warm-up protocol: warm-up set groups where
+   agreed, else a beginner's week carries a qualitative ramp note), then each session, every
    exercise picked from the exercise library (`python3 -m coach library
    search <name>`). If no entry fits, follow
    [custom exercise creation](../../../reference/custom-exercises.md)
-   to agree, preview and create one before using it. Respect every profile
+   to agree, preview and create one before using it. A start load the
+   athlete does not know stays null: week one then carries a calibration
+   note in place of a guessed number. Respect every profile
    constraint (equipment load caps, session time limits, recovery windows around coach-led
    sessions and cardio). The program's interference rules flag quality
    cardio placed too close to lifting: `python3 -m coach interference

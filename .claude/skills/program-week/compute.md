@@ -9,7 +9,7 @@ Run `python3 -m coach history sync`, then the proposal for the mode:
 
 - **normal:** `python3 -m coach propose week --week <label>`.
 - **midweek:** the same with `--kind midweek`: only the days left, less any session trained
-  today, keeping each override approved for them; settle a missed session first (midweek.md).
+  today, with their approved overrides and guidance; settle a missed session first (midweek.md).
 - **light:** the `command` that `block decide` printed for the light week
   the check-in agreed. Standalone, with no light week agreed in `state
   show`, run the command it would print: `python3 -m coach propose week
@@ -101,12 +101,13 @@ Run `python3 -m coach propose override --proposal <id> --session <session>
 --exercise <exercise> (--sets "3x5@95 rpe7" | --load <n>) --reason "<why>"`; a
 timed hold takes seconds, `--sets "2x35s rpe7"`, and a wave's rep-out set keeps
 its `+`, `--sets "1x5+@120"`; `--date <day>` changes only that day's line. Add
-`--standing` (and `--until <date>`, eight weeks at most; four by default) when
-the change should hold in later weeks (a niggle, an agreed hold) so the scheme
-stops proposing it away; it covers sessions to that date, and a deload or light
-week still cuts it. A per-exercise **focus** from check-in findings ("slow the
-eccentric") may go into the draft line; every changed line needs an `override`
-reason. An approved override onto a rung moves the ladder to that rung.
+`--standing` (and `--until <date>`, eight weeks at most; four by default) so the
+scheme keeps the change in later weeks (a niggle, an agreed hold); it covers
+sessions to that date, and a deload or light week still cuts it. An approved
+override onto a rung moves the ladder to that rung. The reason stays your audit,
+off the athlete's pages; **athlete guidance** (brief.md step 1) needs none:
+`python3 -m coach propose note --proposal <id>` with `--week-focus "<text>"`, or
+`--session <s> --exercise <e>` and `--target-note`, `--focus` or `--cues`.
 
 Each niggle's standing and flare limits are already on its lines, and a load the e1RM puts
 over an RPE ceiling comes down (`constraint_applied`; `python3 -m coach niggles
@@ -145,6 +146,5 @@ reason; exit 3 names each unresolved `block` flag. A refused finalize writes
 nothing: fix what it names and run it again. A stale draft (span ended, or a
 newer approved overlay covers it) exits 3: drop it with `python3 -m coach
 propose discard --proposal <id>`, which leaves approved work alone. Then go to
-build.md with that id, starting at "Where it renders". A tweak to the coach's
-brief later means: override or resolve in the draft, finalize again, then check
-and render again.
+build.md with that id, starting at "Where it renders". A later tweak to the
+brief: override, note or resolve in the draft, then finalize, check and render.

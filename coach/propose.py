@@ -33,6 +33,14 @@ from coach.plugins import base
 
 KINDS = ("weekly", "midweek", "deload")
 TIMING_KEYS = ("start", "duration_minutes")
+GUIDANCE_FIELDS = ("target_note", "focus", "cues")
+CALIBRATION_NOTE = ("No logged load yet: pick a load you expect to lift for the target reps within the RPE shown, "
+                    "then adjust it after the first working set.")
+CALIBRATION_SET_NOTE = ("First time at this load: adjust it after the first working set to keep the rest within the "
+                        "RPE shown.")
+RAMP_NOTE = ("Warm up first: a few lighter sets, with fewer reps as the load rises toward the first working set; "
+             "they are not working sets.")
+RAMP_MODES = ("total", "per_hand_x2", "single_implement")
 DECAY_AFTER_DAYS = validity.RETURN_BANDS[0].upper
 STALL_EXPOSURES = 3
 _SET_SPEC = re.compile(r"^\s*(\d+)\s*[x×]\s*(\d+)(?:\s*-\s*(\d+))?\s*(\+)?\s*(s)?\s*(?:@\s*(\d+(?:\.\d+)?))?\s*"
@@ -986,6 +994,11 @@ def propose_line(run, session, day, exercise, ctx_extra):
     rationale = rationale[0].upper() + rationale[1:]
     final_note = getattr(plugin.module, "final_note", None)
     target_note = final_note(ctx, proposal, sets) if final_note is not None else proposal.target_note
+    if _awaits_first_load(sets, mode):
+        target_note = _joined_note(target_note, CALIBRATION_NOTE)
+    elif kept_from is not None and mode in units.LOADED_MODES and not run.exposures_of(exercise_id, day,
+                                                                                     load_mode=mode):
+        target_note = _joined_note(target_note, CALIBRATION_SET_NOTE)
     previous = ctx.last_prescription
     draft_line = {
         "exercise_id": exercise_id,
@@ -999,6 +1012,35 @@ def propose_line(run, session, day, exercise, ctx_extra):
         "sets": [s.to_dict() for s in sets],
     }
     return LineResult(draft_line, line_flags, proposal.state, scheme_name)
+
+
+def _awaits_first_load(sets, mode):
+    return mode in units.LOADED_MODES and any(s.working and s.load is None for s in sets)
+
+
+def _joined_note(*parts):
+    found = [part for part in parts if part]
+    return " · ".join(found) or None
+
+
+def _calibration_note(note, sets, mode):
+    """`note` with its calibration wording matched to whether every working load is now chosen."""
+    if not note:
+        return note
+    wanted, other = ((CALIBRATION_NOTE, CALIBRATION_SET_NOTE) if _awaits_first_load(sets, mode)
+                     else (CALIBRATION_SET_NOTE, CALIBRATION_NOTE))
+    return note.replace(other, wanted)
+
+
+def _with_ramp(lines, experience):
+    """A beginner's session: its first externally loaded line without warm-up sets gets the qualitative ramp note."""
+    if experience != "beginner":
+        return lines
+    first = next((line for line in lines if line["load_mode"] in RAMP_MODES), None)
+    if first is None or any(s["type"] == "warmup" for s in first["sets"]):
+        return lines
+    return [dict(line, target_note=_joined_note(line["target_note"], RAMP_NOTE)) if line is first else line
+            for line in lines]
 
 
 def _rep_out_words(sets):
@@ -1533,7 +1575,7 @@ def _build_week(root, config, today, now, span, kind, transform_name, plan_file=
         else:
             results = [(f"{session_id}/{exercise['exercise_id']}", propose_line(run, session, day, exercise, ctx_extra))
                        for exercise in session["exercises"]]
-            lines = [result.draft_line for _, result in results]
+            lines = _with_ramp([result.draft_line for _, result in results], config.athlete.experience)
         for key, result in results:
             all_flags += [_on_date(flag, session_id, day) for flag in result.flags]
             entry = ctx_extra["states"].get(key)
@@ -1560,11 +1602,18 @@ def _build_week(root, config, today, now, span, kind, transform_name, plan_file=
     }
     if proposal_id is not None:
         draft["id"] = proposal_id
+    proposed = draft
+    approved_guidance = None
+    # A rebuild gets this guidance through _carry_guidance instead, so a note the coach cleared stays cleared.
+    if kind == "midweek" and proposal_id is None:
+        draft = copy.deepcopy(draft)
+        approved_guidance = _carry_approved_guidance(run, draft, transform)
     doc = overlay.build(draft, config, root=root, now=now)
     doc["flags"] = _checked_flags(root, config, doc)
     doc["flags"] += _week_flags(root, config, today, span, doc) + drop_flags
     doc["flags"] += external.requirement_flags(root, doc, config.hevy.enabled)
     draft = dict(draft, id=doc["id"], flags=doc["flags"])
+    proposed = dict(proposed, id=doc["id"], flags=doc["flags"])
     meta = {
         "id": doc["id"], "kind": kind, "span": span.to_json(), "transform": transform[0].name if transform else None,
         "created_at": doc["created_at"], "rotation": found.rotation,
@@ -1573,8 +1622,9 @@ def _build_week(root, config, today, now, span, kind, transform_name, plan_file=
             "sessions": [{"date": day.isoformat(), "session_id": sid} for day, sid in found.sessions],
             "flags": list(found.flags)},
     }
-    return {"run": run, "settled_state": settled_state, "settled": settled, "draft": draft, "proposed": draft,
-            "doc": doc, "meta": meta, "span": span, "kind": kind, "rotation": found.rotation, "dropped": dropped}
+    return {"run": run, "settled_state": settled_state, "settled": settled, "draft": draft, "proposed": proposed,
+            "doc": doc, "meta": meta, "span": span, "kind": kind, "rotation": found.rotation, "dropped": dropped,
+            "approved_guidance": approved_guidance}
 
 
 def _on_date(flag, session_id, day):
@@ -1600,7 +1650,8 @@ def _week_result(root, config, built, dry_run):
         "proposed": _relative(root, proposed_path), "overlay": doc, "flags": flags.with_refs(doc["flags"]),
         "lines": lines,
         "lines_digest": jsonio.canonical_hash(lines), "settled": built["settled"], "rotation": built["rotation"],
-        "dropped": [_dropped_row(entry) for entry in built["dropped"]], "written": not dry_run,
+        "dropped": [_dropped_row(entry) for entry in built["dropped"]],
+        "approved_guidance": built.get("approved_guidance"), "written": not dry_run,
     }
 
 
@@ -1707,18 +1758,24 @@ def _lines_by_key(draft):
     return {_line_key(s, line): line for s in draft.get("sessions", []) for line in s.get("exercises", [])}
 
 
+def _prescription(line):
+    return {k: v for k, v in line.items() if k != "override" and k not in GUIDANCE_FIELDS}
+
+
 def unexplained_changes(draft, proposed):
-    """Lines of the draft that differ from the untouched proposal and carry no override reason."""
+    """Lines of the draft whose prescription differs from the untouched proposal with no override reason.
+
+    Athlete guidance (`target_note`, `focus`, `cues`) is not a prescription, so editing it needs no reason.
+    """
     before, after = _lines_by_key(proposed), _lines_by_key(draft)
     found = []
     for key, line in after.items():
         original = before.get(key)
         explained = bool((line.get("override") or {}).get("reason", "").strip())
-        strip = {k: v for k, v in line.items() if k != "override"}
         if original is None:
             if not explained:
                 found.append((key, "is not in the proposal and has no override reason"))
-        elif strip != {k: v for k, v in original.items() if k != "override"} and not explained:
+        elif _prescription(line) != _prescription(original) and not explained:
             found.append((key, "differs from the proposal and has no override reason"))
     for key in before:
         if key not in after:
@@ -1780,6 +1837,7 @@ def override(root, config, proposal_id, session_id, exercise_id, new_sets, load,
         if line["load_mode"] not in units.LOADED_MODES and any(s.load is not None for s in sets):
             raise ValidationError(f"{exercise_id} is {line['load_mode']}, which carries no load")
         line["sets"] = [s.to_dict() for s in sets]
+        line["target_note"] = _calibration_note(line.get("target_note"), sets, line["load_mode"])
         line["override"] = {"reason": reason.strip(), "proposed_sets": before}
         line["change"] = change_text(previous["sets"] if previous else None, sets, line["load_mode"], unit,
                                      config.hevy.enabled)
@@ -1799,6 +1857,38 @@ def override(root, config, proposal_id, session_id, exercise_id, new_sets, load,
         _write_proposal(root, proposal_id, draft, None, None)
     return {"id": proposal_id, "session_id": session_id, "exercise_id": exercise_id, "lines": changed,
             "decision": decision, "flags": flags.with_refs(draft["flags"]), "written": not dry_run}
+
+
+def note(root, config, proposal_id, week_focus, session_id, exercise_id, fields, dry_run):
+    """Set a draft's week focus, or the athlete guidance (`fields`: target_note, focus, cues) on every line of one
+    slot; an empty text clears a line field (C24). Guidance is not a prescription change, so it needs no override
+    reason, and `propose rebuild` keeps it."""
+    texts = dict(fields, week_focus=week_focus) if week_focus is not None else dict(fields)
+    for name, text in texts.items():
+        if "\n" in text:
+            raise UsageError(f"--{name.replace('_', '-')} must be one line")
+    if week_focus is not None and not week_focus.strip():
+        raise UsageError("--week-focus must not be empty")
+    draft, _, _ = load_proposal(root, proposal_id)
+    selected = _locate(draft, session_id, exercise_id) if fields else []
+    values = {field: text.strip() or None for field, text in fields.items()}
+    for _, line in selected:
+        if line["load_mode"] != PER_HAND_X2:
+            continue
+        for field, text in values.items():
+            figures = bare_figures(text or "")
+            if figures:
+                raise ValidationError(bare_message("note", field, figures, exercise_id, text, config.hevy.enabled))
+    if week_focus is not None:
+        draft["focus"] = week_focus.strip()
+    for _, line in selected:
+        line.update(values)
+    if not dry_run:
+        _write_proposal(root, proposal_id, draft, None, None)
+    return {"id": proposal_id, "focus": draft["focus"],
+            "lines": [dict({field: line[field] for field in GUIDANCE_FIELDS}, session_id=session["session_id"],
+                           date=session["date"], exercise_id=line["exercise_id"]) for session, line in selected],
+            "written": not dry_run}
 
 
 def _rep_out_capped(root, session, line, sets):
@@ -1968,6 +2058,7 @@ def rebuild(root, config, proposal_id, today, now, dry_run):
     kept, lost = _carry_edits(root, proposal_id, draft, proposed, new_draft, config.athlete.units,
                               config.hevy.enabled)
     _carry_timing(draft, new_draft)
+    guidance_kept, guidance_lost = _carry_guidance(draft, proposed, new_draft)
     doc = _checked(root, config, new_draft, now, today)
     resolved = {_flag_identity(f): f for f in draft.get("flags", [])
                 if f.get("resolved") and not first_loads.is_automatic(f)}
@@ -1988,7 +2079,8 @@ def rebuild(root, config, proposal_id, today, now, dry_run):
     dropped_again = {(e["session_id"], e["date"]) for e in built["dropped"]}
     restores_lost = [_dropped_row(e) for e in meta.get("dropped", [])
                      if e.get("restored") and (e["session_id"], e["date"]) in dropped_again]
-    return dict(result, kept=kept, lost=lost, resolutions_kept=carried_resolutions, restores_lost=restores_lost,
+    return dict(result, kept=kept, lost=lost, guidance_kept=guidance_kept, guidance_lost=guidance_lost,
+                resolutions_kept=carried_resolutions, restores_lost=restores_lost,
                 overlay_removed=_relative(root, path) if finalized else None)
 
 
@@ -2019,14 +2111,12 @@ def _carry_edits(root, proposal_id, draft, proposed, new_draft, unit, show_hevy)
     kept, lost = [], []
     for session in draft.get("sessions", []):
         for line in session.get("exercises", []):
-            reason = ((line.get("override") or {}).get("reason") or "").strip()
-            if not reason:
-                continue
             key = _line_key(session, line)
-            row = {"session_id": key[0], "date": key[1], "exercise_id": key[2], "reason": reason}
             original = originals.get(key) or {}
-            if original.get("override") == line["override"] and original.get("sets") == line["sets"]:
+            if not _is_explained_edit(line, original):
                 continue
+            reason = line["override"]["reason"].strip()
+            row = {"session_id": key[0], "date": key[1], "exercise_id": key[2], "reason": reason}
             if key not in targets:
                 lost.append(row)
                 continue
@@ -2043,6 +2133,129 @@ def _carry_edits(root, proposal_id, draft, proposed, new_draft, unit, show_hevy)
                                            target["load_mode"], unit, show_hevy)
             kept.append(row)
     return kept, lost
+
+
+def _is_explained_edit(line, original):
+    """True when `line` carries an override reason and its override or sets differ from the proposed
+    `original`. An override kept from a standing decision or the overlay in force matches the original."""
+    if not ((line.get("override") or {}).get("reason") or "").strip():
+        return False
+    return original.get("override") != line["override"] or original.get("sets") != line["sets"]
+
+
+def _carry_guidance(draft, proposed, new_draft):
+    """Copy the draft's edited week focus, and each guidance field edited on a line that is not an explained
+    edit (`_carry_edits` carries those), onto `new_draft`. Returns (kept rows, lost rows) for the lines."""
+    if draft.get("focus") != proposed.get("focus"):
+        new_draft["focus"] = draft["focus"]
+    originals = _lines_by_key(proposed)
+    targets = _lines_by_key(new_draft)
+    kept, lost = [], []
+    for session in draft.get("sessions", []):
+        for line in session.get("exercises", []):
+            key = _line_key(session, line)
+            original = originals.get(key) or {}
+            if _is_explained_edit(line, original):
+                continue
+            edited = [field for field in GUIDANCE_FIELDS if line.get(field) != original.get(field)]
+            if not edited:
+                continue
+            row = {"session_id": key[0], "date": key[1], "exercise_id": key[2], "fields": edited}
+            if key not in targets:
+                lost.append(row)
+                continue
+            targets[key].update({field: line[field] for field in edited})
+            kept.append(row)
+    return kept, lost
+
+
+def _carry_approved_guidance(run, draft, transform):
+    """Copy the guidance the coach set in the approved overlay in force onto the same session, date and exercise
+    of a midweek `draft`, and its edited week focus (C25).
+
+    A field counts as the coach's when it differs from that overlay's untouched proposal, so scheme, calibration
+    and ramp text is never copied. Guidance whose proposal is gone, or under a transform that may contradict it,
+    is listed in `review` for the coach to re-apply with `propose note`, never copied.
+    """
+    approved = [doc for doc in run.overlays if overlay.is_approved(doc)]
+    originals = {}
+
+    def original_of(doc):
+        if doc["id"] not in originals:
+            try:
+                originals[doc["id"]] = json.loads(proposal_paths(run.root, doc["id"])[1].read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                originals[doc["id"]] = None
+        return originals[doc["id"]]
+
+    kept, review = [], []
+    for session in draft["sessions"]:
+        found = overlay.pick_in_force(approved, session["date"])
+        if found is None:
+            continue
+        doc = found[0]
+        agreed = {_line_key(s, line): line for s in doc["sessions"] for line in s["exercises"]
+                  if not line.get("fold")}
+        schemes = _lines_by_key(original_of(doc) or {})
+        for line in session["exercises"]:
+            key = _line_key(session, line)
+            if key not in agreed:
+                continue
+            known = key in schemes
+            coach = (_coach_guidance(agreed[key], schemes[key]) if known
+                     else {field: agreed[key].get(field) for field in GUIDANCE_FIELDS})
+            fields = {field: text for field, text in coach.items() if line.get(field) != text}
+            if not fields:
+                continue
+            row = {"session_id": key[0], "date": key[1], "exercise_id": key[2], "overlay_id": doc["id"]}
+            if known and transform is None:
+                line.update(fields)
+                kept.append(dict(row, fields=list(fields)))
+            else:
+                review.append(dict(row, approved=fields))
+    return {"kept": kept, "review": review, "focus": _carry_approved_focus(approved, draft, transform, original_of)}
+
+
+def _coach_guidance(approved_line, scheme_line):
+    """The guidance fields of an approved line that differ from its scheme's proposal; an override's calibration
+    rewording (C24) is the scheme's own text."""
+    found = {}
+    for field in GUIDANCE_FIELDS:
+        scheme_text = scheme_line.get(field)
+        if field == "target_note":
+            sets = tuple(base.SetSpec.from_dict(s, load=history.coaching_number(s.get("load")))
+                         for s in approved_line["sets"])
+            scheme_text = _calibration_note(scheme_text, sets, approved_line["load_mode"])
+        if approved_line.get(field) != scheme_text:
+            found[field] = approved_line.get(field)
+    return found
+
+
+def _carry_approved_focus(approved, draft, transform, original_of):
+    """The week focus of the approved overlay in force on the draft's first day, when the coach set it: carried
+    onto `draft` (`kept`) or, as for line guidance, left for the coach to review."""
+    found = overlay.pick_in_force(approved, draft["sessions"][0]["date"]) if draft["sessions"] else None
+    if found is None:
+        return None
+    doc = found[0]
+    original = original_of(doc)
+    set_by_coach = doc["focus"] != original.get("focus") if original else not _generated_focus(doc["focus"])
+    if not set_by_coach or doc["focus"] == draft["focus"]:
+        return None
+    kept = original is not None and transform is None
+    if kept:
+        draft["focus"] = doc["focus"]
+    return {"overlay_id": doc["id"], "text": doc["focus"], "kept": kept}
+
+
+def _generated_focus(text):
+    """True when `text` is a week focus `_focus` writes."""
+    day = re.search(r"\d{4}-\d{2}-\d{2}", text or "")
+    if day is None:
+        return False
+    span = dates.Span(dates.parse_date(day.group()), dates.parse_date(day.group()))
+    return (text in (_focus("weekly", span, None), _focus("midweek", span, None))
+            or text.startswith((f"Deload week of {day.group()}: ", f"Return week of {day.group()}: ")))
 
 
 def discard(root, proposal_id, today, dry_run):

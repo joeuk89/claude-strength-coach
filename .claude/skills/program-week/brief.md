@@ -7,7 +7,22 @@ first, tables second. Every mode uses the same brief.
    why, tied to the current phase and goal, with the mode named. A
    one-off week says why it deviates: the reason, what's protected (the
    program's priority work), what's deliberately dropped, and when the
-   normal program resumes.
+   normal program resumes. Before finalizing a proposed week, put the
+   athlete's line of it ("Practise a controlled squat descent") in the
+   draft as its week focus, replacing the generic line (compute.md step
+   3). **Athlete guidance** on a line (its note, focus or cues) is what
+   the athlete reads on the record and the sheets: an instruction ("10
+   per leg", "stop at RPE 9"), never the override reason. A rebuild
+   keeps both. Keep the scheme's own notes (wave week, ladder rung,
+   deload) as they are. A line with no logged load carries a calibration
+   note; once an override sets the load, it says to adjust after the
+   first working set: keep it while it holds, and never swap in an
+   unexplained number. For a
+   beginner, agree each session's first loaded lift's warm-up: the
+   program's warm-up sets, or the qualitative ramp note the proposal
+   adds (reword it with the athlete if they want); no warm-up loads or
+   percentages the coach has not agreed, and never a test to failure.
+   Their sheets end with a short RPE and rep-range key.
 2. **What's changing:** plain-word bullets, changes only, each with its
    reason ("Squat 80 → 82.5 kg: you hit 5×5 @ RPE 7.5 last week, room
    to move"). Never restate every exercise here. If nothing changes, say

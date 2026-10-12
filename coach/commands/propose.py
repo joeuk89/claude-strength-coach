@@ -69,6 +69,29 @@ def override(args, ctx):
 
 
 @command(
+    "propose note",
+    help="Set a proposal's week focus, or one slot's target note, focus or cues; guidance needs no override reason",
+    args=(_PROPOSAL,
+          arg("--week-focus", metavar="TEXT", help="the week's focus line, on the record, sheets and brief"),
+          arg("--session", metavar="S", help="program session id of the line"),
+          arg("--exercise", metavar="E", help="library exercise id of the line"),
+          arg("--target-note", metavar="TEXT", help="the line's note to the athlete; an empty value clears it"),
+          arg("--focus", metavar="TEXT", help="the line's focus; an empty value clears it"),
+          arg("--cues", metavar="TEXT", help="the line's cues for this week; an empty value clears them")),
+    writes=True,
+)
+def note(args, ctx):
+    fields = {field: value for field, value in (("target_note", args.target_note), ("focus", args.focus),
+                                                ("cues", args.cues)) if value is not None}
+    if args.week_focus is None and not fields:
+        raise UsageError("give --week-focus, or --session, --exercise and --target-note, --focus or --cues")
+    if bool(fields) != bool(args.session and args.exercise) or bool(args.session) != bool(args.exercise):
+        raise UsageError("a line's --target-note, --focus or --cues goes with both --session and --exercise")
+    return propose.note(ctx.root, ctx.config, args.proposal, args.week_focus, args.session, args.exercise, fields,
+                        args.dry_run)
+
+
+@command(
     "propose resolve",
     help="Resolve one flag of a proposal with the reason it stands",
     args=(_PROPOSAL,
