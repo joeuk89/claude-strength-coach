@@ -639,6 +639,22 @@ GIT_ENV = {"GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1", "GIT_AUT
            "GIT_COMMITTER_EMAIL": "test@example.invalid"}
 
 
+def init_with_upstream(case):
+    """Commit `case.root` as the baseline of a repository whose main tracks a bare upstream, `case.remote`."""
+    case.env = dict(case.env, **GIT_ENV)
+    case.git_env = dict(os.environ, **GIT_ENV)
+    case.remote = case.tmp / "remote.git"
+    git(case.tmp, "init", "-q", "--bare", str(case.remote), env=case.git_env)
+    git(case.remote, "config", "core.hooksPath", str(case.remote / "hooks"), env=case.git_env)
+    (case.root / ".gitignore").write_text("/.coach/\n", encoding="utf-8")
+    git(case.root, "init", "-q", env=case.git_env)
+    git(case.root, "symbolic-ref", "HEAD", "refs/heads/main", env=case.git_env)
+    git(case.root, "add", "-A", env=case.git_env)
+    git(case.root, "commit", "-q", "-m", "baseline", env=case.git_env)
+    git(case.root, "remote", "add", "origin", str(case.remote), env=case.git_env)
+    git(case.root, "push", "-q", "-u", "origin", "main", env=case.git_env)
+
+
 @unittest.skipIf(shutil.which("git") is None, "needs git")
 class PublishCase(PagesCase):
     """PagesCase in a git repository pushed to a local bare remote, with the week's overlay unapproved."""
@@ -649,19 +665,8 @@ class PublishCase(PagesCase):
 
     def setUp(self):
         super().setUp()
-        self.env = dict(self.env, **GIT_ENV)
-        self.git_env = dict(os.environ, **GIT_ENV)
-        self.remote = self.tmp / "remote.git"
-        git(self.tmp, "init", "-q", "--bare", str(self.remote), env=self.git_env)
-        git(self.remote, "config", "core.hooksPath", str(self.remote / "hooks"), env=self.git_env)
-        (self.root / ".gitignore").write_text("/.coach/\n", encoding="utf-8")
         self.edit_json(OVERLAY, lambda doc: doc.update(approval=None))
-        git(self.root, "init", "-q", env=self.git_env)
-        git(self.root, "symbolic-ref", "HEAD", "refs/heads/main", env=self.git_env)
-        git(self.root, "add", "-A", env=self.git_env)
-        git(self.root, "commit", "-q", "-m", "baseline", env=self.git_env)
-        git(self.root, "remote", "add", "origin", str(self.remote), env=self.git_env)
-        git(self.root, "push", "-q", "-u", "origin", "main", env=self.git_env)
+        init_with_upstream(self)
         with open(self.root / "check-ins" / "2026-10-11.md", "a", encoding="utf-8") as handle:
             handle.write("\nThe coach's read, written at the check-in.\n")
 

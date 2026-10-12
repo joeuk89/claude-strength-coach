@@ -348,11 +348,13 @@ push the coach makes without being asked.
 _Avoid_: deploy, sync (Hevy sync and framework sync are other things)
 
 **Commit plan**:
-The changed training records the brief's write line names for commit
-with the week, file by file: the manual log, state, decisions, block
+The training records the brief's write line names for commit with the
+week, file by file: those already changed and those the approved write
+steps will write. They are the manual log, state, decisions, block
 ledger, history and routine pages, and the program only for a structural
-change the same brief names. The athlete's "go" approves it; a record
-left out, or changed after the go, stays local until they agree.
+change the same brief names. The athlete's "go" approves each named
+record as it stands at publish; a changed record the plan did not name
+stays local until they agree.
 _Avoid_: backup, auto-commit
 
 **Sunday message**:

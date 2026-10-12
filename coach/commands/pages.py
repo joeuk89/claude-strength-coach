@@ -60,10 +60,21 @@ def publish(args, ctx):
 
 @command(
     "pages plan",
-    help="The changed training records a programming pass's brief can name for commit with the pages",
+    help="The training records a programming pass's brief names for commit with the pages: changed now, or "
+         "written by the steps its \"go\" approves",
     args=(arg("--structural", action="store_true",
-              help="include data/program.json, for a brief with a structural change"),),
+              help="a structural change: data/program.json and routine/program.md"),
+          arg("--session", action="append", default=[], metavar="ID",
+              help="with --structural: a session it edits, adds or removes (its routine/ page); repeat for each"),
+          arg("--light-week", action="store_true",
+              help="block decide records a light week: data/decisions.json, data/state.json, routine/program.md"),
+          arg("--one-off", action="store_true",
+              help="a one-off week is set, or an ended one cleared: data/state.json"),
+          arg("--create-routines", action="store_true", help="routines create records new ids: data/state.json"),
+          arg("--missed", action="store_true",
+              help="missed apply records a matched miss: data/history/annotations.json")),
 )
 def plan(args, ctx):
+    steps = [step for step in closeout.STEP_WRITES if getattr(args, step)]
     pages.require_work_tree(ctx.root)
-    return closeout.plan(ctx.root, args.structural)
+    return closeout.plan(ctx.root, args.structural, args.session, steps)

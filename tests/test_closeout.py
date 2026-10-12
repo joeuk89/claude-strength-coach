@@ -5,7 +5,8 @@ import shutil
 import unittest
 
 from tests.support.history import read_json
-from tests.test_pages import WEEKLY, PublishCase, git
+from tests.test_missed import MIDWEEK, MissedCase
+from tests.test_pages import WEEKLY, PublishCase, git, init_with_upstream
 
 RECORDS = {
     "data/blocks.json": "added",
@@ -54,7 +55,12 @@ class CloseOutCase(PublishCase):
         return {line[3:] for line in lines}
 
     def committed(self, rev="HEAD"):
-        return set(git(self.root, "show", "--name-only", "--format=", rev, env=self.git_env).split())
+        return set(git(self.root, "show", "--name-only", "--no-renames", "--format=", rev, env=self.git_env).split())
+
+    def commit_everything(self):
+        git(self.root, "add", "-A", env=self.git_env)
+        git(self.root, "commit", "-q", "-m", "records", env=self.git_env)
+        git(self.root, "push", "-q", env=self.git_env)
 
     def remote_files(self):
         return set(git(self.remote, "ls-tree", "-r", "--name-only", "main", env=self.git_env).split())
@@ -66,10 +72,12 @@ class CloseOutCase(PublishCase):
 class PlanTest(CloseOutCase):
     def test_lists_exactly_the_changed_training_records_and_changes_nothing(self):
         self.train_the_week()
+        self.coach("block", "decide", "--outcome", "adopted", "--type", "light", "--reason", "poor sleep all week")
+        changed = dict(RECORDS, **{"routine/program.md": "modified"})
         before = self.snapshot()
         data = self.plan()
-        self.assertEqual({row["path"]: row["change"] for row in data["records"]}, RECORDS)
-        self.assertEqual(data["include"], sorted(RECORDS))
+        self.assertEqual({row["path"]: row["change"] for row in data["records"]}, changed)
+        self.assertEqual(data["include"], sorted(changed))
         self.assertFalse(data["program_changed"])
         self.assertIn("config.toml", self.status())
         self.assertEqual(self.snapshot(), before)
@@ -80,7 +88,7 @@ class PlanTest(CloseOutCase):
         self.assertEqual(data["include"], ["routine/session-a.md"])
         self.assertTrue(data["program_changed"])
         structural = self.plan("--structural")
-        self.assertEqual(structural["include"], ["data/program.json", "routine/session-a.md"])
+        self.assertEqual(structural["include"], ["data/program.json", "routine/program.md", "routine/session-a.md"])
 
     def test_lists_deletions_and_untracked_files_under_eligible_directories(self):
         (self.root / "routine" / "session-b.md").unlink()
@@ -89,6 +97,39 @@ class PlanTest(CloseOutCase):
         (self.root / "data" / "followups.json").write_text("{}", encoding="utf-8")
         rows = {row["path"]: row["change"] for row in self.plan()["records"]}
         self.assertEqual(rows, {"data/log/workouts.jsonl": "added", "routine/session-b.md": "deleted"})
+
+    def test_a_staged_rename_lists_the_old_path_as_deleted(self):
+        git(self.root, "mv", "data/history/2026-10.json", "data/history/moved.json", env=self.git_env)
+        rows = {row["path"]: row["change"] for row in self.plan()["records"]}
+        self.assertEqual(rows, {"data/history/2026-10.json": "deleted", "data/history/moved.json": "added"})
+
+    def test_names_the_records_each_approved_write_step_will_write(self):
+        cases = {
+            ("--light-week",): ["data/decisions.json", "data/state.json", "routine/program.md"],
+            ("--one-off",): ["data/state.json"],
+            ("--create-routines",): ["data/state.json"],
+            ("--missed",): ["data/history/annotations.json"],
+            ("--structural",): ["data/program.json", "routine/program.md"],
+            ("--structural", "--session", "session-c", "--session", "session-a"):
+                ["data/program.json", "routine/program.md", "routine/session-a.md", "routine/session-c.md"],
+        }
+        before = self.snapshot()
+        for argv, planned in cases.items():
+            with self.subTest(argv=argv):
+                data = self.plan(*argv)
+                self.assertEqual(data["planned"], planned)
+                self.assertEqual(data["include"], planned)
+                self.assertEqual({row["change"] for row in data["records"]}, {"planned"})
+        self.assertEqual(self.snapshot(), before)
+
+    def test_a_planned_record_that_already_changed_keeps_its_change(self):
+        self.train_the_week()
+        rows = {row["path"]: row["change"] for row in self.plan("--missed")["records"]}
+        self.assertEqual(rows, dict(RECORDS, **{"data/history/annotations.json": "planned"}))
+
+    def test_a_session_page_needs_a_structural_change(self):
+        message = self.coach("pages", "plan", "--session", "session-a", expect=2)["error"]["message"]
+        self.assertIn("--structural", message)
 
 
 class PublishRecordsTest(CloseOutCase):
@@ -201,6 +242,19 @@ class PublishRecordsTest(CloseOutCase):
         self.assertEqual(local, {"data/blocks.json", "data/decisions.json", "data/state.json"})
         self.assertLessEqual(local, self.status())
 
+    def test_a_staged_rename_is_refused_unless_both_paths_are_named(self):
+        git(self.root, "mv", "data/history/2026-10.json", "data/history/moved.json", env=self.git_env)
+        self.approve()
+        before = self.snapshot()
+        message = self.publish("--include", "data/history/moved.json", expect=3)["error"]["message"]
+        self.assertIn("data/history/2026-10.json", message)
+        self.assertEqual(self.snapshot(), before)
+        data = self.publish("--include", "data/history/moved.json", "--include", "data/history/2026-10.json")["data"]
+        self.assertEqual({row["path"]: row["change"] for row in data["records"]["included"]},
+                         {"data/history/2026-10.json": "deleted", "data/history/moved.json": "added"})
+        self.assertLessEqual({"data/history/2026-10.json", "data/history/moved.json"}, self.committed())
+        self.assertNotIn("data/history/2026-10.json", self.remote_files())
+
     def test_an_unchanged_planned_record_is_reported_not_committed(self):
         self.approve()
         data = self.publish("--include", "data/state.json")["data"]
@@ -220,6 +274,45 @@ class PublishRecordsTest(CloseOutCase):
         self.assertLessEqual(set(planned), self.committed())
         self.assertFalse(self.remote_files() & {"data/log/workouts.jsonl", "data/blocks.json"})
         self.assertEqual(read_json(self.root / "data" / "blocks.json")["blocks"][0]["seed_hard_weeks"], 2)
+
+
+class ApprovedPassTest(CloseOutCase):
+    def test_an_approved_light_week_leaves_no_record_local(self):
+        self.disable_hevy()
+        self.coach("block", "init", "--hard-weeks", "2", "--reason", "seeded at the check-in")
+        self.commit_everything()
+        planned = self.plan("--light-week")["include"]
+        self.approve()
+        self.coach("block", "decide", "--outcome", "adopted", "--type", "light", "--reason", "poor sleep all week")
+        dry = self.publish("--dry-run", *self.include(planned))["data"]
+        self.assertEqual(dry["records"]["local"], [])
+        data = self.publish(*self.include(planned))["data"]
+        self.assertTrue(data["pushed"])
+        self.assertEqual([row["path"] for row in data["records"]["included"]], planned)
+        self.assertFalse(self.status() & set(planned))
+        self.assertLessEqual(set(planned), self.remote_files())
+
+
+@unittest.skipIf(shutil.which("git") is None, "needs git")
+class MidweekPassTest(MissedCase):
+    def setUp(self):
+        super().setUp()
+        init_with_upstream(self)
+
+    def test_an_approved_matched_miss_leaves_no_record_local(self):
+        self.assertTrue(self.plan()["matched"])
+        planned = self.coach("pages", "plan", "--missed")["data"]["include"]
+        self.assertEqual(planned, ["data/history/annotations.json"])
+        self.apply("--tag", "sleep")
+        self.coach("overlay", "approve", MIDWEEK)
+        include = ["--include", "data/history/annotations.json"]
+        dry = self.coach("pages", "publish", "--overlay", MIDWEEK, "--dry-run", *include)["data"]
+        self.assertEqual(dry["records"]["local"], [])
+        data = self.coach("pages", "publish", "--overlay", MIDWEEK, *include)["data"]
+        self.assertEqual([row["path"] for row in data["records"]["included"]], planned)
+        shown = git(self.root, "show", "--name-only", "--format=", "HEAD", env=self.git_env).split()
+        self.assertIn("data/history/annotations.json", shown)
+        self.assertIn(f"data/overlays/{MIDWEEK}.json", shown)
 
 
 if __name__ == "__main__":

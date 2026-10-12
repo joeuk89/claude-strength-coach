@@ -1,7 +1,8 @@
 """The training-record commit plan of a programming pass's close-out (C38).
 
-The brief names the changed training records the athlete's "go" commits;
-`pages publish --include` then commits exactly those files with the pages.
+The brief names the training records the athlete's "go" commits: those
+already changed and those its approved write steps will write. `pages
+publish --include` then commits exactly those files with the pages.
 The allowlist decides eligibility only: each record is named as a file,
 never staged as a directory or pattern.
 """
@@ -9,14 +10,20 @@ never staged as a directory or pattern.
 import subprocess
 from pathlib import Path, PurePosixPath
 
-from coach import paths
-from coach.errors import RefusedError
+from coach import paths, program
+from coach.errors import RefusedError, UsageError
 
 ELIGIBLE_FILES = tuple(p.as_posix() for p in (paths.STATE, paths.DECISIONS, paths.BLOCKS))
 ELIGIBLE_DIRS = tuple(p.as_posix() for p in (paths.MANUAL_LOG.parent, paths.HISTORY_DIR, paths.ROUTINE_DIR))
 STRUCTURAL = paths.PROGRAM.as_posix()
 STATUS_SCOPE = (paths.DATA_DIR.as_posix(), paths.ROUTINE_DIR.as_posix())
 ELIGIBLE_TEXT = ", ".join((*ELIGIBLE_FILES, *(f"{d}/" for d in ELIGIBLE_DIRS), f"{STRUCTURAL} (--structural)"))
+STEP_WRITES = {
+    "light_week": (paths.DECISIONS, paths.STATE, paths.ROUTINE_PROGRAM_PAGE),
+    "one_off": (paths.STATE,),
+    "create_routines": (paths.STATE,),
+    "missed": (paths.ANNOTATIONS,),
+}
 
 
 def eligible(path, structural=False):
@@ -36,22 +43,24 @@ def normalise(text):
     return "/".join(parts)
 
 
-def _git(root, *argv, env=None):
+def git(root, *argv, env=None):
+    """Run git in `root`; pathspecs are literal, so a path never matches as a pattern."""
     return subprocess.run(["git", "-C", str(root), "--literal-pathspecs", *argv], capture_output=True, text=True,
                           env=env, timeout=120)
 
 
 def changes(root, env=None):
-    """{path: "added" | "modified" | "deleted"} for every uncommitted change under data/ and routine/."""
-    out = _git(root, "status", "--porcelain=v1", "-z", "--untracked-files=all", "--", *STATUS_SCOPE, env=env).stdout
-    fields = iter(out.split("\0"))
+    """{path: "added" | "modified" | "deleted"} for every uncommitted change under data/ and routine/.
+
+    A rename counts as its two halves, so the deleted source is never committed unnamed.
+    """
+    out = git(root, "status", "--porcelain=v1", "-z", "--no-renames", "--untracked-files=all", "--",
+              *STATUS_SCOPE, env=env).stdout
     found = {}
-    for entry in fields:
+    for entry in out.split("\0"):
         if len(entry) < 4:
             continue
         code, path = entry[:2], entry[3:]
-        if code[0] in "RC":
-            next(fields, None)
         if "D" in code:
             found[path] = "deleted"
         elif code == "??" or "A" in code:
@@ -61,12 +70,33 @@ def changes(root, env=None):
     return found
 
 
-def plan(root, structural=False, env=None):
-    """The changed training records, by path: what the brief names for the athlete's approval."""
+def planned(structural=False, sessions=(), steps=()):
+    """The records the approved write steps will write, whether or not they have changed yet."""
+    if sessions and not structural:
+        raise UsageError("--session names a session page a structural change edits, adds or removes; "
+                         "add --structural")
+    found = {p.as_posix() for step in steps for p in STEP_WRITES[step]}
+    if structural:
+        found |= {STRUCTURAL, paths.ROUTINE_PROGRAM_PAGE.as_posix()}
+    for session_id in sessions:
+        page = normalise(program.page_path(session_id))
+        if page is None or not eligible(page):
+            raise UsageError(f"--session {session_id!r} is not a session id")
+        found.add(page)
+    return sorted(found)
+
+
+def plan(root, structural=False, sessions=(), steps=(), env=None):
+    """The training records the brief names for the athlete's approval: changed now, or written by an approved step.
+
+    A record not yet changed shows as "planned".
+    """
     changed = changes(root, env)
-    records = [{"path": path, "change": change} for path, change in sorted(changed.items())
-               if eligible(path, structural)]
-    return {"records": records, "include": [row["path"] for row in records],
+    will_write = planned(structural, sessions, steps)
+    rows = {path: change for path, change in changed.items() if eligible(path, structural)}
+    rows.update({path: "planned" for path in will_write if path not in rows})
+    records = [{"path": path, "change": change} for path, change in sorted(rows.items())]
+    return {"records": records, "include": [row["path"] for row in records], "planned": will_write,
             "program_changed": STRUCTURAL in changed, "structural": structural}
 
 

@@ -125,7 +125,11 @@ class ProgramWeekModesTest(unittest.TestCase):
         plan = brief[brief.index("**The commit plan**"):]
         self.assertIn("`missed plan`'s too", plan)
         self.assertIn("python3 -m coach pages plan", plan)
-        self.assertIn("`--structural`", plan)
+        for flag in ("`--structural`", "`--session <id>`", "`--light-week`", "`--one-off`", "`--create-routines`",
+                     "`--missed`"):
+            with self.subTest(flag=flag):
+                self.assertIn(flag, plan)
+        self.assertIn("changed now or `planned`", plan)
         for clause in COMMIT_CLAUSES:
             with self.subTest(clause=clause):
                 self.assertIn(f"`{clause}`", plan)
@@ -134,7 +138,16 @@ class ProgramWeekModesTest(unittest.TestCase):
         self.assertIn("don't ask again before writing to Hevy or committing those records", stop)
         self.assertIn("drop the commit plan", stop)
         midweek = flat(step_text("program-week", "midweek.md"))
-        self.assertIn("`write_line` and the commit plan", midweek)
+        self.assertIn("`write_line` and the commit plan (brief.md, step 7, with `--missed`)", midweek)
+
+    def test_a_skip_rule_has_no_commit_plan_and_says_the_miss_stays_local(self):
+        brief = flat(step_text("program-week", "brief.md"))
+        self.assertIn("not a `skip` rule's (midweek.md)", brief)
+        midweek = flat(step_text("program-week", "midweek.md"))
+        skip = midweek[midweek.index("A `skip` rule"):midweek.index("When it reports `matched: false`")]
+        self.assertIn("its write line has no commit plan", skip)
+        self.assertIn("stays only on this computer (uncommitted)", skip)
+        self.assertIn("`data/history/annotations.json`", skip)
 
     def test_close_out_commits_the_approved_plan_and_names_what_stays_local(self):
         write = flat(step_text("program-week", "write.md"))

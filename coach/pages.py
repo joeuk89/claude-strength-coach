@@ -744,8 +744,7 @@ def publish_message(doc):
     return f"coach: publish week of {doc['span']['start']} ({doc['id']})"
 
 
-def _git(root, *argv, env=None):
-    return subprocess.run(["git", "-C", str(root), *argv], capture_output=True, text=True, env=env, timeout=120)
+_git = closeout.git
 
 
 def require_work_tree(root, env=None):
@@ -807,7 +806,7 @@ def publish(root, overlay_id, now, record_date=None, dry_run=False, env=None, in
         publish_paths.append(paths.SESSION_SHEETS.as_posix())
     records = closeout.select(root, include, structural, env)
     publish_paths += [row["path"] for row in records["included"]]
-    staged = _git(root, "diff", "--cached", "--name-only", "-z", env=env).stdout.split("\0")
+    staged = _git(root, "diff", "--cached", "--name-only", "--no-renames", "-z", env=env).stdout.split("\0")
     others = sorted(p for p in staged if p and p not in publish_paths)
     if others:
         raise RefusedError("the git index already holds staged changes to other files, which a publish would "
@@ -830,7 +829,11 @@ def publish(root, overlay_id, now, record_date=None, dry_run=False, env=None, in
     if sheet_text is not None:
         (root / paths.SESSION_SHEETS).write_text(sheet_text, encoding="utf-8")
     checkin.skeleton(root, record.date, refresh=True, now=now)
-    added = _git(root, "--literal-pathspecs", "add", "--", *publish_paths, env=env)
+    deleted = [row["path"] for row in records["included"] if row["change"] == "deleted"]
+    removed = _git(root, "rm", "-q", "--cached", "--ignore-unmatch", "--", *deleted, env=env) if deleted else None
+    if removed is not None and removed.returncode != 0:
+        raise ValidationError(f"git rm failed: {removed.stderr.strip()}")
+    added = _git(root, "add", "--", *(p for p in publish_paths if p not in deleted), env=env)
     if added.returncode != 0:
         raise ValidationError(f"git add failed: {added.stderr.strip()}")
     if _git(root, "diff", "--cached", "--quiet", env=env).returncode == 0:
