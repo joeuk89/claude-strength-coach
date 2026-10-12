@@ -292,6 +292,13 @@ week it was made in, where a re-proposal of that week (a midweek rebuild) keeps 
 except that an approved override onto an assistance ladder's rung moves the ladder to that rung.
 _Avoid_: pinned line, manual hold, permanent override
 
+**First-load warning**:
+The `no_data` flag on one day's line of a lift with no usable exposure
+and no start load, whose load the coach sets with the athlete. It retires
+once every working set of that day's line has a load, and opens again if
+one loses it; the chosen load is still untried until the athlete trains it.
+_Avoid_: calibrated load (nothing is observed yet), resolved by hand (it settles itself)
+
 **Recovery cap**:
 An RPE ceiling written into an exercise's prescription to protect
 recovery or a niggle: every working set stays at or under it. RPE drift

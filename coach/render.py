@@ -193,19 +193,19 @@ def render_week_ahead(doc, name=None, show_hevy=True):
         lines.append("| --- | --- | --- | --- | --- | --- | --- |")
         for exercise in session["exercises"]:
             lines += _exercise_rows(exercise, name, show_hevy)
-    if doc["flags"]:
-        lines += ["", "**Flags**", ""]
-        for flag in doc["flags"]:
-            where = " / ".join(part for part in (flag["session_id"], flag["exercise_id"]) if part)
-            text = f"- {flag['severity']} · `{flag['code']}`"
-            if where:
-                text += f" · {where}"
-            text += f": {flag['message']}"
-            if flag["resolved"]:
-                text += f" (resolved: {flag['resolution']})"
-            lines.append(text)
+    current = [_flag_line(flag, flag["message"]) for flag in doc["flags"] if not flag["resolved"]]
+    if current:
+        lines += ["", "**Flags**", ""] + current
+    resolved = [_flag_line(flag, flag["resolution"]) for flag in doc["flags"] if flag["resolved"]]
+    if resolved:
+        lines += ["", "**Resolved flags**", ""] + resolved
     lines.append(end_marker(REGION_KIND, doc["id"]))
     return "\n".join(lines)
+
+
+def _flag_line(flag, text):
+    where = " / ".join(part for part in (flag["session_id"], flag["exercise_id"]) if part)
+    return f"- {flag['severity']} · `{flag['code']}`" + (f" · {where}" if where else "") + f": {text}"
 
 
 def render_overlay_doc(root, doc):

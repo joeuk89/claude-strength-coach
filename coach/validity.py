@@ -12,7 +12,7 @@ from collections import namedtuple
 from datetime import timedelta
 
 from coach import config as config_module
-from coach import constraints, dates, flags, history, overlay, state, stats, units
+from coach import constraints, dates, first_loads, flags, history, overlay, state, stats, units
 from coach.checks.instance import _capped_value as capped_value
 from coach.checks.instance import cap_for
 from coach.config_tables.sessions import cap_minutes
@@ -397,10 +397,11 @@ class _Checker:
             "feasibility": _feasibility("not_judged", ceiling, "No load check: the line has no data."),
         }
         self.lines.append(row)
-        if (session["session_id"], line["exercise_id"]) in self.no_data:
+        first_load = (session["session_id"], line["exercise_id"]) in self.no_data
+        if first_load and first_loads.missing_load(line):
             return
         working = [s for s in line["sets"] if overlay.is_working(s)]
-        self.stale(session, line, working, facts, band, derived, illness)
+        self.stale(session, line, working, facts, band, derived, illness, coach_set=first_load and not derived)
         self.caps_and_kit(session, line)
         row["feasibility"] = self.feasibility(session, line, working, facts, evidence, ceiling)
 
@@ -420,9 +421,11 @@ class _Checker:
             return "an RPE cap constraint"
         return None
 
-    def stale(self, session, line, working, facts, band, derived, illness):
+    def stale(self, session, line, working, facts, band, derived, illness, coach_set=False):
+        """R-24's stale-prescription problems. A `coach_set` first load derives from no exposure, so the
+        return-band decay has nothing to check it against."""
         problems = []
-        if facts["newest"] is not None and band.id != RETURN_BANDS[0].id:
+        if facts["newest"] is not None and band.id != RETURN_BANDS[0].id and not coach_set:
             problems += self.decay_problems(session, line, working, facts, band, derived)
         if illness and session["date"] == illness[0]:
             over = [s for s in working if s.get("rpe") is None or s["rpe"] > ILLNESS_RPE_CAP]
