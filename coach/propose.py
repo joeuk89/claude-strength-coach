@@ -1784,8 +1784,7 @@ def override(root, config, proposal_id, session_id, exercise_id, new_sets, load,
 
     if until is not None and not standing:
         raise UsageError("--until goes with --standing")
-    doc = overlay.build(draft, config, root=root, now=now)
-    draft["flags"] = _checked_flags(root, config, doc)
+    draft["flags"] = _checked(root, config, draft, now, today)["flags"]
     decision = None
     if standing:
         until_date = decisions.standing_until(today, until)
@@ -1815,11 +1814,22 @@ def _rep_out_capped(root, session, line, sets):
     return tuple(base.rpe_capped((s,), min(caps))[0] if s.rep_out else s for s in sets)
 
 
-def resolve(root, proposal_id, reference, resolution, dry_run):
+def _checked(root, config, draft, now, today=None):
+    """The draft built as an overlay, its flags checked again as `_checked_flags` does and its interference judged
+    again, so show, override, resolve and finalize address the same flags."""
+    doc = overlay.build(draft, config, root=root, now=now)
+    doc["flags"] = _checked_flags(root, config, doc)
+    doc["flags"] = interference.refresh(root, config, doc, today or now.date())
+    return doc
+
+
+def resolve(root, config, proposal_id, reference, resolution, now, dry_run, today=None):
     """Resolve the flag `reference` names (its `ref`, C24) with the reason it stands.
 
     A reference names a condition, not a list position: one that no current flag states is refused, never
-    moved onto another flag. Identical copies of the condition are resolved together.
+    moved onto another flag. Identical copies of the condition are resolved together. The flags are checked
+    again first, so a condition the library or program raised since the draft was saved resolves by the ref
+    finalize shows.
     """
     if not resolution or not resolution.strip():
         raise UsageError("--resolution must say how the flag is settled")
@@ -1829,7 +1839,7 @@ def resolve(root, proposal_id, reference, resolution, dry_run):
                          f"show or override list; list positions change when the flags are checked again, so "
                          f"{reference} names no flag")
     draft, _, _ = load_proposal(root, proposal_id)
-    found = draft.get("flags", [])
+    found = _checked(root, config, draft, now, today)["flags"]
     matches = [index for index, flag in enumerate(found) if flags.ref(flag) == reference]
     if not matches:
         raise ValidationError(
@@ -1846,6 +1856,7 @@ def resolve(root, proposal_id, reference, resolution, dry_run):
                            f"resolution: {flag['message']}")
     for index in matches:
         found[index] = dict(found[index], resolved=True, resolution=resolution.strip())
+    draft["flags"] = found
     if not dry_run:
         _write_proposal(root, proposal_id, draft, None, None)
     return {"id": proposal_id, "flag": flags.with_refs([found[matches[0]]])[0], "written": not dry_run}
@@ -1916,9 +1927,7 @@ def set_time(root, config, proposal_id, session_id, day, start, minutes, today, 
         except ValueError as exc:
             raise ValidationError(f"--start: {exc}") from None
         session["duration_minutes"] = minutes
-    doc = overlay.build(draft, config, root=root, now=now)
-    doc["flags"] = _checked_flags(root, config, doc)
-    doc["flags"] = interference.refresh(root, config, doc, today)
+    doc = _checked(root, config, draft, now, today)
     draft["flags"] = doc["flags"]
     if not dry_run:
         _write_proposal(root, proposal_id, draft, None, None)
@@ -1956,9 +1965,7 @@ def rebuild(root, config, proposal_id, today, now, dry_run):
     kept, lost = _carry_edits(root, proposal_id, draft, proposed, new_draft, config.athlete.units,
                               config.hevy.enabled)
     _carry_timing(draft, new_draft)
-    doc = overlay.build(new_draft, config, root=root, now=now)
-    doc["flags"] = _checked_flags(root, config, doc)
-    doc["flags"] = interference.refresh(root, config, doc, today)
+    doc = _checked(root, config, new_draft, now, today)
     resolved = {_flag_identity(f): f for f in draft.get("flags", [])
                 if f.get("resolved") and not first_loads.is_automatic(f)}
     carried_resolutions = 0
@@ -2061,10 +2068,9 @@ def discard(root, proposal_id, today, dry_run):
             "overlay_kept": approved, "standing_decisions": standing, "written": not dry_run}
 
 
-def show(root, config, proposal_id, now):
+def show(root, config, proposal_id, now, today=None):
     draft, proposed, meta = load_proposal(root, proposal_id)
-    doc = overlay.build(draft, config, root=root, now=now)
-    doc["flags"] = first_loads.settle(doc["flags"], doc["sessions"], config.hevy.enabled)
+    doc = _checked(root, config, draft, now, today)
     lines = lines_of(doc, config.athlete.units, config.hevy.enabled)
     return {"id": proposal_id, "kind": meta["kind"], "span": meta["span"], "overlay": doc,
             "flags": flags.with_refs(doc["flags"]), "lines": lines, "lines_digest": jsonio.canonical_hash(lines),
@@ -2145,9 +2151,7 @@ def finalize(root, config, proposal_id, now, dry_run, today=None):
         raise ValidationError(f"{len(unexplained)} line(s) of proposal {proposal_id} changed without an override "
                               "reason; use propose override, or give the line's override a reason",
                               details=unexplained)
-    doc = overlay.build(draft, config, root=root, now=now)
-    doc["flags"] = _checked_flags(root, config, doc)
-    doc["flags"] = interference.refresh(root, config, doc, today or now.date())
+    doc = _checked(root, config, draft, now, today)
     blocks = overlay.unresolved_blocks(doc)
     if blocks:
         raise RefusedError(

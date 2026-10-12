@@ -68,7 +68,7 @@ class ReorderTest(ProposalRefCase):
         self.coach(*TRAVEL)
         self.propose()
         self.put_mismatch_in_proposed_order()
-        before = self.shown()
+        before = flags.with_refs(read_json(self.draft_path())["flags"])
         codes = [f["code"] for f in before]
         mismatch = next(f for f in before if f["code"] == "load_mode_mismatch")
         self.assertLess(codes.index("load_mode_mismatch"), codes.index("status_active"))
@@ -83,6 +83,19 @@ class ReorderTest(ProposalRefCase):
                          ("load_mode_mismatch", mismatch["ref"], REASON))
         status = [f for f in self.shown() if f["code"] == "status_active"]
         self.assertTrue(status and not any(f["resolved"] for f in status))
+
+    def test_a_condition_raised_on_revalidation_resolves_by_the_ref_finalize_shows(self):
+        self.propose()
+        self.edit_json("data/exercises.json", lambda doc: doc["exercises"]["db_single_arm_row"].update(
+            load_mode="total"))
+        refused = self.coach("propose", "finalize", "--proposal", FIRST_ID, "--dry-run", expect=3)
+        [detail] = [d["message"] for d in refused["error"]["details"] if d["message"].startswith("load_mode_mismatch:")]
+        ref = detail.split(" ", 1)[0]
+        self.assertIn(ref, [f["ref"] for f in self.shown()])
+        self.assertIn(ref, [f["ref"] for f in self.data("propose", "show", FIRST_ID)["unresolved_blocks"]])
+
+        self.assertEqual(self.resolve(ref)["flag"]["code"], "load_mode_mismatch")
+        self.coach("propose", "finalize", "--proposal", FIRST_ID, "--dry-run")
 
     def test_a_list_position_is_refused_and_changes_nothing(self):
         self.coach(*TRAVEL)
@@ -172,11 +185,11 @@ class LifecycleTest(ProposalRefCase):
 
     def test_a_hand_added_flag_with_only_the_required_fields_resolves_by_its_ref(self):
         draft = read_json(self.draft_path())
-        draft["flags"].append({"code": "unearned_load", "severity": "warn", "message": "hand added"})
+        draft["flags"].append({"code": "stalled", "severity": "warn", "message": "hand added"})
         write_json(self.draft_path(), draft)
         [hand] = [f for f in self.shown() if f["message"] == "hand added"]
 
-        envelope = self.resolve("unearned_load:000000", expect=1)
+        envelope = self.resolve("stalled:000000", expect=1)
         self.assertIn(hand["ref"], str(envelope["error"]["details"]))
 
         resolved = self.resolve(hand["ref"])["flag"]

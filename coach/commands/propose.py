@@ -34,7 +34,7 @@ def week(args, ctx):
 @command("propose show", help="Show a proposal draft built as an overlay, its lines and what finalize would refuse",
          args=(arg("id", metavar="ID", help="proposal id"),))
 def show(args, ctx):
-    return propose.show(ctx.root, ctx.config, args.id, ctx.now())
+    return propose.show(ctx.root, ctx.config, args.id, ctx.now(), ctx.today())
 
 
 @command(
@@ -78,7 +78,8 @@ def override(args, ctx):
     writes=True,
 )
 def resolve(args, ctx):
-    return propose.resolve(ctx.root, args.proposal, args.flag, args.resolution, args.dry_run)
+    return propose.resolve(ctx.root, ctx.config, args.proposal, args.flag, args.resolution, ctx.now(), args.dry_run,
+                           ctx.today())
 
 
 @command(

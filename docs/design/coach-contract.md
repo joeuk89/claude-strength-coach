@@ -3359,7 +3359,10 @@ id follows C10. `data.lines_digest` (R-21b) is the C7 canonical hash of
   its session and date in the message (`session-a on 2026-10-14: ...`),
   so a session planned on two dates raises two conditions.
 - `propose resolve --proposal ID --flag REF --resolution TEXT` resolves
-  the flag that ref names on the draft, and any identical copy of it. A
+  the flag that ref names on the draft, and any identical copy of it.
+  Like `show`, `override` and `finalize`, it checks the flags again
+  first and saves them, so a condition raised since the draft was saved
+  (a library change, say) resolves by the ref finalize lists. A
   number is refused (exit 2), since list positions change when the
   flags are checked again. A ref no current flag carries exits 1,
   listing the open flags' refs, and leaves the draft unchanged; so does a
@@ -3372,10 +3375,10 @@ id follows C10. `data.lines_digest` (R-21b) is the C7 canonical hash of
   ties it to that occurrence of its slot; a message naming no date the
   slot has (an older flag, or one a missed-day rule moved) stands for
   every line of the slot. Each command that judges a draft's flags again
-  (`propose week`, `override`, `restore`, `time`, `rebuild`, `finalize`,
-  and `show` for its output) settles each one against its lines: once
-  every working set has a load, the flag is resolved with `first load set:
-  <loads> on <date>, not yet trained`; when a working set loses its load,
+  (`propose week`, `override`, `resolve`, `restore`, `time`, `rebuild`,
+  `finalize`, and `show` for its output) settles each one against its
+  lines: once every working set has a load, the flag is resolved with
+  `first load set: <loads> on <date>, not yet trained`; when a working set loses its load,
   that automatic resolution is withdrawn and the flag is open again. A
   resolution written with `propose resolve` stays. `propose rebuild`
   never carries an automatic resolution over: it judges the new lines.
@@ -3505,7 +3508,9 @@ constrained mode) stay coach-built through `overlay build`.
   nor an active decision on the line's session date for that scope with
   the same reason, standing or with the same chosen sets.
 - `propose show ID` returns the built overlay, `lines`, `unexplained`
-  (what finalize would refuse with exit 1) and `unresolved_blocks`.
+  (what finalize would refuse with exit 1) and `unresolved_blocks`. Its
+  flags, interference included, are checked again first, as finalize
+  checks them.
 - `schedule confirm --position P [--week W]` records the position for
   the week holding tomorrow by default, with `confirmed_at` today.
 - Steps 5a and 5b are left to R-43 and R-44b, which own those providers.
@@ -7710,8 +7715,8 @@ times are known (Built with R-44a, Timing).
   24-hour rule is labelled a cautious coaching heuristic in its message.
 - **Every proposed week.** `propose week` (every kind) judges the rules
   through the weekflags provider (`coach.interference.flags`). `propose
-  time`, `propose finalize`, `propose rebuild`, a missed-day rule's copy
-  and `overlay build` (a constrained or reshuffled one-off week) judge
+  time`, `show`, `override`, `resolve`, `finalize` and `rebuild`, a
+  missed-day rule's copy and `overlay build` (a constrained or reshuffled one-off week) judge
   them on the overlay's sessions before approval, through
   `coach.interference.refresh(root, config, doc, today)`: it replaces
   every earlier interference flag (`collision` and each instance rule's
