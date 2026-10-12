@@ -135,10 +135,14 @@ def _backoff_words(ctx, sets):
     backoffs = base.working(sets)[WAVE_SETS:]
     if not backoffs:
         return None
-    count = f"{len(backoffs)} back-off set{'s' if len(backoffs) > 1 else ''}"
-    if any(_from_e1rm(ctx, s) for s in backoffs):
-        return f"{count} loaded from the e1RM of {base.number(ctx.e1rm)} at their reps and RPE"
-    return f"{count} at the first wave set's load"
+    count, from_e1rm = len(backoffs), sum(1 for s in backoffs if _from_e1rm(ctx, s))
+    first = "at the first wave set's load"
+    if not from_e1rm:
+        return f"{count} back-off set{'s' if count > 1 else ''} {first}"
+    loaded = f"loaded from the e1RM of {base.number(ctx.e1rm)} at their reps and RPE"
+    if from_e1rm == count:
+        return f"{count} back-off set{'s' if count > 1 else ''} {loaded}"
+    return f"{count} back-off sets: {from_e1rm} {loaded} and {count - from_e1rm} {first}"
 
 
 def _marker(exposure):

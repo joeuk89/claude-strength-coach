@@ -3,7 +3,9 @@
 The old wave state counted the week last approved, trained or not, so the
 migration keeps its training max and counts the weeks before that one as
 completed. The week last approved is judged again from the sessions logged
-after the run that proposed it; history up to that day is marked judged.
+after the run that proposed it; history up to that day is marked judged. A
+training max an old return week lowered stays lowered, so the notes name each
+one kept.
 """
 
 DOC = "state"
@@ -34,7 +36,8 @@ def migrate(doc):
 
 
 def notes(before, after):
-    """One note per wave slot, naming the pending week when there is one: approving its overlay settles it."""
+    """One note per wave slot: the week to judge again, naming the pending week when there is one (approving its
+    overlay settles it), and the training max it keeps."""
     found = []
     for slot, entry in before["scheme_state"].items():
         pending = entry.get("pending")
@@ -46,8 +49,13 @@ def notes(before, after):
             week = f"wave week {old['wave_week']}"
         else:
             continue
-        if not old["wave_week"]:
-            continue
-        since = f"logged after {new['through']['date']}" if new["through"] else "logged"
-        found.append(f"data/state.json: {slot}'s {week} counts as done only once a session {since} trained it")
+        words = []
+        if old["wave_week"]:
+            since = f"logged after {new['through']['date']}" if new["through"] else "logged"
+            words.append(f"{slot}'s {week} counts as done only once a session {since} trained it")
+        if new["training_max"] is not None:
+            words.append(f"{slot}'s training max stays {new['training_max']}, so if a return week lowered it, "
+                         "restore it with python3 -m coach state set-training-max")
+        if words:
+            found.append("data/state.json: " + "; ".join(words))
     return found

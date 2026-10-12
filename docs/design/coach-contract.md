@@ -795,7 +795,7 @@ none and `bodyweight`, `assisted`, `duration` or `distance`; band and
 | `plugins/<kind>/<name>.py`, `plugins/tests/test_<name>.py` | instance plugins and their tests | committed | the athlete, as a code change |
 | `.coach/cache/hevy/` | raw Hevy cache, rebuildable with `hevy pull --full` | **gitignored** | R-12 |
 | `.coach/backups/<UTC timestamp>/` | pre-migration copies; old recipe cards and index before conversion | gitignored | R-17a; R-33b (`recipes convert --apply`) |
-| `.coach/proposals/<id>.json`, `<id>.proposed.json`, `<id>.meta.json` | editable proposal draft (an overlay draft, C10), its untouched original, and the run's facts (kind, span, transform, rotation, each slot's proposed scheme state) | gitignored | R-23a |
+| `.coach/proposals/<id>.json`, `<id>.proposed.json`, `<id>.meta.json` | editable proposal draft (an overlay draft, C10), its untouched original, and the run's facts (kind, span, transform, rotation, each slot's proposed scheme state and a hash of the stored state it started from) | gitignored | R-23a |
 | `.coach/plans/<week start>-<name>.json` | schedule plans handed to `propose week --plan` | gitignored | R-30b; R-22 may |
 | `.coach/drafts/` | drafts the coach edits before a command applies them (program drafts, log drafts, custom-exercise entries, recipe drafts and saved recipe pages) | gitignored | R-40c, R-41a, R-41b; the coach (R-33b recipe pages) |
 
@@ -3241,7 +3241,11 @@ id follows C10. `data.lines_digest` (R-21b) is the C7 canonical hash of
   reason; finalize accepts it.
 - `propose finalize --proposal ID [--dry-run]` re-runs step 5. It exits
   1 if any line differs from `.proposed.json` without `override.reason`,
-  and exits 3 if a `block` flag is unresolved. Otherwise it writes the
+  and exits 3 if a `block` flag is unresolved. It also exits 3 when a
+  slot's stored scheme state differs from the state `propose week`
+  started from (the run facts keep a hash of each, `state_basis`), as
+  after `state set-training-max`: the draft's loads and pending state
+  come from the old state, so the span is proposed again. Otherwise it writes the
   overlay, decisions and pending scheme state. It builds and checks all
   three first, the updated state against the program included (C16), so
   a refusal or `--dry-run` writes nothing. It writes the state, then the
@@ -3306,7 +3310,10 @@ constrained mode) stay coach-built through `overlay build`.
   state still waits for approval, the result names its overlay
   (`pending_overlay`) and a `note` asks for that week to be proposed
   again before approval, since its sets hold the old training max's
-  loads; both are null otherwise.
+  loads; both are null otherwise. `open_drafts` lists the other
+  proposals holding the slot for a span not yet over whose overlay is
+  not approved; finalize refuses them, so the `note` asks for each span
+  to be proposed again.
 - `propose finalize` also appends a one-week override decision
   (`standing: false`, `until` the overlay's span end) for each line whose
   `override` no decision yet records: neither one made for this proposal

@@ -5,6 +5,7 @@ import importlib
 import unittest
 from dataclasses import replace
 from datetime import date
+from pathlib import Path
 
 from coach import overlay, plugins, propose, render, sheets, stats, units
 from coach.errors import UsageError
@@ -114,6 +115,21 @@ class TrainedWorkTest(unittest.TestCase):
         again = run(wave(proposal.state, exposures=(week_one,)))
         self.assertEqual(again.state, proposal.state)
         self.assertIn("week 2 again", again.rationale)
+
+    def test_ramp_sets_logged_as_warm_ups_leave_the_wave_sets_in_line(self):
+        """The starter's cue asks for this, since logged working sets line up with the wave sets by position."""
+        starter = read_json(Path(plugins.__file__).parent.parent / "starters" / "wave-3wk.json")
+        wave_cues = [e["cues"] for s in starter["program"]["sessions"] for e in s["exercises"]
+                     if e["scheme"]["name"] == "wave_531"]
+        self.assertTrue(wave_cues)
+        self.assertTrue(all("logged as warm-ups" in cue for cue in wave_cues))
+        log = trained(date(2026, 10, 5), 1)
+        ramps = tuple(base.LoggedSet(index=i, type="warmup", reps=5, rpe=None, load=load)
+                      for i, load in enumerate((40, 50)))
+        log = replace(log, sets=ramps + tuple(replace(s, index=s.index + 2) for s in log.sets))
+        proposal = run(wave(exposures=(log,)))
+        self.assertEqual(proposal.state["completed_weeks"], 1)
+        self.assertEqual(flag_codes(proposal), [])
 
     def test_a_second_session_of_the_same_week_does_not_earn_the_next(self):
         first = trained(date(2026, 10, 5), 1)
@@ -237,6 +253,13 @@ class BackOffTest(unittest.TestCase):
                 proposal = run(wave(sets=sets, e1rm=e1rm))
                 self.assertEqual(shape(proposal)[WAVE_SETS:], [(65, 5, False, rpe)] * 3)
                 self.assertIn("3 back-off sets at the first wave set's load", proposal.rationale)
+
+    def test_mixed_back_off_groups_are_each_described_by_their_own_load(self):
+        sets = (WAVE_GROUP, BACK_OFFS, {"count": 2, "type": "normal", "reps": 8})
+        proposal = run(wave(sets=sets, e1rm=121.88))
+        self.assertEqual(shape(proposal)[WAVE_SETS:], [(95, 5, False, 7)] * 3 + [(65, 8, False, None)] * 2)
+        self.assertIn("5 back-off sets: 3 loaded from the e1RM of 121.88 at their reps and RPE and 2 at the first "
+                      "wave set's load", proposal.rationale)
 
     def test_a_wave_group_that_is_not_three_sets_is_refused(self):
         module = scheme("wave_531").module
@@ -372,7 +395,10 @@ class MigrationTest(unittest.TestCase):
         self.assertEqual(after["scheme_state"][SLOT]["pending"]["data"], expected)
         self.assertEqual(after["scheme_state"]["session-a/db_bench_press"]["data"], {"misses": 0, "through": None})
         self.assertFalse(plugins.state_errors(scheme("wave_531"), expected))
-        self.assertIn("2026-10-11", step.notes(before, after)[0])
+        note = step.notes(before, after)[0]
+        self.assertIn("2026-10-11", note)
+        self.assertIn("training max stays 170", note)
+        self.assertIn("state set-training-max", note)
 
     def test_state_notes_name_the_pending_week_the_approval_will_settle(self):
         step = self.step("state.0005_wave_evidence")
@@ -636,6 +662,36 @@ class TrainingMaxCommandTest(WavePipelineCase):
                           {"session_id": "session-a", "exercise_id": "bb_back_squat"}))
         line = squat(self.propose("--dry-run", week="2026-W43", env={"COACH_NOW": "2026-10-18T18:00:00Z"})["overlay"])
         self.assertIn("training max of 95", line["provenance"]["rationale"])
+
+    def test_a_draft_proposed_before_the_change_is_refused_until_proposed_again(self):
+        self.propose()
+        data = self.set_max()["data"]
+        self.assertEqual((data["pending_overlay"], data["open_drafts"]), (None, [FIRST_ID]))
+        self.assertIn(f"propose that week again before finalizing {FIRST_ID}", data["note"])
+        envelope = self.coach("propose", "finalize", "--proposal", FIRST_ID, expect=3)
+        self.assertIn(SLOT, envelope["error"]["message"])
+        self.assertIn("propose week again", envelope["error"]["message"])
+        self.assertEqual((self.state()["data"]["training_max"], self.state()["pending"]), (95, None))
+        self.assertFalse((self.root / "data" / "overlays" / f"{FIRST_ID}.json").exists())
+
+        self.approve("2026-W42", "2026-10-11T18:00:00Z")
+        self.assertEqual(self.state()["pending"]["data"]["training_max"], 95)
+        line = squat(self.propose("--dry-run", week="2026-W43", env={"COACH_NOW": "2026-10-18T18:00:00Z"})["overlay"])
+        self.assertIn("training max of 95", line["provenance"]["rationale"])
+
+    def test_finalizing_a_draft_again_after_the_change_is_refused(self):
+        self.propose()
+        self.coach("propose", "finalize", "--proposal", FIRST_ID)
+        self.set_max()
+        self.coach("propose", "finalize", "--proposal", FIRST_ID, expect=3)
+        self.assertEqual(self.state()["pending"]["data"]["training_max"], 95)
+
+    def test_the_skill_proposes_the_week_again_after_a_change(self):
+        text = (Path(__file__).parents[1] / ".claude" / "skills" / "program-week" / "compute.md").read_text(
+            encoding="utf-8")
+        entry = text.split("- `wave_review`", 1)[1].split("\n- ", 1)[0]
+        self.assertIn("state set-training-max", entry)
+        self.assertIn("run step 1 again", entry)
 
     def test_a_slot_without_a_training_max_is_refused(self):
         self.set_scheme("session-a", "bb_back_squat", "linear")

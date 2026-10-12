@@ -1214,6 +1214,8 @@ def propose_week(root, config, today, now, span, kind="weekly", transform_name=N
             "exercises": lines,
         })
     all_flags += followups.due_flags(root, today) + niggles.week_flags(root)
+    basis = {key: _state_basis(run.registry, key, entry["scheme"], settled_state["scheme_state"].get(key))
+             for key, entry in scheme_state.items()}
     draft_sessions, dropped, drop_flags = _drop_rule(run, span, draft_sessions, session_keys, scheme_state, all_flags)
     all_flags = [f for f in all_flags if not any(f in entry["flags"] for entry in dropped)]
 
@@ -1230,7 +1232,7 @@ def propose_week(root, config, today, now, span, kind="weekly", transform_name=N
     meta = {
         "id": doc["id"], "kind": kind, "span": span.to_json(), "transform": transform[0].name if transform else None,
         "created_at": doc["created_at"], "rotation": found.rotation,
-        "scheme_state": {} if kind == "deload" else scheme_state, "dropped": dropped,
+        "scheme_state": {} if kind == "deload" else scheme_state, "dropped": dropped, "state_basis": basis,
     }
     if not dry_run:
         if settled:
@@ -1478,6 +1480,9 @@ def finalize(root, config, proposal_id, now, dry_run):
     Everything is built and checked before the first write, so a refusal or a dry run writes nothing.
     """
     draft, proposed, meta = load_proposal(root, proposal_id)
+    state_doc = state_module.load(root)
+    registry = plugins.load(root)
+    _check_basis(meta, state_doc, registry, proposal_id)
     unexplained = unexplained_changes(draft, proposed)
     if unexplained:
         raise ValidationError(f"{len(unexplained)} line(s) of proposal {proposal_id} changed without an override "
@@ -1520,8 +1525,6 @@ def finalize(root, config, proposal_id, now, dry_run):
             appended.append(decision)
 
     program_doc = program.load(root)
-    state_doc = state_module.load(root)
-    registry = plugins.load(root)
     last_lines = _last_lines(draft)
     pending = []
     for slot, entry in meta["scheme_state"].items():
@@ -1549,6 +1552,44 @@ def finalize(root, config, proposal_id, now, dry_run):
         jsonio.write_doc(path, doc, False)
     return {"id": doc["id"], "path": _relative(root, path), "overlay": doc, "decisions": appended,
             "pending": pending, "rotation": state_doc["rotation"], "written": not dry_run}
+
+
+def _state_basis(registry, slot, plugin_name, entry):
+    """A hash of the stored data finalize builds the slot's pending state on, a state kept for another scheme
+    counting as the scheme's initial one, as finalize treats it."""
+    if entry is None or entry["scheme"] not in (None, plugin_name):
+        plugin = registry.get("conditioning" if conditioning.is_state_key(slot) else "scheme", plugin_name)
+        data = plugins.initial_state(plugin) if plugin is not None else None
+    else:
+        data = entry["data"]
+    return jsonio.canonical_hash(data)
+
+
+def _check_basis(meta, state_doc, registry, proposal_id):
+    """Refuse a draft whose slots' stored state changed after it was proposed: its loads come from the old state,
+    and its pending state would quietly undo the change."""
+    basis = meta.get("state_basis") or {}
+    changed = sorted(slot for slot, entry in meta["scheme_state"].items() if slot in basis and basis[slot]
+                     != _state_basis(registry, slot, entry["scheme"], state_doc["scheme_state"].get(slot)))
+    if changed:
+        raise RefusedError(f"The stored scheme state of {', '.join(changed)} changed after proposal {proposal_id} "
+                           "was proposed (a training max set, or another week settled), so its loads are out of "
+                           "date; run propose week again for this span")
+
+
+def _open_drafts(root, slot, today, skip):
+    """Ids of proposals for a span not yet over that hold `slot` and whose overlay is not approved."""
+    found = []
+    for path in sorted((Path(root) / paths.PROPOSALS_DIR).glob("*.meta.json")):
+        try:
+            meta = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        proposal_id = meta.get("id")
+        if (proposal_id and proposal_id != skip and slot in (meta.get("scheme_state") or {})
+                and meta["span"]["end"] >= today.isoformat() and not _approved(root, proposal_id)):
+            found.append(proposal_id)
+    return found
 
 
 def _last_lines(draft):
@@ -1630,8 +1671,16 @@ def set_training_max(root, session_id, exercise_id, value, reason, now, today, d
         jsonio.write_doc(state_module.path_for(root), state_doc, False)
         jsonio.write_doc(decisions.path_for(root), decision_doc, False)
     waiting = pending["overlay_id"] if pending else None
-    note = (f"{waiting} still prescribes the old training max's loads, and a session trained from them can miss "
-            f"the new one's: propose that week again before approving {waiting}") if waiting else None
+    drafts = _open_drafts(root, slot, today, waiting)
+    notes = []
+    if waiting:
+        notes.append(f"{waiting} still prescribes the old training max's loads, and a session trained from them can "
+                     f"miss the new one's: propose that week again before approving {waiting}")
+    if drafts:
+        listed = ", ".join(drafts)
+        notes.append(f"{listed} was proposed at the old training max, so finalize refuses it: propose that week "
+                     f"again before finalizing {listed}")
     return {"slot": slot, "scheme": name, "from": before, "to": value, "state": data, "decision": decision,
-            "pending_overlay": waiting, "note": note, "written": not dry_run}
+            "pending_overlay": waiting, "open_drafts": drafts, "note": "; ".join(notes) or None,
+            "written": not dry_run}
 
