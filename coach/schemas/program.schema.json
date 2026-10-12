@@ -5,7 +5,7 @@
                "interference"],
   "additionalProperties": false,
   "properties": {
-    "schema_version": {"const": 8},
+    "schema_version": {"const": 9},
     "name": {"$ref": "#/$defs/text"},
     "sessions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/session"}},
     "external_sessions": {"type": "array", "items": {"$ref": "#/$defs/external_session"}},
@@ -37,6 +37,16 @@
     },
     "missed_day_rules": {"type": "array", "items": {"$ref": "#/$defs/missed_day_rule"}},
     "dose_targets": {"$ref": "#/$defs/dose_targets"},
+    "dose_intent": {
+      "type": ["object", "null"],
+      "required": ["goal"],
+      "additionalProperties": false,
+      "properties": {
+        "goal": {"enum": ["hypertrophy", "strength", "maintenance"]},
+        "baseline": {"$ref": "#/$defs/dose_targets"},
+        "reasons": {"$ref": "#/$defs/dose_reasons"}
+      }
+    },
     "interference": {"type": "array", "items": {"$ref": "#/$defs/interference_rule"}},
     "priority": {"type": "array", "items": {"$ref": "#/$defs/priority_lift"}},
     "minimum_week": {
@@ -215,6 +225,34 @@
         "neck": {"type": "number", "minimum": 0, "maximum": 40},
         "full_body": {"type": "number", "minimum": 0, "maximum": 40},
         "other": {"type": "number", "minimum": 0, "maximum": 40}
+      }
+    },
+    "dose_reasons": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "abdominals": {"$ref": "#/$defs/text"},
+        "front_delts": {"$ref": "#/$defs/text"},
+        "side_delts": {"$ref": "#/$defs/text"},
+        "rear_delts": {"$ref": "#/$defs/text"},
+        "biceps": {"$ref": "#/$defs/text"},
+        "triceps": {"$ref": "#/$defs/text"},
+        "forearms": {"$ref": "#/$defs/text"},
+        "quadriceps": {"$ref": "#/$defs/text"},
+        "hamstrings": {"$ref": "#/$defs/text"},
+        "calves": {"$ref": "#/$defs/text"},
+        "glutes": {"$ref": "#/$defs/text"},
+        "abductors": {"$ref": "#/$defs/text"},
+        "adductors": {"$ref": "#/$defs/text"},
+        "lats": {"$ref": "#/$defs/text"},
+        "upper_back": {"$ref": "#/$defs/text"},
+        "traps": {"$ref": "#/$defs/text"},
+        "lower_back": {"$ref": "#/$defs/text"},
+        "chest": {"$ref": "#/$defs/text"},
+        "cardio": {"$ref": "#/$defs/text"},
+        "neck": {"$ref": "#/$defs/text"},
+        "full_body": {"$ref": "#/$defs/text"},
+        "other": {"$ref": "#/$defs/text"}
       }
     },
     "weekday": {"enum": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]},

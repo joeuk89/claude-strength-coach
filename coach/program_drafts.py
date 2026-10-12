@@ -351,6 +351,16 @@ def _under(prefix, path):
     return prefix + path[1:]
 
 
+def is_draft(doc):
+    """True for a draft wrapper (a `program` member and no `sessions`), False for a bare program."""
+    return isinstance(doc, dict) and "program" in doc and "sessions" not in doc
+
+
+def validate(draft, config, library, root):
+    """Every problem `program adopt` would report for a draft, as Errors with JSONPaths from the draft's root."""
+    return _draft_errors(draft, config, library, root)
+
+
 def _draft_errors(draft, config, library, root):
     """Every problem with a draft, as Errors with JSONPaths from the draft's root."""
     if not isinstance(draft, dict):

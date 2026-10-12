@@ -60,12 +60,16 @@ def read_json(path):
 def normalised(doc):
     """A copy of a schema-valid program with absent optional keys filled.
 
-    Session `location` null, `dose_targets` {}, `priority` [] with each KPI's
-    `target` and `by` null and each floor 2 sets at the prescribed RPE
-    (rn:minimum-effective-dose.4), and `minimum_week` null.
+    Session `location` null, `dose_targets` {}, `dose_intent` null, `priority`
+    [] with each KPI's `target` and `by` null and each floor 2 sets at the
+    prescribed RPE (rn:minimum-effective-dose.4), and `minimum_week` null.
     """
     doc = copy.deepcopy(doc)
     doc.setdefault("dose_targets", {})
+    doc.setdefault("dose_intent", None)
+    if doc["dose_intent"] is not None:
+        doc["dose_intent"].setdefault("baseline", {})
+        doc["dose_intent"].setdefault("reasons", {})
     doc.setdefault("priority", [])
     doc.setdefault("minimum_week", None)
     if doc["minimum_week"] is not None:
@@ -339,7 +343,17 @@ def _structure(doc):
         errors += _rule_shape_errors(rule, path)
     errors += _priority_errors(doc)
     errors += _minimum_week_errors(doc)
+    errors += _dose_intent_errors(doc)
     return errors
+
+
+def _dose_intent_errors(doc):
+    intent = doc["dose_intent"]
+    if intent is None:
+        return []
+    return [Error(f"$.dose_intent.reasons.{muscle}",
+                  f"a reason explains an agreed target; set dose_targets.{muscle} too (0 for a deliberate omission)")
+            for muscle in intent["reasons"] if muscle not in doc["dose_targets"]]
 
 
 def _priority_errors(doc):

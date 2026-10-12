@@ -23,6 +23,8 @@ CODES = {
     "restructure_required": (("warn",), True),
     "volume_undershoot": (("warn",), True),
     "session_volume_high": (("warn", "info"), True),
+    "dose_coverage_gap": (("warn",), True),
+    "dose_target_pending": (("warn",), True),
 }
 
 
@@ -111,6 +113,15 @@ class TargetsTest(unittest.TestCase):
         self.doc["dose_targets"] = {"chest": 14, "calves": 6}
         found = structure.targets(self.doc, self.library)
         self.assertEqual((found["chest"], found["calves"], found["lats"]), (14, 6, 10))
+
+    def test_a_strength_or_maintenance_goal_takes_no_fallback(self):
+        for goal in ("strength", "maintenance"):
+            with self.subTest(goal=goal):
+                self.doc["dose_intent"] = {"goal": goal, "baseline": {}, "reasons": {}}
+                self.doc["dose_targets"] = {"chest": 4}
+                self.assertEqual(structure.targets(self.doc, self.library), {"chest": 4})
+        self.doc["dose_intent"]["goal"] = "hypertrophy"
+        self.assertEqual(structure.targets(self.doc, self.library)["lats"], 10)
 
     def test_optional_and_parked_sessions_give_no_default(self):
         self.doc["sessions"][1]["tier"] = "optional"
@@ -495,18 +506,25 @@ class BalanceTest(StructureCase):
     def test_chest_undershoots_on_bench_plus_pt_and_passes_when_pt_carries_more(self):
         self.add_pt(3)
         data = self.data("structure", "balance")
-        self.assertEqual(data["muscles"]["chest"], {"target": 10, "average": 6, "met": False})
+        self.assertEqual(data["muscles"]["chest"], {"target": 10, "average": 6, "met": False, "source": "explicit",
+                                                    "baseline": None, "reason": None})
         chest = [f for f in data["flags"] if f["code"] == "volume_undershoot" and f["message"].startswith("chest:")]
         self.assertEqual(len(chest), 1)
         self.assertIn("planned 6", chest[0]["message"])
         self.add_pt(7)
         data = self.data("structure", "balance")
-        self.assertEqual(data["muscles"]["chest"], {"target": 10, "average": 10, "met": True})
+        self.assertEqual((data["muscles"]["chest"]["average"], data["muscles"]["chest"]["met"]), (10, True))
         self.assertFalse([f for f in data["flags"] if f["message"].startswith("chest:")])
 
     def test_a_target_set_at_what_is_planned_passes(self):
-        self.edit("data/program.json", lambda doc: doc.update(dose_targets={
-            "chest": 3, "quadriceps": 3, "glutes": 3, "lats": 6, "upper_back": 4.5}))
+        untrained = ("abdominals", "calves", "hamstrings", "side_delts")
+
+        def change(doc):
+            doc["dose_targets"] = dict({"chest": 3, "quadriceps": 3, "glutes": 3, "lats": 6, "upper_back": 4.5},
+                                       **dict.fromkeys(untrained, 0))
+            doc["dose_intent"] = {"goal": "hypertrophy",
+                                  "reasons": dict.fromkeys(untrained, "left out while the athlete learns the lifts")}
+        self.edit("data/program.json", change)
         data = self.data("structure", "balance")
         self.assertEqual(data["flags"], [])
         self.assertEqual(self.coach("check", "--only", "program_balance")["data"]["results"][0]["status"], "pass")

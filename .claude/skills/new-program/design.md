@@ -38,6 +38,33 @@ and `config.toml` (units, equipment and its increments).
      `available` with its defaults. For a redesign, carry over
      `interference list` `rules` (each rule's name and params), so a
      tuned param or a rule the athlete left off survives.
+   - `dose_targets` and `dose_intent`, agreed with the athlete; the
+     goal comes from that conversation, never from the nutrition phase.
+     Keep three numbers apart: the **target** (weekly fractional hard sets
+     balance judges), the **ordinary baseline** (what the athlete trains
+     in an ordinary week now) and the **minimum week** (the short-week
+     variant in `minimum_week`, checked against the ordinary program,
+     never a target). For example:
+
+     ```json
+     "dose_targets": {"chest": 4, "lats": 4, "quadriceps": 4, "hamstrings": 0},
+     "dose_intent": {"goal": "maintenance", "baseline": {"chest": 12, "lats": 12, "quadriceps": 10},
+                     "reasons": {"chest": "a third of their own 12 sets while the new job settles",
+                                 "hamstrings": "trained by their weekly hill sprints for now"}}
+     ```
+
+     Hypertrophy: a muscle without a target falls back to 10
+     (rn:volume-frequency.1). Strength: set targets from the agreed
+     priority emphasis. Maintenance: record `baseline` and agree each
+     target from it; for an athlete about 60 or older keep it nearer the
+     baseline (rn:minimum-effective-dose.2). Running counts no sets: say
+     in `reasons` how it shaped a target. A 0 with a reason records a
+     deliberate omission.
+   - Before showing the draft, run `python3 -m coach structure balance
+     --program .coach/drafts/program.json`. It only reads, and needs no
+     adopted program. Settle each `dose_coverage_gap` (a target, or a 0
+     with its reason) and `dose_target_pending` (an agreed target), and
+     weigh each `volume_undershoot` with the athlete.
    - `hevy_routines` `{}` for a first program. For a redesign, adopt
      builds `hevy.routines` only from the draft, so carry the mapping
      over: take each `hevy.routines` entry from `python3 -m coach state

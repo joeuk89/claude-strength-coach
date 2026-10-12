@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from coach import dates, flags, program, structure
+from coach import dates, flags, program, program_drafts, structure
 from coach.commands import arg, command
 from coach.config_tables import coaching
 from coach.errors import UsageError, ValidationError
@@ -42,24 +42,32 @@ def adherence(args, ctx):
     return _presented(structure.adherence(ctx.root, until, today=ctx.today(), now=ctx.now()), ctx)
 
 
+def _candidate(path, ctx):
+    """The program in FILE, a program draft or a bare program, validated as `program adopt` or `program validate`."""
+    doc = program.read_json(path)
+    library = Library.load(ctx.root)
+    if program_drafts.is_draft(doc):
+        errors, kind = program_drafts.validate(doc, ctx.config, library, ctx.root), "program draft"
+    else:
+        errors, kind = program.validate(doc, ctx.config, library, ctx.root), "program"
+    if errors:
+        raise ValidationError(f"{path} is not a valid {kind} ({len(errors)} problem(s))",
+                              details=[error.to_json() for error in errors])
+    return program.normalised(doc["program"] if kind == "program draft" else doc)
+
+
 @command(
     "structure balance",
     help="Weekly sets per muscle the program plans on core and coach-led sessions, against its dose targets",
     args=(arg("--program", metavar="FILE",
-              help="a candidate program to check instead, compared with data/program.json for new sessions"),
+              help="a candidate to check instead: a program draft (.coach/drafts/program.json) or a bare program; "
+                   "compared with data/program.json for new sessions when one is adopted"),
           arg("--variant", choices=structure.VARIANTS,
               help="minimum: check the minimum week (at most two sessions within their caps, every priority floor, "
                    "a third of the corresponding ordinary week's planned dose); exit 1 names each reason it fails")),
 )
 def balance(args, ctx):
-    candidate = None
-    if args.program:
-        candidate = program.read_json(args.program)
-        errors = program.validate(candidate, ctx.config, Library.load(ctx.root), ctx.root)
-        if errors:
-            raise ValidationError(f"{args.program} is not a valid program ({len(errors)} problem(s))",
-                                  details=[error.to_json() for error in errors])
-        candidate = program.normalised(candidate)
+    candidate = _candidate(args.program, ctx) if args.program else None
     report = _presented(structure.balance(ctx.root, candidate, args.variant, today=ctx.today(), now=ctx.now()), ctx)
     if args.variant and not report["passed"]:
         raise ValidationError(f"The minimum week fails: {'; '.join(report['reasons'])}",

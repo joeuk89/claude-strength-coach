@@ -16,3 +16,9 @@ register("volume_undershoot", owner=OWNER, severities=("warn",), structural=True
 register("session_volume_high", owner=OWNER, severities=("warn", "info"), structural=True,
          summary="More than 11 fractional sets for one muscle in one session (warn planned, info logged) "
                  "(rn:volume-frequency.3).")
+register("dose_coverage_gap", owner=OWNER, severities=("warn",), structural=True,
+         summary="A major muscle with no planned hard sets and no agreed target, or a target of 0 without a recorded "
+                 "reason.")
+register("dose_target_pending", owner=OWNER, severities=("warn",), structural=True,
+         summary="A strength or maintenance program trains a muscle with no agreed target; the coach agrees one "
+                 "instead of a default.")

@@ -83,8 +83,9 @@ redesign), offer the three paths in one message and recommend one from
 - Later edits to `data/program.json` (a swap, a fix): edit it, then
   `python3 -m coach program validate` and `python3 -m coach program
   render`. The pages are rendered — never edit them by hand.
-- A weekly balance picture (muscle group × sessions, coach-led ones
-  included), shown in the walk-through so check-ins can audit it.
+- A weekly balance picture from `python3 -m coach structure balance
+  --program .coach/drafts/program.json` before adoption (coach-led sessions
+  included); settle its flags as design.md step 4 sets out.
 
 ## 3. Redesigns: adopt with `--replace`
 

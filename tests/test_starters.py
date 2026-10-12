@@ -236,7 +236,9 @@ class AdoptedStarterTest(Case):
             with self.subTest(starter=starter_id):
                 root, _ = self.adopted(starter_id)
                 balance = self.ok(root, "structure", "balance")
-                self.assertEqual(balance["flags"], [])
+                self.assertEqual([(f["code"], f["message"].split(":")[0]) for f in balance["flags"]],
+                                 [("dose_coverage_gap", "abdominals")])
+                self.assertEqual(balance["coverage"]["abdominals"], "gap")
                 for muscle in MAJOR_MUSCLES:
                     average = balance["muscles"].get(muscle, {}).get("average", 0)
                     self.assertTrue(10 <= average <= 20, f"{muscle}: {average}")
