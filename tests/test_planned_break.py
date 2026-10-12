@@ -361,7 +361,7 @@ class MigrationTest(BlockCase):
         write_json(path, doc)
         migrate.run(self.root, dry_run=False)
         doc = read_json(path)
-        self.assertEqual(doc["schema_version"], 2)
+        self.assertEqual(doc["schema_version"], jsonio.current_version(jsonio.load_schema("blocks")))
         self.assertEqual({week["on_break"] for week in doc["blocks"][0]["weeks"]}, {0})
 
     def test_the_schemas_carry_the_new_fields(self):
