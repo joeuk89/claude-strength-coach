@@ -230,6 +230,16 @@ def approve(args, ctx):
     if overlay.is_approved(doc):
         return {"id": args.id, "hash": doc["approval"]["hash"], "approved_at": doc["approval"]["approved_at"],
                 "already_approved": True, "written": False}
+    from coach.propose import proposal_paths, structure_drift
+
+    # Only an overlay built from a proposal draft follows the program; a one-off, or a missed-day rule's copy of
+    # one, may leave out program exercises on purpose.
+    drift = structure_drift(ctx.root, doc) if proposal_paths(ctx.root, args.id)[0].is_file() else []
+    if drift:
+        raise RefusedError(f"Overlay {args.id} no longer matches data/program.json: run python3 -m coach propose "
+                           f"rebuild --proposal {args.id} and finalize it again, then present the changed lines "
+                           "before approval.",
+                           details=[{"path": None, "message": message} for message in drift])
     blocks = _approval_blocks(ctx, doc)
     if blocks:
         raise RefusedError(

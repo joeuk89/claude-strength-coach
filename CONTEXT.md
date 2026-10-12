@@ -280,8 +280,8 @@ later weeks until a set end date (four weeks by default, eight at most),
 so the progression scheme stops proposing it away; the scheme's own
 proposal is still shown beside it. It covers only sessions dated on or
 before the end date, and a deload or light week still cuts it. A one-week override changes only the
-week it was made in, except that an approved override onto an
-assistance ladder's rung moves the ladder to that rung.
+week it was made in, where a re-proposal of that week (a midweek rebuild) keeps it once approved,
+except that an approved override onto an assistance ladder's rung moves the ladder to that rung.
 _Avoid_: pinned line, manual hold, permanent override
 
 **Recovery cap**:

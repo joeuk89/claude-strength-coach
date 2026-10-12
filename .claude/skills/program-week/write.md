@@ -10,7 +10,9 @@ write line named, nothing more.
    grip width edits that exercise's `cues`), then run `python3 -m coach
    program validate` and `python3 -m coach program render`. Re-check the
    day before and after each edited session and the program's weekly
-   balance.
+   balance. Then rebuild and finalize the week's draft as compute.md
+   step 5 says, so the overlay holds the change: `overlay approve`
+   refuses an overlay built before the edit.
 2. `python3 -m coach overlay approve <id>` stamps the athlete's
    approval. It exits 3 on an unresolved `block` flag, or on a
    `load_mode_unconfirmed` line whose exercise still has no confirmed

@@ -440,15 +440,27 @@ class _View:
         return list(SESSIONS_HEADER) + self.session_rows()
 
     def changed(self):
-        found = []
+        """One bullet per exercise and change: a change repeated across sessions is listed once with its days, a
+        lift with different changes gets a bullet each, and the program's priority lifts come first."""
+        found = {}
         for row in self.week_rows:
             _, session = self.session_of(row)
+            day = _DAYS[dates.parse_date(row["date"]).weekday()]
             for line in session["exercises"]:
                 if line.get("change"):
-                    text = f"{self.short_name(line['exercise_id'])} {_change_text(line, self.show_hevy)}"
-                    reason = _change_reason(line)
-                    found.append(f"{text}: {reason}" if reason else text)
-        return found
+                    key = (line["exercise_id"], _change_text(line, self.show_hevy))
+                    item = found.setdefault(key, {"days": [], "reason": _change_reason(line), "order": len(found)})
+                    item["days"].append(day)
+        priority = [lift["exercise_id"] for lift in (self.program or {}).get("priority", [])]
+        bullets = {exercise_id for exercise_id, _ in found}
+        repeated = {e for e in bullets if sum(1 for exercise_id, _ in found if exercise_id == e) > 1}
+        texts = []
+        for (exercise_id, change), item in sorted(found.items(), key=lambda pair: (
+                priority.index(pair[0][0]) if pair[0][0] in priority else len(priority), pair[1]["order"])):
+            days = f" ({', '.join(item['days'])})" if len(item["days"]) > 1 or exercise_id in repeated else ""
+            text = f"{self.short_name(exercise_id)}{days} {change}"
+            texts.append(f"{text}: {item['reason']}" if item["reason"] else text)
+        return texts
 
     def week_docs(self):
         ids = []

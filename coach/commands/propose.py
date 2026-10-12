@@ -98,4 +98,24 @@ def restore(args, ctx):
     writes=True,
 )
 def finalize(args, ctx):
-    return propose.finalize(ctx.root, ctx.config, args.proposal, ctx.now(), args.dry_run)
+    return propose.finalize(ctx.root, ctx.config, args.proposal, ctx.now(), args.dry_run, ctx.today())
+
+
+@command(
+    "propose rebuild",
+    help="Propose a draft's span again from the program as it is now, keeping its explained edits and resolutions",
+    args=(_PROPOSAL,),
+    writes=True,
+)
+def rebuild(args, ctx):
+    return propose.rebuild(ctx.root, ctx.config, args.proposal, ctx.today(), ctx.now(), args.dry_run)
+
+
+@command(
+    "propose discard",
+    help="Remove an abandoned draft and any unapproved overlay finalized from it; approved work stays",
+    args=(_PROPOSAL,),
+    writes=True,
+)
+def discard(args, ctx):
+    return propose.discard(ctx.root, args.proposal, ctx.today(), args.dry_run)

@@ -182,6 +182,37 @@ class RenderTest(PagesCase):
         self.assertIn("2026-10-12 db_bench_press", changed[1])
         self.assertIn("2026-10-13 bb_back_squat", changed[2])
 
+    def test_changed_lists_a_repeated_change_once_keeps_distinct_ones_and_puts_priority_lifts_first(self):
+        self.edit_json("data/program.json", lambda doc: doc.update(
+            priority=[{"exercise_id": "pull_up", "kpi": {"kind": "top_reps"}}]))
+        doc = self.overlay_doc()
+        wednesday = copy.deepcopy(doc["sessions"][0])
+        wednesday["date"] = "2026-10-14"
+        friday = copy.deepcopy(doc["sessions"][1])
+        friday["date"] = "2026-10-16"
+        doc["sessions"] = sorted(doc["sessions"] + [wednesday, friday], key=lambda s: s["date"])
+        changes = {("2026-10-12", "bb_back_squat"): "97.5 → 100", ("2026-10-14", "bb_back_squat"): "97.5 → 100",
+                   ("2026-10-12", "db_bench_press"): "first prescription",
+                   ("2026-10-14", "db_bench_press"): "3×8–10 RPE 8 → 4×8 RPE 8",
+                   ("2026-10-15", "db_single_arm_row"): "first prescription",
+                   ("2026-10-16", "db_single_arm_row"): "3×10 RPE 8 → 3×12 RPE 8",
+                   ("2026-10-16", "pull_up"): "3×8 RPE 8 → 3×9 RPE 8"}
+        for session in doc["sessions"]:
+            for found in session["exercises"]:
+                found["change"] = changes.get((session["date"], found["exercise_id"]))
+                found["provenance"] = None
+                found["target_note"] = None
+        self.write_overlay(doc)
+        changed = section(self.brief(), "Changed")
+        self.assertEqual(changed, [
+            "- Pull Up 3×8 RPE 8 → 3×9 RPE 8",
+            "- Back Squat (Mon, Wed) 97.5 → 100",
+            "- Bench Press (Mon) first prescription",
+            "- Bench Press (Wed) 3×8–10 RPE 8 → 4×8 RPE 8",
+            "- Single Arm Row (Thu) first prescription",
+            "- and 1 more in the check-in",
+        ])
+
     def test_the_reason_comes_from_the_override_then_the_rationale_then_the_target_note(self):
         doc = self.overlay_doc()
         squat, bench = doc["sessions"][0]["exercises"]

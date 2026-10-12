@@ -86,7 +86,7 @@ def _load_text(value, mode, unit):
     return units.format_load(units.make_load(value, mode, unit))
 
 
-def sets_text(sets, mode, unit):
+def sets_text(sets, mode, unit, with_load=True):
     """The working sets in words, loads through units.format_load: "3×8 @ 24/hand (Hevy: 48) RPE 8"."""
     groups = []
     for s in sets:
@@ -97,7 +97,7 @@ def sets_text(sets, mode, unit):
                 f"{s.duration_seconds} s" if s.duration_seconds else
                 f"{units.json_number(s.distance_meters)} m" if s.distance_meters is not None else "?")
         words = f"{reps}+" if s.rep_out else reps
-        load = _load_text(s.load, mode, unit)
+        load = _load_text(s.load, mode, unit) if with_load else None
         if load:
             words += f" @ {load}"
         if s.rpe is not None:
@@ -249,30 +249,37 @@ class Run:
         return evidence["estimate"]["e1rm"] if evidence["estimate"] else None
 
     def last_prescription(self, session_id, exercise_id, ordinary=False):
-        """This slot's line in the newest approved overlay that has it, loads as coaching numbers.
+        """This slot's line in the newest approved overlay that has it; `recovery` names deload, light or return
+        work, else None, and `ordinary` skips such lines."""
+        return last_prescription(self.overlays, session_id, exercise_id, kind_of=self.recovery().line_kind,
+                                 ordinary=ordinary)
 
-        Lines a missed-day rule folded in (`fold`, C37) last one week, so they never stand for the slot.
-        `recovery` names deload, light or return work, else None; `ordinary` skips such lines.
+    def agreed_override(self, session_id, exercise_id, day):
+        """The override on this slot's line in the approved overlay in force on `day`, or None (C25).
+
+        It is carried while no decision for it has expired or been withdrawn; a deload overlay's sets are already
+        cut, so only a deload run carries them.
         """
-        approved = sorted((doc for doc in self.overlays if overlay.is_approved(doc)),
-                          key=lambda d: (d["created_at"], d["id"]), reverse=True)
-        for doc in approved:
-            sessions = sorted((s for s in doc["sessions"] if s["session_id"] == session_id),
-                              key=lambda s: s["date"], reverse=True)
-            for session in sessions:
-                line = next((e for e in session["exercises"]
-                             if e["exercise_id"] == exercise_id and not e.get("fold")), None)
-                if line is None:
-                    continue
-                kind = self.recovery().line_kind(doc, session, line)
-                if ordinary and kind != "normal":
-                    continue
-                return {"overlay_id": doc["id"], "session_id": session_id, "date": session["date"],
-                        "exercise_id": exercise_id, "load_mode": line["load_mode"],
-                        "sets": tuple(base.SetSpec.from_dict(s, load=history.coaching_number(s.get("load")))
-                                      for s in line["sets"]),
-                        "override": line["override"], "recovery": None if kind == "normal" else kind}
-        return None
+        approved = [doc for doc in self.overlays if overlay.is_approved(doc)]
+        found = overlay.pick_in_force(approved, day)
+        if found is None:
+            return None
+        doc = found[0]
+        sessions = [s for s in doc["sessions"] if s["session_id"] == session_id]
+        if not sessions:
+            return None
+        session = min(sessions, key=lambda s: (abs((dates.parse_date(s["date"]) - day).days), s["date"]))
+        line = next((e for e in session["exercises"] if e["exercise_id"] == exercise_id and not e.get("fold")
+                     and e.get("override")), None)
+        if line is None:
+            return None
+        made = [d for d in self.decisions["decisions"] if d["kind"] == "override"
+                and d["scope"] == {"session_id": session_id, "exercise_id": exercise_id}
+                and d["reason"] == line["override"]["reason"]]
+        if made and not any(decisions.effective_status(d, day) == "active" for d in made):
+            return None
+        return {"overlay_id": doc["id"], "kind": doc["kind"], "reason": line["override"]["reason"],
+                "sets": _coaching_sets(line["sets"]), "decayed": bool((line.get("provenance") or {}).get("decay"))}
 
     def increment(self, exercise_id, location):
         return stats.load_increment(self.library, self.config, exercise_id, location) or 0
@@ -287,6 +294,38 @@ class Run:
                 self._research = ({note.id: note for note in notes}, research.expired_areas(notes, self.today),
                                   research.local_updates_from(notes, self.today))
         return self._research or None
+
+
+def _coaching_sets(overlay_sets):
+    return tuple(base.SetSpec.from_dict(s, load=history.coaching_number(s.get("load"))) for s in overlay_sets)
+
+
+def last_prescription(overlays, session_id, exercise_id, exclude=None, kind_of=None, ordinary=False):
+    """This slot's line in the newest approved overlay that has it, loads as coaching numbers: the prior agreed
+    prescription a line's `change` is measured from.
+
+    Lines a missed-day rule folded in (`fold`, C37) last one week, so they never stand for the slot. `exclude` names
+    an overlay id to pass over, the proposal's own. `kind_of(doc, session, line)` names a line's recovery kind, and
+    `ordinary` skips lines that are not `normal`.
+    """
+    approved = sorted((doc for doc in overlays if overlay.is_approved(doc) and doc["id"] != exclude),
+                      key=lambda d: (d["created_at"], d["id"]), reverse=True)
+    for doc in approved:
+        sessions = sorted((s for s in doc["sessions"] if s["session_id"] == session_id),
+                          key=lambda s: s["date"], reverse=True)
+        for session in sessions:
+            line = next((e for e in session["exercises"]
+                         if e["exercise_id"] == exercise_id and not e.get("fold")), None)
+            if line is None:
+                continue
+            kind = kind_of(doc, session, line) if kind_of else "normal"
+            if ordinary and kind != "normal":
+                continue
+            return {"overlay_id": doc["id"], "session_id": session_id, "date": session["date"],
+                    "exercise_id": exercise_id, "load_mode": line["load_mode"],
+                    "sets": _coaching_sets(line["sets"]), "override": line["override"],
+                    "recovery": None if kind == "normal" else kind}
+    return None
 
 
 def settle(state_doc, by_id):
@@ -655,16 +694,16 @@ def propose_line(run, session, day, exercise, ctx_extra):
         clauses.append(_cut_words(cut, mode, run.unit))
 
     override = None
-    last = ctx.last_override
-    if last is not None and last["standing"]:
-        kept = tuple(base.SetSpec.from_dict(s) for s in last["chosen_sets"])
+    kept_from = _kept_override(run, ctx, session_id, exercise_id, day, transform)
+    if kept_from is not None:
+        kept = kept_from["sets"]
         chosen = base.Proposal(sets=kept, rationale="kept", derived_from=source, state={})
         chosen_cut_from = _cut_from(chosen)
         kept_adjusted = []
-        if decay is not None:
+        if decay is not None and kept_from["decay"]:
             chosen = plugin.module.decay(ctx, chosen, days_off)
             kept_adjusted.append(f"return band {decay['band']} after {days_off} days off")
-        if transform is not None:
+        if transform is not None and kept_from["transform"]:
             # A scheme's own deload rebuilds the scheme's prescription and would drop the coach's sets.
             chosen = transformed(chosen, None)
             kept_adjusted.append(f"the {transform[0].name} deload")
@@ -677,19 +716,19 @@ def propose_line(run, session, day, exercise, ctx_extra):
         if first_after_illness:
             kept_adjusted.append(f"an RPE {validity.ILLNESS_RPE_CAP} cap on the first session after illness")
         kept_adjusted += kept_words
-        override = {"reason": last["reason"], "proposed_sets": [s.to_dict() for s in sets]}
+        override = {"reason": kept_from["reason"], "proposed_sets": [s.to_dict() for s in sets]}
         scheme_text = sets_text(sets, mode, run.unit)
         kept_text = sets_text(chosen_sets, mode, run.unit)
         if kept_adjusted:
             kept_text = (f"{sets_text(kept, mode, run.unit)}, adjusted for {', '.join(kept_adjusted)}: "
                          f"{kept_text},")
-        clauses = [f"standing override until {last['until']} ({last['reason'].rstrip('. ')}) kept as "
+        clauses = [f"{kept_from['words']} ({kept_from['reason'].rstrip('. ')}) kept as "
                    f"{kept_text} instead of the scheme's {scheme_text}"]
         clauses += _kit_words(kept_kit_changes, mode, run.unit)
         if cut is not None:
             clauses.append(_cut_words(cut, mode, run.unit))
-        line_flags.append(line_flag("override_standing", f"Standing override {last['id']} until {last['until']} "
-                                                         f"kept; the scheme proposed {scheme_text}"))
+        code, message = kept_from["flag"]
+        line_flags.append(line_flag(code, f"{message}; the scheme proposed {scheme_text}"))
         sets, constraint_words = chosen_sets, kept_words
     if cut is not None and cut["held"]:
         line_flags.append(line_flag("load_cut_held", _held_cut_words(cut, info.name, mode, run.unit),
@@ -741,6 +780,25 @@ def _rep_out_words(sets):
         if words not in found:
             found.append(words)
     return ", ".join(found)
+
+
+def _kept_override(run, ctx, session_id, exercise_id, day, transform):
+    """The override a line keeps instead of its scheme's sets, or None (C25).
+
+    An active standing decision wins. Otherwise the line keeps the override approved for this session in the overlay
+    in force, a one-week override included, with the decay and transform its sets have not had yet.
+    """
+    last = ctx.last_override
+    if last is not None and last["standing"]:
+        return {"sets": tuple(base.SetSpec.from_dict(s) for s in last["chosen_sets"]), "reason": last["reason"],
+                "decay": True, "transform": True, "words": f"standing override until {last['until']}",
+                "flag": ("override_standing", f"Standing override {last['id']} until {last['until']} kept")}
+    agreed = run.agreed_override(session_id, exercise_id, day)
+    if agreed is None or (agreed["kind"] == "deload" and transform is None):
+        return None
+    return {"sets": agreed["sets"], "reason": agreed["reason"], "decay": not agreed["decayed"],
+            "transform": agreed["kind"] != "deload", "words": f"the override approved in {agreed['overlay_id']}",
+            "flag": ("override_kept", f"The override approved in {agreed['overlay_id']} kept")}
 
 
 def _exercise_info(run, session, exercise):
@@ -1039,14 +1097,31 @@ def _bounded_rung(value, rounding):
     return min(fits, key=lambda r: (abs(r - value), r * rounding.load_direction), default=None)
 
 
+FIRST_PRESCRIPTION = "first prescription"
+
+
 def change_text(before_sets, after_sets, mode, unit):
-    """"22.5/hand (Hevy: 45) → 24.5/hand (Hevy: 49)" when the top working load moved, else None."""
-    if mode not in units.LOADED_MODES or not before_sets:
-        return None
-    before, after = base.top_load(before_sets), base.top_load(after_sets)
-    if before is None or after is None or _same(before, after):
-        return None
-    return f"{_load_text(before, mode, unit)} → {_load_text(after, mode, unit)}"
+    """What moved from the prior agreed prescription, or None when nothing did.
+
+    The set shape (count, reps, RPE) and the top working load are compared apart:
+    "3×8–10 RPE 8 → 4×8 RPE 8", "100 → 110", or both, the load last. A line with no prior prescription reads
+    "first prescription", never a made-up earlier load.
+    """
+    if not before_sets:
+        return FIRST_PRESCRIPTION
+    parts = []
+    shape = [sets_text(sets, mode, unit, with_load=False) for sets in (before_sets, after_sets)]
+    if shape[0] != shape[1]:
+        parts.append(" → ".join(shape))
+    if mode in units.LOADED_MODES:
+        before, after = base.top_load(before_sets), base.top_load(after_sets)
+        if (before is None) != (after is None) or (before is not None and not _same(before, after)):
+            parts.append(f"{_load_text(before, mode, unit)} → {_load_text(after, mode, unit)}")
+        elif not parts:
+            full = [sets_text(sets, mode, unit) for sets in (before_sets, after_sets)]
+            if full[0] != full[1]:
+                parts.append(" → ".join(full))
+    return ", ".join(parts) or None
 
 
 def _core_flags(ctx, entry, exercise, sets, exposures, active, line_flag, mode):
@@ -1144,9 +1219,9 @@ def _focus(kind, span, transform):
     return f"Week of {span.start.isoformat()}: each lift as its progression scheme proposes."
 
 
-def _supersedes(run, span):
-    overlapping = [doc for doc in run.overlays
-                   if doc["span"]["start"] <= span.end.isoformat() and span.start.isoformat() <= doc["span"]["end"]]
+def _supersedes(run, span, own_id=None):
+    overlapping = [doc for doc in run.overlays if doc["id"] != own_id
+                   and doc["span"]["start"] <= span.end.isoformat() and span.start.isoformat() <= doc["span"]["end"]]
     newest = max(overlapping, key=lambda d: (d["created_at"], d["id"]), default=None)
     return newest["id"] if newest else None
 
@@ -1168,12 +1243,28 @@ def lines_of(doc, unit):
 
 
 def propose_week(root, config, today, now, span, kind="weekly", transform_name=None, plan_file=None, dry_run=False):
+    built = _build_week(root, config, today, now, span, kind, transform_name, plan_file=plan_file)
+    if not dry_run:
+        _write_built(root, built)
+    return _week_result(root, config, built, dry_run)
+
+
+def _build_week(root, config, today, now, span, kind, transform_name, plan_file=None, plan=None, proposal_id=None):
+    """Everything `propose week` writes, built and checked: the draft, its overlay, run facts and settled state.
+
+    `plan` (a SchedulePlan) and `proposal_id` let `propose rebuild` replan the same dated sessions under the same id.
+    """
     if kind not in KINDS:
         raise UsageError(f"--kind must be one of {', '.join(KINDS)}")
     run = Run(root, config, today, now)
     settled_state, settled = settle(run.state, run.by_id)
     run.state = settled_state
-    found = read_plan(run, plan_file, span) if plan_file else plan_schedule(run, span)
+    if plan is not None:
+        found = plan
+    elif plan_file:
+        found = read_plan(run, plan_file, span)
+    else:
+        span, found = _rest_of_week(run, span, kind, keep_start=proposal_id is not None)
     if not found.sessions:
         raise ValidationError(f"The schedule plans no active session in {span.start}..{span.end}")
     found, ill_flags = _without_ill_days(run, span, found)
@@ -1221,9 +1312,11 @@ def propose_week(root, config, today, now, span, kind="weekly", transform_name=N
 
     draft = {
         "schema_version": overlay.current_version(), "kind": kind, "span": span.to_json(),
-        "supersedes": _supersedes(run, span), "focus": _focus(kind, span, transform), "flags": all_flags,
+        "supersedes": _supersedes(run, span, proposal_id), "focus": _focus(kind, span, transform), "flags": all_flags,
         "sessions": draft_sessions,
     }
+    if proposal_id is not None:
+        draft["id"] = proposal_id
     doc = overlay.build(draft, config, root=root, now=now)
     doc["flags"] = validity.merge_flags(doc, validity.check_overlay(root, doc))
     doc["flags"] += _week_flags(root, config, today, span, doc) + drop_flags
@@ -1233,19 +1326,63 @@ def propose_week(root, config, today, now, span, kind="weekly", transform_name=N
         "id": doc["id"], "kind": kind, "span": span.to_json(), "transform": transform[0].name if transform else None,
         "created_at": doc["created_at"], "rotation": found.rotation,
         "scheme_state": {} if kind == "deload" else scheme_state, "dropped": dropped, "state_basis": basis,
+        "plan": None if plan is None and not plan_file else {
+            "sessions": [{"date": day.isoformat(), "session_id": sid} for day, sid in found.sessions],
+            "flags": list(found.flags)},
     }
-    if not dry_run:
-        if settled:
-            _write_state(root, settled_state, run.program)
-        _write_proposal(root, doc["id"], draft, draft, meta)
+    return {"run": run, "settled_state": settled_state, "settled": settled, "draft": draft, "proposed": draft,
+            "doc": doc, "meta": meta, "span": span, "kind": kind, "rotation": found.rotation, "dropped": dropped}
+
+
+def _write_built(root, built):
+    if built["settled"]:
+        _write_state(root, built["settled_state"], built["run"].program)
+    _write_proposal(root, built["doc"]["id"], built["draft"], built["proposed"], built["meta"])
+
+
+def _week_result(root, config, built, dry_run):
+    doc = built["doc"]
     draft_path, proposed_path, _ = proposal_paths(root, doc["id"])
     lines = lines_of(doc, config.athlete.units)
     return {
-        "id": doc["id"], "kind": kind, "span": span.to_json(), "draft": _relative(root, draft_path),
+        "id": doc["id"], "kind": built["kind"], "span": built["span"].to_json(), "draft": _relative(root, draft_path),
         "proposed": _relative(root, proposed_path), "overlay": doc, "lines": lines,
-        "lines_digest": jsonio.canonical_hash(lines), "settled": settled, "rotation": found.rotation,
-        "dropped": [_dropped_row(entry) for entry in dropped], "written": not dry_run,
+        "lines_digest": jsonio.canonical_hash(lines), "settled": built["settled"], "rotation": built["rotation"],
+        "dropped": [_dropped_row(entry) for entry in built["dropped"]], "written": not dry_run,
     }
+
+
+def _rest_of_week(run, span, kind, keep_start=False):
+    """(span, plan) from the schedule rule; a midweek run leaves out each session already trained from the span
+    start through today.
+
+    When nothing is left to train today, the span starts tomorrow, unless `keep_start`: a rebuild keeps its draft's
+    span, because the span start is part of the draft's id.
+    """
+    found = plan_schedule(run, span)
+    if kind != "midweek" or not span.start <= run.today <= span.end:
+        return span, found
+    done = trained_on(run.root, span.start, run.today)
+    if not done:
+        return span, found
+    left = tuple(planned for planned in found.sessions if planned not in done)
+    if (not keep_start and span.start == run.today and run.today < span.end
+            and not any(day == run.today for day, _ in left)):
+        span = dates.Span(run.today + timedelta(days=1), span.end)
+        found = plan_schedule(run, span)
+        left = found.sessions
+    return span, replace(found, sessions=left)
+
+
+def trained_on(root, start, end):
+    """(date, session id) pairs trained from `start` through `end`: each planned session `stats adherence` counts as
+    trained (C18), on its planned date, and any other workout logged in those days."""
+    found = stats.adherence(root, span=(start, end), today=end)
+    done = {(dates.parse_date(row["date"]), row["session_id"]) for row in found["sessions"]
+            if row["status"] == "trained"}
+    done |= {(dates.parse_date(w["date"]), w["session_id"]) for w in found["extra"]
+             if start.isoformat() <= w["date"] <= end.isoformat() and w["session_id"]}
+    return done
 
 
 def _dropped_row(entry):
@@ -1358,6 +1495,7 @@ def override(root, config, proposal_id, session_id, exercise_id, new_sets, load,
         raise ValidationError(bare_message("override", "reason", figures, exercise_id, reason, config.hevy.enabled))
     originals = _lines_by_key(proposed)
     unit = config.athlete.units
+    previous = last_prescription(overlay.list(root), session_id, exercise_id, exclude=proposal_id)
     changed = []
     for session, line in selected:
         original = originals.get(_line_key(session, line))
@@ -1374,7 +1512,7 @@ def override(root, config, proposal_id, session_id, exercise_id, new_sets, load,
             raise ValidationError(f"{exercise_id} is {line['load_mode']}, which carries no load")
         line["sets"] = [s.to_dict() for s in sets]
         line["override"] = {"reason": reason.strip(), "proposed_sets": before}
-        line["change"] = change_text(tuple(base.SetSpec.from_dict(s) for s in before), sets, line["load_mode"], unit)
+        line["change"] = change_text(previous["sets"] if previous else None, sets, line["load_mode"], unit)
         changed.append({"date": session["date"], "text": sets_text(sets, line["load_mode"], unit)})
 
     if until is not None and not standing:
@@ -1464,6 +1602,124 @@ def restore(root, config, proposal_id, session_id, reason, now, today, dry_run):
             "flags": draft["flags"], "lines": lines_of(doc, config.athlete.units), "written": not dry_run}
 
 
+def rebuild(root, config, proposal_id, today, now, dry_run):
+    """Propose a draft's span again under the same id from the program as it is now, keeping the draft's
+    explained edits and flag resolutions (C24).
+
+    An edit whose line the program no longer has is reported in `lost`, never applied elsewhere. An unapproved
+    overlay finalized from the old draft is removed, so only a new finalize can reach approval.
+    """
+    draft, proposed, meta = load_proposal(root, proposal_id)
+    path = overlay.path_for(root, proposal_id)
+    if path.exists() and overlay.is_approved(overlay.read_json(path) or {}):
+        raise RefusedError(f"Overlay {proposal_id} is already approved, so rebuild does not replace it; run "
+                           "propose week again for a new id")
+    stale = stale_reason(meta, today, overlay.list(root))
+    if stale:
+        raise RefusedError(f"Proposal {proposal_id} is stale: {stale}. Propose the week again, or discard it with "
+                           f"python3 -m coach propose discard --proposal {proposal_id}")
+    span = dates.Span(dates.parse_date(meta["span"]["start"]), dates.parse_date(meta["span"]["end"]))
+    plan = None
+    if meta.get("plan"):
+        plan = base.SchedulePlan(
+            sessions=tuple(sorted((dates.parse_date(s["date"]), s["session_id"]) for s in meta["plan"]["sessions"])),
+            rotation=None, flags=tuple(meta["plan"].get("flags", ())))
+    built = _build_week(root, config, today, now, span, meta["kind"], meta.get("transform"), plan=plan,
+                        proposal_id=proposal_id)
+    new_draft = copy.deepcopy(built["draft"])
+    kept, lost = _carry_edits(root, proposal_id, draft, proposed, new_draft, config.athlete.units)
+    doc = overlay.build(new_draft, config, root=root, now=now)
+    doc["flags"] = validity.merge_flags(doc, validity.check_overlay(root, doc))
+    resolved = {_flag_identity(f): f for f in draft.get("flags", []) if f.get("resolved")}
+    carried_resolutions = 0
+    for flag in doc["flags"]:
+        earlier = resolved.get(_flag_identity(flag))
+        if earlier is not None and not flag["resolved"] and flag["code"] != validity.UNCONFIRMED:
+            flag.update(resolved=True, resolution=earlier["resolution"])
+            carried_resolutions += 1
+    new_draft["flags"] = doc["flags"]
+    built = dict(built, draft=new_draft, doc=doc)
+    finalized = path.exists()
+    if not dry_run:
+        _write_built(root, built)
+        if finalized:
+            path.unlink()
+    result = _week_result(root, config, built, dry_run)
+    dropped_again = {(e["session_id"], e["date"]) for e in built["dropped"]}
+    restores_lost = [_dropped_row(e) for e in meta.get("dropped", [])
+                     if e.get("restored") and (e["session_id"], e["date"]) in dropped_again]
+    return dict(result, kept=kept, lost=lost, resolutions_kept=carried_resolutions, restores_lost=restores_lost,
+                overlay_removed=_relative(root, path) if finalized else None)
+
+
+def _flag_identity(flag):
+    return flag["code"], flag.get("session_id"), flag.get("exercise_id"), flag["message"]
+
+
+def _carry_edits(root, proposal_id, draft, proposed, new_draft, unit):
+    """Copy each explained line edit of `draft` onto the same session, date and exercise in `new_draft`.
+
+    Returns (kept rows, lost rows). The scheme's new sets become the line's `override.proposed_sets`.
+    """
+    originals = _lines_by_key(proposed)
+    targets = {_line_key(session, line): (session, line) for session in new_draft["sessions"]
+               for line in session["exercises"]}
+    overlays = overlay.list(root)
+    kept, lost = [], []
+    for session in draft.get("sessions", []):
+        for line in session.get("exercises", []):
+            reason = ((line.get("override") or {}).get("reason") or "").strip()
+            if not reason:
+                continue
+            key = _line_key(session, line)
+            row = {"session_id": key[0], "date": key[1], "exercise_id": key[2], "reason": reason}
+            original = originals.get(key) or {}
+            if original.get("override") == line["override"] and original.get("sets") == line["sets"]:
+                continue
+            if key not in targets:
+                lost.append(row)
+                continue
+            _, target = targets[key]
+            scheme_sets = ((target.get("override") or {}).get("proposed_sets")) or target["sets"]
+            for field, value in line.items():
+                if field not in ("override", "change", "provenance") and (field not in original
+                                                                          or original[field] != value):
+                    target[field] = copy.deepcopy(value)
+            target["override"] = {"reason": reason, "proposed_sets": scheme_sets}
+            previous = last_prescription(overlays, key[0], key[2], exclude=proposal_id)
+            target["change"] = change_text(previous["sets"] if previous else None,
+                                           tuple(base.SetSpec.from_dict(s) for s in target["sets"]),
+                                           target["load_mode"], unit)
+            kept.append(row)
+    return kept, lost
+
+
+def discard(root, proposal_id, today, dry_run):
+    """Remove a draft and any unapproved overlay finalized from it, with the scheme state pending on that overlay
+    (C24). An approved overlay of the same id, and every decision, stay as they are."""
+    draft_path, proposed_path, meta_path = proposal_paths(root, proposal_id)
+    load_proposal(root, proposal_id)
+    removed = [p for p in (draft_path, proposed_path, meta_path) if p.exists()]
+    path = overlay.path_for(root, proposal_id)
+    approved = path.exists() and overlay.is_approved(overlay.read_json(path) or {})
+    if path.exists() and not approved:
+        removed.append(path)
+    state_doc = state_module.load(root)
+    cleared = sorted(slot for slot, entry in state_doc["scheme_state"].items()
+                     if not approved and (entry.get("pending") or {}).get("overlay_id") == proposal_id)
+    standing = [d["id"] for d in decisions.load(root)["decisions"] if d["kind"] == "override" and d["standing"]
+                and d["overlay_id"] == proposal_id and decisions.effective_status(d, today) == "active"]
+    if not dry_run:
+        if cleared:
+            for slot in cleared:
+                state_doc["scheme_state"][slot] = dict(state_doc["scheme_state"][slot], pending=None)
+            _write_state(root, state_doc, program.load(root))
+        for found in removed:
+            found.unlink()
+    return {"id": proposal_id, "removed": [_relative(root, p) for p in removed], "pending_cleared": cleared,
+            "overlay_kept": approved, "standing_decisions": standing, "written": not dry_run}
+
+
 def show(root, config, proposal_id, now):
     draft, proposed, meta = load_proposal(root, proposal_id)
     doc = overlay.build(draft, config, root=root, now=now)
@@ -1474,12 +1730,70 @@ def show(root, config, proposal_id, now):
             "dropped": [_dropped_row(e) for e in meta.get("dropped", [])]}
 
 
-def finalize(root, config, proposal_id, now, dry_run):
+def stale_reason(meta, today, overlays):
+    """Why a draft no longer stands for its days, or None: its span has ended, or an overlay finalized after the
+    draft was proposed and since approved covers its remaining days (C24)."""
+    span, created = meta.get("span") or {}, meta.get("created_at")
+    if not span.get("start") or not span.get("end") or not created:
+        return None
+    if span["end"] < today.isoformat():
+        return f"its span ended on {span['end']}"
+    rest = max(span["start"], today.isoformat())
+    proposed_at = dates.parse_timestamp(created)
+    newer = [doc for doc in overlays if doc["id"] != meta.get("id") and overlay.is_approved(doc)
+             and dates.parse_timestamp(doc["created_at"]) > proposed_at
+             and doc["span"]["start"] <= span["end"] and rest <= doc["span"]["end"]]
+    if not newer:
+        return None
+    newest = max(newer, key=lambda d: (d["created_at"], d["id"]))
+    return f"overlay {newest['id']}, approved since it was proposed, covers its remaining days"
+
+
+def _refuse_structure_drift(root, doc, then):
+    drift = structure_drift(root, doc)
+    if drift:
+        raise RefusedError(f"Overlay {doc['id']} no longer matches data/program.json; {then}",
+                           details=[{"path": None, "message": message} for message in drift])
+
+
+def structure_drift(root, doc):
+    """How a pipeline-built overlay's sessions differ from the program's exercises, one message each (C24).
+
+    One-off overlays are coach-built and lines a missed-day rule folded in last one week, so neither is compared.
+    A line the program lacks passes when it carries an override reason: the coach added it for this week.
+    """
+    if doc["kind"] == "one_off" or not (Path(root) / paths.PROGRAM).is_file():
+        return []
+    sessions = {s["id"]: s for s in program.load(root)["sessions"]}
+    found = []
+    for session in doc["sessions"]:
+        planned = sessions.get(session["session_id"])
+        if planned is None:
+            found.append(f"{session['session_id']} on {session['date']} is no longer a program session")
+            continue
+        lines = [line for line in session["exercises"] if not line.get("fold")]
+        want = {line["exercise_id"] for line in planned["exercises"]}
+        missing = want - {line["exercise_id"] for line in lines}
+        extra = {line["exercise_id"] for line in lines if line["exercise_id"] not in want
+                 and not ((line.get("override") or {}).get("reason") or "").strip()}
+        if missing:
+            found.append(f"{session['session_id']} on {session['date']} lacks {', '.join(sorted(missing))}")
+        if extra:
+            found.append(f"{session['session_id']} on {session['date']} has {', '.join(sorted(extra))}, which "
+                         "the program does not list, with no override reason")
+    return found
+
+
+def finalize(root, config, proposal_id, now, dry_run, today=None):
     """Write the overlay, one-week override decisions and pending scheme state, once every change is explained (C24).
 
     Everything is built and checked before the first write, so a refusal or a dry run writes nothing.
     """
     draft, proposed, meta = load_proposal(root, proposal_id)
+    stale = stale_reason(meta, today or now.date(), overlay.list(root))
+    if stale:
+        raise RefusedError(f"Proposal {proposal_id} is stale: {stale}. Propose the week again, or discard it with "
+                           f"python3 -m coach propose discard --proposal {proposal_id}")
     state_doc = state_module.load(root)
     registry = plugins.load(root)
     _check_basis(meta, state_doc, registry, proposal_id)
@@ -1501,11 +1815,13 @@ def finalize(root, config, proposal_id, now, dry_run):
     if path.exists() and (overlay.read_json(path) or {}).get("approval"):
         raise RefusedError(f"Overlay {doc['id']} is already approved, so finalize does not replace it; run "
                            "propose week again for a new id")
+    _refuse_structure_drift(root, doc, f"run python3 -m coach propose rebuild --proposal {proposal_id}, which "
+                                       "keeps the draft's overrides, then finalize again")
 
     decision_doc = decisions.load(root)
     recorded = {(d["overlay_id"], d["scope"].get("session_id"), d["scope"].get("exercise_id"))
                 for d in decision_doc["decisions"] if d["kind"] == "override"}
-    standing = [d for d in decision_doc["decisions"] if d["kind"] == "override" and d["standing"]]
+    made = [d for d in decision_doc["decisions"] if d["kind"] == "override"]
     appended = []
     for session in draft["sessions"]:
         day = dates.parse_date(session["date"])
@@ -1515,7 +1831,8 @@ def finalize(root, config, proposal_id, now, dry_run):
             scope = (session["session_id"], line["exercise_id"])
             kept = any(d["scope"] == {"session_id": scope[0], "exercise_id": scope[1]}
                        and d["reason"] == line["override"]["reason"] and decisions.effective_status(d, day) == "active"
-                       for d in standing)
+                       and (d["standing"] or d["chosen_sets"] == line["sets"])
+                       for d in made)
             if (proposal_id, *scope) in recorded or kept:
                 continue
             record = decisions.override(_timestamp(now), doc["id"], scope[0], scope[1], line["override"]["reason"],
