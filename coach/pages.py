@@ -290,8 +290,8 @@ class _View:
     def per_hand(self, exercise_id):
         return "/hand" if self.mode(exercise_id) == "per_hand_x2" else ""
 
-    def e1rm_text(self, exercise_id, value):
-        return f"{_num(value)} {self.unit}{self.per_hand(exercise_id)}"
+    def e1rm_text(self, exercise_id, point):
+        return f"{_num(point['e1rm'])} {self.unit}{self.per_hand(exercise_id)}{stats.basis_label(point)}"
 
     def program_order(self, exercise_ids):
         """`exercise_ids` with the program's exercises first, in session order, then the rest by name."""
@@ -465,7 +465,7 @@ class _View:
             earlier = [p["e1rm"] for p in points if p["date"] < best["date"]]
             if best["date"] >= start and earlier and best["e1rm"] > max(earlier):
                 items.append(Item(f"New best e1RM: {self.short_name(exercise_id)} "
-                                  f"{self.e1rm_text(exercise_id, best['e1rm'])} "
+                                  f"{self.e1rm_text(exercise_id, best)} "
                                   f"({render.day_label(best['date'])})", PRIORITY["e1rm"]))
         current, _ = self.streak
         if current >= STREAK_WIN_WEEKS:
@@ -586,7 +586,7 @@ def _progress_summary(view):
     found = []
     for exercise_id in view.program_order(view.series)[:SUMMARY_BESTS]:
         top = max(view.series[exercise_id], key=lambda p: (p["e1rm"], p["date"]))
-        found.append(f"Best e1RM: {view.short_name(exercise_id)} {view.e1rm_text(exercise_id, top['e1rm'])} "
+        found.append(f"Best e1RM: {view.short_name(exercise_id)} {view.e1rm_text(exercise_id, top)} "
                      f"({_long_date(top['date'])})")
     if not found:
         found.append("No e1RM yet.")
@@ -649,8 +649,9 @@ def _lifts_table(view):
         before = [p for p in points if p["date"] <= cutoff]
         change = latest["e1rm"] - before[-1]["e1rm"] if before else None
         suffix = view.per_hand(exercise_id)
-        rows.append(_row([view.name(exercise_id), _num(best["e1rm"]) + suffix, _long_date(best["date"]),
-                          _num(latest["e1rm"]) + suffix, _signed(change)]))
+        rows.append(_row([view.name(exercise_id), _num(best["e1rm"]) + suffix + stats.basis_label(best),
+                          _long_date(best["date"]), _num(latest["e1rm"]) + suffix + stats.basis_label(latest),
+                          _signed(change)]))
     return rows + notes
 
 

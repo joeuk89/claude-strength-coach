@@ -10,11 +10,11 @@ from datetime import date, datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
 
 from coach import config as config_module
-from coach import capacity, dates, flags, history, overlay, program, state, units
+from coach import capacity, dates, flags, history, nutrition, overlay, program, state, units
 from coach.config_tables.sessions import cap_minutes
 from coach.errors import ConfigError
 from coach.hevy.cache import HevyCache
-from coach.library import Library
+from coach.library import Library, e1rm_supported
 
 MAX_REPS_TO_FAILURE = 12
 EASY_RPE = 5
@@ -22,6 +22,9 @@ CITES = ("rn:autoregulation.5", "rn:proximity-to-failure.5")
 BODYWEIGHT_WINDOW_DAYS = 14
 SERIES_MODES = ("total", "per_hand_x2", "single_implement")
 BODYWEIGHT_MODES = ("bodyweight", "assisted")
+TOTAL_SYSTEM = "total_system"
+LOAD_BASIS = "load"
+TOTAL_SYSTEM_LABEL = "total system mass"
 PRIMARY_WEIGHT = 1.0
 SECONDARY_WEIGHT = 0.5
 _EQUIPMENT_INCREMENT = {
@@ -92,36 +95,66 @@ def _span(value):
 
 
 def _bodyweights(root, unit, until=None):
+    """[(date, weight in `unit`, source)] from Hevy body measurements and nutrition readings dated by `until`."""
     found = []
-    for reading in HevyCache(root).body_measurements():
-        if reading.get("weight_kg") and reading.get("date") and (until is None or reading["date"][:10] <= until):
-            weight = units.from_hevy_kg(reading["weight_kg"], "total", unit)
-            found.append((dates.parse_date(reading["date"][:10]), weight))
+    for reading in HevyCache(root).body_measurements() or []:
+        day = (reading.get("date") or "")[:10]
+        if reading.get("weight_kg") and day and (until is None or day <= until):
+            found.append((dates.parse_date(day), units.from_hevy_kg(reading["weight_kg"], "total", unit), "hevy"))
+    for reading in nutrition.readings(root):
+        weight = reading["trend_weight"] if reading["trend_weight"] is not None else reading["scale_weight"]
+        if weight is None or (until is not None and reading["date"] > until):
+            continue
+        if reading["weight_unit"] != unit:
+            weight = units.mass_from_kg(units.mass_kg(weight, reading["weight_unit"]), unit)
+        found.append((dates.parse_date(reading["date"]), weight, "nutrition"))
     return found
 
 
 def _bodyweight_on(readings, day):
-    near = [(abs((when - day).days), when, weight) for when, weight in readings
+    """The reading nearest `day` within the window as {value, date, source}; a tie goes to the earlier date, then Hevy."""
+    near = [(abs((when - day).days), when, source != "hevy", weight, source) for when, weight, source in readings
             if abs((when - day).days) <= BODYWEIGHT_WINDOW_DAYS]
-    return min(near)[2] if near else None
+    if not near:
+        return None
+    _, when, _, weight, source = min(near)
+    return {"value": weight, "date": when.isoformat(), "source": source}
 
 
-def _formula_load(exposure, logged, readings):
+def _formula_load(exposure, logged, bodyweight):
     load = logged["load"]
     if load is None:
         return None
     if exposure["load_mode"] in SERIES_MODES:
         return history.coaching_number(load)
-    bodyweight = _bodyweight_on(readings, dates.parse_date(exposure["date"]))
     if bodyweight is None:
         return None
     if exposure["load_mode"] == "bodyweight":
-        return bodyweight + load["hevy_total"]
-    return bodyweight - load["hevy_total"]
+        return bodyweight["value"] + load["hevy_total"]
+    return bodyweight["value"] - load["hevy_total"]
 
 
-def _estimate_set(exposure, logged, readings):
-    number = _formula_load(exposure, logged, readings)
+def basis_label(point):
+    """The words a human display puts after an e1RM so its basis is clear: empty for an external-load e1RM."""
+    return f" {TOTAL_SYSTEM_LABEL}" if point.get("basis") == TOTAL_SYSTEM else ""
+
+
+def _unavailable(exposure, reason):
+    if reason == "unsupported_exercise":
+        message = ("no e1RM: body mass dominates this movement, so an estimate from the external load alone would "
+                   "mislead; judge it by its logged reps and load")
+    else:
+        message = (f"no e1RM on {exposure['date']}: a total-system e1RM counts body mass, and no bodyweight "
+                   f"reading lies within {BODYWEIGHT_WINDOW_DAYS} days of it; record one as a Hevy body measurement "
+                   "or a nutrition reading")
+    sets = [{"set_index": s["index"], "load": history.coaching_number(s["load"]), "reps": s["reps"], "rpe": s["rpe"]}
+            for s in exposure["sets"] if not s["discounted"] and not s["convention_unknown"]]
+    return {"reason": reason, "message": message, "date": exposure["date"], "workout_id": exposure["workout_id"],
+            "sets": sets}
+
+
+def _estimate_set(exposure, logged, bodyweight, supported):
+    number = _formula_load(exposure, logged, bodyweight)
     reps, rpe = logged["reps"], logged["rpe"]
     n = reps_to_failure(reps, rpe) if reps is not None else None
     reason = None
@@ -131,6 +164,8 @@ def _estimate_set(exposure, logged, readings):
         reason = "suspect_convention"
     elif exposure["load_mode"] not in SERIES_MODES + BODYWEIGHT_MODES:
         reason = "unsupported_load_mode"
+    elif not supported:
+        reason = "unsupported_exercise"
     elif reps is not None and reps >= 1 and logged["load"] is not None and number is None:
         reason = "no_bodyweight_reading"
     elif number is None or reps is None or reps < 1:
@@ -147,42 +182,62 @@ def _estimate_set(exposure, logged, readings):
 def e1rm_series(root, exercise_id=None, since=None, include_unsynced=False, now=None, as_of=None):
     """Comparable capacity series plus every exposure's estimate eligibility and context.
 
+    `unavailable` explains an exercise whose newest exposure can give no e1RM: the movement has none
+    (`unsupported_exercise`) or its total-system e1RM has no bodyweight reading (`no_bodyweight_reading`).
     `as_of` bounds workouts, annotations, recovery context and body weights.
     """
     config = config_module.load(root)
     until = _today(config, as_of).isoformat() if as_of else None
     readings = _bodyweights(root, config.athlete.units, until)
     since = str(since) if since else None
-    series, observations = {}, {}
+    series, observations, unavailable = {}, {}, {}
     recovery = capacity.Context(root, as_of)
     for exposure in history.all_exposures(root, include_unsynced, now, as_of):
-        if exercise_id and exposure["exercise_id"] != exercise_id:
+        key = exposure["exercise_id"]
+        if exercise_id and key != exercise_id:
             continue
         if since and exposure["date"] < since:
             continue
-        sets = [_estimate_set(exposure, logged, readings) for logged in exposure["sets"]]
+        supported = e1rm_supported(key)
+        bodyweight = None
+        if supported and exposure["load_mode"] in BODYWEIGHT_MODES:
+            bodyweight = _bodyweight_on(readings, dates.parse_date(exposure["date"]))
+        countable = not (exposure["excluded"] or exposure["suspect"]) and exposure["load_mode"] in (
+            SERIES_MODES + BODYWEIGHT_MODES)
+        gone = None
+        if countable and not supported:
+            gone = "unsupported_exercise"
+        elif countable and exposure["load_mode"] in BODYWEIGHT_MODES and bodyweight is None:
+            gone = "no_bodyweight_reading"
+        if gone:
+            unavailable[key] = _unavailable(exposure, gone)
+        elif countable:
+            unavailable.pop(key, None)
+        sets = [_estimate_set(exposure, logged, bodyweight, supported) for logged in exposure["sets"]]
         usable = [s for s in sets if s["eligible"]]
         best_set = max(usable, key=lambda s: s["e1rm"]) if usable else None
         context = recovery.for_exposure(exposure)
         comparable = best_set is not None and context["kind"] == "normal"
-        reason = (None if comparable else "recovery_context" if context["kind"] != "normal"
+        reason = (None if comparable else "unsupported_exercise" if gone == "unsupported_exercise"
+                  else "recovery_context" if context["kind"] != "normal"
                   else "over_rep_cap" if any(s["reason"] == "over_rep_cap" for s in sets)
                   else sets[0]["reason"])
         observation = {"date": exposure["date"], "workout_id": exposure["workout_id"],
                        "session_id": exposure["session_id"], "load_mode": exposure["load_mode"],
                        "eligible": best_set is not None, "comparable": comparable, "reason": reason,
                        "context": context, "e1rm": best_set["e1rm"] if best_set else None, "sets": sets}
-        observations.setdefault(exposure["exercise_id"], []).append(observation)
+        observations.setdefault(key, []).append(observation)
         if comparable:
-            point = {key: best_set[key] for key in ("e1rm", "method", "set_index", "load", "reps", "rpe")}
-            point.update(date=exposure["date"], workout_id=exposure["workout_id"])
-            series.setdefault(exposure["exercise_id"], []).append(point)
+            point = {field: best_set[field] for field in ("e1rm", "method", "set_index", "load", "reps", "rpe")}
+            point.update(date=exposure["date"], workout_id=exposure["workout_id"],
+                         basis=TOTAL_SYSTEM if bodyweight else LOAD_BASIS, bodyweight=bodyweight)
+            series.setdefault(key, []).append(point)
     best, delta = {}, {}
     for key, points in series.items():
         top = max(points, key=lambda p: (p["e1rm"], p["date"]))
         best[key] = {"e1rm": top["e1rm"], "date": top["date"]}
         delta[key] = _round(points[-1]["e1rm"] - points[-2]["e1rm"]) if len(points) > 1 else None
-    return {"series": series, "best": best, "delta": delta, "observations": observations}
+    return {"series": series, "best": best, "delta": delta, "observations": observations, "unavailable": unavailable}
 
 
 RECOVERY_NOTES = {"deload": "deload (light week)", "light": "light week", "return": "return week",
@@ -194,7 +249,8 @@ def capacity_note(observation):
 
     Lifts no e1RM can come from, and exposures missing a load, reps or bodyweight reading, get no note.
     """
-    if observation["comparable"] or observation["load_mode"] not in SERIES_MODES + BODYWEIGHT_MODES:
+    if (observation["comparable"] or observation["load_mode"] not in SERIES_MODES + BODYWEIGHT_MODES
+            or observation["reason"] == "unsupported_exercise"):
         return None
     kind = observation["context"]["kind"]
     if kind != "normal":

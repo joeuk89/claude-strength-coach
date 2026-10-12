@@ -17,7 +17,7 @@ from coach.checks.instance import _capped_value as capped_value
 from coach.checks.instance import cap_for
 from coach.config_tables.sessions import cap_minutes
 from coach.errors import ConfigError, ValidationError
-from coach.library import Library
+from coach.library import Library, e1rm_supported
 
 OWNER = "R-24"
 
@@ -485,10 +485,11 @@ class _Checker:
             return
         top = max(load for _, load, _ in sets)
         if top > before + NO_E1RM_INCREMENTS * step + 1e-9:
+            why = "" if e1rm_supported(line["exercise_id"]) else " (body mass dominates this movement)"
             self.flag("unearned_load", session, line,
                       f"{self.where(session, line)}: {_number(top)} is more than {NO_E1RM_INCREMENTS} increments "
                       f"of {_number(step)} above {_number(before)} on {baseline['date']}, and there is no "
-                      "e1RM to judge it by")
+                      f"e1RM to judge it by{why}")
 
     def check_duration(self, session):
         cap = cap_minutes(self.config, session["session_id"])

@@ -285,7 +285,10 @@
               {
                 "count": 3,
                 "type": "normal",
-                "reps": 10,
+                "rep_range": {
+                  "start": 8,
+                  "end": 12
+                },
                 "rpe": 8
               }
             ],
@@ -294,7 +297,7 @@
             "cues": "front foot far enough to keep the heel down · drop the back knee straight down",
             "constraints": [],
             "scheme": {
-              "name": "fixed_reps_rpe",
+              "name": "double_progression",
               "params": {}
             },
             "start_load": null

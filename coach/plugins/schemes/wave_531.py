@@ -86,10 +86,10 @@ def _repeats(ctx):
 
 def _hold(ctx, source):
     load = source.top_load if source else base.start_load(ctx)
+    why = "no e1RM in the last 42 days" if ctx.exercise.e1rm_supported else base.NO_E1RM_REASON
     return base.Proposal(
         sets=base.with_load(base.expand(ctx.slot.sets), load),
-        rationale=(f"5/3/1 wave: no training max and no e1RM in the last 42 days, so the program's sets hold at "
-                   f"{base.load_words(ctx, load)}"),
+        rationale=f"5/3/1 wave: no training max and {why}, so the program's sets hold at {base.load_words(ctx, load)}",
         derived_from=source, state=dict(ctx.state))
 
 

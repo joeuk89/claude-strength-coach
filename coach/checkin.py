@@ -406,7 +406,7 @@ def _e1rm(inst, window, live, now):
         entry = inst.library.get(exercise_id) or {}
         rows.append({"exercise_id": exercise_id, "name": inst.name(exercise_id),
                      "load_mode": entry.get("load_mode"), "date": latest["date"], "e1rm": latest["e1rm"],
-                     "delta": delta, "method": latest["method"]})
+                     "delta": delta, "method": latest["method"], "basis": latest["basis"]})
     rows.sort(key=lambda r: ((inst.library.get(r["exercise_id"]) or {}).get("pattern") not in compounds,
                              order.get(r["exercise_id"], len(order)), r["exercise_id"]))
     notes = {}
@@ -770,7 +770,8 @@ def _builtin_fields(inst, card, runs):
 
 def _e1rm_value(row):
     value = _text(row["e1rm"])
-    return f"{value}/hand" if row["load_mode"] == "per_hand_x2" else value
+    value = f"{value}/hand" if row["load_mode"] == "per_hand_x2" else value
+    return value + stats.basis_label(row)
 
 
 def _result_text(row):

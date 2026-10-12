@@ -13,7 +13,7 @@ from pathlib import Path
 from coach import config as config_module
 from coach import jsonio, paths, plugins, units
 from coach.errors import ConfigError, ValidationError
-from coach.library import MUSCLES, Library
+from coach.library import MUSCLES, Library, e1rm_supported
 from coach.validate import Error
 from coach.validate import validate as validate_schema
 
@@ -23,6 +23,9 @@ EXERCISE_PROBLEM = "exercise_ids"
 LOAD_MODE_PROBLEM = "load_mode"
 NO_E1RM_WARNING = "fixed_reps_no_e1rm"
 PRIORITY_NO_E1RM_WARNING = "priority_no_e1rm"
+PRIORITY_E1RM_UNSUPPORTED = "priority_e1rm_unsupported"
+E1RM_SCHEME_UNSUPPORTED = "e1rm_scheme_unsupported"
+E1RM_SCHEMES = ("fixed_reps_rpe", "rpe_anchored", "wave_531")
 RENDER_COMMAND = "program render"
 RECONCILE_COMMAND = "program reconcile-mode"
 BASES = ("old", "confirmed")
@@ -125,14 +128,26 @@ def validate(doc, config=None, library=None, root=None):
     return [error for _, error in problems(doc, config, library, root)]
 
 
+def _loads_from_e1rm(scheme):
+    if scheme["name"] == "wave_531":
+        return (scheme.get("params") or {}).get("training_max") is None
+    return scheme["name"] in E1RM_SCHEMES
+
+
 def warnings(doc):
-    """Warnings for a valid program, each starting with its code: prescriptions that cannot supply an e1RM."""
+    """Warnings for a valid program, each starting with its code: an e1RM a line or priority KPI cannot get."""
     from coach import stats
     from coach.plugins import base
 
     found = []
     for _, _, session, exercise in slots(doc):
-        if exercise["scheme"]["name"] != "fixed_reps_rpe":
+        scheme = exercise["scheme"]
+        if _loads_from_e1rm(scheme) and not e1rm_supported(exercise["exercise_id"]):
+            found.append(f"{E1RM_SCHEME_UNSUPPORTED}: {exercise['exercise_id']} in {session['id']} uses "
+                         f"{scheme['name']}, which loads from an e1RM, but body mass dominates the movement, so it "
+                         "gets no e1RM and its load holds; use double_progression")
+            continue
+        if scheme["name"] != "fixed_reps_rpe":
             continue
         to_failure = [stats.reps_to_failure(s.target_reps, s.rpe)
                       for s in base.expand(exercise["sets"]) if s.working and s.target_reps is not None]
@@ -145,6 +160,11 @@ def warnings(doc):
         if lift["kpi"]["kind"] != "e1rm":
             continue
         exercise_id = lift["exercise_id"]
+        if not e1rm_supported(exercise_id):
+            found.append(f"{PRIORITY_E1RM_UNSUPPORTED}: {exercise_id} is a priority lift with an e1rm KPI, "
+                         "but it gets no e1RM because body mass dominates the movement, so the KPI never has a "
+                         "value; set its kpi kind to top_load or top_reps")
+            continue
         working = [s for _, _, _, exercise in slots(doc) if exercise["exercise_id"] == exercise_id
                    for s in base.expand(exercise["sets"]) if s.working and s.target_reps is not None]
         if not any(stats.reps_to_failure(s.target_reps, s.rpe) <= stats.MAX_REPS_TO_FAILURE for s in working):
@@ -739,6 +759,17 @@ def render_program_page(doc, library=None, status_line=None):
 _KPI_WORDS = {"e1rm": "e1RM", "top_load": "top load", "top_reps": "top reps", "rung": "ladder rung"}
 
 
+def _e1rm_basis_words(doc, lift):
+    from coach import stats
+
+    if lift["kpi"]["kind"] != "e1rm":
+        return ""
+    if not e1rm_supported(lift["exercise_id"]):
+        return " (unavailable: body mass dominates this movement)"
+    modes = {line["load_mode"] for _, _, _, line in slots(doc) if line["exercise_id"] == lift["exercise_id"]}
+    return f" ({stats.TOTAL_SYSTEM_LABEL})" if modes & set(stats.BODYWEIGHT_MODES) else ""
+
+
 def _priority_lines(doc, library):
     """The priority lifts and the minimum week, only when the program has them, so older pages stay as they were."""
     lines = []
@@ -748,7 +779,7 @@ def _priority_lines(doc, library):
             entry = library.get(lift["exercise_id"]) if library else None
             name = entry["name"] if entry else lift["exercise_id"]
             kpi = lift["kpi"]
-            words = f"KPI {_KPI_WORDS[kpi['kind']]}"
+            words = f"KPI {_KPI_WORDS[kpi['kind']]}{_e1rm_basis_words(doc, lift)}"
             if kpi["target"] is not None:
                 words += f", target {_number(kpi['target'])}"
                 if kpi["by"]:

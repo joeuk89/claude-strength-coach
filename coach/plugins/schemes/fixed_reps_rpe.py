@@ -21,8 +21,8 @@ def propose(ctx):
     source = base.baseline(ctx.exposures)
     if ctx.e1rm is None:
         load = source.top_load if source else base.start_load(ctx)
-        return base.Proposal(sets=base.with_load(sets, load),
-                             rationale="Fixed reps at RPE: no e1RM in the last 42 days, so the load holds",
+        why = "no e1RM in the last 42 days" if ctx.exercise.e1rm_supported else base.NO_E1RM_REASON
+        return base.Proposal(sets=base.with_load(sets, load), rationale=f"Fixed reps at RPE: {why}, so the load holds",
                              derived_from=source, state={})
     found = []
     for s in sets:

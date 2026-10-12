@@ -63,6 +63,8 @@ def _backoff_rpe_programmed(ctx):
 
 def _calibration(ctx, source):
     """(e1RM, words) from the newest logged top set with reps and an RPE, else the 42-day best, else (None, None)."""
+    if not ctx.exercise.e1rm_supported:
+        return None, None
     if source is not None:
         logged = [s for s in source.sets if s.working and s.load is not None and s.reps]
         if logged:
@@ -112,8 +114,12 @@ def propose(ctx):
         load = source.top_load if source else base.start_load(ctx)
         share = HOLD_BACKOFF_PCT if pct is None else pct
         backoff = replace(backoff, rpe=backoff.rpe if _backoff_rpe_programmed(ctx) else None, load=_share(load, share))
-        why = "no e1RM in the last 42 days" if value is None else "no top-set reps or RPE target"
-        rationale = _hold_rationale(ctx, why, load, backoff, count, share, provisional=value is None)
+        supported = ctx.exercise.e1rm_supported
+        if not supported:
+            why = base.NO_E1RM_REASON
+        else:
+            why = "no e1RM in the last 42 days" if value is None else "no top-set reps or RPE target"
+        rationale = _hold_rationale(ctx, why, load, backoff, count, share, provisional=supported and value is None)
         round_down = False
     else:
         load = _floored(load_for(value, top.reps, top.rpe), ctx.exercise.increment)

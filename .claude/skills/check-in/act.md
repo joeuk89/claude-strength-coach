@@ -9,7 +9,8 @@
   change lands in `data/program.json` through program-week's write step
   (below); re-check the day before and after any edited day and the
   program's weekly balance.
-- Update `profile.md`: e1RMs, watch notes, and `_Last reviewed_` when
+- Update `profile.md`: e1RMs (a `total_system` one with "total system
+  mass" after its number), watch notes, and `_Last reviewed_` when
   they move (the deep tier refreshes the whole file). Add or retire
   **Coach's notes** as patterns emerge or resolve, with the athlete's
   confirmation.

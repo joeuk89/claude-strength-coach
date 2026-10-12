@@ -73,16 +73,30 @@ class E1rmSeriesTest(HistoryCase):
         series = self.coach("stats", "e1rm")["data"]["series"]
         self.assertEqual(series["db_bench_press"][0]["load"], 22.5)
 
-    def test_bodyweight_lifts_need_a_weigh_in_within_14_days(self):
+    def test_bodyweight_lifts_need_a_bodyweight_reading_within_14_days(self):
         from coach.hevy.cache import HevyCache
 
+        (self.root / "data" / "nutrition" / "readings.json").unlink()
         cache = HevyCache(self.root)
         cache.write_collection("body_measurements", [], "2026-10-11T12:00:00Z")
-        self.assertNotIn("pull_up", self.coach("stats", "e1rm")["data"]["series"])
+        data = self.coach("stats", "e1rm")["data"]
+        self.assertNotIn("pull_up", data["series"])
+        self.assertEqual(data["unavailable"]["pull_up"]["reason"], "no_bodyweight_reading")
         cache.write_collection("body_measurements", [{"date": "2026-10-01", "weight_kg": 80.0, "lean_mass_kg": None,
                                                      "fat_percent": None}], "2026-10-11T12:00:00Z")
         series = self.coach("stats", "e1rm", "--exercise", "pull_up")["data"]["series"]["pull_up"]
         self.assertEqual((series[0]["date"], series[0]["method"], series[0]["load"]), ("2026-10-01", "epley", 80))
+        self.assertEqual((series[0]["basis"], series[0]["bodyweight"]),
+                         ("total_system", {"value": 80, "date": "2026-10-01", "source": "hevy"}))
+
+    def test_on_one_date_a_hevy_measurement_wins_over_a_nutrition_reading(self):
+        from coach.hevy.cache import HevyCache
+
+        HevyCache(self.root).write_collection("body_measurements", [
+            {"date": "2026-09-28", "weight_kg": 80.0, "lean_mass_kg": None, "fat_percent": None}],
+            "2026-10-11T12:00:00Z")
+        first = self.coach("stats", "e1rm", "--exercise", "pull_up")["data"]["series"]["pull_up"][0]
+        self.assertEqual(first["bodyweight"], {"value": 80, "date": "2026-09-28", "source": "hevy"})
 
 
 class RepairTest(HistoryCase):
