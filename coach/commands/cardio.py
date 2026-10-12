@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from coach import cardio, dates, weekflags
+from coach.activity import actions, associations
 from coach.commands import arg, command
 from coach.errors import UsageError, ValidationError
 
@@ -36,7 +37,8 @@ def week(args, ctx):
     return cardio.week(ctx.root, span)
 
 
-@command("cardio reconcile", help="Planned activities against logged ones: done, moved, missed, upcoming, extra",
+@command("cardio reconcile",
+         help="Planned activities against logged ones: done, moved, missed, upcoming, extra, ambiguous, duplicate",
          args=(_WEEK_REQUIRED,))
 def reconcile(args, ctx):
     span = _span(ctx, week=args.week)
@@ -81,3 +83,11 @@ def render_block(args, ctx):
         target.write_bytes(after.encode("utf-8"))
     return {"week": span.label(), "into": str(target), "changed": changed, "written": changed and not args.dry_run,
             "text": region}
+
+
+@command("cardio associate", help="Associate an activity ID with a planned ID, or clear its association",
+         args=(arg("activity_id"), arg("--planned-id"), arg("--clear", action="store_true")), writes=True)
+def associate(args, ctx):
+    if args.clear == (args.planned_id is not None):
+        raise UsageError("give --planned-id or --clear")
+    return associations.associate(actions.store_for(ctx), args.activity_id, args.planned_id, args.clear, args.dry_run)

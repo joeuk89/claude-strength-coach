@@ -14,10 +14,12 @@ from coach import config as config_module
 from coach import dates, flags, history, niggles, render, stats, statusdays, units, validity, weekflags
 from coach import program as program_module
 from coach.activity.store import ActivityStore
+from coach.activity import associations
+from coach.cardio_matching import QUALITY_WORDS, resolve
+from coach.config_tables.cardio import CARDIO
 
 CITES = ("rn:running-load.1", "rn:running-load.2", "rn:running-load.3", "rn:running-load.4")
 PLAN_TIERS = ("review", "program")
-QUALITY_WORDS = ("interval", "tempo", "threshold", "hill", "fartlek", "track", "race")
 LIFTING = "lifting"
 EXTERNAL = "external"
 NOT_ACTIVITIES = (LIFTING, EXTERNAL)
@@ -120,37 +122,14 @@ def quality_of(activity, planned, rpe_min):
     return False, "none"
 
 
-def match(planned, logged, move_days, today=None):
-    """Reconcile planned activities against logged Activities (C49).
-
-    Pass 1 pairs the same kind on the same local date (`done`); pass 2 the
-    same kind within `move_days`, nearest first, ties to the earlier
-    activity and then the earlier plan (`moved`). An unmatched plan is
-    `missed` before `today` and `upcoming` from it on (every one `missed`
-    when `today` is None); an unmatched activity is `extra`.
-    """
+def match(planned, logged, move_days, today=None, links=None,
+          quality_rpe_min=CARDIO.keys["quality_rpe_min"].default):
+    """Match only mutually unique identities; unresolved candidates never supply inferred quality."""
     plans = sorted(planned, key=lambda p: (p["date"], p["id"]))
     acts = sorted(logged, key=lambda a: (a["local_date"], a["start"], a["id"]))
-    pairs, used = {}, set()
-    for pi, plan in enumerate(plans):
-        for ai, act in enumerate(acts):
-            if ai not in used and act["kind"] == plan["kind"] and act["local_date"] == plan["date"]:
-                pairs[pi] = ai
-                used.add(ai)
-                break
-    candidates = []
-    for pi, plan in enumerate(plans):
-        if pi in pairs:
-            continue
-        for ai, act in enumerate(acts):
-            gap = abs((dates.parse_date(act["local_date"]) - dates.parse_date(plan["date"])).days)
-            if ai not in used and act["kind"] == plan["kind"] and gap <= move_days:
-                candidates.append((gap, ai, pi))
-    for _, ai, pi in sorted(candidates):
-        if pi not in pairs and ai not in used:
-            pairs[pi] = ai
-            used.add(ai)
-
+    found = resolve(plans, acts, move_days, links or {}, quality_rpe_min)
+    pairs, plan_review, activity_review, candidates = (found.pairs, found.plan_review, found.activity_review,
+                                                       found.candidates)
     items = []
     for pi, plan in enumerate(plans):
         act = acts[pairs[pi]] if pi in pairs else None
@@ -160,8 +139,27 @@ def match(planned, logged, move_days, today=None):
         else:
             moved = None
             status = "upcoming" if today is not None and dates.parse_date(plan["date"]) >= today else "missed"
-        items.append(_item(status, plan, act, moved))
-    items += [_item("extra", None, act, None) for ai, act in enumerate(acts) if ai not in used]
+        reason = plan_review.get(pi)
+        if reason:
+            status = "ambiguous"
+        elif pi in found.duplicates:
+            status = "duplicate"
+            reason = f"duplicates {plans[found.duplicates[pi]]['id']}, planned by another source and matched"
+        item = _item(status, plan, act, moved)
+        item.update(match_basis=found.basis.get(pi, []), review_reason=reason,
+                    candidate_ids=sorted(acts[ai]["id"] for p, ai in candidates if p == pi)
+                    if status == "ambiguous" else [])
+        items.append(item)
+    for ai, act in enumerate(acts):
+        if ai not in pairs.values():
+            item = _item("ambiguous" if ai in activity_review else "extra", None, act, None)
+            item.update(match_basis=[], review_reason=activity_review.get(ai),
+                        candidate_ids=sorted(plans[pi]["id"] for pi, a in candidates if a == ai)
+                        if ai in activity_review else [])
+            items.append(item)
+    for item in items:
+        if item["_activity"] is not None:
+            item["quality"], item["quality_basis"] = quality_of(item["_activity"], item["_planned"], quality_rpe_min)
     return sorted(items, key=lambda i: (i["date"], i["planned_id"] or "", i["activity_id"] or ""))
 
 
@@ -176,7 +174,7 @@ def _item(status, plan, act, moved):
         "date": plan["date"] if plan else act["local_date"], "activity_date": act["local_date"] if act else None,
         "moved_days": moved if status == "moved" else None, "kind": (plan or act)["kind"],
         "title": plan["title"] if plan else act.get("name"), "target": plan.get("target") if plan else None,
-        "actual": actual, "delta": delta, "quality": bool(plan["quality"]) if plan else None,
+        "actual": actual, "delta": delta, "quality": bool(plan["quality"]) if plan else None, "quality_basis": None,
         "_planned": plan, "_activity": act,
     }
 
@@ -192,10 +190,17 @@ class _Week:
         self.root, self.config, self.span, self.today = root, config, span, today
         self.settings = _settings(config)
         self.store = _store(root, config)
-        self.activities = self.store.activities(span) if self.store else []
-        planned = self.store.planned(span) if self.store and plans_read(config) else []
-        self.items = match(planned, self.activities, self.settings["reconcile_move_days"], today)
-        self.plan_for = {i["activity_id"]: i["_planned"] for i in self.items if i["_planned"] and i["_activity"]}
+        activities = self.store.activity_groups() if self.store else []
+        self.activities = [a for a in activities if span.contains(dates.parse_date(a["local_date"]))]
+        planned = self.store.planned() if self.store and plans_read(config) else []
+        links = associations.load(root)["associations"] if self.store and plans_read(config) else {}
+        all_items = match(planned, activities, self.settings["reconcile_move_days"], today, links,
+                          self.settings["quality_rpe_min"])
+        self.items = [i for i in all_items if span.contains(dates.parse_date(i["date"]))
+                      or (i["activity_date"] and span.contains(dates.parse_date(i["activity_date"])))]
+        self.activity_days = {a["id"]: dates.parse_date(a["local_date"]) for a in activities}
+        self.match_for = {i["activity_id"]: i for i in all_items if i["_planned"] and i["_activity"]}
+        self.plan_for = {key: i["_planned"] for key, i in self.match_for.items()}
 
     def activity_entries(self):
         """(Bout, srpe) for each logged Activity."""
@@ -248,9 +253,20 @@ class _Week:
         return found
 
     def upcoming_planned(self):
-        """Planned bouts no logged Activity matched (tier review or program): from today on, or all with no today."""
-        wanted = ("upcoming",) if self.today is not None else ("missed",)
-        return [_planned_bout(i["_planned"]) for i in self.items if i["status"] in wanted]
+        """Unmatched planned bouts in the span, from today on when today is given.
+
+        An ambiguous plan stays when all its candidate runs come before its date, so a run done on
+        its own day cannot hide a later plan; a plan on or before a candidate's day may be that run,
+        which already counts.
+        """
+        return [_planned_bout(i["_planned"]) for i in self.items
+                if i["_planned"] and not i["_activity"] and i["status"] != "duplicate" and self._still_ahead(i)
+                and self.span.contains(dates.parse_date(i["date"]))
+                and (self.today is None or dates.parse_date(i["date"]) >= self.today)]
+
+    def _still_ahead(self, item):
+        day = dates.parse_date(item["date"])
+        return all(self.activity_days[ref] < day for ref in item["candidate_ids"])
 
 
 def _srpe(rpe, minutes, method):
@@ -358,7 +374,10 @@ def week(root, week_value):
         "other": dict(sorted(other.items())),
         "srpe": {"total": _number(sum(s["load"] or 0 for _, s in entries)),
                  "by_method": dict(sorted(by_method.items()))},
-        "bouts": [_bout_row(bout, srpe, unit) for bout, srpe in entries],
+        "bouts": [dict(_bout_row(bout, srpe, unit),
+                       planned_id=week_data.match_for.get(bout.ref, {}).get("planned_id"),
+                       match_basis=week_data.match_for.get(bout.ref, {}).get("match_basis", []))
+                  for bout, srpe in entries],
     }
 
 
@@ -376,12 +395,7 @@ def reconcile(root, week_value, today):
     if tier not in PLAN_TIERS or not activity_on(config):
         return {"week": _label(span), "span": span.to_json(), "tier": tier, "items": [], "summary": {}}
     week_data = _Week(root, config, span, today)
-    rpe_min = week_data.settings["quality_rpe_min"]
-    items = []
-    for item in week_data.items:
-        if item["status"] == "extra":
-            item = dict(item, quality=quality_of(item["_activity"], None, rpe_min)[0])
-        items.append(_public(item))
+    items = [_public(item) for item in week_data.items]
     summary = {}
     for item in items:
         summary[item["status"]] = summary.get(item["status"], 0) + 1
@@ -629,8 +643,14 @@ def render_text(root, week_value, today):
                 f"| {item['title'] or item['kind']} | {render.short_date(dates.parse_date(item['date']))} | "
                 f"{item['status']} | "
                 f"{render.short_date(dates.parse_date(item['activity_date'])) if item['activity_date'] else ''} | "
-                f"{_cell(_signed(_distance(delta['distance_meters'], unit)))} | "
+                f"{_cell(_signed_distance(delta['distance_meters'], unit))} | "
                 f"{_cell(_signed(_minutes(delta['duration_seconds'])))} |")
+        for item in items:
+            if item["status"] == "duplicate":
+                lines += ["", f"{item['planned_id']} {item['review_reason']}."]
+            elif item["review_reason"]:
+                lines += ["", f"Review {item['planned_id'] or item['activity_id']}: "
+                          f"{item['review_reason']} (candidates: {', '.join(item['candidate_ids']) or 'none'})."]
     lines += [""] + ([f"- {f['severity']} `{f['code']}`: {f['message']}" for f in found] or ["No cardio flags."])
     lines.append(render.end_marker(REGION_KIND, label))
     return "\n".join(lines)
@@ -638,6 +658,13 @@ def render_text(root, week_value, today):
 
 def _cell(value):
     return "" if value is None else f"{value:g}" if isinstance(value, (int, float)) else str(value)
+
+
+def _signed_distance(meters, unit):
+    if meters is None:
+        return None
+    magnitude = _distance(abs(meters), unit)
+    return _signed(-magnitude if meters < 0 else magnitude)
 
 
 def _signed(value):

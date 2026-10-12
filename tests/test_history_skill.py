@@ -28,6 +28,12 @@ class CheckInSkillTest(unittest.TestCase):
         act = flat(step_text("check-in", "act.md"))
         self.assertIn('e1RMs (a `total_system` one with "total system mass" after its number)', act)
 
+    def test_ambiguous_cardio_rows_point_at_cardio_associate(self):
+        analyse = flat(step_text("check-in", "analyze.md"))
+        self.assertIn("`ambiguous` reconcile row", analyse)
+        self.assertIn("`cardio associate ACTIVITY_ID --planned-id PLANNED_ID`", analyse)
+        self.assertIn("A `duplicate` row was done, not missed.", analyse)
+
     def test_carries_no_e1rm_formula(self):
         self.assertIsNone(re.search(r"Epley|reps\s*/\s*30|1 \+ reps", self.text))
 

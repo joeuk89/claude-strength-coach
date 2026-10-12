@@ -1,7 +1,7 @@
 """Checks on the activity-source files (contract C13, C29, C31, C32)."""
 
 from coach import dates, jsonio, paths
-from coach.activity import actions, adapters, records
+from coach.activity import actions, adapters, associations, records
 from coach.activity.store import SYNC_SCHEMA, ActivityStore, wellness_path
 from coach.checks import Result, check
 from coach.errors import ValidationError
@@ -32,10 +32,18 @@ def activity_records_valid(ctx):
         try:
             jsonio.read_doc(sync_path, SYNC_SCHEMA)
         except ValidationError as exc:
-            where = paths.ACTIVITY_SYNC.as_posix()
-            results += [Result("fail", f"{where}: {d['path']}: {d['message']}", where) for d in exc.details] \
-                or [Result("fail", exc.message, where)]
+            results += _doc_failures(paths.ACTIVITY_SYNC, exc)
+    try:
+        associations.load(ctx.root)
+    except ValidationError as exc:
+        results += _doc_failures(paths.ACTIVITY_ASSOCIATIONS, exc)
     return results
+
+
+def _doc_failures(relative, exc):
+    where = relative.as_posix()
+    return [Result("fail", f"{where}: {d['path']}: {d['message']}", where) for d in exc.details] \
+        or [Result("fail", exc.message, where)]
 
 
 @check(id="activity_wellness_location", owner="R-42a")

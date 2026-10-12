@@ -41,6 +41,7 @@ PATH_MAP = (
     ("data/activity/activities.jsonl", _ACTIVITY_CHECKS),
     ("data/activity/planned.jsonl", _ACTIVITY_CHECKS),
     ("data/activity/sync.json", _ACTIVITY_CHECKS),
+    ("data/activity/associations.json", _ACTIVITY_CHECKS),
     ("data/activity/wellness.jsonl", _ACTIVITY_CHECKS),
     (".coach/activity/wellness.jsonl", _ACTIVITY_CHECKS),
     ("data/nutrition/readings.json", ("nutrition_readings",)),

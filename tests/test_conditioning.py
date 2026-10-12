@@ -377,6 +377,27 @@ class ActivityTest(CircuitCase):
         self.assertEqual([s["reps"] for s in lines["kb_swing"]["sets"]], [11] * 5)
         self.assertIn("RPE 7", lines["kb_swing"]["provenance"]["rationale"])
 
+    def test_a_moved_low_effort_completion_still_advances_the_density_scheme(self):
+        from coach import conditioning, config
+
+        activities = self.data("activity", "list", "--kind", "conditioning")["activities"]
+        for activity in activities:
+            for record_id in activity["merged_from"]:
+                self.data("activity", "void", record_id, "--reason", "replaced by reported completion")
+        added = self.data("activity", "add", "--kind", "conditioning", "--start", "2026-10-10T09:00:00Z",
+                          "--duration-min", "12", "--rpe", "6", "--name", "Easy circuit")
+        last = conditioning.last_prescription(overlay.list(self.root), "circuit")
+        self.assertEqual(last["dates"], ["2026-10-09"])
+        matched = conditioning.bouts(self.root, config.load(self.root), last, date(2026, 10, 11))
+        self.assertEqual(matched, ({"date": "2026-10-10", "activity_id": added["record"]["id"],
+                                    "duration_seconds": 720, "rpe": 6},))
+        week = self.data("cardio", "week", "--week", "2026-W41")
+        completed = next(b for b in week["bouts"] if b["ref"] == added["record"]["id"])
+        self.assertEqual((completed["quality"], completed["quality_basis"]), (True, "kind"))
+        lines = self.circuit_lines(self.propose("--dry-run")["overlay"])
+        self.assertEqual([s["reps"] for s in lines["kb_swing"]["sets"]], [11] * 5)
+        self.assertIn("RPE 6", lines["kb_swing"]["provenance"]["rationale"])
+
 
 class LayoffTest(CircuitCase):
     """The Circuit on Wednesday and Saturday after 30 days without conditioning."""
