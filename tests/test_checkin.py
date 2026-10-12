@@ -115,7 +115,7 @@ class DueCommandTest(CheckinCase):
 class CardSessionsTest(CheckinCase):
     def test_window_mode_and_sessions(self):
         card = self.card()
-        self.assertEqual(card["schema_version"], 5)
+        self.assertEqual(card["schema_version"], 6)
         self.assertEqual(card["window"], {"start": "2026-10-05", "end": "2026-10-11"})
         self.assertEqual((card["mode"], card["days_since_last"], card["unsynced"]), ("weekly", 7, 0))
         sessions = card["sessions"]

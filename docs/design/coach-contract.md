@@ -4457,7 +4457,7 @@ earliest overlay, else at the first-review anchor, else on the end day:
 
 ```json
 {
-  "schema_version": 5,
+  "schema_version": 6,
   "date": "2026-10-11",
   "window": {"start": "2026-10-05", "end": "2026-10-11"},
   "mode": "weekly", "tier_reasons": [], "deep_deferred": false,
@@ -4604,7 +4604,10 @@ def contribute(ctx: CardContext) -> Contribution | None
   `Meal plan: <path>.` when `data.plan` is set, and omits `meal_plan`.
   When the module is absent or reports `{"enabled": false}`, it returns
   None and the builtin scale-weight field stays. A soft dependency on
-  R-33a: nothing is computed from nutrition data here.
+  R-33a: nothing is computed from nutrition data here. In catch-up mode
+  the pre-fill opens with the dates the readings cover: "Readings for the
+  last 7 days (<day> – <day>) only, not the whole gap since <window
+  start>." (`coach.nutrition.FULL_WEEK` days to the card date).
 - Expected parts from later items: R-27 (`niggles` field from `niggles
   list` and the card's `notes`: `Open: <area> (<status>), ….` and `You
   logged notes on <day> <title>, … (above).`, asking whether anything in
@@ -4682,7 +4685,10 @@ as it was):
   "layoff_days": 28,
   "summary": [{"week": "2026-W38", "planned_core": 3, "trained_core": 0, "missed_by_tag": {"untagged": 3},
                "optional_trained": 0, "external_done": null, "workouts": 0, "planned_from": "schedule"}],
-  "questions": [{"id": "gap", "n": 1, "ask": "…"}, {"id": "now", "n": 2, "ask": "…"}, {"id": "next_week", "n": 3, "ask": "…"}],
+  "questions": [{"id": "gap", "n": 1, "label": "The gap", "prefill": null, "ask": "…"},
+                {"id": "now", "n": 2, "label": "Now", "prefill": null, "ask": "…"},
+                {"id": "nutrition", "n": 3, "label": "Food", "prefill": "Readings for the last 7 days …", "ask": "a. …"},
+                {"id": "next_week", "n": 4, "label": "Next week", "prefill": null, "ask": "…"}],
   "missed": [{"date": "2026-09-17", "session_id": "session-b", "title": "Session B", "tag": "untagged"}],
   "return_week": {"proposal_id": "2026-10-12-weekly", "overlay_id": "2026-10-12-weekly", "week": "2026-W42",
                   "span": {"start": "2026-10-12", "end": "2026-10-18"}, "band": "22-42", "days_off": 28,
@@ -4722,20 +4728,27 @@ as it was):
   again. When the proposal fails (an invalid program, no session
   planned), `return_week` and `write_line` are null,
   `return_week_problem` holds the message, `checkin prepare` warns, and
-  the text ends "Answer 1–3." instead.
+  the text ends "Answer any of 1–<n>." instead.
 - The record of a catch-up check-in is titled `(catch-up)`; `checkin
   skeleton` picks that tier from the mode. Its week-review region holds
   the `Missed:` line and the summary table, never the return week (the
   region reads committed history only and runs no proposal).
 - The rotation line (the `coach_led` field, else `next_week`; in
-  catch-up mode question 3) states the position `schedule plan` infers
+  catch-up mode the `next_week` question) states the position `schedule plan` infers
   for next week and whether it is confirmed; with no plannable program
   it falls back to `state.rotation`.
+- `questions` have the card fields' shape, `{id, n, label, prefill,
+  ask}`, numbered in order: `gap`, `now`, `nutrition`, `next_week`.
+  `nutrition` is the field the weekly card would ask: the nutrition
+  part's Food field (its `nutrition status` questions and pre-fills),
+  else the builtin Bodyweight field; a part mapping it to None leaves
+  the question out and the rest renumbered.
 - The card ends with the write line (R-03's shape) and "Reply ok to accept
-  all of this, or answer 1–3." "ok" alone means: misses stay untagged,
-  nothing new to report, the return week as shown, written to Hevy.
-- Parts contribute `facts` in catch-up mode; their
-  fields are ignored.
+  all of this, or answer any of 1–<n>.", `n` the number of questions.
+  "ok" alone means: misses stay untagged, nothing new to report, no
+  food readings supplied, the return week as shown, written to Hevy.
+- Parts contribute `facts` in catch-up mode; of their fields only
+  `nutrition` is used, as above.
 - `checkin tag-gap --tag T [--dry-run]` writes one `miss` annotation per
   untagged missed planned core session in the window (`source` "checkin
   tag-gap <date>"), through `coach.history.add_annotations`, the same

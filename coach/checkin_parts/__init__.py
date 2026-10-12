@@ -21,6 +21,17 @@ class Field:
     label: str = None
 
 
+def field_lines(field):
+    """A numbered field or question in the message: `n. Label. prefill ask`, or, for a multi-line ask, the
+    prefill and each ask line on their own lines under the label."""
+    ask_lines = (field["ask"] or "").split("\n")
+    if len(ask_lines) == 1:
+        body = " ".join(part for part in (field["prefill"], field["ask"]) if part)
+        return [f"{field['n']}. {field['label']}. {body}".rstrip()]
+    lines = ([field["prefill"]] if field["prefill"] else []) + ask_lines
+    return [f"{field['n']}. {field['label']}."] + [f"   {line}" for line in lines]
+
+
 @dataclass(frozen=True)
 class Contribution:
     """What one part adds. A field mapped to None leaves that field out of the card."""

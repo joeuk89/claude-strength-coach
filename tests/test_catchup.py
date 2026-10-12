@@ -2,17 +2,23 @@
 
 import json
 import unittest
+from unittest import mock
 
-from coach import checkin, jsonio, validity
+from coach import checkin, checkin_parts, jsonio, validity
+from coach.checkin_parts import nutrition as nutrition_part
 from tests.support import FIXTURES, INSTANCES, REPO_ROOT
+from tests.support.config_edit import apply
 from tests.support.history import HistoryCase, read_json, write_json
 from tests.support.skills import skill_text
 
 GAP = INSTANCES / "gap"
 CHECKIN = INSTANCES / "checkin"
+NOHEVY = INSTANCES / "nohevy"
 WEEKS = ["2026-W38", "2026-W39", "2026-W40", "2026-W41"]
 WRITE_LINE = 'Reply "go" to train this and write: Session A, Session B (Hevy).'
-REPLY_OK = "Reply ok to accept all of this, or answer 1–3."
+REPLY_OK = "Reply ok to accept all of this, or answer any of 1–4."
+PLAN_ASK = "Anything in the plan that didn't work?"
+NEXT_WEEK_FOOD = "food exceptions next week"
 MISSED_CORE = ["2026-09-17", "2026-09-21", "2026-09-24", "2026-09-28", "2026-10-01", "2026-10-05", "2026-10-08"]
 ALTERNATING = {
     "rule": "alternating_external_anchor",
@@ -48,7 +54,7 @@ class GapCase(HistoryCase):
 
 
 class CatchUpCardTest(GapCase):
-    def test_a_28_day_gap_is_catch_up_with_a_weekly_summary_and_three_questions(self):
+    def test_a_28_day_gap_is_catch_up_with_a_weekly_summary_and_four_questions(self):
         card = self.card()
         self.assertEqual((card["mode"], card["days_since_last"], card["fields"]), ("catch_up", 28, []))
         catch_up = card["catch_up"]
@@ -60,8 +66,9 @@ class CatchUpCardTest(GapCase):
                          [(2, 1), (2, 0), (2, 0), (2, 0)])
         self.assertEqual(summary[0]["missed_by_tag"], {"untagged": 1})
         self.assertEqual([row["workouts"] for row in summary], [1, 0, 0, 0])
-        self.assertEqual([q["id"] for q in catch_up["questions"]], ["gap", "now", "next_week"])
-        self.assertEqual([q["n"] for q in catch_up["questions"]], [1, 2, 3])
+        self.assertEqual([q["id"] for q in catch_up["questions"]], ["gap", "now", "nutrition", "next_week"])
+        self.assertEqual([q["n"] for q in catch_up["questions"]], [1, 2, 3, 4])
+        self.assertEqual([q["label"] for q in catch_up["questions"]], ["The gap", "Now", "Food", "Next week"])
         gap = catch_up["questions"][0]["ask"]
         self.assertIn("time / sleep / ill / family / skipped / other", gap)
         self.assertIn(f"{validity.SYMPTOM_FREE_HOURS} hours symptom-free", gap)
@@ -97,7 +104,7 @@ class CatchUpCardTest(GapCase):
         text = self.prepare()["data"]["text"]
         self.assertIn("catch_up", text.splitlines()[0])
         self.assertIn("| 14 Sep | 1 of 2 |", text)
-        for n in (1, 2, 3):
+        for n in (1, 2, 3, 4):
             self.assertIn(f"\n{n}. ", text)
 
     def test_ten_days_is_weekly_and_eleven_is_catch_up(self):
@@ -289,10 +296,140 @@ class RotationTest(GapCase):
         coach_led = next(f for f in self.card("--tier", "weekly")["fields"] if f["id"] == "coach_led")
         self.assertIn("next week is week-b (confirmed)", coach_led["prefill"])
 
-    def test_the_catch_up_card_states_it_in_question_3(self):
+    def test_the_catch_up_card_states_it_in_the_next_week_question(self):
         self.alternate()
-        question = self.card()["catch_up"]["questions"][2]["ask"]
+        question = next(q for q in self.card()["catch_up"]["questions"] if q["id"] == "next_week")["ask"]
         self.assertIn("next week is week-a", question)
+
+
+class CatchUpFoodTest(HistoryCase):
+    """`nohevy/` with MacroFactor on, last reviewed Sunday 11 October, prepared on Sunday 25 October."""
+
+    base = NOHEVY
+
+    def setUp(self):
+        super().setUp()
+        self.env = {"COACH_NOW": "2026-10-25T18:00:00Z"}
+
+    def configure(self, values):
+        path = self.root / "config.toml"
+        path.write_text(apply(path.read_text(encoding="utf-8"), values), encoding="utf-8")
+
+    def prepared(self, *argv):
+        return self.coach("checkin", "prepare", *argv)["data"]
+
+    def food(self, card):
+        return next((q for q in card["catch_up"]["questions"] if q["id"] == "nutrition"), None)
+
+    def test_macrofactor_food_comes_from_nutrition_status_alongside_the_three_questions(self):
+        data = self.prepared()
+        card = data["card"]
+        self.assertEqual((card["mode"], card["days_since_last"], card["schema_version"]), ("catch_up", 14, 6))
+        questions = card["catch_up"]["questions"]
+        self.assertEqual([q["id"] for q in questions], ["gap", "now", "nutrition", "next_week"])
+        self.assertEqual([q["n"] for q in questions], [1, 2, 3, 4])
+        food = self.food(card)
+        self.assertEqual(food["label"], "Food")
+        asked = self.coach("nutrition", "status")["data"]["questions"]
+        self.assertEqual(food["ask"].splitlines(), [f"{letter}. {ask}" for letter, ask in zip("abc", asked)])
+        for ask in asked:
+            self.assertEqual(data["text"].count(ask), 1, ask)
+        self.assertIn("7-day average (kcal/protein)", food["ask"])
+        self.assertIn(NEXT_WEEK_FOOD, food["ask"])
+        self.assertNotIn(PLAN_ASK, data["text"])
+
+    def test_the_seven_day_readings_name_the_days_they_cover_not_the_whole_gap(self):
+        food = self.food(self.prepared()["card"])
+        self.assertEqual(food["prefill"],
+                         "Readings for the last 7 days (Mon 19 Oct – Sun 25 Oct) only, not the whole gap since "
+                         "Mon 12 Oct.")
+        self.assertNotIn("14-day", food["ask"])
+
+    def test_the_food_prefill_sits_on_its_own_line_above_the_lettered_asks(self):
+        lines = self.prepared()["text"].splitlines()
+        at = lines.index("3. Food.")
+        self.assertEqual(lines[at + 1], "   Readings for the last 7 days (Mon 19 Oct – Sun 25 Oct) only, not the "
+                                        "whole gap since Mon 12 Oct.")
+        self.assertTrue(lines[at + 2].startswith("   a. trend weight"), lines[at + 2])
+
+    def test_a_part_that_leaves_food_out_drops_the_question_and_renumbers(self):
+        def no_food(ctx):
+            return checkin_parts.Contribution(fields={"nutrition": None})
+
+        with mock.patch.object(nutrition_part, "contribute", no_food):
+            data = self.prepared()
+        questions = data["card"]["catch_up"]["questions"]
+        self.assertEqual([(q["id"], q["n"]) for q in questions], [("gap", 1), ("now", 2), ("next_week", 3)])
+        self.assertNotIn("Food.", data["text"])
+        self.assertNotIn("Bodyweight.", data["text"])
+        self.assertIn("\n3. Next week.", data["text"])
+        self.assertTrue(data["text"].splitlines()[-1].endswith("any of 1–3."))
+
+    def test_known_values_stay_prefills_and_are_not_asked_again(self):
+        self.edit_json("data/nutrition/plans/2026-10-12.json",
+                       lambda doc: doc["span"].update(start="2026-10-19", end="2026-10-25"))
+        data = self.prepared()
+        food = self.food(data["card"])
+        self.assertIn("Meal plan: nutrition/plans/2026-10-12.md.", food["prefill"])
+        self.assertNotIn("Meal plan:", food["ask"])
+        self.assertIn(PLAN_ASK, food["ask"])
+        self.assertEqual(data["text"].count("Meal plan: nutrition/plans/2026-10-12.md."), 1)
+
+    def test_without_an_app_food_asks_the_scale_questions_and_no_macrofactor_fields(self):
+        self.configure({"nutrition": {"app": "none"}})
+        food = self.food(self.prepared()["card"])
+        self.assertIn("this week's morning weigh-ins", food["ask"])
+        for word in ("trend weight", "expenditure", "MacroFactor"):
+            self.assertNotIn(word, food["ask"])
+
+    def test_nutrition_off_asks_one_morning_scale_weight_only(self):
+        self.configure({"nutrition": {"enabled": False}})
+        data = self.prepared()
+        food = self.food(data["card"])
+        self.assertEqual((food["n"], food["label"], food["prefill"], food["ask"]),
+                         (3, "Bodyweight", None, "One morning scale weight."))
+        self.assertIn("\n3. Bodyweight. One morning scale weight.\n", data["text"])
+        self.assertNotIn("Meal plan", data["text"])
+        self.assertNotIn("Food.", data["text"])
+
+    def test_labels_numbering_and_the_reply_line_agree(self):
+        data = self.prepared()
+        lines = data["text"].splitlines()
+        questions = data["card"]["catch_up"]["questions"]
+        for question in questions:
+            self.assertTrue(any(line.startswith(f"{question['n']}. {question['label']}.") for line in lines),
+                            question)
+        self.assertEqual(lines[-1], "Reply ok to accept all of this, or answer any of 1–4."
+                         if data["card"]["catch_up"]["write_line"] else "Answer any of 1–4.")
+
+    def test_a_deferred_deep_review_stays_catch_up_with_food(self):
+        card = self.prepared("--deep-reason", "light_week_proposed")["card"]
+        self.assertEqual((card["mode"], card["deep_deferred"], card["fields"]), ("catch_up", True, []))
+        self.assertIn("deep review deferred (no deep check-in on record; a light week is being proposed)",
+                      card["tier_reasons"])
+        self.assertEqual(self.food(card)["label"], "Food")
+
+    def test_the_reading_is_saved_with_its_own_date_and_no_backfilled_weeks(self):
+        before = [r["date"] for r in self.coach("nutrition", "readings")["data"]["readings"]]
+        self.coach("nutrition", "record", "--date", "2026-10-25", "--trend-weight", "80.4", "--avg-kcal", "2350",
+                   "--avg-protein", "131", "--days-logged", "7", "--anchors", "yes")
+        after = self.coach("nutrition", "readings")["data"]["readings"]
+        self.assertEqual([r["date"] for r in after], before + ["2026-10-25"])
+        self.assertEqual((after[-1]["avg_protein_g"], after[-1]["days_logged"]), (131, 7))
+        self.assertEqual(self.prepared()["card"]["mode"], "catch_up")
+
+    def test_food_answers_in_the_record_survive_a_re_render(self):
+        self.coach("checkin", "skeleton", "--date", "2026-10-25")
+        path = self.root / "check-ins" / "2026-10-25.md"
+        answers = ("Weight: trend 80.4 kg (MacroFactor, 25 Oct).\n"
+                   "Nutrition: 7-day average 2,350 kcal / 131 g protein (19–25 Oct), 7 of 7 days logged.\n")
+        text = path.read_text(encoding="utf-8")
+        self.assertTrue(text.startswith("# Check-in — 2026-10-25 (catch-up)\n"))
+        path.write_text(text.replace("## Coach's read\n", "## Coach's read\n\n" + answers), encoding="utf-8")
+        before = path.read_text(encoding="utf-8")
+        self.coach("checkin", "skeleton", "--date", "2026-10-25", "--refresh")
+        self.assertEqual(path.read_text(encoding="utf-8"), before)
+        self.assertIn(answers, before)
 
 
 class RegistrationTest(unittest.TestCase):
@@ -314,6 +451,12 @@ class CheckInSkillTest(unittest.TestCase):
     def test_catch_up_path(self):
         for words in ("catch_up", "python3 -m coach checkin tag-gap", "lines_digest", "propose finalize",
                       "overlay approve", "routines push"):
+            with self.subTest(words=words):
+                self.assertIn(words, self.text)
+
+    def test_catch_up_food(self):
+        for words in ("or answer any of 1–4", "with nutrition off, **Bodyweight**",
+                      "one reading dated the check-in date, and nothing for the earlier weeks of the gap"):
             with self.subTest(words=words):
                 self.assertIn(words, self.text)
 

@@ -102,6 +102,14 @@ class ApplicableFieldsTest(CardSourcesCase):
         self.assertIn("Meal plan: nutrition/plans/2026-10-12.md.", food["prefill"])
         self.assertIn(PLAN_ASK, food["ask"])
 
+    def test_the_meal_plan_prefill_sits_on_its_own_line_above_the_lettered_asks(self):
+        data = self.card()
+        food = self.field(data["card"], "nutrition")
+        lines = data["text"].splitlines()
+        at = lines.index(f"{food['n']}. Food.")
+        self.assertTrue(lines[at + 1].startswith("   Meal plan: nutrition/plans/2026-10-12.md."), lines[at + 1])
+        self.assertTrue(lines[at + 2].startswith("   a. "), lines[at + 2])
+
     def test_no_meal_plan_means_no_plan_question(self):
         self.without("data/nutrition/plans")
         food = self.field(self.card()["card"], "nutrition")
@@ -152,7 +160,7 @@ class LoggedNotesTest(CardSourcesCase):
     def test_workout_and_exercise_notes_reach_the_card_and_the_record_once(self):
         self.log(notes=WORKOUT_NOTE, bench_notes=BENCH_NOTE)
         data = self.card()
-        self.assertEqual(data["card"]["schema_version"], 5)
+        self.assertEqual(data["card"]["schema_version"], 6)
         notes = [{k: n[k] for k in ("date", "session_id", "exercise_id", "text")} for n in data["card"]["notes"]]
         self.assertEqual(notes, [
             {"date": "2026-10-12", "session_id": "session-a", "exercise_id": None, "text": WORKOUT_NOTE},
