@@ -29,7 +29,7 @@ def prepare(args, ctx):
     if card["unsynced"]:
         ctx.warn(f"{card['unsynced']} workout(s) in the window are not in data/history yet; the card reads them "
                  "from the Hevy cache. Run python3 -m coach history sync before writing the record")
-    return {"card": card, "text": checkin.card_text(card)}
+    return {"card": card, "text": checkin.card_text(card, ctx.config.athlete.units)}
 
 
 @command(

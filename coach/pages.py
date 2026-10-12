@@ -100,12 +100,6 @@ def _num(value):
     return "0" if text in ("", "-0") else text
 
 
-def _signed(value):
-    if value is None:
-        return "—"
-    return "±0" if value == 0 else f"{'+' if value > 0 else ''}{_num(value)}"
-
-
 def _long_date(day):
     day = dates.parse_date(day) if isinstance(day, str) else day
     return f"{day.day} {_MONTHS[day.month - 1]} {day.year}"
@@ -291,7 +285,7 @@ class _View:
         return "/hand" if self.mode(exercise_id) == "per_hand_x2" else ""
 
     def e1rm_text(self, exercise_id, point):
-        return f"{_num(point['e1rm'])} {self.unit}{self.per_hand(exercise_id)}{stats.basis_label(point)}"
+        return stats.e1rm_text(point, bool(self.per_hand(exercise_id)), self.unit)
 
     def program_order(self, exercise_ids):
         """`exercise_ids` with the program's exercises first, in session order, then the rest by name."""
@@ -462,7 +456,8 @@ class _View:
             best = max(points, key=lambda p: (p["e1rm"], p["date"]))
             earlier = [p["e1rm"] for p in points if p["date"] < best["date"]]
             if best["date"] >= start and earlier and best["e1rm"] > max(earlier):
-                items.append(Item(f"New best e1RM: {self.short_name(exercise_id)} "
+                label = "e1RM" if items else stats.E1RM_LABEL
+                items.append(Item(f"New best {label}: {self.short_name(exercise_id)} "
                                   f"{self.e1rm_text(exercise_id, best)} "
                                   f"({render.day_label(best['date'])})", PRIORITY["e1rm"]))
         current, _ = self.streak
@@ -585,7 +580,8 @@ def _progress_summary(view):
     found = []
     for exercise_id in view.program_order(view.series)[:SUMMARY_BESTS]:
         top = max(view.series[exercise_id], key=lambda p: (p["e1rm"], p["date"]))
-        found.append(f"Best e1RM: {view.short_name(exercise_id)} {view.e1rm_text(exercise_id, top)} "
+        label = "e1RM" if found else stats.E1RM_LABEL
+        found.append(f"Best {label}: {view.short_name(exercise_id)} {view.e1rm_text(exercise_id, top)} "
                      f"({_long_date(top['date'])})")
     if not found:
         found.append("No e1RM yet.")
@@ -642,17 +638,17 @@ def _lifts_table(view):
     notes = ["", "e1RM notes:"] + notes if notes else []
     if not view.series:
         return ["No e1RM yet: it comes from logged working sets of barbell, dumbbell and machine lifts."] + notes
-    rows = [_row(["Lift", f"Best e1RM ({view.unit})", "Date", "Latest", f"{CHANGE_DAYS}-day change"]),
+    rows = [stats.e1rm_meaning(view.unit), "",
+            _row(["Lift", f"Best e1RM ({view.unit})", "Date", "Latest", f"{CHANGE_DAYS}-day change"]),
             "|---|---|---|---|---|"]
     for exercise_id, points in sorted(view.series.items(), key=lambda pair: view.name(pair[0])):
         best = max(points, key=lambda p: (p["e1rm"], p["date"]))
         latest = points[-1]
         before = [p for p in points if p["date"] <= cutoff]
         change = latest["e1rm"] - before[-1]["e1rm"] if before else None
-        suffix = view.per_hand(exercise_id)
-        rows.append(_row([view.name(exercise_id), _num(best["e1rm"]) + suffix + stats.basis_label(best),
-                          _long_date(best["date"]), _num(latest["e1rm"]) + suffix + stats.basis_label(latest),
-                          _signed(change)]))
+        per_hand = bool(view.per_hand(exercise_id))
+        rows.append(_row([view.name(exercise_id), stats.e1rm_text(best, per_hand), _long_date(best["date"]),
+                          stats.e1rm_text(latest, per_hand), units.signed_whole(change)]))
     return rows + notes
 
 

@@ -347,8 +347,9 @@ def week(root, week_value):
     workouts = week_data.workouts()
     entries = sorted(week_data.lifting_entries(workouts) + week_data.external_entries()
                      + week_data.activity_entries(), key=lambda e: _order(e[0]))
-    hard_sets = sum(1 for w in workouts for e in w["exercises"] if e["exercise_id"] for s in e["sets"]
-                    if s["type"] in history.WORKING_SET_TYPES and (s["rpe"] is None or s["rpe"] > stats.EASY_RPE))
+    working = [s for w in workouts for e in w["exercises"] if e["exercise_id"] for s in e["sets"]
+               if s["type"] in history.WORKING_SET_TYPES]
+    hard_sets = sum(1 for s in working if s["rpe"] is None or s["rpe"] > stats.EASY_RPE)
     lifting_minutes = [w["duration_minutes"] for w in workouts if w["duration_minutes"] is not None]
     acts = [b for b, _ in entries if b.is_activity()]
     runs = [b for b in acts if b.kind == "run"]
@@ -365,7 +366,7 @@ def week(root, week_value):
     return {
         "week": _label(span), "span": span.to_json(), "tier": _settings(config)["tier"], "distance_unit": unit,
         "activity_source": activity_on(config),
-        "lifting": {"workouts": len(workouts), "hard_sets": hard_sets,
+        "lifting": {"workouts": len(workouts), "working_sets": len(working), "hard_sets": hard_sets,
                     "minutes": _number(sum(lifting_minutes))},
         "external": {"done": sum(1 for b, _ in entries if b.kind == EXTERNAL)},
         "run": {"count": len(runs), "distance": _distance(sum(b.distance_meters or 0 for b in runs), unit),
@@ -641,9 +642,15 @@ def render_text(root, week_value, today):
              f"**Cardio, {label}** ({render.short_date(span.start)} → {render.short_date(span.end)}) · "
              f"tier {numbers['tier']}", ""]
     lifting = numbers["lifting"]
-    lines.append(f"Lifting: {lifting['workouts']} workouts, {lifting['hard_sets']} hard sets, "
-                 f"{_cell(lifting['minutes'])} min · coach-led done: {numbers['external']['done']} · "
-                 f"session-RPE load {_cell(numbers['srpe']['total'])} (information only)")
+    hard = _count_text(lifting["hard_sets"], "hard set")
+    lines.append(f"Lifting: {_count_text(lifting['workouts'], 'workout')}, {_cell(lifting['minutes'])} min, "
+                 f"{hard} of {_count_text(lifting['working_sets'], 'working set')} "
+                 f"(a working set logged at RPE {stats.EASY_RPE} or below is not a hard set) · "
+                 f"coach-led done: {numbers['external']['done']}")
+    lines += ["", f"Session-RPE load: {units.whole(numbers['srpe']['total'])} arbitrary units, each session's "
+                 "minutes × session RPE (0–10; a lifting session's is the mean RPE of its working sets, "
+                 f"or {KIND_RPE[LIFTING]} when most have none), "
+                 "summed over the week; information only, with no target or limit"]
     if not numbers["activity_source"]:
         lines += ["", "No activity source: runs and conditioning are not counted."]
     else:

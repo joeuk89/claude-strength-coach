@@ -119,7 +119,7 @@ class WeekTest(CardioCase):
         self.assertEqual(data["run"], {"count": 2, "distance": 18.5, "minutes": 110, "quality": 1})
         self.assertEqual(data["conditioning"], {"count": 1, "minutes": 20})
         self.assertEqual(data["other"], {"ride": {"count": 1, "minutes": 45}})
-        self.assertEqual(data["lifting"], {"workouts": 2, "hard_sets": 12, "minutes": 118})
+        self.assertEqual(data["lifting"], {"workouts": 2, "working_sets": 12, "hard_sets": 12, "minutes": 118})
         self.assertEqual(data["external"], {"done": 0})
         by_ref = {b["ref"]: b for b in data["bouts"]}
         self.assertEqual((by_ref["manual:2026-10-06-run-1"]["quality"],
