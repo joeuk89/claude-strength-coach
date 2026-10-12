@@ -1005,8 +1005,9 @@ def _priority_weeks(inst, lifts, since, until):
     window = dates.Span(spans[0].start, spans[-1].end)
     matched = stats.adherence_of(inst.root, pairs, window, today=inst.today, now=inst.now)
     status = {(r["date"], r["session_id"]): r["status"] for r in matched["sessions"]}
-    rested = {(r["date"], r["session_id"]) for r in matched["on_break"]}
-    sessions_by_key = {(s["date"], s["session_id"]): s for _, s in pairs if (s["date"], s["session_id"]) not in rested}
+    on_break_keys = {(r["date"], r["session_id"]) for r in matched["on_break"]}
+    sessions_by_key = {(s["date"], s["session_id"]): s for _, s in pairs
+                       if (s["date"], s["session_id"]) not in on_break_keys}
     trained_on = {}
     for workout in inst.workouts():
         if workout["conditioning"]:

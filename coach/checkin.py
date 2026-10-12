@@ -33,7 +33,7 @@ from coach.library import Library
 DEEP_AFTER_DAYS = 42
 E1RM_ROW_LIMIT = 8          # a heuristic: as many lifts as a message reads at a glance
 WORD_CEILINGS = {"weekly": 600, "deep": 1000, "catch-up": 600}    # heuristics, prose words outside regions
-CARD_VERSION = 6
+CARD_VERSION = 7
 TIERS = ("weekly", "deep", "catch-up")
 CARD_TIERS = ("weekly", "deep")
 CHECK_IN = "check-in"
@@ -638,7 +638,7 @@ def _hevy(inst, end):
 
 def misses(root, since, until, now=None, include_unsynced=True):
     """Missed sessions by tag and by session: `miss` annotations plus untagged missed planned sessions (C18).
-    An optional session skipped is not a miss, so it is never counted."""
+    An optional session skipped, or a session on a planned break (C50), is not a miss, so it is never counted."""
     since, until = _as_date(since), _as_date(until)
     by_tag = {tag: 0 for tag in history.MISS_TAGS + ("untagged",)}
     by_session = {}
@@ -654,11 +654,13 @@ def misses(root, since, until, now=None, include_unsynced=True):
     spans = {doc["id"]: doc["span"] for doc in docs}
     planned = [(row["session_id"], spans[row["overlay_id"]]) for row in adherence["sessions"] + adherence["on_break"]]
     moved = overlay.moved_away(docs)
+    off = {day.isoformat() for day in statusdays.break_days(root, dates.Span(since, until))}
     for row in adherence["sessions"]:
         if row["status"] == "missed" and row["session_id"] not in optional:
             count(row["tag"], row["session_id"])
     for note in history.annotations(root, "miss"):
-        if not since.isoformat() <= note["date"] <= until.isoformat() or note["session_id"] in optional:
+        in_span = since.isoformat() <= note["date"] <= until.isoformat()
+        if not in_span or note["session_id"] in optional or note["date"] in off:
             continue
         if (note["date"], note["session_id"]) in moved or any(
                 sid == note["session_id"] and span["start"] <= note["date"] <= span["end"] for sid, span in planned):

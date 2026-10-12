@@ -160,9 +160,10 @@ class BriefTest(BreakCase):
 
 
 class MissesTest(BreakCase):
-    def misses_with_a_note_on_the_break(self, *argv):
+    def misses_with_a_note_on_the_break(self, *argv, overlay=True):
         self.add_break(*BREAK, *argv)
-        self.write_one_off()
+        if overlay:
+            self.write_one_off()
         self.data("history", "annotate", "--kind", "miss", "--date", "2026-10-19", "--session", "session-a",
                   "--tag", "other", now=CLOSE_DAY)
         return checkin.misses(self.root, "2026-10-19", "2026-11-01", now=CLOSE_DAY)["sessions_missed"]
@@ -170,8 +171,14 @@ class MissesTest(BreakCase):
     def test_a_miss_note_on_a_break_day_is_not_a_miss(self):
         self.assertEqual(self.misses_with_a_note_on_the_break("--no-training"), 0)
 
+    def test_a_miss_note_on_a_break_day_is_not_a_miss_without_an_overlay(self):
+        self.assertEqual(self.misses_with_a_note_on_the_break("--no-training", overlay=False), 0)
+
     def test_without_the_intent_the_noted_session_is_one_miss(self):
         self.assertEqual(self.misses_with_a_note_on_the_break(), 1)
+
+    def test_without_the_intent_or_an_overlay_the_noted_session_is_one_miss(self):
+        self.assertEqual(self.misses_with_a_note_on_the_break(overlay=False), 1)
 
 
 class CatchUpTest(BreakCase):

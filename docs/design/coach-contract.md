@@ -4493,7 +4493,7 @@ earliest overlay, else at the first-review anchor, else on the end day:
 
 ```json
 {
-  "schema_version": 6,
+  "schema_version": 7,
   "date": "2026-10-11",
   "window": {"start": "2026-10-05", "end": "2026-10-11"},
   "mode": "weekly", "tier_reasons": [], "deep_deferred": false,
@@ -4504,7 +4504,8 @@ earliest overlay, else at the first-review anchor, else on the end day:
               "status": "trained", "moved": false, "unlogged": false, "tag": null,
               "workout_id": "…", "workout_date": "2026-10-05", "minutes": 58, "cap_minutes": 45}],
     "external": [{"date": "2026-10-06", "external_id": "pt-tue", "title": "PT", "done": null, "note": null}],
-    "extra": []
+    "extra": [],
+    "on_break": []
   },
   "exercises": [{"date": "2026-10-05", "session_id": "session-a", "exercise_id": "bb_back_squat",
                  "name": "Back Squat (Barbell)", "prescribed": "3×5 @ 97.5 @ RPE 7.5",
@@ -4593,7 +4594,9 @@ earliest overlay, else at the first-review anchor, else on the end day:
   and `until`. Counts each missed planned session (C18 adherence over the
   span, by its tag or `untagged`) and each `miss` annotation in the span
   that no planned session's overlay span could match, so a tagged miss is
-  counted once. A session the program marks `optional` is never counted.
+  counted once. A session the program marks `optional` is never counted,
+  nor a `miss` annotation dated on a planned-break day (C50), with or
+  without an overlay over it.
 - `facts` collects the parts' contributions; facts print above the fields.
 
 **Fields.** Ids and order are R-01's Sunday message: `sessions`,
@@ -5945,19 +5948,18 @@ Flags (registered in `coach/flags/block.py`; rows in C20):
   count nor reset; a break week is judged on planned-break coverage alone,
   never on whether an overlay was written for it, and a one-off in force
   only on break days leaves a partly covered week to the classes below);
-  `return` when a
-  session of the overlay in force carries a line decay past `0-10` and the last lifting workout before the first such
-  session is more than 10 days back (R-02: a return week follows a
-  layoff of 11+ days, so one stale lift rotated back in never ends a
-  block); `low` when trained is under half of planned; `hard` when
-  trained as prescribed is at least three quarters of planned; else
-  `partial` (also with nothing planned). A partial break's covered
-  sessions leave `planned` (C41 `on_break`), so the sessions left are
-  classed as usual. Trained as prescribed counts
-  coach-led sessions `done` and core sessions logged against the overlay
-  line (or the program session when no overlay covered the day),
-  comparing `min(logged, prescribed)` working sets per line; a
-  `trained_unlogged` session has no logged sets, so it is not.
+  `return` when a session of the overlay in force carries a line decay past
+  `0-10` and the last lifting workout before the first such session is more
+  than 10 days back (R-02: a return week follows a layoff of 11+ days, so
+  one stale lift rotated back in never ends a block); `low` when trained is
+  under half of planned; `hard` when trained as prescribed is at least three
+  quarters of planned; else `partial` (also with nothing planned). A partial
+  break's covered sessions leave `planned` (C41 `on_break`), so the sessions
+  left are classed as usual. Trained as prescribed counts coach-led sessions
+  `done` and core sessions logged against the overlay line (or the program
+  session when no overlay covered the day), comparing
+  `min(logged, prescribed)` working sets per line; a `trained_unlogged`
+  session has no logged sets, so it is not.
 - **Triggers**: readiness and sleep only for the week `--week` names
   (earlier weeks of a catch-up close read sleep from
   `coach.cardio.sleep_debt` only, else `unknown`). RPE drift: a compound
