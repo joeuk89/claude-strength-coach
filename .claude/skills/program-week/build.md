@@ -51,8 +51,8 @@ from `overlay build --input <draft>`.
    - `rpe_infeasible`, `session_over_cap` (warn): name each in the
      coach's brief, with the change you made or why it stands. A rep
      range passes when any whole rep target in it fits the RPE; a deload,
-     light, return, post-illness or RPE-capped line's RPE is a ceiling,
-     flagged only when the load is too hard for it.
+     light or return line's RPE, or a post-illness or RPE-capped set's at
+     or over its cap, is a ceiling, flagged only when the load is too hard.
 
    Fix, then validate and check again until no `block` flag is left. A
    block you and the athlete decide to keep needs its flag's `resolved`

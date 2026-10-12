@@ -2649,8 +2649,11 @@ coach.validity.estimate_minutes(root, session) -> int
   A recovery line's RPE is a **ceiling**, flagged only when the implied
   RPE at the fewest reps is more than 1 above it: a `deload`-kind
   overlay (deload, light and return weeks), a line with
-  `provenance.decay`, the first session after illness and a line under
-  an active C26 `rpe_cap` (rn:deloads.9). A rep-out set's `rpe` is its
+  `provenance.decay`, and, on the first session after illness or a line
+  under an active C26 `rpe_cap`, each set whose RPE is missing or at or
+  over that cap (rn:deloads.9); a set under every cap keeps its RPE a
+  target. The line's `feasibility` names how many working
+  sets read a ceiling when only some do. A rep-out set's `rpe` is its
   cap, not a target (C10), so it is judged as a ceiling on any line,
   never for being lighter. A lower-bound estimate (C18)
   never shows a load beyond failure or too hard for its RPE; the
@@ -3570,8 +3573,12 @@ niggle rows (C27):
 - **RPE ceilings change the work.** A ceiling set is every working set
   of a return-band line or a `deload`-kind week, and each set whose RPE
   an `rpe_cap` or the illness cap lowered. A cap the set already meets
-  leaves its RPE the program's target, so its progression and model check
-  stay as they are without the cap. Each ceiling set's load is at most
+  leaves its RPE the program's target, so its load stays as it is without
+  the cap. Two readers still see the cap there: double progression holds
+  an isolation line logged over its target RPE while any `rpe_cap` is in
+  force, and the C22 check reads an RPE equal to a cap as a ceiling,
+  because the overlay cannot tell it from one the cap lowered. The check
+  reads an RPE under every cap as a target. Each ceiling set's load is at most
   `coach.stats.load_for(e1rm, fewest reps, its RPE)` to 0.01 at the
   line's C22 model evidence, then rounds down to the kit; the rationale
   and `constraint_applied` give the model load and the kit's. A load

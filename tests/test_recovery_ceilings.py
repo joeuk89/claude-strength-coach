@@ -158,6 +158,23 @@ class ModelCeilingTest(CeilingCase):
         self.assertEqual([c for c in line_codes(doc, "bb_back_squat") if c in MODEL_CODES],
                          [c for c in line_codes(before, "bb_back_squat") if c in MODEL_CODES])
 
+    def test_a_cap_above_the_rpe_still_lets_the_check_call_the_load_too_easy(self):
+        self.prescribe_squat_rpe(9)
+        before = self.propose()
+        self.assertIn("target RPE 9, but", line_flag(before, "bb_back_squat", "rpe_infeasible")["message"])
+        self.cap("bb_back_squat", value=9.5, status="chronic")
+        doc = self.propose()
+        self.assertEqual(find_line(doc, "bb_back_squat")["sets"], find_line(before, "bb_back_squat")["sets"])
+        self.assertEqual(line_flag(doc, "bb_back_squat", "rpe_infeasible")["message"],
+                         line_flag(before, "bb_back_squat", "rpe_infeasible")["message"])
+
+    def test_the_check_reads_an_rpe_at_the_cap_as_a_ceiling(self):
+        self.prescribe_squat_rpe(9)
+        self.cap("bb_back_squat", value=9, status="chronic")
+        doc = self.propose()
+        self.assertEqual(self.rpes(doc, "bb_back_squat"), {9})
+        self.assertNotIn("rpe_infeasible", line_codes(doc, "bb_back_squat"))
+
     def test_a_limit_a_hair_under_a_kit_load_lands_on_that_load(self):
         self.prescribe_squat_rpe(8)
         self.use_plugin("bb_back_squat", step=5)
