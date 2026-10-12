@@ -2,7 +2,8 @@
 
 from dataclasses import asdict
 
-from coach import jsonio, log
+from coach import dates, jsonio, log, timing
+from coach.activity.records import utc_text
 from coach.history_sources import SourceWorkout
 from coach.library import Library
 
@@ -31,8 +32,11 @@ def _source_workout(line, title, library):
         exercises.append({"exercise_id": exercise["exercise_id"], "title": entry["name"] if entry else "",
                           "hevy_template_id": None, "load_mode": exercise["load_mode"], "unit": exercise["unit"],
                           "notes": exercise["notes"], "sets": sets})
+    start = line.get("start_time")
+    end = timing.end_of(dates.parse_timestamp(start), line["duration_minutes"]) if start else None
     return SourceWorkout(
-        source="manual", workout_id=line["id"], date=line["date"], duration_minutes=line["duration_minutes"],
+        source="manual", workout_id=line["id"], date=line["date"], start_time=start,
+        end_time=utc_text(end) if end else None, duration_minutes=line["duration_minutes"],
         title=title, description=line["notes"], session_id=line["session_id"], overlay_id=line["overlay_id"],
         exercises=exercises,
     )

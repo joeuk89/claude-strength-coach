@@ -7,7 +7,7 @@ plugin ever converts or doubles a load.
 """
 
 from dataclasses import dataclass, field, replace
-from datetime import date, timedelta
+from datetime import date, timedelta, timezone
 from typing import Callable, Optional
 
 from coach import flags as _flags
@@ -258,17 +258,33 @@ def timed(bout):
 
 
 def bout_end(bout):
-    """When the bout ended: its end, else its start plus its minutes, else None."""
+    """When the bout ended: its end, else its start plus its minutes of elapsed time, else None."""
     if bout.end is not None:
         return bout.end
     if bout.start is not None and bout.minutes is not None:
-        return bout.start + timedelta(minutes=bout.minutes)
+        return (bout.start.astimezone(timezone.utc) + timedelta(minutes=bout.minutes)).astimezone(bout.start.tzinfo)
     return None
 
 
 def hours_between(earlier, later):
-    """Hours from one moment to a later one (negative when `later` comes first)."""
-    return (later - earlier).total_seconds() / 3600
+    """Elapsed hours from one moment to a later one (negative when `later` comes first), across offset changes."""
+    return (later.astimezone(timezone.utc) - earlier.astimezone(timezone.utc)).total_seconds() / 3600
+
+
+def timing_gaps(entries):
+    """What the bouts lack for an hour-level judgement, as message text: "no start time for X; no duration for Y".
+
+    `entries` are (bout, text, need_end) triples; `need_end` asks for the bout's end (a start and duration) too.
+    """
+    parts = []
+    for bout, text, need_end in entries:
+        if bout.start is None and need_end and bout_end(bout) is None and bout.minutes is None:
+            parts.append(f"no start time or duration for {text}")
+        elif bout.start is None:
+            parts.append(f"no start time for {text}")
+        elif need_end and bout_end(bout) is None:
+            parts.append(f"no duration for {text}")
+    return "; ".join(parts)
 
 
 def hours_text(hours):

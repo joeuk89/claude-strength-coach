@@ -123,7 +123,7 @@ class ActivityStore:
                 if span.contains(dates.parse_date(a["local_date"])) and (kinds is None or a["kind"] in kinds)]
 
     def planned(self, span=None, kinds=None):
-        found = [records.strip(r) for r in self.records("planned")
+        found = [{"start": None, **records.strip(r)} for r in self.records("planned")
                  if (span is None or span.contains(dates.parse_date(r["date"])))
                  and (kinds is None or r["kind"] in kinds)]
         return sorted(found, key=lambda r: (r["date"], self.rank(r["source"]), r["id"]))

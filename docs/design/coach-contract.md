@@ -217,6 +217,7 @@ Phase 2 to 4 command inventory. No command here writes to Hevy.
 | `schedule plan --week W`, `decisions list`, `propose show ID` | R-23a | |
 | `schedule confirm --position P`, `propose week`, `propose override`, `propose resolve`, `propose finalize`, `propose rebuild`, `propose discard`, `decisions withdraw ID` | R-23a | W |
 | `propose restore --proposal ID --session S --reason TEXT [--dry-run]` | R-44b | W |
+| `propose time --proposal ID --session S [--date D] (--start TIME [--duration-min N] \| --clear) [--dry-run]` | R-44a | W |
 | `followups list`, `followups render`, `niggles list`, `niggles constraints` | R-27 | |
 | `followups add\|resolve\|drop\|defer`, `niggles add\|update\|resolve\|import` | R-27 | W |
 | `checkin prepare [--until D] [--tier weekly\|deep] [--deep-reason CODE ...]`, `checkin misses [--since D] [--until D]`, `checkin due` | R-21a | |
@@ -1081,7 +1082,26 @@ for every non-GET request, success or failure, once its retries are over.
   (C23). Its migration turns the `failure` set of each wave line
   (`provenance.scheme` `wave_531`, no `override`) into a rep-out set,
   with `rpe` 9 when it had none, as earlier versions wrote a wave's
-  rep-out set that way.
+  rep-out set that way. v6 adds a session's planned `start` (a C7
+  timestamp) and `duration_minutes` (whole minutes, at least 1), both
+  nullable; its migration writes null on every session. A draft's
+  session may give `start` as `HH:MM` on its date or an ISO 8601
+  timestamp (with an offset, or local time in `[athlete] timezone`);
+  `overlay build` stores it as UTC and exits 1, at
+  `$.sessions[i].start`, when it falls on another date than the
+  session's (judged in the text's own offset when that is not UTC, else
+  in `[athlete] timezone`). A stored C7 timestamp has lost its travel
+  offset, so it reads back when any real offset (-12:00 to +14:00) puts
+  it on the session's date. `overlay build` reads a draft at
+  `schema_version` 5 as 6, so a proposal drafted before v6 still builds,
+  untimed. Every mode
+  keeps both: a proposal's finalize and rebuild, a one-off draft and a
+  missed-day rule's copy (a shifted session drops its `start`, which
+  belonged to the old date).
+  `overlay build` replaces the overlay's interference flags with the
+  rules' judgement of its sessions (C51). With an invalid library it
+  keeps the draft's flags, since the rules need the library to find heavy
+  lower-body work, and `overlay approve` exits 1 until it is repaired.
 
 ## C11. Rendered markdown markers (R-13, R-16, R-17a; later renderers follow it)
 
@@ -3304,17 +3324,27 @@ id follows C10. `data.lines_digest` (R-21b) is the C7 canonical hash of
   ties it to that occurrence of its slot; a message naming no date the
   slot has (an older flag, or one a missed-day rule moved) stands for
   every line of the slot. Each command that judges a draft's flags again
-  (`propose week`, `override`, `restore`, `rebuild`, `finalize`, and
-  `show` for its output) settles each one against its lines: once every
-  working set has a load, the flag is resolved with `first load set:
+  (`propose week`, `override`, `restore`, `time`, `rebuild`, `finalize`,
+  and `show` for its output) settles each one against its lines: once
+  every working set has a load, the flag is resolved with `first load set:
   <loads> on <date>, not yet trained`; when a working set loses its load,
   that automatic resolution is withdrawn and the flag is open again. A
   resolution written with `propose resolve` stays. `propose rebuild`
   never carries an automatic resolution over: it judges the new lines.
+- `propose time --proposal ID --session S [--date D] (--start TIME
+  [--duration-min N] | --clear) [--dry-run]` sets one session's planned
+  `start` and `duration_minutes` in the draft (C10 v6; `--date` when the
+  draft holds the session twice), or clears both, then judges the
+  interference rules again (C51). Only the session's timing changes, so
+  finalize needs no override reason. It returns `{id, session_id, date,
+  start, duration_minutes, interference, finalized, written}`;
+  `finalized` true means an overlay of that id exists, so finalize
+  again. A start on another date exits 1.
 - `propose restore --proposal ID --session S --reason TEXT [--dry-run]` (R-44b) puts
   a dropped conditioning session back and resolves its flag with the
   reason; finalize accepts it.
-- `propose finalize --proposal ID [--dry-run]` re-runs step 5. It exits
+- `propose finalize --proposal ID [--dry-run]` re-runs step 5, judging
+  the interference rules on the draft's sessions as they now are. It exits
   1 if any line differs from `.proposed.json` without `override.reason`,
   and exits 3 if a `block` flag is unresolved, if the draft is stale
   (below) or if its sessions no longer hold the program's exercises (as
@@ -3340,8 +3370,10 @@ id follows C10. `data.lines_digest` (R-21b) is the C7 canonical hash of
   draft explained with `override.reason` goes onto the same session,
   date and exercise, with the new scheme sets as `proposed_sets`; one
   whose line is gone is listed in `lost`. Flag resolutions carry to
-  identical flags. An unapproved overlay finalized from the old draft is
-  removed, so only a new finalize reaches approval. A midweek draft
+  identical flags, and each session's planned `start` and
+  `duration_minutes` carry to the same session and date. An unapproved
+  overlay finalized from the old draft is removed, so only a new
+  finalize reaches approval. A midweek draft
   keeps its span and id, and leaves out each session trained from the
   span start through today, so a rebuild the next day never plans a
   session trained the day before. It exits 3 for an approved overlay of
@@ -4017,15 +4049,27 @@ short nights for the separate seven-day fatigue decision.
   those fields only. `field_sources` leaves out `id`, `source` and
   `source_id`, which are the winner's.
 
-Planned-activity record (`planned_record.schema.json`):
+Planned-activity record (`planned_record.schema.json`, v2):
 
 ```json
-{"schema_version": 1, "op": "upsert", "id": "runna:20261014-easy", "source": "runna",
+{"schema_version": 2, "op": "upsert", "id": "runna:20261014-easy", "source": "runna",
  "recorded_at": "2026-10-11T18:00:00Z",
  "date": "2026-10-14", "kind": "run", "title": "Easy 5 km", "quality": false,
+ "start": "2026-10-14T06:30:00Z",
  "target": {"distance_meters": 5000, "duration_seconds": null, "description": "Zone 2"},
  "notes": null, "content_hash": "sha256:..."}
 ```
+
+- v2 adds `start`, required and nullable: when the activity is planned
+  to start (C7 timestamp). Its end is `start` plus the target duration.
+  A v1 line has no `start` and still reads, as an untimed plan
+  (`planned()` returns `start` null for it); lines keep their version
+  (C29). `planned add --start TIME` takes `HH:MM` on `--date` in
+  `[athlete] timezone` or an ISO 8601 timestamp, and exits 1 when it
+  falls on another date. `planned add` exits 3, writing nothing, when a
+  live plan already holds the same session (C49's identity: date, kind,
+  quality, title and targets), naming it and `planned void`; `--again`
+  adds a second identical session that day.
 
 - A planned activity is a dated activity the athlete or a plan intends.
   `quality` is true for intervals, tempo, threshold, hills and races (R-43
@@ -4061,7 +4105,8 @@ def normalise(item, ctx) -> list[dict]: ...
   adapter's `CONFIG`, so a new adapter is one new file: its config table,
   sync and status come with it.
 - A normalised record goes to the file its shape names: `span` is
-  wellness, `date` is planned, anything else is an activity. A void goes
+  wellness, `date` without `local_date` is planned (a missing `start` is
+  stored as `null`), anything else is an activity. A void goes
   to whichever of the adapter's `KINDS` files holds the id. Every line is
   validated before anything is appended; an invalid record, or a file
   outside `KINDS`, fails that adapter.
@@ -6902,8 +6947,8 @@ R-14b's `routines create`; adopt itself never calls Hevy.
 corrections are a `void` line plus a new entry:
 
 ```json
-{"schema_version": 1, "kind": "workout", "id": "manual:2026-10-12-session-a-1",
- "logged_at": "2026-10-12T19:05:00Z", "date": "2026-10-12",
+{"schema_version": 2, "kind": "workout", "id": "manual:2026-10-12-session-a-1",
+ "logged_at": "2026-10-12T19:05:00Z", "date": "2026-10-12", "start_time": "2026-10-12T17:50:00Z",
  "session_id": "session-a", "overlay_id": "2026-10-12-weekly",
  "duration_minutes": 55, "notes": "",
  "exercises": [
@@ -6923,6 +6968,13 @@ corrections are a `void` line plus a new entry:
 - Ids are `manual:<date>-<session_id>-<n>` (`adhoc` for no session);
   `n` counts from 1 per date and session, voided ids included.
 - `session_id` and `overlay_id` may be null (an unplanned workout).
+- v2 adds `start_time`, required and nullable (C7 timestamp). `log add`
+  takes it as `HH:MM` on the line's date in `[athlete] timezone` or an
+  ISO 8601 timestamp, stores it as UTC and exits 1 when it falls on
+  another date; it writes every new line at v2. A v1 line, without
+  `start_time`, still reads as untimed. The manual history source gives
+  the workout `start_time` and an `end_time` of start plus
+  `duration_minutes`, so logged interference judges its hours (C51).
 - Schemas: `manual_workout_line` (`kind: "workout"`) and
   `manual_void_line` (`kind: "void"`), both claiming the file through
   `x-coach-paths` (C7).
@@ -6931,8 +6983,8 @@ corrections are a `void` line plus a new entry:
   (its session S nearest to D, so a moved session prefills too; no
   overlay, or none with S, exits 1).
   Fixed reps and loads are filled as prescribed; a `rep_range` or a
-  rep-out set (C10) leaves `reps` null; `rpe` and `duration_minutes` are
-  null. Warm-up sets are left out. The draft records observations only:
+  rep-out set (C10) leaves `reps` null; `rpe`, `start_time` and
+  `duration_minutes` are null. Warm-up sets are left out. The draft records observations only:
   an RPE target or stop is never a logged RPE, and a range or a rep-out
   minimum is never a count.
   `data.ask` keeps the prescription beside the draft, one item per
@@ -7145,7 +7197,7 @@ external_session_rpe = 6
 @dataclass(frozen=True)
 class Bout:
     date: date
-    start: datetime | None        # None for planned bouts (no times are planned)
+    start: datetime | None        # None when not known: a v1 plan, an untimed session, a coach-led session
     end: datetime | None
     kind: str                     # "lifting" | "external" | a C30 activity kind
     source: str                   # "logged" | "planned"
@@ -7159,7 +7211,8 @@ class Bout:
 coach.cardio.bouts(root, span, mode, overlay=None, today=None) -> list[Bout]
 #   mode "logged":   C17 workouts, C30 activities, C17 `external` annotations marked done
 #   mode "proposal": the overlay's sessions (kind "conditioning" for a conditioning session, else
-#                    "lifting"; ref "<overlay id>/<session id>", minutes None), external sessions
+#                    "lifting"; ref "<overlay id>/<session id>"; start and minutes from the session's
+#                    `start` and `duration_minutes`, C10 v6), external sessions
 #                    placed on their `weekday`, and at tier review|program the planned activities
 #                    no logged Activity matched (an ambiguous plan is left out unless every
 #                    candidate activity is dated before it); with `today`, only dates from today on.
@@ -7459,8 +7512,11 @@ class InterferenceContext:
 
 | Rule | Proposal mode | Logged mode |
 |---|---|---|
-| `same_day` | lifting or coach-led bout and a quality activity on one date → `collision` info ("same day: lift first, keep at least 6 h between") | gap between the earlier bout's end and the later's start < `min_gap_hours`, or (`lift_first`) the quality activity starts first → `collision` warn |
-| `quality_before_heavy_lower` | quality activity on the date before a heavy-lower bout → `collision` warn | quality activity ending < `hours` before a heavy-lower bout starts → `collision` warn |
+| `same_day` | untimed: lifting or coach-led bout and a quality activity on one date → `collision` info ("same day: lift first, keep at least 6 h between") | timed: gap between the earlier bout's end and the later's start < `min_gap_hours`, or (`lift_first`) the quality activity starts first → `collision` warn |
+| `quality_before_heavy_lower` | untimed: quality activity on the date before a heavy-lower bout → `collision` warn, saying the gap is unknown | timed: quality activity ending < `hours` before a heavy-lower bout starts → `collision` warn |
+
+Either column applies in either mode: what decides is whether the pair's
+times are known (Built with R-44a, Timing).
 
 - `collision` messages name both bouts (title, date, time when known), the
   rule and the actual gap. The flag's `session_id` is the lifting session.
@@ -7483,13 +7539,42 @@ class InterferenceContext:
   unmatched plans from today on, as `cardio flags` reads them), so a
   session on the span's first day is judged against the day before.
   Timestamps are in `[athlete] timezone`.
-- A pair is judged on timestamps when both bouts have times, and at day
-  level otherwise (a planned bout, a coach-led annotation), with the
-  proposal-mode severities. At day level `quality_before_heavy_lower`
-  looks 1 to `ceil(hours / 24)` days back. On timestamps it judges any
-  quality activity ending under `hours` before the session starts, the
-  same date included, so a quality run before a heavy squat session on
-  one day raises both rules.
+- **Timing.** A bout's start comes from its record: a logged Activity
+  or workout (Hevy, or a manual line's `start_time`, C46 v2), a planned
+  activity's `start` (C30 v2) and an overlay session's `start` (C10 v6).
+  Its end is its `end`, else its start plus its minutes (a plan's target
+  duration, a session's `duration_minutes`). Every gap is elapsed time:
+  both moments go to UTC before subtracting and an end is added in UTC,
+  so offsets, midnight and daylight-saving changes count actual hours.
+  `base.timing_gaps` names what a pair lacks.
+- `quality_before_heavy_lower` judges hours when the activity's end and
+  the session's start are known: a quality activity ending under `hours`
+  before the session starts, the same date included, so a quality run
+  before a heavy squat session on one day raises both rules. Otherwise it
+  looks 1 to `ceil(hours / 24)` days back at day level, still `warn`, and
+  the message says the gap in hours is unknown, names each missing start
+  or duration, says it may or may not be under `hours`, and asks for the
+  times; it never states a measured breach.
+- `same_day` judges a pair on one date, and a pair across midnight whose
+  measured spacing is under `min_gap_hours`. With both starts and the
+  earlier bout's end it is `warn` when the gap is short or (`lift_first`)
+  the activity came first, and nothing otherwise. With both starts but no
+  end for the earlier bout, the order is known: `warn` when it breaks
+  `lift_first` or the starts are already under the gap apart, else `info`
+  saying the gap is unknown. Without both starts it is `info` saying the
+  order and gap are unknown, naming what is missing. The 6-hour and
+  24-hour policies and the heavy-session definition are unchanged; the
+  24-hour rule is labelled a cautious coaching heuristic in its message.
+- **Every proposed week.** `propose week` (every kind) judges the rules
+  through the weekflags provider (`coach.interference.flags`). `propose
+  time`, `propose finalize`, `propose rebuild`, a missed-day rule's copy
+  and `overlay build` (a constrained or reshuffled one-off week) judge
+  them on the overlay's sessions before approval, through
+  `coach.interference.refresh(root, config, doc, today)`: it replaces
+  every earlier interference flag (`collision` and each instance rule's
+  codes, `coach.interference.codes(root)`) with the rules' judgement now,
+  keeping the resolution of an identical flag, so a recheck adds no copy
+  and a moved session drops a collision it no longer has.
 - Heavy lower reads a rep range by its start (the fewest reps asked). A
   rule without `heavy_rpe` or `heavy_max_reps` gets 7 and 6.
 - `program validate` checks each rule's params against its plugin and
@@ -7511,9 +7596,13 @@ class InterferenceContext:
   week it judges planned activities against logged lifting alone;
   `propose week` judges the week's planned sessions.
 - Messages start with the rule name, e.g. `quality_before_heavy_lower:
-  planned run "Tempo" (2026-10-11) is the day before planned Session A
-  (2026-10-12), a heavy squat or hinge session. Keep quality activities
-  at least 24 h before heavy lower-body lifting.`
+  planned run "Tempo" (2026-10-11 20:00) ended 21.3 h before planned
+  Session A (2026-10-12 18:00), a heavy squat or hinge session. Keep
+  quality activities at least 24 h before heavy lower-body lifting, a
+  cautious coaching heuristic.` Untimed, the same pair reads `... is the
+  day before planned Session A (2026-10-12), a heavy squat or hinge
+  session. The gap in hours is unknown (no start time for planned
+  Session A (2026-10-12)), so it may or may not be under 24 h. ...`
 
 **Conditioning sessions** (R-44b). R-44b's program bump lets a session of
 `kind: conditioning` carry `"scheme": {"name": "emom_density", "params":

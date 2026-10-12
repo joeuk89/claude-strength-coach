@@ -64,12 +64,12 @@ rotation position, and settle its flags:
   resolve the `return_after_illness` block (step 4) only on that confirmation, never on
   the ill status day ending. Ill days plan no session (exit 3 while an open row covers
   them all). The next pass progresses from the return week; a wave keeps its training max.
-- `collision` (an interference rule: a quality activity on a lifting day, or in
-  the 24 hours before a heavy squat or hinge session; the message names the
-  rule, both bouts and the gap): the script never moves anything. Agree with
-  the athlete what moves, usually the run, or keep the plan and resolve the
-  flag with the reason (step 4). `python3 -m coach interference list` shows the
-  program's rules.
+- `collision` (an interference rule: a quality activity near a lifting session,
+  naming the rule, both bouts and the hours between or that they are unknown):
+  ask unknown times, then `python3 -m coach propose time --proposal <id>
+  --session <s> --start HH:MM --duration-min N`. Nothing moves by itself: agree
+  what moves, usually the run, or resolve the flag with the reason (step 4).
+  `python3 -m coach interference list` shows the program's rules.
 - `conditioning_dropped` (the drop rule: sleep debt, a status day on the date,
   or a quality activity the day either side): at info, an optional conditioning
   session left the draft, listed in `data.dropped` with its trigger. If the

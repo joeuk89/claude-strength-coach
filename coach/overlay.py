@@ -13,7 +13,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from coach import config as config_module
-from coach import dates, jsonio, paths, units
+from coach import dates, jsonio, paths, timing, units
+from coach.activity.records import utc_text
 from coach.errors import ConfigError, ValidationError
 from coach.validate import Error
 from coach.validate import validate as validate_schema
@@ -377,6 +378,18 @@ def _flags(doc):
     return errors
 
 
+def _start(draft_session, where, zone, errors):
+    """The session's planned start as a C7 timestamp: local text in `zone` or text with an offset, on its date."""
+    text = draft_session.get("start")
+    if text is None:
+        return None
+    try:
+        return utc_text(timing.parse_start(text, draft_session["date"], zone))
+    except ValueError as exc:
+        errors.append(Error(where, str(exc)))
+        return None
+
+
 def build(draft, config, *, root=None, now=None):
     """A complete overlay from a draft in athlete units.
 
@@ -385,6 +398,8 @@ def build(draft, config, *, root=None, now=None):
     `created_at` when the draft has none. Raises ValidationError, with a
     JSONPath per problem, when the draft or the overlay it builds is invalid.
     """
+    if isinstance(draft, dict) and draft.get("schema_version") == 5:
+        draft = dict(draft, schema_version=6)  # v6 only added optional session fields
     draft_errors = validate_schema(draft, jsonio.load_schema(DRAFT_SCHEMA))
     if draft_errors:
         raise ValidationError(
@@ -395,6 +410,7 @@ def build(draft, config, *, root=None, now=None):
     now = now or datetime.now(timezone.utc)
     unit = config.athlete.units
     locations = _program_locations(root)
+    zone = dates.zone(config.athlete.timezone) if config.athlete.timezone else None
     load_errors = []
 
     sessions = []
@@ -409,6 +425,8 @@ def build(draft, config, *, root=None, now=None):
             "location": draft_session.get("location", locations.get(session_id)),
             "focus": draft_session.get("focus"),
             "moved_from": draft_session.get("moved_from"),
+            "start": _start(draft_session, f"$.sessions[{s_index}].start", zone, load_errors),
+            "duration_minutes": draft_session.get("duration_minutes"),
             "exercises": [
                 _build_line(line, unit, f"$.sessions[{s_index}].exercises[{e_index}]", load_errors)
                 for e_index, line in enumerate(draft_session["exercises"])
@@ -416,7 +434,7 @@ def build(draft, config, *, root=None, now=None):
         })
 
     if load_errors:
-        raise ValidationError(f"The draft has {len(load_errors)} load(s) that cannot be built",
+        raise ValidationError(f"The draft has {len(load_errors)} load(s) or start time(s) that cannot be built",
                               details=[error.to_json() for error in load_errors])
 
     doc = {

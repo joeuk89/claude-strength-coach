@@ -10,7 +10,7 @@ from coach.errors import CoachError, ConfigError, UsageError, ValidationError
 def file_kind(record):
     if "span" in record:
         return "wellness"
-    if "date" in record and "start" not in record:
+    if "date" in record and "local_date" not in record:
         return "planned"
     return "activity"
 
@@ -110,7 +110,7 @@ def _line(store, module, record, now):
         kind = next((k for k in module.KINDS if store.history(k, record["id"])), None)
     else:
         kind = file_kind(record)
-        line = records.upsert_line(record, now)
+        line = records.upsert_line(record, now, kind)
     if kind is not None and kind not in module.KINDS:
         raise ValidationError(f"adapter {module.NAME} returned a {kind} record, but its KINDS are {module.KINDS}")
     if kind is not None:

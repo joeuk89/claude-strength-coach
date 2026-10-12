@@ -6,8 +6,9 @@ import tempfile
 import textwrap
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
-from coach.activity import adapters
+from coach.activity import adapters, sync
 from coach.activity.adapters import hevy_conditioning
 from tests.support import FIXTURES
 from tests.support.activity import map_routines, write_hevy_cache
@@ -262,6 +263,34 @@ class DiscoveredAdapterTest(SyncCase):
         self.assertEqual(rows["test_source"]["counts"], {"activity": 0, "wellness": 1})
         self.assertEqual(len(rows["test_source"]["missing_days"]), 13)
         self.assertNotIn("2026-10-11", rows["test_source"]["missing_days"])
+
+
+class PlannedAdapterLineTest(unittest.TestCase):
+    """A synced plan feed writes planned records with or without a start (C30, C31)."""
+
+    PLAN = {"id": "runna:20261014-easy", "source": "runna", "date": "2026-10-14", "kind": "run",
+            "title": "Easy 5 km", "quality": False, "target": None, "notes": None}
+    FEED = SimpleNamespace(NAME="runna", KINDS=("planned",))
+
+    def line(self, record):
+        return sync._line(None, self.FEED, record, "2026-10-11T18:00:00Z")
+
+    def test_a_plan_without_a_start_is_planned_and_untimed(self):
+        kind, line = self.line(dict(self.PLAN))
+        self.assertEqual(kind, "planned")
+        self.assertEqual(line["schema_version"], 2)
+        self.assertIsNone(line["start"])
+
+    def test_a_plan_with_a_start_or_a_null_start_is_planned(self):
+        for start in ("2026-10-14T06:30:00Z", None):
+            with self.subTest(start=start):
+                kind, line = self.line({**self.PLAN, "start": start})
+                self.assertEqual(kind, "planned")
+                self.assertEqual(line["start"], start)
+
+    def test_activity_and_wellness_shapes_keep_their_files(self):
+        self.assertEqual(sync.file_kind({"start": "2026-10-14T06:30:00Z", "local_date": "2026-10-14"}), "activity")
+        self.assertEqual(sync.file_kind({"span": {"from": "2026-10-14", "to": "2026-10-14"}}), "wellness")
 
 
 if __name__ == "__main__":

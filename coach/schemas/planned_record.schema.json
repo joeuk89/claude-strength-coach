@@ -2,11 +2,11 @@
   "x-coach-paths": ["data/activity/planned.jsonl"],
   "title": "One upsert line in data/activity/planned.jsonl: a planned activity (contract C29, C30)",
   "type": "object",
-  "required": ["schema_version", "op", "id", "source", "recorded_at", "date", "kind", "title", "quality",
+  "required": ["schema_version", "op", "id", "source", "recorded_at", "date", "kind", "title", "quality", "start",
                "content_hash"],
   "additionalProperties": false,
   "properties": {
-    "schema_version": {"const": 1},
+    "schema_version": {"const": 2},
     "op": {"const": "upsert"},
     "id": {"type": "string", "pattern": "^[a-z_]+:[A-Za-z0-9._:-]+$"},
     "source": {"type": "string", "pattern": "^[a-z_]+$"},
@@ -15,6 +15,7 @@
     "kind": {"enum": ["run", "ride", "swim", "row", "walk", "hike", "conditioning", "sport", "mobility", "other"]},
     "title": {"type": "string", "pattern": "\\S"},
     "quality": {"type": "boolean"},
+    "start": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"},
     "target": {
       "type": ["object", "null"],
       "additionalProperties": false,

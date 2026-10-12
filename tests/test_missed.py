@@ -344,6 +344,16 @@ class ShiftTest(MissedCase):
         self.assertEqual([(f["session_id"], f["exercise_id"]) for f in moved], [("session-a", None)])
         self.assertEqual(data["write_line"], 'Reply "go" to train this and write: Session B, Session A (Hevy).')
 
+    def test_the_copy_keeps_planned_starts_and_a_shifted_session_drops_its_old_one(self):
+        def timed(doc):
+            for session in doc["sessions"]:
+                session.update(start=f"{session['date']}T17:00:00Z", duration_minutes=60)
+        self.edit_overlay(timed)
+        draft = self.plan(session="session-a", day="2026-10-12")["draft"]
+        self.assertEqual([(s["date"], s["start"], s["duration_minutes"]) for s in draft["sessions"]],
+                         [("2026-10-14", "2026-10-14T17:00:00Z", 60), ("2026-10-15", None, 60),
+                          ("2026-10-17", "2026-10-17T17:00:00Z", 60)])
+
     def test_with_a_session_also_on_thursday_it_is_unmatched(self):
         def add_thursday(doc):
             extra = copy.deepcopy(next(s for s in doc["sessions"] if s["session_id"] == "session-b"))

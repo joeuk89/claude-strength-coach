@@ -2,9 +2,10 @@ import os
 import tempfile
 from pathlib import Path
 
-from coach import dates, jsonio, overlay, render, validity
+from coach import dates, interference, jsonio, overlay, render, validity
 from coach.commands import arg, command
 from coach.errors import RefusedError, UsageError, ValidationError
+from coach.library import Library
 from coach.validate import Error
 
 _ID = arg("id", metavar="ID", help="overlay id, e.g. 2026-10-12-weekly")
@@ -62,6 +63,8 @@ def _write_text(path, text):
 def build(args, ctx):
     draft = overlay.read_json(args.input)
     doc = overlay.build(draft, ctx.config, root=ctx.root, now=ctx.now())
+    if _library_readable(ctx.root):
+        doc["flags"] = interference.refresh(ctx.root, ctx.config, doc, ctx.today())
     path = overlay.path_for(ctx.root, doc["id"])
     if path.exists():
         existing = overlay.read_json(path)
@@ -77,6 +80,14 @@ def build(args, ctx):
     for flag in unconfirmed:
         ctx.warn(flag["message"])
     return {"id": doc["id"], "path": _relative(ctx, path), "written": not args.dry_run, "overlay": doc}
+
+
+def _library_readable(root):
+    try:
+        Library.load(root)
+    except ValidationError:
+        return False
+    return True
 
 
 @command(

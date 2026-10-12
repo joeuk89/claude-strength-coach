@@ -1,5 +1,5 @@
 {
-  "schema_version": 5,
+  "schema_version": 6,
   "id": "2026-08-31-weekly",
   "kind": "weekly",
   "created_at": "2026-08-30T19:00:00Z",
@@ -12,7 +12,7 @@
   "flags": [],
   "approval": {
     "approved_at": "2026-08-30T19:00:00Z",
-    "hash": "sha256:81a0afab9252de51a76ba9b3994006d6532edd2e4054d22f54a259b6f0f9fa16"
+    "hash": "sha256:52737f55476d73d15bd9ece974f43695d883cb361886011212ad6e085ed67787"
   },
   "sessions": [
     {
@@ -24,6 +24,8 @@
       "location": null,
       "focus": null,
       "moved_from": null,
+      "start": null,
+      "duration_minutes": null,
       "exercises": [
         {
           "exercise_id": "bb_back_squat",
@@ -173,6 +175,8 @@
       "location": null,
       "focus": null,
       "moved_from": null,
+      "start": null,
+      "duration_minutes": null,
       "exercises": [
         {
           "exercise_id": "db_single_arm_row",

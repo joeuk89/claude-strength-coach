@@ -52,5 +52,5 @@ def _planned(item, ctx):
     return {
         "id": item["id"], "source": NAME,
         "date": item["date"], "kind": item["kind"], "title": item["title"], "quality": item["quality"],
-        "target": item.get("target"), "notes": item.get("notes"),
+        "start": item.get("start"), "target": item.get("target"), "notes": item.get("notes"),
     }

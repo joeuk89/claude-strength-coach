@@ -10,6 +10,8 @@ from coach.validate import Error, validate
 
 VERSION = 1
 SCHEMAS = {"activity": "activity_record", "wellness": "wellness_record", "planned": "planned_record"}
+VERSIONS = {"activity": 1, "wellness": 1, "planned": 2}
+ADDED_IN = {"planned": {2: ("start",)}}
 VOID_SCHEMA = "activity_void"
 KINDS = ("run", "ride", "swim", "row", "walk", "hike", "conditioning", "sport", "mobility", "other")
 BOOKKEEPING = ("schema_version", "op", "recorded_at", "content_hash")
@@ -55,10 +57,12 @@ def content_hash(record):
     return jsonio.canonical_hash({key: value for key, value in record.items() if key not in _NOT_HASHED})
 
 
-def upsert_line(record, recorded_at):
-    """The full C30 line for a normalised record: version, op, recorded_at and content_hash added."""
+def upsert_line(record, recorded_at, kind):
+    """The full C30 line for a normalised record of `kind`: version, op, recorded_at and content_hash added."""
     body = {key: value for key, value in record.items() if key not in BOOKKEEPING}
-    line = {"schema_version": VERSION, "op": "upsert", "id": body.pop("id"), "source": body.pop("source"),
+    if kind == "planned":
+        body.setdefault("start", None)
+    line = {"schema_version": VERSIONS[kind], "op": "upsert", "id": body.pop("id"), "source": body.pop("source"),
             "recorded_at": recorded_at, **body}
     line["content_hash"] = content_hash(line)
     return line
@@ -79,11 +83,18 @@ def line_errors(line, kind):
     if not isinstance(line, dict):
         return [Error("$", "expected an object")]
     version = line.get("schema_version")
-    if isinstance(version, int) and not isinstance(version, bool) and version > VERSION:
-        return [Error("$.schema_version", f"version {version} is newer than this coach reads ({VERSION}); "
+    void = line.get("op") == "void"
+    newest = VERSION if void else VERSIONS[kind]
+    if isinstance(version, int) and not isinstance(version, bool) and version > newest:
+        return [Error("$.schema_version", f"version {version} is newer than this coach reads ({newest}); "
                                           "run /framework-sync")]
-    schema = VOID_SCHEMA if line.get("op") == "void" else SCHEMAS[kind]
-    errors = validate(line, jsonio.load_schema(schema))
+    if void:
+        schema = jsonio.load_schema(VOID_SCHEMA)
+    elif isinstance(version, int) and not isinstance(version, bool) and 1 <= version < newest:
+        schema = jsonio.line_schema(SCHEMAS[kind], version, ADDED_IN.get(kind, {}))
+    else:
+        schema = jsonio.load_schema(SCHEMAS[kind])
+    errors = validate(line, schema)
     if errors:
         return errors
     if line["id"].split(":", 1)[0] != line["source"]:

@@ -71,7 +71,7 @@ Use these six groups: 1 to 3, then 4 to 6.
    strict pull-ups or dips they can do now.
 4. **The training week:** desired weekly sessions, available weekdays,
    minutes per session, any coach-led sessions (PT, team training) and their days,
-   any classes, any runs.
+   any classes, any runs and whether an outside plan sets them.
 5. **Equipment, per place they train:** what each place has, benches,
    bars and supports too; plus what `config suggest`'s notes said to confirm.
 6. **Injuries and limitations:** anything that hurts or limits training

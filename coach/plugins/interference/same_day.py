@@ -26,10 +26,9 @@ def evaluate(ctx):
     found = []
     for lift in (b for b in ctx.bouts if base.is_lift(b)):
         for activity in base.quality_activities(ctx.bouts):
-            if activity.date == lift.date:
-                flag = _judge(ctx, lift, activity)
-                if flag is not None:
-                    found.append(flag)
+            flag = _judge(ctx, lift, activity)
+            if flag is not None:
+                found.append(flag)
     return found
 
 
@@ -41,19 +40,37 @@ def _advice(params):
 
 
 def _judge(ctx, lift, activity):
+    """A same-date pair, or a pair across midnight whose measured spacing is under the gap; None when it passes."""
     params = ctx.params
+    min_gap = params["min_gap_hours"]
     lift_text, activity_text = base.bout_text(ctx, lift), base.bout_text(ctx, activity)
-    if not (base.timed(lift) and base.timed(activity)):
+    same_date = activity.date == lift.date
+    if lift.start is None or activity.start is None:
+        if not same_date:
+            return None
+        missing = base.timing_gaps(((lift, lift_text, False), (activity, activity_text, False)))
         return base.session_flag("collision", (
-            f"same_day: {lift_text} and {activity_text} are on one day. {_advice(params)}"), lift.session_id, "info")
-    if activity.start < lift.start:
-        gap = base.hours_between(base.bout_end(activity), lift.start)
-        what = f"{activity_text} came before {lift_text}, ending {base.hours_text(max(gap, 0))} before it started"
-        broken = params["lift_first"] or gap < params["min_gap_hours"]
-    else:
-        gap = base.hours_between(base.bout_end(lift), activity.start)
-        what = f"{activity_text} started {base.hours_text(max(gap, 0))} after {lift_text} ended"
-        broken = gap < params["min_gap_hours"]
-    if not broken:
+            f"same_day: {lift_text} and {activity_text} are on one day; their order and gap are unknown "
+            f"({missing}). {_advice(params)}"), lift.session_id, "info")
+    activity_first = activity.start < lift.start
+    first, second = (activity, lift) if activity_first else (lift, activity)
+    first_text = activity_text if activity_first else lift_text
+    end = base.bout_end(first)
+    spacing = base.hours_between(end if end is not None else first.start, second.start)
+    if not same_date and spacing >= min_gap:
         return None
-    return base.session_flag("collision", f"same_day: {what}. {_advice(params)}", lift.session_id, "warn")
+    out_of_order = activity_first and params["lift_first"]
+    if end is not None:
+        if not out_of_order and spacing >= min_gap:
+            return None
+        gap = base.hours_text(max(spacing, 0))
+        if activity_first:
+            what = f"{activity_text} came before {lift_text}, ending {gap} before it started"
+        else:
+            what = f"{activity_text} started {gap} after {lift_text} ended"
+        return base.session_flag("collision", f"same_day: {what}. {_advice(params)}", lift.session_id, "warn")
+    order = "started before" if activity_first else f"started {base.hours_text(spacing)} after"
+    what = f"{activity_text} {order} {lift_text} started; the gap after {first_text} ends is unknown (no duration)"
+    if out_of_order or spacing < min_gap:
+        return base.session_flag("collision", f"same_day: {what}. {_advice(params)}", lift.session_id, "warn")
+    return base.session_flag("collision", f"same_day: {what}. {_advice(params)}", lift.session_id, "info")

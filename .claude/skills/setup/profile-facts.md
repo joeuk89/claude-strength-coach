@@ -23,6 +23,11 @@ The answers that scripts read go into config and data, not prose:
   selecting solo sessions. Pick that many days from availability with the
   athlete; availability alone creates no obligations. Coach-led sessions go
   into the program draft. A yes to runs or classes sets `[activity] enabled = true`.
+  Then set `[cardio] tier` explicitly from who plans the runs: an outside plan
+  (a running app, club, coach or race plan) → `tier = "review"`; runs only
+  counted, with no plan → `tier = "count"`. Never `"program"`: setup writes no
+  running plan. At `review`, capture the coming week's runs with `python3 -m
+  coach planned add`, as program-week's context.md says.
   Wanting to record manual sleep hours proposes it, with athlete approval and
   config validation; manual sleep needs no watch or device adapter.
 - **Question 5** → `[equipment]` for the main place: `available` (from

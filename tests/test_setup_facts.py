@@ -232,5 +232,64 @@ class SetupWorkflowTest(unittest.TestCase):
         self.assertIn("calculator's existing bounds", calories)
 
 
+RUNNERS = json.loads((FIXTURES / "onboarding/runners.json").read_text())
+
+
+class RunnerSetupTest(unittest.TestCase):
+    """Who plans the runs decides the cardio tier; only an outside plan is captured, and none is ever written."""
+
+    def instance(self, answers):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name)
+        text = apply((REPO_ROOT / "config.example.toml").read_text(), ANSWERS["config"])
+        (root / "config.toml").write_text(apply(text, answers["config"]))
+        return root
+
+    def cli(self, root, *args, expect=0):
+        code, out, stderr = run_cli(["--root", str(root), *args], env={"COACH_NOW": RUNNERS["now"]})
+        self.assertEqual(code, expect, (args, out, stderr))
+        return out
+
+    def test_setup_maps_who_plans_the_runs_to_an_explicit_tier(self):
+        facts = flat(step_text("setup", "profile-facts.md"))
+        self.assertIn('an outside plan (a running app, club, coach or race plan) → `tier = "review"`', facts)
+        self.assertIn('runs only counted, with no plan → `tier = "count"`', facts)
+        self.assertIn('Never `"program"`: setup writes no running plan', facts)
+        self.assertIn("python3 -m coach planned add", facts)
+        self.assertIn("whether an outside plan sets them", flat(step_text("setup", "SKILL.md")))
+
+    def test_weekly_preparation_names_supported_commands_to_capture_the_coming_week(self):
+        context = flat(step_text("program-week", "context.md"))
+        section = context.split("## Planned runs and session times", 1)[1].split("## Goal events", 1)[0]
+        for command in ("python3 -m coach planned list --from <span start> --to <span end>",
+                        "python3 -m coach planned add --date <D> --kind run",
+                        "--start HH:MM --duration-min <N>", "python3 -m coach planned void <id>"):
+            self.assertIn(command, section)
+        self.assertIn("A run already planned is refused, not added twice", section)
+        self.assertIn("At `count`, ask nothing", section)
+
+    def test_an_outside_plan_athlete_reviews_and_captures_the_coming_week_once(self):
+        answers = RUNNERS["outside_plan"]
+        root = self.instance(answers)
+        self.cli(root, "config", "validate")
+        self.assertEqual(self.cli(root, "config", "show")["data"]["config"]["cardio"]["tier"], "review")
+        for command in answers["coming_week"]:
+            self.cli(root, *command)
+            self.cli(root, *command, expect=3)
+        rows = self.cli(root, "cardio", "reconcile", "--week", "2026-W42")["data"]["items"]
+        self.assertEqual([(r["status"], r["title"]) for r in rows], [("upcoming", "Intervals")])
+        [plan] = self.cli(root, "planned", "list", "--from", "2026-10-12", "--to", "2026-10-18")["data"]["planned"]
+        self.assertEqual(plan["start"], "2026-10-13T06:00:00Z")
+
+    def test_a_count_only_athlete_keeps_count_and_gets_no_running_plan(self):
+        root = self.instance(RUNNERS["count_only"])
+        self.cli(root, "config", "validate")
+        self.assertEqual(self.cli(root, "config", "show")["data"]["config"]["cardio"]["tier"], "count")
+        reconcile = self.cli(root, "cardio", "reconcile", "--week", "2026-W42")["data"]
+        self.assertEqual((reconcile["tier"], reconcile["items"]), ("count", []))
+        self.assertFalse((root / "data" / "activity" / "planned.jsonl").exists())
+
+
 if __name__ == "__main__":
     unittest.main()

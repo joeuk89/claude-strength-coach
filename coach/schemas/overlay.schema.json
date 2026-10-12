@@ -4,7 +4,7 @@
   "required": ["schema_version", "id", "kind", "created_at", "span", "supersedes", "focus", "flags", "approval", "sessions"],
   "additionalProperties": false,
   "properties": {
-    "schema_version": {"const": 5},
+    "schema_version": {"const": 6},
     "id": {"$ref": "#/$defs/overlay_id"},
     "kind": {"enum": ["weekly", "midweek", "deload", "one_off"]},
     "created_at": {"$ref": "#/$defs/timestamp"},
@@ -52,7 +52,7 @@
     "session": {
       "type": "object",
       "required": ["session_id", "date", "title", "hevy_routine_id", "temporary", "location", "focus",
-                   "moved_from", "exercises"],
+                   "moved_from", "start", "duration_minutes", "exercises"],
       "additionalProperties": false,
       "properties": {
         "session_id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
@@ -63,6 +63,8 @@
         "location": {"type": ["string", "null"], "pattern": "^[a-z0-9-]+$"},
         "focus": {"$ref": "#/$defs/optional_text"},
         "moved_from": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+        "start": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"},
+        "duration_minutes": {"type": ["integer", "null"], "minimum": 1},
         "exercises": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/exercise"}}
       }
     },

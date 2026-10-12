@@ -114,7 +114,8 @@ def _activity_order(activity):
     return activity["local_date"], activity["start"], activity["id"]
 
 
-def _session(plan):
+def session_identity(plan):
+    """What makes two plans one session (C49): date, kind, quality, title and targets."""
     target = plan.get("target") or {}
     return (plan["date"], plan["kind"], _planned_quality(plan), plan["title"].strip().casefold(),
             target.get("distance_meters"), target.get("duration_seconds"))
@@ -169,14 +170,14 @@ def resolve(plans, activities, move_days, associations, rpe_min):
             plan_review[pi] = activity_review[ai] = reason
     sessions, duplicates = {}, {}
     for pi in sorted(range(len(plans)), key=lambda i: plans[i]["id"]):
-        sessions.setdefault(_session(plans[pi]), []).append(pi)
+        sessions.setdefault(session_identity(plans[pi]), []).append(pi)
 
     def claim_twins(matched):
         """Per other source, the first free plan for a matched plan's session (date, kind, quality,
         title and targets). Plans that differ in any of these are separate sessions the athlete sees."""
         for pi in sorted(matched, key=lambda i: plans[i]["id"]):
             claimed = {plans[pi].get("source")}
-            for other in sessions[_session(plans[pi])]:
+            for other in sessions[session_identity(plans[pi])]:
                 source = plans[other].get("source")
                 if source not in claimed and not (other in pairs or other in reserved_plans or other in duplicates):
                     duplicates[other] = pi
