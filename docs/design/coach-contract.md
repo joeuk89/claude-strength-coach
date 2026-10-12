@@ -369,6 +369,7 @@ cache_max_age_hours = 24  # coach check warns past this
 available = []            # R-11 equipment enum values; empty = every piece assumed
 apparatus = []            # R-11 apparatus enum values; empty with available empty = every piece assumed
 dumbbells = []            # per-hand rack; empty = use the physical increment grid
+kettlebells = []          # bell sizes; empty = kettlebell loads are not matched or checked
 dumbbell_increment = 2.0  # per hand
 dumbbell_max = 40.0       # per hand; a cap
 barbell_increment = 2.5   # smallest total jump
@@ -617,9 +618,10 @@ merges them; with no instance file the catalogue stands alone.
   and `distance`. `Library.increment(id, unit)` returns null when the
   entry has none. A declared equipment increment from `equipment_for`
   (C54) takes precedence over this fallback (not for a kettlebell, which
-  has no equipment key: its step is this one, else 4 kg or 10 lb, the
-  catalogue's kettlebell step); scheme parameters request a
-  progression step but never define physically available loads.
+  has no step key: its step is this one, else 4 kg or 10 lb, the
+  catalogue's kettlebell step, and is a progression request only); scheme
+  parameters request a progression step but never define physically
+  available loads.
 - Optional `e1rm: "unsupported"` marks a lift whose external load is too
   small a share of the mass moved for any e1RM: the dumbbell split squat,
   lunge, walking lunge and step-up. No body-mass fraction is estimated
@@ -2352,7 +2354,7 @@ Reserved codes:
 | `stale_prescription` | block | R-24 | | Line derived from an exposure outside the validity window and not decayed to its band, or above the `ILLNESS_RPE_CAP` (7) cap on the first session after an illness. |
 | `unearned_load` | block | R-24 | | Load predicted beyond failure for the prescribed reps, or, with no e1RM, more than two increments above the last exposure. |
 | `load_cap` | block | R-24 | | Load above `[caps]` or `dumbbell_max`. |
-| `load_unrepresentable` | block | R-24 | | Load cannot be built from the available increments, dumbbells or plates. |
+| `load_unrepresentable` | block | R-24 | | Load cannot be built from the available increments, dumbbells, kettlebells or plates. |
 | `load_geometry_unknown` | warn | R-24 | | Physical feasibility unknown: configure the known Smith base mass. |
 | `load_mode_mismatch` | block | R-24 | | Line's load mode or load arithmetic disagrees with the library or C5. |
 | `load_mode_unconfirmed` | block | R-24 | | Line's exercise has no confirmed load mode in the library; only confirming it clears the flag. |
@@ -2534,8 +2536,9 @@ coach.validity.estimate_minutes(root, session) -> int
 - **Caps** follow the R-16 `load_caps` rule exactly: `[caps]` id first,
   else `dumbbell_max` per hand for per-hand modes.
 - **Representable**: proposal generation and validation share
-  `coach.loads.AvailableLoads`. Explicit per-hand dumbbell racks and
-  barbell/Smith plate combinations take precedence over an increment.
+  `coach.loads.AvailableLoads`. Explicit per-hand dumbbell racks,
+  declared kettlebells and barbell/Smith plate combinations take
+  precedence over an increment.
   Plates name sizes available in pairs, with unlimited pairs of each size
   as in C5. Barbell totals use `bar_weight`; Smith totals require
   `smith_base_weight`, the explicitly known effective unloaded mass in
@@ -2547,8 +2550,9 @@ coach.validity.estimate_minutes(root, session) -> int
   location equipment increment defines the physical grid; the library
   increment is fallback, then the equipment default. A location the config
   no longer names (a historical session's) falls back to the main table.
-  A kettlebell never takes `dumbbell_increment`: its grid is the library
-  increment, else 4 kg or 10 lb. Grids start at zero, or the known base mass
+  Kettlebells have no grid: a declared `kettlebells` list (main table or
+  location) names the bells, and without one a kettlebell load is neither
+  selected nor checked. Grids start at zero, or the known base mass
   for a bar/Smith total. Other loaded equipment uses its corresponding
   increment when known. Historical off-grid loads are checked too. A load
   already over its cap is flagged `load_cap` only for representability.
@@ -2862,7 +2866,9 @@ and `plugins test` runs them. Loaded with
   so ("the kit makes 25/hand, not 24.5/hand"). Caps and
   clipped constraints remain upper numeric bounds, with a buildable load
   below the cap taking precedence when assistance cannot round up within
-  it. If no physical load fits, retain the bounded request and flag it as
+  it. A load with nothing on its lighter side (under the lightest
+  dumbbell or the bare bar) takes the nearest load within the cap. If no
+  physical load fits, retain the bounded request and flag it as
   unrepresentable instead of crossing the cap. Explicit assistance-ladder
   rungs remain exact; an incompatible rung is flagged without snapping.
   A cap or constraint that clips a rung moves it to the nearest rung
@@ -5942,11 +5948,13 @@ values:
   `dumbbell_max` out, so an lb home config fails validation until the
   athlete's answer is written. `notes` is `[{key, message}]`, `key` a
   dotted config path such as `equipment.dumbbell_max`.
-- `notes` always asks the athlete to confirm `dumbbell_increment`: with no
-  `dumbbells` list it is the per-hand physical grid (C22 Representable).
-  An existing instance whose approved loads sit off that step gets a
-  `load_unrepresentable` flag naming the step; the fix is the confirmed
-  step or a `dumbbells` list.
+- `notes` always asks the athlete to confirm `dumbbell_increment`,
+  `machine_increment` and `cable_increment`: each is a physical grid (C22
+  Representable), the dumbbell one when there is no `dumbbells` list. An
+  existing instance whose approved loads sit off a step gets a
+  `load_unrepresentable` flag naming it; the fix is the confirmed step or
+  a `dumbbells` list. `notes` also asks for the `kettlebells` the place
+  has; `values` never suggests them.
 - `/setup` writes Hevy free as `[hevy] enabled = false`. It writes
   `[nutrition]` only as `enabled = false`, when the athlete declines
   nutrition coaching. On a yes it writes nothing and `/goals` sets the

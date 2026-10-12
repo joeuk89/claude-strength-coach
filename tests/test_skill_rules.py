@@ -178,7 +178,8 @@ class ProgramWeekModesTest(unittest.TestCase):
 
     def test_constrained_mode_builds_checks_and_writes_temporary_routines(self):
         text = flat(step_text("program-week", "one-off.md"))
-        for needle in ("python3 -m coach units round", "`[equipment.locations.*]`", "`one_off`", '`"temporary": true`'):
+        for needle in ("python3 -m coach units round", "`[equipment.locations.*]`", "`one_off`", '`"temporary": true`',
+                       "`dumbbells`", "`kettlebells`", "`load_unrepresentable`"):
             with self.subTest(needle=needle):
                 self.assertIn(needle, text)
         write = flat(step_text("program-week", "write.md"))

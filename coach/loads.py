@@ -42,14 +42,25 @@ class AvailableLoads:
         return None
 
     @property
+    def rack(self):
+        """The enumerated loads that replace any grid: the per-hand dumbbell rack or the declared kettlebells."""
+        if self.equipment == "dumbbell" and self.mode in units.PER_HAND_MODES:
+            return self.kit.get("dumbbells") or []
+        if self.equipment == "kettlebell":
+            return self.kit.get("kettlebells") or []
+        return []
+
+    @property
     def plate_built(self):
         return self.plates_win and self.base_weight is not None and bool(self.kit.get("plates"))
 
     def select(self, value, direction="nearest", cap=None):
         if self.geometry_warning:
             return value
-        if self.equipment == "dumbbell" and self.mode in units.PER_HAND_MODES and self.kit.get("dumbbells"):
-            return units.select_available(value, self.kit["dumbbells"], direction, cap)
+        if self.rack:
+            return units.select_available(value, self.rack, direction, cap)
+        if self.equipment == "kettlebell":
+            return value
         if self.plate_built:
             return units.round_plate_load(value, self.base_weight, self.kit["plates"], direction, cap)
         if self.increment:
@@ -57,13 +68,14 @@ class AvailableLoads:
         return value
 
     def problem(self, value):
-        if self.geometry_warning:
+        if self.geometry_warning or (self.equipment == "kettlebell" and not self.rack):
             return None
         selected = self.select(value)
         if selected is not None and abs(selected - value) < 1e-6:
             return None
         if self.plate_built:
             return f"no plate breakdown with base mass {units.json_number(self.base_weight)}"
-        if self.equipment == "dumbbell" and self.kit.get("dumbbells"):
-            return "no matching dumbbell in the declared rack"
+        if self.rack:
+            declared = "rack" if self.equipment == "dumbbell" else "kettlebells"
+            return f"no matching {self.equipment} in the declared {declared}"
         return f"not on the physical load grid (step {units.json_number(self.increment)})"

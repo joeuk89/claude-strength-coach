@@ -34,7 +34,7 @@ _EQUIPMENT_INCREMENT = {
     "plate": "barbell_increment", "machine": "machine_increment", "cable": "cable_increment",
 }
 
-# Kettlebells have no config step and bell sizes are not a dumbbell grid; this matches the catalogue's kettlebell.
+# The catalogue's kettlebell step, a progression request only: real bell sizes come from equipment.kettlebells.
 _KETTLEBELL_STEP = {"kg": 4, "lb": 10}
 
 

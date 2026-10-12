@@ -57,6 +57,7 @@ EQUIPMENT_KEYS = {
     "available": Key("list", default=[], item="string", item_choices=library.EQUIPMENT, distinct=True),
     "apparatus": Key("list", default=[], item="string", item_choices=library.APPARATUS, distinct=True),
     "dumbbells": Key("list", default=[], item="number", distinct=True, positive=True),
+    "kettlebells": Key("list", default=[], item="number", distinct=True, positive=True),
     "dumbbell_increment": Key("number", default=ByUnit({"kg": 2.0}), positive=True),
     "dumbbell_max": Key("number", default=ByUnit({"kg": 40.0}), positive=True),
     "barbell_increment": Key("number", default=ByUnit({"kg": 2.5}), positive=True),

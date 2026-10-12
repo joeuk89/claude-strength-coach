@@ -39,6 +39,7 @@ apparatus = []                # benches, bars and supports confirmed here: "flat
                               # or chair; a bench serves as one). [] with available = [] assumes every
                               # piece; otherwise an unlisted one is missing
 dumbbells = []                # per-hand rack; [] = use the physical increment grid
+kettlebells = []              # the bells here; [] = kettlebell loads are not matched or checked
 # dumbbell_increment = 2.0    # smallest per-hand dumbbell jump
 # dumbbell_max = 40.0         # heaviest per-hand dumbbell; prescriptions are capped here
 # barbell_increment = 2.5     # smallest jump in total bar load

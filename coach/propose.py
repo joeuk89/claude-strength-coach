@@ -779,27 +779,31 @@ def _rounded(sets, clipped, round_down, rounding):
             found.append(s)
             continue
         value = max(0, s.load)
+        leaves_ladder = False
         if rounding.rungs:
             rung = _bounded_rung(value, rounding) if index in clipped else next(
                 (r for r in rounding.rungs if _same(value, r)), None)
             if rung is not None:
                 found.append(replace(s, load=units.json_number(rung)))
                 continue
-            if index in clipped and value not in off_ladder:
-                off_ladder.append(value)
+            leaves_ladder = index in clipped
         derived = rounding.derived
         lighter = (round_down or index in clipped
                    or (derived is not None and (value - derived) * rounding.load_direction <= 1e-9))
         direction = ("down" if rounding.load_direction > 0 else "up") if lighter else "nearest"
-        selected = rounding.available.select(value, direction, rounding.cap)
         floor, cap = rounding.floor, rounding.cap
+        selected = rounding.available.select(value, direction, cap)
+        if selected is None and direction != "nearest":
+            # Nothing on the lighter side (below the lightest dumbbell, the bare bar): the nearest load in the cap.
+            selected = rounding.available.select(value, "nearest", cap)
         if selected is not None and floor is not None and selected < floor and (cap is None or cap >= floor):
-            selected = rounding.available.select(floor, "up", cap)
-        if selected is None and cap is not None:
-            selected = rounding.available.select(cap, "down", cap)
+            raised = rounding.available.select(floor, "up", cap)
+            selected = raised if raised is not None else rounding.available.select(cap, "down", cap)
         if selected is not None and not _same(selected, value):
             changes[value] = selected
             value = selected
+        if leaves_ladder and value not in off_ladder:
+            off_ladder.append(value)
         found.append(replace(s, load=units.json_number(max(0, value))))
     return tuple(found), changes, off_ladder
 

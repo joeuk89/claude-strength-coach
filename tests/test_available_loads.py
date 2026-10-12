@@ -2,7 +2,7 @@
 
 import unittest
 
-from coach import config, library, loads, stats, units, validity
+from coach import config, library, loads, onboarding, stats, units, validity
 from coach.library import Library
 from tests.support import VALID
 from tests.test_propose import SQUAT, ProposeCase, coaching, codes, edit_sets, find_line, working
@@ -68,12 +68,34 @@ class AvailableLoadsTest(unittest.TestCase):
             config.parse(raw, "config.toml")
 
     def test_machine_cable_and_other_bar_grids_are_checked(self):
-        for equipment in ("machine", "cable", "ez_bar", "trap_bar", "kettlebell"):
+        for equipment in ("machine", "cable", "ez_bar", "trap_bar"):
             with self.subTest(equipment=equipment):
                 kit = loads.AvailableLoads(equipment, "total", {}, 5)
                 self.assertIsNotNone(kit.problem(22.5))
                 self.assertEqual(kit.select(22.5), 25)
                 self.assertIsNone(kit.problem(25))
+
+    def test_undeclared_kettlebell_sizes_are_neither_snapped_nor_flagged(self):
+        for unit, bells in (("kg", (14, 18)), ("lb", (35, 44, 53, 62))):
+            raw = dict(onboarding.suggest(unit)["values"], schema_version=1)
+            kit = loads.available_loads(Library.load(VALID), config.parse(raw, "config.toml"), "kb_swing",
+                                        "single_implement", None)
+            for bell in bells:
+                with self.subTest(unit=unit, bell=bell):
+                    self.assertIsNone(kit.problem(bell))
+                    self.assertEqual(kit.select(bell, "down"), bell)
+
+    def test_declared_kettlebells_are_the_bells_at_their_location(self):
+        raw = {"schema_version": 1, "athlete": {"units": "kg"},
+               "equipment": {"kettlebells": [12, 14, 16, 18, 20], "locations": {"home": {"kettlebells": [8, 12]}}}}
+        cfg = config.parse(raw, "config.toml")
+        gym = loads.available_loads(Library.load(VALID), cfg, "kb_swing", "single_implement", None)
+        self.assertEqual(gym.select(17, "down"), 16)
+        self.assertIsNone(gym.problem(18))
+        self.assertIn("kettlebell", gym.problem(15))
+        home = loads.available_loads(Library.load(VALID), cfg, "kb_swing", "single_implement", "home")
+        self.assertEqual(home.select(16, "down"), 12)
+        self.assertIsNotNone(home.problem(16))
 
     def test_zero_smith_base_is_known_geometry(self):
         kit = loads.AvailableLoads("smith_machine", "total", {"smith_base_weight": 0, "plates": [5]}, 2.5)
@@ -170,6 +192,17 @@ class PhysicalKitProposalTest(ProposeCase):
         [flag] = [f for f in doc["flags"] if f["code"] == "load_unrepresentable" and f["exercise_id"] == "pull_up"]
         self.assertIn("explicit ladder rung", flag["message"])
 
+    def test_a_deload_below_the_lightest_rack_dumbbell_takes_the_lightest_not_the_heaviest(self):
+        self.set_config("dumbbells = []", "dumbbells = [22.5, 25, 27.5]")
+        doc = self.propose("--kind", "deload", "--dry-run")["overlay"]
+        self.assertEqual({coaching(s["load"]) for s in working(find_line(doc, "db_bench_press"))}, {22.5})
+        self.assertNotIn("unearned_load", codes(doc, "db_bench_press"))
+
+    def test_a_deload_below_the_bar_takes_the_bar_under_a_cap(self):
+        self.set_config("[caps]", "[caps]\nbb_back_squat = 120")
+        doc = self.fixed("bb_back_squat", 15)
+        self.assertEqual({coaching(s["load"]) for s in working(find_line(doc, "bb_back_squat"))}, {20})
+
     def test_no_available_rack_load_below_cap_remains_flagged(self):
         self.set_config("dumbbells = []", "dumbbells = [25, 30]")
         self.set_config("[caps]", "[caps]\ndb_bench_press = 20")
@@ -186,6 +219,14 @@ class PhysicalKitProposalTest(ProposeCase):
         [flag] = [f for f in doc["flags"] if f["code"] == "constraint_applied" and f["exercise_id"] == "pull_up"]
         self.assertIn("no ladder rung", flag["message"])
         self.assertTrue(find_line(doc, "bb_back_squat")["sets"])
+
+    def test_a_line_leaving_the_ladder_names_the_load_the_kit_makes(self):
+        self.ladder(25)
+        self.set_config("[caps]", "[caps]\npull_up = 22")
+        doc = self.propose("--dry-run")["overlay"]
+        self.assertEqual({coaching(s["load"]) for s in working(find_line(doc, "pull_up"))}, {20})
+        [flag] = [f for f in doc["flags"] if f["code"] == "constraint_applied" and f["exercise_id"] == "pull_up"]
+        self.assertIn("leaves the ladder at BW-20 assist", flag["message"])
 
     def test_no_added_load_holds_the_nearest_rung_that_keeps_the_assistance(self):
         def constrained(doc):

@@ -28,9 +28,11 @@ Name the place's kit as an `[equipment.locations.*]` table in
 Every temporary session must be concrete enough to train directly:
 exercises, sets × reps, load or RPE, rest. Unfamiliar dumbbells (a
 hotel rack, a different increment) are exactly when a doubled entry
-slips in unnoticed, so snap each load to the kit with `python3 -m coach
-units round --value <load> --increment <step>` and let the renderer
-print both numbers.
+slips in unnoticed, so take each load from that place's kit: a listed
+`dumbbells` or `kettlebells` weight, or a load its plates build, else
+its step with `python3 -m coach units round --value <load> --increment
+<step>`. Let the renderer print both numbers; build.md's
+`load_unrepresentable` check names any load the kit cannot make.
 
 **Confirm the load mode of every exercise new to the athlete** before
 the draft, above all the temporary ones the standing program lacks

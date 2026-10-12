@@ -94,6 +94,15 @@ class SuggestTest(unittest.TestCase):
                     self.assertIn("equipment.dumbbell_increment", notes)
                     self.assertIn("dumbbells", notes["equipment.dumbbell_increment"])
 
+    def test_every_suggestion_asks_for_the_stack_steps_and_the_kettlebells(self):
+        for unit in ("kg", "lb"):
+            for gym in ("commercial", "home"):
+                with self.subTest(unit=unit, gym=gym):
+                    notes = {n["key"]: n["message"] for n in self.suggest("--unit", unit, "--gym", gym)["notes"]}
+                    self.assertIn("equipment.machine_increment", notes)
+                    self.assertIn("equipment.cable_increment", notes)
+                    self.assertIn("kettlebells", notes["equipment.kettlebells"])
+
     def test_every_note_names_a_key_and_says_what_to_confirm(self):
         for unit in ("kg", "lb"):
             for gym in ("commercial", "home"):
