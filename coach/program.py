@@ -22,6 +22,7 @@ SCHEMA_PROBLEM = "schema"
 EXERCISE_PROBLEM = "exercise_ids"
 LOAD_MODE_PROBLEM = "load_mode"
 NO_E1RM_WARNING = "fixed_reps_no_e1rm"
+PRIORITY_NO_E1RM_WARNING = "priority_no_e1rm"
 RENDER_COMMAND = "program render"
 RECONCILE_COMMAND = "program reconcile-mode"
 BASES = ("old", "confirmed")
@@ -121,7 +122,7 @@ def validate(doc, config=None, library=None, root=None):
 
 
 def warnings(doc):
-    """Warnings for valid programs whose prescriptions cannot supply their model evidence."""
+    """Warnings for a valid program, each starting with its code: prescriptions that cannot supply an e1RM."""
     from coach import stats
     from coach.plugins import base
 
@@ -143,9 +144,9 @@ def warnings(doc):
         working = [s for _, _, _, exercise in slots(doc) if exercise["exercise_id"] == exercise_id
                    for s in base.expand(exercise["sets"]) if s.working and s.target_reps is not None]
         if not any(stats.reps_to_failure(s.target_reps, s.rpe) <= stats.MAX_REPS_TO_FAILURE for s in working):
-            found.append(f"priority_no_e1rm: {exercise_id}'s priority e1RM KPI has no prescribed working set "
-                         f"within {stats.MAX_REPS_TO_FAILURE} reps to failure; model evidence may stay unavailable. "
-                         "Choose top_load/top_reps or include an eligible normal exposure.")
+            found.append(f"{PRIORITY_NO_E1RM_WARNING}: {exercise_id}'s priority e1RM KPI has no prescribed "
+                         f"working set within {stats.MAX_REPS_TO_FAILURE} reps to failure, so the KPI may have no "
+                         "e1RM to show. Choose a top_load or top_reps KPI, or prescribe a working set within the cap.")
     return found
 
 

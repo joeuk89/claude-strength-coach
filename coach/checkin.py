@@ -31,7 +31,7 @@ from coach.library import Library
 DEEP_AFTER_DAYS = 42
 E1RM_ROW_LIMIT = 8          # a heuristic: as many lifts as a message reads at a glance
 WORD_CEILINGS = {"weekly": 600, "deep": 1000, "catch-up": 600}    # heuristics, prose words outside regions
-CARD_VERSION = 2
+CARD_VERSION = 3
 TIERS = ("weekly", "deep", "catch-up")
 CARD_TIERS = ("weekly", "deep")
 CATCH_UP = "catch_up"
@@ -409,10 +409,13 @@ def _e1rm(inst, window, live, now):
                      "delta": delta, "method": latest["method"]})
     rows.sort(key=lambda r: ((inst.library.get(r["exercise_id"]) or {}).get("pattern") not in compounds,
                              order.get(r["exercise_id"], len(order)), r["exercise_id"]))
-    notes = [f"{inst.name(exercise_id)} ({o['date']}): {stats.capacity_note(o)}."
-             for exercise_id, observed in evidence["observations"].items()
-             for o in observed if start <= o["date"] <= end and not o["comparable"]]
-    return rows[:E1RM_ROW_LIMIT], notes
+    notes = {}
+    for exercise_id, observed in evidence["observations"].items():
+        for o in observed:
+            note = stats.capacity_note(o) if start <= o["date"] <= end else None
+            if note:
+                notes[exercise_id] = f"{inst.name(exercise_id)} ({o['date']}): {note}"
+    return rows[:E1RM_ROW_LIMIT], list(notes.values())[:E1RM_ROW_LIMIT]
 
 
 def _verify_lines(root):
@@ -796,6 +799,11 @@ def _field_lines(field):
     return [f"{field['n']}. {field['label']}."] + [f"   {line}" for line in lines]
 
 
+def _e1rm_notes(card):
+    notes = card.get("e1rm_notes")
+    return ["", "e1RM notes:"] + [f"- {note}" for note in notes] if notes else []
+
+
 def card_text(card):
     """The Sunday message: the week as the log shows it, then the numbered fields."""
     if card["mode"] == CATCH_UP:
@@ -819,8 +827,7 @@ def card_text(card):
     if card["e1rm"]:
         lines += ["", "e1RM: " + " · ".join(f"{r['name']} {_e1rm_value(r)} ({_signed(r['delta'])})"
                                              for r in card["e1rm"])]
-    if card.get("e1rm_notes"):
-        lines += ["", "Capacity evidence:"] + [f"- {note}" for note in card["e1rm_notes"]]
+    lines += _e1rm_notes(card)
     if card["flags"]:
         lines += ["", "Flags:"] + [f"- `{f['code']}`: {f['message']}" for f in card["flags"]]
     loads = [h for h in card["hevy"] if h["state"] == "loads_edited"]
@@ -899,8 +906,7 @@ def _region(card, record_date):
         for row in card["e1rm"]:
             lines.append(_row([row["exercise_id"], _e1rm_value(row), _signed(row["delta"]),
                                render.short_date(row["date"])]))
-    if card.get("e1rm_notes"):
-        lines += ["", "Capacity evidence:"] + [f"- {note}" for note in card["e1rm_notes"]]
+    lines += _e1rm_notes(card)
     if card["flags"]:
         lines += ["", "**Flags**", ""]
         for flag in card["flags"]:

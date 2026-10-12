@@ -193,11 +193,11 @@ class CapacityEvidenceTest(NoHevyCase):
         self.log_session("2026-10-12", squat=90, bench=18.5, bench_reps=8, rpe=6, squat_rpe=6)
         card = self.coach("checkin", "prepare", "--until", "2026-10-18")["data"]
         self.assertFalse(any(row["delta"] is not None and row["delta"] < 0 for row in card["card"]["e1rm"]))
-        self.assertIn("recovery", card["text"].lower())
+        self.assertIn("deload (light week), kept in the log", card["text"])
         progress = pages.render_progress(self.root, datetime(2026, 10, 19, 19, tzinfo=timezone.utc))
         self.assertIn("31.5", progress)
         self.assertNotIn("25.9", progress)
-        self.assertIn("recovery", progress.lower())
+        self.assertIn("deload (light week), kept in the log", progress)
         path = self.root / "data/program.json"
         doc = read_json(path)
         doc["priority"] = [{"exercise_id": "db_bench_press", "kpi": {"kind": "e1rm", "target": None, "by": None},
@@ -261,7 +261,7 @@ class CapacityEvidenceTest(NoHevyCase):
         self.log_session("2026-10-12", bench=25, rpe=6)
         self.log_session("2026-10-18", bench=27, bench_reps=8, rpe=8)
         data = stats.e1rm_series(self.root)
-        evidence = stats.capacity_evidence(data, "db_bench_press", "2026-10-19")
+        evidence = stats.capacity_evidence(data, "db_bench_press", "2026-10-19", 42)
         self.assertEqual(evidence["estimate"]["e1rm"], 36)
         self.assertIsNone(evidence["reason"])
 
@@ -347,3 +347,115 @@ class CapacityEvidenceTest(NoHevyCase):
                 data = stats.e1rm_series(self.root)
                 self.assertEqual(data["observations"]["db_bench_press"][-1]["context"]["kind"], "normal")
                 self.assertEqual(data["series"]["db_bench_press"][-1]["date"], "2026-10-19")
+
+    def next_week_bench(self, load, reps, rpe):
+        from coach import units
+
+        doc = read_json(next((self.root / "data/overlays").glob("2026-10-12-*.json")))
+        doc.update(id="2026-10-19-weekly", kind="weekly", span={"start": "2026-10-19", "end": "2026-10-25"},
+                   approval=None)
+        for session in doc["sessions"]:
+            session["date"] = "2026-10-19"
+            for line in session["exercises"]:
+                if line["exercise_id"] == "db_bench_press":
+                    line["sets"] = [{"type": "normal", "load": units.make_load(load, "per_hand_x2", "kg"),
+                                     "reps": reps, "rpe": rpe} for _ in range(3)]
+        write_json(self.root / "data/overlays/2026-10-19-weekly.json", doc)
+        result = self.coach("prescription", "check", "--overlay", doc["id"])["data"]
+        flags = [f["code"] for f in result["flags"] if f["exercise_id"] == "db_bench_press"]
+        return flags, next(r for r in result["lines"] if r["exercise_id"] == "db_bench_press")
+
+    def test_over_cap_recovery_work_keeps_the_older_estimate_veto(self):
+        self.log_session("2026-10-05")
+        doc = self.approve_context()
+        self.log_session("2026-10-12", bench=18.5, bench_reps=8, rpe=5, overlay_id=doc["id"])
+        observed = stats.e1rm_series(self.root)["observations"]["db_bench_press"][-1]
+        self.assertEqual((observed["reason"], observed["context"]["kind"]), ("recovery_context", "deload"))
+        flags, row = self.next_week_bench(22.5, 12, 7)
+        self.assertIn("rpe_infeasible", flags)
+        self.assertIsNone(row["model_evidence"]["reason"])
+        self.assertEqual(row["model_evidence"]["estimate"]["e1rm"], 31.5)
+        result = self.coach("propose", "week", "--week", "2026-10-19")["data"]
+        bench = next(r for r in result["lines"] if r["exercise_id"] == "db_bench_press")
+        self.assertNotIn("unavailable", bench["rationale"])
+
+    def test_every_prescription_check_line_carries_its_model_evidence(self):
+        self.log_session("2026-10-05")
+        flags, row = self.next_week_bench(22.5, 10, 8)
+        self.assertEqual(row["model_evidence"]["estimate"]["e1rm"], 31.5)
+        result = self.coach("prescription", "check", "--overlay", "2026-10-19-weekly")["data"]
+        self.assertTrue(all("model_evidence" in line for line in result["lines"]))
+
+    def assisted_context(self, chosen_load):
+        from coach import capacity
+
+        doc = self.approve_context(kind="one_off")
+        self.decision(kind="override", overlay_id=doc["id"],
+                      scope={"session_id": "session-a", "exercise_id": "db_bench_press"}, details=None,
+                      proposed_sets=[{"type": "normal", "load": 20, "reps": 8, "rpe": 8}] * 3,
+                      chosen_sets=[{"type": "normal", "load": chosen_load, "reps": 8, "rpe": 8}] * 3)
+        exposure = {"date": "2026-10-12", "start_time": None, "session_id": "session-a",
+                    "exercise_id": "db_bench_press", "load_mode": "assisted", "overlay_id": doc["id"]}
+        return capacity.Context(self.root).for_exposure(exposure)["kind"]
+
+    def test_more_assistance_is_a_reduction_and_less_assistance_is_not(self):
+        self.assertEqual(self.assisted_context(30), "reduced")
+        self.assertEqual(self.assisted_context(10), "normal")
+
+    def card_and_progress(self):
+        from coach import pages
+
+        card = self.coach("checkin", "prepare", "--until", "2026-10-18")["data"]
+        progress = pages.render_progress(self.root, datetime(2026, 10, 19, 19, tzinfo=timezone.utc))
+        return card["card"]["e1rm_notes"], card["text"], progress
+
+    def test_lifts_that_cannot_have_an_e1rm_get_no_notes(self):
+        self.log_session("2026-10-05")
+        self.log_session("2026-10-12")
+        path = self.root / "data/history/2026-10.json"
+        original = read_json(path)
+        for mode in ("band", "duration", "distance"):
+            with self.subTest(mode=mode):
+                doc = read_json(path)
+                for workout in doc["workouts"]:
+                    for exercise in workout["exercises"]:
+                        if workout["date"] == "2026-10-12" and exercise["exercise_id"] == "db_bench_press":
+                            exercise["load_mode"] = mode
+                write_json(path, doc)
+                notes, text, progress = self.card_and_progress()
+                self.assertEqual(notes, [])
+                self.assertNotIn("e1RM notes", text)
+                self.assertNotIn("unsupported", progress)
+        write_json(path, original)
+        draft = self.prefill(session="session-b", day="2026-10-13")
+        for exercise in draft["exercises"]:
+            for logged in exercise["sets"]:
+                logged.update(reps=8, rpe=8, value=logged["value"] if logged["value"] is not None else 0)
+        self.add(draft)
+        self.coach("history", "sync")
+        observed = stats.e1rm_series(self.root)["observations"]["pull_up"][-1]
+        self.assertEqual(observed["reason"], "no_bodyweight_reading")
+        notes, text, progress = self.card_and_progress()
+        self.assertEqual(notes, [])
+        self.assertNotIn("Pull Up (", progress)
+
+    def test_notes_name_cap_and_light_week_reasons_plainly(self):
+        self.log_session("2026-10-05")
+        self.log_session("2026-10-12", bench=25, rpe=6)
+        notes, text, progress = self.card_and_progress()
+        self.assertEqual(notes, ["Bench Press (Dumbbell) (2026-10-12): more than 12 reps from failure, "
+                                 "too far for an e1RM"])
+        self.assertIn("e1RM notes:", text)
+        self.assertIn("more than 12 reps from failure", progress)
+        self.decision(details={"type": "light", "week": "2026-10-12", "reason": "coach", "triggers": [],
+                               "hard_weeks": 4})
+        notes, _, _ = self.card_and_progress()
+        self.assertEqual(notes, [f"{name} (2026-10-12): light week, kept in the log and left out of e1RM changes"
+                                 for name in ("Back Squat (Barbell)", "Bench Press (Dumbbell)")])
+
+    def test_progress_without_an_e1rm_says_where_one_comes_from(self):
+        from coach import pages
+
+        progress = pages.render_progress(self.root, datetime(2026, 10, 19, 19, tzinfo=timezone.utc))
+        self.assertIn("No e1RM yet: it comes from logged working sets of barbell, dumbbell and machine lifts.",
+                      progress)

@@ -70,6 +70,13 @@ One logged instance of a single exercise on a given date. Prescriptions
 are derived from exposures and go stale when the exposure is old.
 _Avoid_: attempt, data point
 
+**Comparable e1RM**:
+An e1RM from an exposure of ordinary training whose sets fall within the
+reps-to-failure cap. Only comparable e1RMs feed a lift's best e1RM, its
+change and a priority lift's e1RM KPI; light-week, return-week and
+reduced work stays in the log beside them without counting as a loss.
+_Avoid_: capacity evidence, model evidence
+
 **Validity window**:
 How long an exercise's newest exposure keeps its prescription current:
 the exercise's usual gap between exposures plus a short grace period.

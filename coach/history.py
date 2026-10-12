@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from coach import config as config_module
-from coach import capacity, dates, history_sources, jsonio, overlay, paths, program, state, units
+from coach import dates, history_sources, jsonio, overlay, paths, program, state, units
 from coach.errors import ValidationError
 from coach.history_sources import SourceWorkout
 from coach.library import Library
@@ -669,9 +669,7 @@ def all_exposures(root, include_unsynced=False, now=None, as_of=None):
     found_annotations = annotations(root, as_of=as_of)
     open_slips = {(c["workout_id"], c["exercise_id"]) for c in slip_candidates(exposures, found_annotations)
                   if c["status"] == "open"}
-    context = capacity.Context(root, as_of)
     for exposure in exposures:
-        exposure["capacity_context"] = context.for_exposure(exposure)
         exposure["suspect"] = (exposure["workout_id"], exposure["exercise_id"]) in open_slips
     return exposures
 

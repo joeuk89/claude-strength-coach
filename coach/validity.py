@@ -324,17 +324,18 @@ class _Checker:
         facts = self.history.gap_facts(line["exercise_id"], session_date)
         band = band_for(facts["days_off"]) if facts["days_off"] is not None else None
         derived, inferred = self.derived_from(session_date, line)
+        evidence = self.history.evidence(line["exercise_id"], session_date)
         self.lines.append({
             "session_id": session["session_id"], "date": session["date"], "exercise_id": line["exercise_id"],
             "days_off": facts["days_off"], "band": band.id if band else None, "derived_from": derived,
-            "inferred": inferred,
+            "inferred": inferred, "model_evidence": evidence,
         })
         if (session["session_id"], line["exercise_id"]) in self.no_data:
             return
         working = [s for s in line["sets"] if overlay.is_working(s)]
         self.stale(session, line, working, facts, band, derived, illness)
         self.caps_and_kit(session, line)
-        self.feasibility(session, session_date, line, working, facts)
+        self.feasibility(session, line, working, facts, evidence)
 
     def stale(self, session, line, working, facts, band, derived, illness):
         problems = []
@@ -446,16 +447,12 @@ class _Checker:
                                    f"{units.json_number(kit['bar_weight'])} {self.unit} bar)")
         return list(dict.fromkeys(missing))
 
-    def best_e1rm(self, exercise_id, session_date):
-        return self.history.evidence(exercise_id, session_date)["estimate"]
-
-    def feasibility(self, session, session_date, line, working, facts):
+    def feasibility(self, session, line, working, facts, evidence):
         sets = [(s, history.coaching_number(s["load"]), _reps(s)) for s in working if self.sound(line, s.get("load"))]
         sets = [(s, load, reps) for s, load, reps in sets if load and reps]
         if not sets:
             return
-        best = self.best_e1rm(line["exercise_id"], session_date) if line["load_mode"] in FEASIBILITY_MODES else None
-        self.lines[-1]["model_evidence"] = self.history.evidence(line["exercise_id"], session_date)
+        best = evidence["estimate"] if line["load_mode"] in FEASIBILITY_MODES else None
         if best is None:
             self.unearned_without_e1rm(session, line, sets, facts)
             return

@@ -47,7 +47,9 @@ athlete hit the prescribed load × reps @ RPE?
 **Deep tier** — all of the above, plus:
 - Per main lift: loads/reps across the window, and the e1RM trend from
   `python3 -m coach stats e1rm --since <last deep check-in>` (each
-  lift's series, best and latest change): trend, not gospel. Flag stalls
+  lift's series, best and latest change): trend, not gospel. Light-week,
+  return-week, reduced and over-cap exposures stay out of the series; read
+  them in `observations`, and the card's `e1rm_notes` says why. Flag stalls
   (same load+reps 3+ sessions) and progression-scheme violations.
 - Missed sessions since the last deep check-in: `python3 -m coach
   checkin misses` counts them by tag and by session (the deep card's

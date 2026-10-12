@@ -9,8 +9,6 @@
 | Bench Press (Dumbbell) | 35/hand | 12 Oct 2026 | 35/hand | — |
 | Single Arm Row (Dumbbell) | 42 | 1 Oct 2026 | 41.5 | — |
 
-Pull Up (2026-10-08): model evidence unavailable: missing load or reps.
-
 ## Core-complete weeks
 
 Current streak: 0 weeks · longest: 0 weeks
