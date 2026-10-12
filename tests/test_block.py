@@ -12,7 +12,7 @@ from unittest import mock
 from coach import block, flags, jsonio, program, structure
 from coach.validate import validate
 from tests.support import INSTANCES, REPO_ROOT, VALID, run_cli
-from tests.support.history import prescribe_fixture_history, read_json, write_json
+from tests.support.history import log_at_prescription, prescribe_fixture_history, read_json, write_json
 from tests.support.skills import skill_text
 
 BLOCK = INSTANCES / "block"
@@ -21,6 +21,8 @@ NEXT_SUNDAY = "2026-10-18T18:00:00Z"
 CEILING_LINE = ("Block 1 · 6 of 6 hard weeks · triggers 0 of 4 · light week: proposed for wk of 12 Oct "
                 "(deload, ceiling)")
 WORKING = ("normal", "dropset", "failure")
+POOR_SLEEP = ("--sleep", "poor", "--sleep-reason", "short nights reported, no diary")
+OK_SLEEP = ("--sleep", "ok", "--sleep-reason", "slept well, no diary")
 CODES = {"light_week_due": ("warn",), "light_week_skipped": ("info",), "fatigue_watch": ("info",),
          "deep_review_due": ("info",)}
 
@@ -136,7 +138,7 @@ def ill_week(case, pt_done=False):
 
 class CeilingTest(BlockCase):
     def test_w41_closes_six_hard_weeks_and_proposes_a_deload_at_the_ceiling(self):
-        data = self.close("2026-W41", "--readiness", "ok", "--sleep", "ok")
+        data = self.close("2026-W41", "--readiness", "ok", *OK_SLEEP)
         self.assertEqual([(w["week"], w["class"], w["count_after"]) for w in data["weeks"]],
                          [("2026-08-31", "hard", 1), ("2026-09-07", "hard", 2), ("2026-09-14", "hard", 3),
                           ("2026-09-21", "hard", 4), ("2026-09-28", "hard", 5), ("2026-10-05", "hard", 6)])
@@ -152,10 +154,11 @@ class CeilingTest(BlockCase):
         self.assertEqual(self.ledger()["blocks"][0]["weeks"], data["weeks"])
 
     def test_each_week_records_its_counts_and_signals(self):
-        week = self.close("2026-W41", "--readiness", "ok", "--sleep", "ok")["weeks"][-1]
+        week = self.close("2026-W41", "--readiness", "ok", *OK_SLEEP)["weeks"][-1]
         self.assertEqual((week["planned"], week["trained"], week["as_prescribed"]), (3, 3, 3))
-        self.assertEqual(week["signals"], {"readiness": "ok", "sleep": "ok", "sleep_source": "athlete",
-                                           "rpe_drift": False, "niggle": False})
+        self.assertEqual(week["signals"], {"readiness": "ok", "sleep": "ok", "sleep_source": "override",
+                                           "sleep_reason": "slept well, no diary", "rpe_drift": False,
+                                           "niggle": False})
         self.assertEqual(week["closed_at"], NOW)
         self.assertFalse(week["deep"])
 
@@ -302,7 +305,7 @@ class WeekClassTest(BlockCase):
 class TriggerTest(BlockCase):
     def test_two_triggers_from_readiness_and_sleep_propose_a_light_week(self):
         self.init(3)
-        data = self.close("2026-W41", "--readiness", "poor", "--sleep", "poor")
+        data = self.close("2026-W41", "--readiness", "poor", *POOR_SLEEP)
         self.assertEqual(data["block"]["hard_weeks_completed"], 4)
         self.assertEqual(data["weeks"][-1]["triggers"], ["readiness", "sleep"])
         light = data["block"]["light_week"]
@@ -312,10 +315,11 @@ class TriggerTest(BlockCase):
 
     def test_rpe_drift_on_squat_in_the_last_two_session_a_workouts_makes_it_a_deload(self):
         prescribe_fixture_history(self.root)
+        log_at_prescription(self.root, ("bb_back_squat",))
         self.init(3)
         for day in ("2026-09-28", "2026-10-05"):
             self.set_rpe(day, "bb_back_squat", 8.5)
-        data = self.close("2026-W41", "--readiness", "poor", "--sleep", "poor")
+        data = self.close("2026-W41", "--readiness", "poor", *POOR_SLEEP)
         self.assertEqual(data["weeks"][-1]["triggers"], ["readiness", "rpe_drift", "sleep"])
         self.assertTrue(data["weeks"][-1]["signals"]["rpe_drift"])
         self.assertEqual(data["block"]["light_week"]["type"], "deload")
@@ -328,7 +332,7 @@ class TriggerTest(BlockCase):
 
     def test_two_triggers_below_three_hard_weeks_skip_the_light_week(self):
         self.init(1)
-        data = self.close("2026-W41", "--readiness", "poor", "--sleep", "poor")
+        data = self.close("2026-W41", "--readiness", "poor", *POOR_SLEEP)
         self.assertEqual(data["weeks"][-1]["outcome"], "skipped")
         self.assertEqual(data["block"]["light_week"]["status"], "skipped")
         self.assertTrue(data["status_line"].endswith("light week: skipped (2 hard weeks)"))
@@ -337,7 +341,7 @@ class TriggerTest(BlockCase):
 
     def test_one_trigger_is_a_watch(self):
         self.init(1)
-        data = self.close("2026-W41", "--readiness", "poor", "--sleep", "ok")
+        data = self.close("2026-W41", "--readiness", "poor", *OK_SLEEP)
         self.assertEqual(data["weeks"][-1]["outcome"], "watch")
         self.assertEqual([c for c in codes(data) if c != "deep_review_due"], ["fatigue_watch"])
         self.assertTrue(data["status_line"].endswith("triggers 1 of 4 (readiness) · light week: watch"))
@@ -354,15 +358,11 @@ class TriggerTest(BlockCase):
         self.assertFalse(data["weeks"][-1]["signals"]["niggle"])
         self.assertEqual(data["weeks"][-1]["outcome"], "watch")
 
-    def test_sleep_debt_reads_the_cardio_module_when_the_athlete_says_nothing(self):
-        with mock.patch("coach.cardio.sleep_debt", return_value=True) as reader:
-            week = self.close("2026-W41")["weeks"][-1]
-        self.assertEqual((week["signals"]["sleep"], week["signals"]["sleep_source"]), ("poor", "sleep_debt"))
-        self.assertIn("sleep", week["triggers"])
-        span = reader.call_args_list[-1][0][1]
-        self.assertEqual((span.start, span.end), (date(2026, 10, 5), date(2026, 10, 11)))
+    def test_sleep_is_unknown_without_an_activity_source(self):
         week = self.close("2026-W41")["weeks"][-1]
         self.assertEqual((week["signals"]["sleep"], week["signals"]["sleep_source"]), ("unknown", "none"))
+        self.assertIsNone(week["signals"]["sleep_reason"])
+        self.assertNotIn("sleep", week["triggers"])
 
     def test_an_ill_week_under_half_after_eleven_days_off_proposes_a_return_week(self):
         ill_week(self)
@@ -617,30 +617,30 @@ class DeepReviewTest(BlockCase):
         self.assertEqual((again["deep_review"], again["flags"]), (data["deep_review"], data["flags"]))
 
     def test_a_changed_fatigue_reason_makes_the_repeat_deep(self):
-        _, data = self.declined_then_w42("--readiness", "poor", "--sleep", "poor")
+        _, data = self.declined_then_w42("--readiness", "poor", *POOR_SLEEP)
         self.assertEqual(data["deep_review"]["reasons"], ["light_week_proposed"])
         self.assertIsNone(data["deep_review"]["repeat_of"])
 
     def fatigue_proposal_declined(self):
         """Close W41 deep with two fatigue triggers (3 hard weeks) and decline the light week it proposes."""
         self.init(2)
-        self.assertEqual(self.close("2026-W41", "--readiness", "poor", "--sleep", "poor", "--deep")
+        self.assertEqual(self.close("2026-W41", "--readiness", "poor", *POOR_SLEEP, "--deep")
                          ["block"]["light_week"]["reason"], "triggers")
         return self.data("block", "decide", "--outcome", "declined", "--reason", "work trip")["decision"]
 
     def test_a_fatigue_proposal_running_on_unchanged_is_a_repeat(self):
         decision = self.fatigue_proposal_declined()
         self.train_week("2026-10-12")
-        data = self.close("2026-W42", "--readiness", "poor", "--sleep", "poor", now=NEXT_SUNDAY)
+        data = self.close("2026-W42", "--readiness", "poor", *POOR_SLEEP, now=NEXT_SUNDAY)
         self.assertEqual((data["deep_review"]["due"], data["deep_review"]["repeat_of"]), (False, decision["id"]))
 
     def test_a_fatigue_proposal_that_lapsed_and_returns_is_new_and_deep(self):
         self.fatigue_proposal_declined()
         self.train_week("2026-10-12")
-        lapsed = self.close("2026-W42", "--readiness", "ok", "--sleep", "ok", now=NEXT_SUNDAY)
+        lapsed = self.close("2026-W42", "--readiness", "ok", *OK_SLEEP, now=NEXT_SUNDAY)
         self.assertEqual(lapsed["block"]["light_week"]["status"], "not_due")
         self.train_week("2026-10-19")
-        data = self.close("2026-W43", "--readiness", "poor", "--sleep", "poor", now="2026-10-25T18:00:00Z")
+        data = self.close("2026-W43", "--readiness", "poor", *POOR_SLEEP, now="2026-10-25T18:00:00Z")
         self.assertEqual((data["block"]["light_week"]["status"], data["block"]["light_week"]["reason"]),
                          ("proposed", "triggers"))
         self.assertEqual(data["deep_review"]["reasons"], ["light_week_proposed"])
@@ -662,7 +662,7 @@ class DeepReviewTest(BlockCase):
 
     def test_a_watch_does_not_make_the_check_in_deep(self):
         self.init(2)
-        data = self.close("2026-W41", "--readiness", "poor", "--sleep", "ok")
+        data = self.close("2026-W41", "--readiness", "poor", *OK_SLEEP)
         self.assertIn("fatigue_watch", codes(data))
         self.assertEqual(data["block"]["light_week"]["status"], "watch")
         self.assertNotIn("light_week_proposed", data["deep_review"]["reasons"])

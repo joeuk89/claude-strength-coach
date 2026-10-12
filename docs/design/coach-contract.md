@@ -55,7 +55,8 @@ coach/                       # framework: synced to instances
   flags/__init__.py          # flag registry + auto-discovery                            (R-20)
   flags/<topic>.py           # one module per item that registers codes                  (each item)
   validity.py                # validity window, return bands, prescription checks        (R-24)
-  patterns.py                # is_compound(), is_isolation(), rpe_drift()                (R-23a)
+  patterns.py                # is_compound(), is_isolation(), rpe_drift(), drift_reading() (R-23a)
+  fatigue.py                 # a closed week's trigger evidence and recovery ceilings    (R-31)
   plugins/__init__.py        # plugin loader: framework + instance, kinds by subpackage  (R-23a)
   plugins/base.py            # context and proposal types, default_decay                 (R-23a)
   plugins/schemes/<name>.py, plugins/schedules/<name>.py, plugins/transforms/<name>.py  (R-23a, R-23b, R-31)
@@ -235,7 +236,7 @@ Phase 2 to 4 command inventory. No command here writes to Hevy.
 | `structure decide --rule restructure\|add_session --outcome adopted\|declined\|deferred [--reason T] [--revisit D]` | R-30a | W |
 | `structure priority [--since D]`, `structure minimum --week W` | R-30b | W with `--write` |
 | `block status` | R-31 | |
-| `block close --week W [--readiness poor\|ok] [--sleep poor\|ok] [--deep]`, `block decide --outcome adopted\|declined [--type deload\|light\|return] [--week W] [--reason T]`, `block init --hard-weeks N [--through W] [--started D] [--reason T]` | R-31 | W |
+| `block close --week W [--readiness poor\|ok] [--sleep poor\|ok --sleep-reason T] [--deep]`, `block decide --outcome adopted\|declined [--type deload\|light\|return] [--week W] [--reason T]`, `block init --hard-weeks N [--through W] [--started D] [--reason T]` | R-31 | W |
 | `nutrition status`, `nutrition readings [--last N]` | R-33a | |
 | `nutrition targets [--bodyweight X] [--goal-weight X] [--body-fat PCT --body-fat-source credible\|rough] [--sex male\|female] [--height N [--height-unit cm\|in]] [--recent-intake G] [--app macrofactor\|none] [--age N] [--activity sedentary\|active\|vigorous] [--phase PHASE:RATE]...` | R-33a | |
 | `nutrition record`, `nutrition import --input FILE` | R-33a | W |
@@ -2432,7 +2433,7 @@ Reserved codes:
 | `linear_below_start` | info | R-23a | | Linear reset fell below the starting load; review progression without automatic adjustment. |
 | `load_cut_held` | info, warn | R-23a | | A reset, return-band or deload load cut that the kit cannot make holds the load, and the rationale gives the target and actual cut. Info when the line's set or effort cuts still apply; warn when nothing is cut, naming the next lighter load the kit makes so the coach chooses, or when the kit makes nothing that light and the load rises. |
 | `wave_review` | warn | R-23a | | A 5/3/1 wave week was trained but a wave set fell short of its reps or its load, or past its RPE cap: the week repeats and no training-max raise is earned; review the training max with the athlete (a coaching heuristic). |
-| `rpe_drift` | warn | R-23a | | Compound or recovery-capped exercise: logged RPE at least 1 over target on two or more working sets of the last exposure. |
+| `rpe_drift` | warn | R-23a | | Compound or recovery-capped exercise: logged RPE at least 1 over target on two or more working sets of the last exposure, each against its own prescribed set and no harder (`coach.patterns.drift_reading`). |
 | `range_effort_mismatch` | warn | R-23a | | Double progression held a load whose derived-from exposure had a working set below its set group's rep range or 2 or more RPE over target; review a lighter load or a different rep range. |
 | `return_week` | info | R-23a | | Decay applied; names the band and days off. A lifting line's flag adds the load change (`loads × 0.9`, or `assistance held` on an `assisted` line), the set change and any RPE cap. |
 | `return_after_illness` | block | R-23a | | An `ill` miss or status day in the gap: the coach resolves it only once the athlete confirms `SYMPTOM_FREE_HOURS` (48) hours symptom-free, and ending the ill status day does not; first session capped at RPE `ILLNESS_RPE_CAP` (7). Overlays written before it blocked keep their `warn`. |
@@ -2459,12 +2460,14 @@ Reserved codes:
 | `light_week_due` | warn | R-31 | | Ceiling reached, or two fatigue triggers with three or more hard weeks; names the reason and proposed type. |
 | `light_week_skipped` | info | R-31 | | Two triggers fired below three hard weeks; light week skipped with the count. |
 | `fatigue_watch` | info | R-31 | | One fatigue trigger fired; names it. |
+| `drift_calibration` | info | R-31 | | A lift's two newest exposures drifted with no earlier at-prescription exposure that did not drift: calibration, not a trigger. |
+| `recovery_ceiling_exceeded` | warn | R-31 | | Logged deload, light or return work, or a line under an RPE cap, went over its RPE ceiling; not a trigger. |
 | `deep_review_due` | info | R-31 | | The next check-in is deep; lists the reasons. |
 | `effort_below_target` | info | R-31 | | A logged line's mean RPE is more than 1.5 under its targets; review the loads. |
 | `effort_above_target` | info | R-31 | | A logged line's mean RPE is more than 1.5 over its targets; review the loads and recovery. |
 | `reps_missed` | info | R-31 | | A logged working set fell short of its prescribed reps; names each line and its logged reps. |
 | `cap_breach` | warn | R-43 | | A weekly run, single-run or weekly-quality cap is exceeded, logged or planned. |
-| `run_volume_spike` | warn, info | R-43 | | A run is more than `spike_ratio` × the longest run in the lookback (warn logged, info planned). |
+| `run_volume_spike` | warn, info | R-43 | | A run is more than `spike_ratio` × the longest run in the lookback (warn logged, info planned); asks for a review and a recorded follow-up, never a fatigue trigger. |
 | `quality_stack` | warn | R-43 | | Two quality activities on the same or consecutive days. |
 | `collision` | warn, info | R-43 (registers), R-44a (emits) | | An interference rule is broken (C51). |
 | `sleep_debt` | warn | R-43 | | Most nights of the last seven were short. |
@@ -2792,8 +2795,19 @@ the scheme prescribed one, the final line has none and the scheme's
 clause still stands, it says "no + set this week" instead.
 
 R-23a also exposes its drift rule as `coach.patterns.rpe_drift(sets,
-prescribed_sets, capped) -> bool`, so R-31 calls the same function the
-`rpe_drift` flag uses.
+prescribed_sets, capped, load_mode) -> bool`, so R-31 calls the same
+function the `rpe_drift` flag uses. `drift_reading` gives the detail: each
+logged working set is paired by position with a prescribed working set;
+a set past the last prescribed one (`extra`), heavier than prescribed
+(less assistance for `assisted`; a missing load counts as 0 for
+`bodyweight` and `assisted`), with more reps than the top of its target
+(a rep-out set has no top), longer, with no target RPE, no load in a
+loaded mode, or no logged RPE is set aside. `compared` counts the rest, `over` their positions 1 or more
+RPE over target (the cap lowers every target), and `below` those logged
+lighter (more assistance for `assisted`), with fewer reps than the bottom
+of their target, or shorter. `drifted` is two or more over; `steady` is
+two or more compared sets not `below`, and not drifted. A `below` set can
+show drift but never steadiness.
 
 **Schedules.** `plan(ctx)` returns dated sessions for a span and the
 rotation it implies:
@@ -3553,11 +3567,14 @@ is the single function R-23a's pipeline, R-31's niggle trigger and R-43's
   `aggravated` from a better one (the entry before it is `watching`,
   `easing` or `resolved`). It is a week-level flag in `propose week` and
   the R-21a card, and `niggles list` gives each row's `escalate` reason.
-- `history` holds one entry per check-in day: `niggles update ID
-  [--status S] [--note T] [--mention]` adds today's entry, or replaces
-  it when today already has one. `--mention` bumps `mentions` and
-  `last_noted` once a day. `niggles resolve ID` sets `resolved`. The
-  newest entry's status equals `status`.
+- `history` holds one entry per report day: `niggles update ID
+  [--status S] [--note T] [--mention] [--date D]` adds the entry for `D`
+  (default today), or replaces it when that day already has one.
+  `--mention` bumps `mentions` and `last_noted` once a day. `niggles
+  resolve ID [--date D]` sets `resolved`; `niggles add --date D` dates
+  `first_noted` and the first entry. `--date` dates a report to the day
+  it describes: after today, or before the row's newest entry, exits 1.
+  The newest entry's status equals `status`.
 - Whether a row's constraints apply on a date reads its status on that
   date: the newest `history` entry on or before it (none: not yet
   noted). `coach.niggles.active_constraints(doc, entry, on_date)` returns
@@ -6083,13 +6100,13 @@ static balance alone. The command only reads: it never adopts FILE.
 
 ```json
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "blocks": [
     {"id": "b-0001", "started": "2026-08-31", "seed_hard_weeks": 0, "seed_reason": null,
      "ended": null, "end_reason": null,
      "weeks": [
        {"week": "2026-08-31", "class": "hard", "planned": 3, "trained": 3, "as_prescribed": 3, "on_break": 0,
-        "signals": {"readiness": "ok", "sleep": "ok", "sleep_source": "athlete",
+        "signals": {"readiness": "ok", "sleep": "ok", "sleep_source": "sleep_debt", "sleep_reason": null,
                     "rpe_drift": false, "niggle": false},
         "triggers": [], "count_after": 1,
         "outcome": "none", "deep": false, "closed_at": "2026-09-06T18:00:00Z"}
@@ -6108,7 +6125,13 @@ static balance alone. The command only reads: it never adopts FILE.
   migration step that creates a ledger at version 1 (state v3 → v4) has it
   brought to the current version by the runner before it is written.
 - `signals.readiness` and `signals.sleep`: `poor`, `ok`, `unknown`;
-  `sleep_source`: `athlete`, `sleep_debt`, `none`.
+  `sleep_source`: `sleep_debt` (measured), `override` (a `--sleep`
+  override, with its `sleep_reason`), `none`, or `athlete` on weeks
+  closed before version 3, when the athlete's word replaced the
+  measurement. `sleep_reason` is set exactly when the source is
+  `override`. Version 3 adds `override` and `sleep_reason`; its migration
+  (`coach/migrations/blocks/0002_sleep_override.py`) sets `sleep_reason`
+  null on every closed week and keeps each `athlete` source.
 - `triggers`: the fired subset of `readiness`, `rpe_drift`, `niggle`,
   `sleep`.
 - `outcome`: `none`, `watch`, `due`, `skipped`.
@@ -6141,7 +6164,7 @@ C25 `light_week` decision `details`:
 `{"type": "deload", "week": "2026-10-12", "reason": "ceiling", "triggers": [], "hard_weeks": 6}`.
 
 ```python
-coach.block.close(root, week_start, readiness, sleep, deep, dry_run) -> CloseReport   # week_start from coach.dates.week_span
+coach.block.close(root, week_start, readiness, sleep, deep, dry_run, *, sleep_reason) -> CloseReport   # week_start from coach.dates.week_span
 coach.block.status(root) -> StatusReport     # state summary, status_line, deep_review, flags
 coach.block.status_line(root) -> str
 coach.block.classify(root, week_start) -> str   # pure read; used by close and by tests
@@ -6185,9 +6208,13 @@ Rules (R-02's prose, scripted; the prose stays the human copy):
   return bands count (C22 reads the last lifting workout).
 - **Ceiling**: `program.blocks.hard_weeks_ceiling`, default 6, allowed 4–8.
 - **Triggers** (four): athlete-reported readiness, compound RPE drift two
-  sessions running (`coach.patterns.rpe_drift`), an `aggravated` niggle
-  (C27), poor sleep (the athlete's report, or `coach.cardio.sleep_debt`
-  over the closed week; None means no source).
+  sessions running at the prescription after an earlier at-prescription
+  exposure that did not drift (`coach.patterns.rpe_drift`), a niggle
+  `aggravated` at any point in the week (C27 history), poor sleep
+  measured by `coach.cardio.sleep_debt` from tracker and diary nights
+  alike (no source or too few nights: `unknown`), or a reasoned override.
+  A run spike (C49 `run_volume_spike`) is reviewed in the check-in and is
+  never a trigger.
 - A light week is due at the ceiling, or on two fired triggers with at
   least three hard weeks; skipped with a recorded reason below three; one
   trigger is a watch. A declined light week at the ceiling is proposed
@@ -6225,13 +6252,15 @@ Block <n> · <count> of <ceiling> hard weeks · triggers <k> of 4 (<names>) · l
 Flags (registered in `coach/flags/block.py`; rows in C20):
 `light_week_due`, `light_week_skipped`, `fatigue_watch`,
 `deep_review_due`, and from `block close` only, `effort_below_target`,
-`effort_above_target` and `reps_missed`.
+`effort_above_target`, `reps_missed`, `drift_calibration` and
+`recovery_ceiling_exceeded`.
 
 **Built with R-31** (details C42 and C43 leave open):
 
 - Signatures: `close(root, week_start, readiness=None, sleep=None,
-  deep=False, dry_run=False, *, today=None, now=None)`, `status(root, *,
-  today, now)`, `classify(root, week_start, *, today, now)`;
+  deep=False, dry_run=False, *, sleep_reason=None, today=None,
+  now=None)`, `status(root, *, today, now)`,
+  `classify(root, week_start, *, today, now)`;
   `status_line_for(block_state, ceiling, ledger=None, decisions=None)` is
   the pure form `status_line(root)` and `program adopt` call.
   `coach.block.trained_as_prescribed(lines, workout)` is the gate and
@@ -6272,15 +6301,33 @@ Flags (registered in `coach/flags/block.py`; rows in C20):
   no overlay covered the day), comparing
   `min(logged, prescribed)` working sets per line; a `trained_unlogged`
   session has no logged sets, so it is not.
-- **Triggers**: readiness and sleep only for the week `--week` names
-  (earlier weeks of a catch-up close read sleep from
-  `coach.cardio.sleep_debt` only, else `unknown`). RPE drift: a compound
-  or recovery-capped lift whose two newest non-excluded exposures up to
-  the week's end, the newer inside the week, both drift (prescriptions
-  from `coach.propose.Run.exposures`). Niggle: a row whose status on the
-  week's last day (today for the week closed today or later) is
-  `aggravated`. Sleep reads `coach.cardio.sleep_debt(root, span)`
-  (C49): None, so `unknown`, without an activity source.
+- **Triggers**: readiness and a sleep override only for the week
+  `--week` names; every week's sleep is measured. RPE drift
+  (`coach.fatigue.drift_review`): a compound or recovery-capped lift whose
+  two newest non-excluded exposures up to the week's end, the newer
+  inside the week, both drift against their own prescriptions
+  (`patterns.drift_reading`, prescriptions from
+  `coach.propose.Run.exposures`), in one load mode, with an earlier
+  exposure of that load mode `steady`. An exposure is not comparable,
+  so neither drift nor steady, when its recorded intent
+  (`coach.capacity`) is `deload`, `light` or `return`, it is a suspect
+  convention slip, or its prescription is unknown (no overlay line for
+  its session). Both drifting with no steady exposure before them is
+  `calibration` (flag `drift_calibration`), not a trigger. Niggle
+  (`fatigue.flares`): a row whose history has an `aggravated` entry
+  dated in the week, or whose status on the week's first day (C27) is
+  still `aggravated`, so a report settling it on that day ends it
+  before the week. An entry dated after the week never counts for it; a
+  check-in held after the week dates the athlete's report to when the
+  flare happened (`niggles update --date`, C27). A later status never
+  erases the entry. Sleep (`fatigue.sleep_reading`, reading
+  `coach.cardio.sleep_evidence(root, span)`, C49): `poor` or `ok` by the
+  `sleep_debt` rule over nightly tracker and diary hours, a period mean
+  counting for no night; `unknown` without an activity source or with
+  too few nights. `close(..., sleep, sleep_reason=...)`: `--sleep` needs
+  `--sleep-reason` and records source `override` (exit 1 otherwise);
+  `--sleep-reason` alone exits 1. How the athlete felt is
+  `--readiness`.
 - **Illness**: a `low` week with an `ill` miss proposes a `return` week
   with reason `illness` (C42's reason enum gains `illness`), whatever
   the count, only when the days off pass the first return band (C22):
@@ -6336,8 +6383,24 @@ Flags (registered in `coach/flags/block.py`; rows in C20):
   effort over or under target, how many targeted sets had no RPE logged,
   and, for an `illness` week, that adherence leaves it out. Its flags add
   one `effort_below_target`, `effort_above_target` or `reps_missed` per
-  session and signal, naming each line. A repeated close of the same week
-  returns the same reviews and flags.
+  session and signal, naming each line. Each review also carries
+  `fatigue`: `readiness` `{value, source}`, `rpe_drift` (each lift
+  `drift_review` reports, `status` `drift`, `calibration` or
+  `not_counted` when the logged RPE ran over target on enough sets that
+  were set aside or not comparable, with its two exposures' `date`,
+  `workout_id`, `session_id`, `intent`, `verdict`, `why`,
+  `compared_sets`, `over_sets`, `set_aside` and `below_prescription`, and
+  the `baseline`
+  exposure), `niggle` (each flare's `id`, `area`, `aggravated_on`,
+  `aggravated_since`, `status_now`) and `sleep` (`value`, `source`,
+  `reason`, and `measured`: the reading with its nights, their sources
+  and any period means set aside); and `recovery_ceilings`
+  (`fatigue.ceiling_breaches`): each logged line in the week over its RPE
+  ceiling, the prescribed RPE of deload, light or return work or an
+  active `rpe_cap`, set by set, whether or not it counts toward drift.
+  `drift_calibration` names each `calibration` lift and
+  `recovery_ceiling_exceeded` each breach. A repeated close of the same
+  week returns the same reviews and flags.
 - `block decide`: `declined` needs a proposed (or declined) week and
   `--reason`; at the ceiling its `revisit_on` is the end of the proposed
   week. `adopted` takes the proposal's type and week by default; another
@@ -7093,7 +7156,7 @@ week-flag provider in `propose week`; registered in
 | Code | Rule |
 |---|---|
 | `cap_breach` | Logged week, and planned week at `review`/`program`: run distance or minutes above the weekly cap; any single run above the single-run cap; quality activities above `weekly_quality`. One flag per cap broken, naming value, cap and unit. A planned record with only a duration target is checked on minutes only. |
-| `run_volume_spike` | A run whose distance (else minutes) exceeds `spike_ratio` × the longest logged run in the `spike_lookback_days` before its date. Warn logged, info planned. No reference run, or store history shorter than the lookback (the store's first logged Activity, any kind, is fewer than `spike_min_history_days` before the run): listed in `data.skipped` with the reason, not flagged (rn:running-load.1, rn:running-load.4). |
+| `run_volume_spike` | A run whose distance (else minutes) exceeds `spike_ratio` × the longest logged run in the `spike_lookback_days` before its date. Warn logged, info planned. No reference run, or store history shorter than the lookback (the store's first logged Activity, any kind, is fewer than `spike_min_history_days` before the run): listed in `data.skipped` with the reason, not flagged (rn:running-load.1, rn:running-load.4). The message asks for a review with the athlete (symptoms, recovery, the next long run) and an agreed action recorded as a follow-up; it is no fatigue trigger, quality classification or load cut. |
 | `quality_stack` | Two quality bouts on the same or consecutive local dates, logged or planned. Lifting is not part of it; lifting against runs is `collision` (C51). |
 | `sleep_debt` | Over the 7 nights ending on the evaluation date (C30 `asleep_days`): at least `sleep_min_nights` nightly observations of hours asleep (a period mean counts for none) and at least `sleep_debt_nights` of them below `sleep_short_hours`. Evaluation date: the span's last day for `--week` and `--span`, or today when the span ends later; today for proposals. |
 | `status_active` | A status day overlaps the span or today. Warn `ill`/`injured` (`injured` adds "check with a qualified professional"), info `travel`. |
@@ -7115,8 +7178,13 @@ judges the nights ending on the evaluation date
 (`coach.cardio.evaluation_date(ctx)`) instead. For a span ending on or
 before today the two agree: the flag is raised exactly when
 `sleep_debt(root, span)` returns True. For a span ending later they can
-differ, because `sleep_debt` does not clamp to today. R-31 calls it for
-its poor-sleep trigger.
+differ, because `sleep_debt` does not clamp to today.
+`coach.cardio.sleep_evidence(root, span)` returns the same judgement
+with what it read (`debt`, `short_nights`, `nights`, `window`,
+`short_hours`, `debt_nights`, `min_nights`, `nightly` as `{date,
+asleep_hours, source}` and `period_means` as record ids), or None when
+`[activity]` is off; R-31 reads it for its poor-sleep trigger, so tracker
+and diary nights count alike.
 
 **Week-flag providers.** `coach/weekflags/<name>.py`, discovered with
 `pkgutil.iter_modules`:

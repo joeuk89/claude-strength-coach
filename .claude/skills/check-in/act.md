@@ -21,6 +21,10 @@
   <patterns> --note "<report>"` (`--exercise` and `--activity-kinds`
   name anything else it affects). Repeat mention: `python3 -m coach
   niggles update <id> --mention --status <status> --note "<report>"`.
+  A status the athlete reports for an earlier day (it flared Tuesday)
+  takes `--date <that day>`, in date order: a flare counts toward a
+  closed week's niggle trigger only when dated inside that week, so after
+  a dated report run `block close` for that week again (analyze.md).
   Confirmed gone: `python3 -m coach niggles resolve <id>`, which **keeps
   the row**: recurrence is the signal this log exists to catch. Agree
   with the athlete the limit an active niggle sets and add it with
@@ -32,6 +36,12 @@
   diagnose — when `python3 -m coach niggles list` gives a row an
   `escalate` reason (three check-ins running, or worse to
   `aggravated`), or when a niggle interferes with prescribed training.
+- **A `run_volume_spike`** (analyze.md): ask about symptoms, how the
+  athlete recovered and the next long run, agree an action (hold the next
+  long run, shorten it, or review it next week) and record it with
+  `python3 -m coach followups add --text "<action>" --review-at <date>
+  --source "check-in <date>"`. A spike is not a fatigue trigger: never pass
+  it to `block close`, and cut no load for it alone.
 - **Update `data/state.json`:** the confirmed `rotation` (`position`,
   `confirmed`, `confirmed_at`) if the program rotates. `block` is
   written only by the `block` commands (analyze.md and below). Then run

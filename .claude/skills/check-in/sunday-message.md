@@ -44,9 +44,9 @@ fields, always in this order:
    field. Lifting alone never implies running.
 4. **Sleep** — with enough dated nightly observations, the card
    states the last seven nights (average and short nights) and asks how
-   it felt. Otherwise ask, in one line: "average hours a night, dates
-   covered and source (manual diary, self-reported period mean or
-   tracker), and how it felt".
+   it felt. Otherwise ask, in one line, for hours asleep each night (diary
+   or tracker), else the average with its dates and source, and how it
+   felt: only nightly hours feed the fatigue check (analyze.md).
 5. **Niggles** — anything new? Name each open niggle-log row (`watching`
    or `easing`) and ask whether it is quiet or still there. The card
    quotes the window's workout and exercise notes once, under "Notes

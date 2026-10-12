@@ -31,14 +31,16 @@ def status(args, ctx):
          "propose, watch or skip a light week",
     args=(arg("--week", required=True, metavar="W", help="a week label (YYYY-Www) or any date in it"),
           arg("--readiness", choices=block.READINGS, help="the athlete's readiness this week"),
-          arg("--sleep", choices=block.READINGS, help="the athlete's sleep this week (most nights)"),
+          arg("--sleep", choices=block.READINGS,
+              help="override the sleep measured from tracker or diary hours; needs --sleep-reason"),
+          arg("--sleep-reason", metavar="TEXT", help="why the override, shown with the close"),
           arg("--deep", action="store_true", help="this check-in is a deep review")),
     writes=True,
 )
 def close(args, ctx):
     span = _week(args.week, "--week", ctx)
-    return block.close(ctx.root, span, args.readiness, args.sleep, args.deep, args.dry_run, today=ctx.today(),
-                       now=ctx.now())
+    return block.close(ctx.root, span, args.readiness, args.sleep, args.deep, args.dry_run,
+                       sleep_reason=args.sleep_reason, today=ctx.today(), now=ctx.now())
 
 
 @command(

@@ -426,8 +426,11 @@ def runs_on_file(root, config, span, today):
 
 def sleep_judgement(store, settings, end):
     """(short nights, nights with data, debt: True | False | None) over the 7 nights ending on `end`."""
-    nights = dates.Span(end - timedelta(days=NIGHTS - 1), end)
-    hours = [day["asleep_hours"] for day in store.asleep_days(nights) if day["provenance"]["kind"] == "nightly"]
+    return _judge(store.asleep_days(dates.Span(end - timedelta(days=NIGHTS - 1), end)), settings)
+
+
+def _judge(days, settings):
+    hours = [day["asleep_hours"] for day in days if day["provenance"]["kind"] == "nightly"]
     short = sum(1 for value in hours if value < settings["sleep_short_hours"])
     if len(hours) < settings["sleep_min_nights"]:
         return short, len(hours), None
@@ -440,6 +443,30 @@ def sleep_debt(root, span):
     if not activity_on(config):
         return None
     return sleep_judgement(ActivityStore(root, config), _settings(config), span.end)[2]
+
+
+def sleep_evidence(root, span):
+    """The `sleep_debt` rule's reading of the 7 nights ending on `span.end`, with the nights it read; None with no
+    activity source.
+
+    Tracker and diary nights count alike; a period mean counts for no night and is listed by id.
+    """
+    config = config_module.load(root)
+    if not activity_on(config):
+        return None
+    settings = _settings(config)
+    store = ActivityStore(root, config)
+    window = dates.Span(span.end - timedelta(days=NIGHTS - 1), span.end)
+    days = store.asleep_days(window)
+    short, nights, debt = _judge(days, settings)
+    return {"debt": debt, "short_nights": short, "nights": nights, "window": window.to_json(),
+            "short_hours": settings["sleep_short_hours"], "debt_nights": settings["sleep_debt_nights"],
+            "min_nights": settings["sleep_min_nights"],
+            "nightly": [{"date": day["date"], "asleep_hours": day["asleep_hours"],
+                         "source": day["provenance"]["source"]}
+                        for day in days if day["provenance"]["kind"] == "nightly"],
+            "period_means": sorted({day["provenance"]["id"] for day in days
+                                    if day["provenance"]["kind"] != "nightly"})}
 
 
 def evaluation_date(ctx):
@@ -579,7 +606,9 @@ def _spike_flags(store, bouts, settings):
             found.append(flags.make("run_volume_spike", severity, message=(
                 f"{what} on {run.date.isoformat()} is {size}, more than {ratio:g} × the longest run in the "
                 f"{lookback} days before it ({reference}). In one observational cohort, single runs this far "
-                "past the recent longest had more overuse injuries.")))
+                "past the recent longest had more overuse injuries. Review it with the athlete (any symptoms, how "
+                "they recovered, the next long run) and record the agreed action as a follow-up; it is not a "
+                "fatigue trigger and sets no load cut.")))
     return found, skipped
 
 

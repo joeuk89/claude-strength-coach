@@ -87,7 +87,7 @@ class ReviewContextTest(HistoryCase):
 
     def test_earliest_ledger_start_survives_a_later_block_start_without_a_program_start_record(self):
         self.edit_json("data/state.json", lambda doc: doc["block"].update(started="2026-11-01"))
-        write_json(self.root / "data/blocks.json", {"schema_version": 2, "blocks": [{
+        write_json(self.root / "data/blocks.json", {"schema_version": 3, "blocks": [{
             "id": "b-0001", "started": "2026-10-11", "seed_hard_weeks": 0, "seed_reason": None,
             "ended": None, "end_reason": None, "weeks": []}]})
         self.assertEqual(checkin.due(self.root, date(2026, 11, 1)).due_date, date(2026, 10, 18))
@@ -97,7 +97,7 @@ class ReviewContextTest(HistoryCase):
 
     def test_an_invalid_block_ledger_leaves_the_first_due_date_on_the_other_starts(self):
         open_block = {"seed_hard_weeks": 0, "seed_reason": None, "ended": None, "end_reason": None, "weeks": []}
-        write_json(self.root / "data/blocks.json", {"schema_version": 2, "blocks": [
+        write_json(self.root / "data/blocks.json", {"schema_version": 3, "blocks": [
             dict(open_block, id="b-0001", started="2026-10-04"),
             dict(open_block, id="b-0002", started="2026-10-11")]})
         with self.assertRaises(ValidationError):

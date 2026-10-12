@@ -120,7 +120,8 @@ class SkillTest(unittest.TestCase):
         self.assertIn("python3 -m coach interference list", text)
 
     def test_check_in_names_collision_among_the_cardio_flags(self):
-        self.assertIn("`collision` from the program's interference rules", self.read("check-in"))
+        text = " ".join(self.read("check-in").split())
+        self.assertIn("`collision` from the program's interference rules", text)
 
     def test_new_program_sets_the_rules_in_a_designed_draft(self):
         text = " ".join(self.read("new-program").split())

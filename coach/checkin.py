@@ -51,8 +51,8 @@ LABELS = {
 MISS_TAG_TEXT = " / ".join(history.MISS_TAGS)
 WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 
-SLEEP_ASK = ("One line: average hours a night, dates covered and source "
-             "(manual diary, self-reported period mean or tracker), and how it felt.")
+SLEEP_ASK = ("One line: hours asleep each night (diary or tracker), else the average hours a night with the "
+             "dates covered and source (self-reported period mean), and how it felt.")
 SCALE_WEIGHT_ASK = "One morning scale weight."
 _SCALE_WEIGHT = checkin_parts.Field(ask=SCALE_WEIGHT_ASK, label="Bodyweight")
 NEXT_WEEK_ASK = "Anything different: travel, schedule, kit, illness?"

@@ -14,9 +14,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from coach import cardio
 from coach import config as config_module
-from coach import constraints, dates, decisions, flags, history, jsonio, niggles, overlay, paths, patterns
+from coach import dates, decisions, fatigue, flags, history, jsonio, overlay, paths
 from coach import program as program_module
 from coach import render, stats, statusdays, structure, validity
 from coach import state as state_module
@@ -93,6 +92,10 @@ def problems(doc):
             previous_week = week["week"]
             if any(t not in TRIGGERS for t in week["triggers"]):
                 errors.append(Error(f"{path}.weeks[{position}].triggers", "unknown trigger"))
+            signals = week["signals"]
+            if (signals["sleep_source"] == "override") != (signals["sleep_reason"] is not None):
+                errors.append(Error(f"{path}.weeks[{position}].signals.sleep_reason",
+                                    "a sleep override carries its reason, and only an override does"))
         if block["weeks"] and block["end_reason"] is not None and block["weeks"][-1]["class"] != block["end_reason"]:
             errors.append(Error(f"{path}.end_reason",
                                 f"{block['end_reason']} does not match the class of the week that ended the block"))
@@ -354,58 +357,57 @@ def _as_date(value):
     return dates.parse_date(value) if isinstance(value, str) else value
 
 
-def _drifting(inst, span):
-    """Names of compound or recovery-capped lifts whose two newest exposures, the newer in the week, both drifted."""
-    by_exercise = {}
-    for exposure in inst.run().exposures():
-        if not exposure.excluded and exposure.date <= span.end:
-            by_exercise.setdefault(exposure.exercise_id, []).append(exposure)
-    found = []
-    for exercise_id, exposures in sorted(by_exercise.items()):
-        pair = exposures[:2]
-        if len(pair) < 2 or not span.contains(pair[0].date):
-            continue
-        entry = inst.library.get(exercise_id) or {}
-        if all(_drifted(inst, exposure, entry) for exposure in pair):
-            found.append(entry.get("name", exercise_id))
-    return found
+def _short(day):
+    return render.short_date(dates.parse_date(day))
 
 
-def _drifted(inst, exposure, entry):
-    caps = [c["value"] for c in constraints.active(inst.root, exposure.session_id, exposure.exercise_id, exposure.date)
-            if c["kind"] == "rpe_cap"] if exposure.session_id else []
-    cap = min(caps) if caps else None
-    if not patterns.is_compound(entry) and cap is None:
-        return False
-    return patterns.rpe_drift(exposure.sets, exposure.prescribed, cap)
+def _drift_words(lifts):
+    return [lift["name"] for lift in lifts if lift["status"] == "drift"]
 
 
-def _aggravated(inst, on_date):
-    if not niggles.exists(inst.root):
-        return []
-    doc = niggles.load(inst.root, inst.library)
-    return [row["area"] for row in doc["niggles"] if niggles.status_on(row, on_date) == "aggravated"]
+def _niggle_words(flared):
+    parts = []
+    for row in flared:
+        when = [f"aggravated {_short(day)}" for day in row["aggravated_on"]]
+        if row["aggravated_since"] and not row["aggravated_on"]:
+            when = [f"aggravated since {_short(row['aggravated_since'])}"]
+        parts.append(f"{row['area']} ({', '.join(when)})")
+    return ", ".join(parts)
 
 
-def _signals(inst, span, readiness, sleep, target):
-    """(signals, fired triggers, detail words) for one closed week."""
-    drift = _drifting(inst, span)
-    aggravated = _aggravated(inst, max(span.end, inst.today) if target else span.end)
+def _sleep_words(sleep):
+    if sleep["source"] == "override":
+        return f"poor sleep (override: {sleep['reason']})"
+    measured = sleep["measured"]
+    return (f"poor sleep ({measured['short_nights']} of the 7 nights to {_short(measured['window']['end'])} under "
+            f"{measured['short_hours']:g} h)")
+
+
+def _signals(inst, span, readiness, sleep, sleep_reason, target):
+    """(signals, fired triggers, detail words, evidence) for one closed week.
+
+    Readiness and a sleep override apply to the target week only.
+    """
+    drift = fatigue.drift_review(inst, span)
+    drifting = _drift_words(drift)
+    flared = fatigue.flares(inst, span)
     readiness = (readiness if target else None) or "unknown"
+    measured = fatigue.sleep_reading(inst.root, span)
     if target and sleep:
-        sleep_value, source = sleep, "athlete"
+        sleep_value, source, reason = sleep, "override", sleep_reason
     else:
-        debt = cardio.sleep_debt(inst.root, span)
-        sleep_value = "unknown" if debt is None else ("poor" if debt else "ok")
-        source = "none" if debt is None else "sleep_debt"
-    signals = {"readiness": readiness, "sleep": sleep_value, "sleep_source": source, "rpe_drift": bool(drift),
-               "niggle": bool(aggravated)}
-    fired = [name for name, on in (("readiness", readiness == "poor"), ("rpe_drift", bool(drift)),
-                                   ("niggle", bool(aggravated)), ("sleep", sleep_value == "poor")) if on]
-    words = {"rpe_drift": f"RPE drift on {', '.join(drift)}" if drift else None,
-             "niggle": f"aggravated niggle: {', '.join(aggravated)}" if aggravated else None,
-             "readiness": "poor readiness", "sleep": "poor sleep"}
-    return signals, fired, words
+        sleep_value, source, reason = measured["value"], measured["source"], None
+    signals = {"readiness": readiness, "sleep": sleep_value, "sleep_source": source, "sleep_reason": reason,
+               "rpe_drift": bool(drifting), "niggle": bool(flared)}
+    fired = [name for name, on in (("readiness", readiness == "poor"), ("rpe_drift", bool(drifting)),
+                                   ("niggle", bool(flared)), ("sleep", sleep_value == "poor")) if on]
+    evidence = {"readiness": {"value": readiness, "source": "athlete" if readiness != "unknown" else "none"},
+                "rpe_drift": drift, "niggle": flared,
+                "sleep": {"value": sleep_value, "source": source, "reason": reason, "measured": measured}}
+    words = {"rpe_drift": f"RPE drift on {', '.join(drifting)}" if drifting else None,
+             "niggle": f"aggravated niggle: {_niggle_words(flared)}" if flared else None,
+             "readiness": "poor readiness", "sleep": _sleep_words(evidence["sleep"]) if sleep_value == "poor" else None}
+    return signals, fired, words, evidence
 
 
 def outcome_for(week_class, count, fired, ceiling, ill=False, days_off=None):
@@ -627,6 +629,30 @@ def _session_flags(inst, review):
     return found
 
 
+def _fatigue_flags(inst, review):
+    """Calibration context for drift that has no earlier at-prescription exposure, and each recovery ceiling the
+    logged work went over; neither is a fatigue trigger."""
+    def name(exercise_id):
+        return (inst.library.get(exercise_id) or {}).get("name", exercise_id)
+
+    found = []
+    for lift in review["fatigue"]["rpe_drift"]:
+        if lift["status"] == "calibration":
+            days = " and ".join(_short(e["date"]) for e in reversed(lift["exposures"]))
+            found.append(flags.make("drift_calibration", exercise_id=lift["exercise_id"], message=(
+                f"{lift['name']}: logged RPE ran 1 or more over target on {days}, with no earlier exposure at the "
+                "prescription that did not drift, so this reads as load calibration, not fatigue drift; review the "
+                "loads with the athlete")))
+    for breach in review["recovery_ceilings"]:
+        sets = ", ".join(f"set {s['set']} at RPE {s['rpe']:g} (ceiling {s['ceiling']:g})" for s in breach["sets"])
+        found.append(flags.make("recovery_ceiling_exceeded", session_id=breach["session_id"],
+                                exercise_id=breach["exercise_id"], message=(
+            f"{breach['date']} {breach['session_id']}: {name(breach['exercise_id'])} went over its recovery RPE "
+            f"ceiling ({breach['why']}): {sets}. A ceiling is a limit, not a target: ask how it felt and review "
+            "the loads; it is not a fatigue trigger")))
+    return found
+
+
 def _review(span, facts):
     """One closed week's sessions against their prescriptions, and a summary that keeps the hard-week gate apart
     from completing the prescription."""
@@ -746,11 +772,21 @@ def _save(inst, ledger, block_state, dry_run):
     return _render_program(inst.root, dry_run) if not dry_run else []
 
 
-def close(root, week_start, readiness=None, sleep=None, deep=False, dry_run=False, *, today=None, now=None):
-    """Close every week from the last closed one up to `week_start`'s week: class, count, triggers, rules (C42, C43)."""
+def close(root, week_start, readiness=None, sleep=None, deep=False, dry_run=False, *, sleep_reason=None, today=None,
+          now=None):
+    """Close every week from the last closed one up to `week_start`'s week: class, count, triggers, rules (C42, C43).
+
+    `sleep` overrides the week's measured sleep and needs `sleep_reason`: the athlete's feeling alone is readiness.
+    """
     for name, value in (("readiness", readiness), ("sleep", sleep)):
         if value is not None and value not in READINGS:
             raise ValidationError(f"{name} must be one of {', '.join(READINGS)}")
+    sleep_reason = sleep_reason.strip() if sleep_reason and sleep_reason.strip() else None
+    if sleep is not None and sleep_reason is None:
+        raise ValidationError("--sleep overrides the sleep measured from tracker or diary hours, so --sleep-reason "
+                              "must say why (how the athlete felt is --readiness)")
+    if sleep is None and sleep_reason is not None:
+        raise ValidationError("--sleep-reason explains a --sleep override; give --sleep too")
     inst = _Instance.load(root, today, now)
     target = inst.week(_as_date(week_start))
     if target.start > inst.today:
@@ -776,7 +812,7 @@ def close(root, week_start, readiness=None, sleep=None, deep=False, dry_run=Fals
         facts = _facts(inst, span)
         block = ledger["blocks"][-1]
         count = 0 if facts["class"] in ENDS_BLOCK else count_of(block) + (facts["class"] == "hard")
-        signals, fired, words = _signals(inst, span, readiness, sleep, is_target)
+        signals, fired, words, evidence = _signals(inst, span, readiness, sleep, sleep_reason, is_target)
         days_off = _days_off_after(inst, span) if facts["class"] == "low" and facts["ill"] else None
         outcome, week_type, reason = outcome_for(facts["class"], count, fired, ceiling, facts["ill"], days_off)
         entry = {"week": span.start.isoformat(), "class": facts["class"], "planned": facts["planned"],
@@ -786,7 +822,8 @@ def close(root, week_start, readiness=None, sleep=None, deep=False, dry_run=Fals
                  "closed_at": closed_at}
         block["weeks"].append(entry)
         entries.append(entry)
-        reviews.append(_review(span, facts))
+        reviews.append(dict(_review(span, facts), fatigue=evidence,
+                            recovery_ceilings=fatigue.ceiling_breaches(inst, span)))
         if facts["class"] in ENDS_BLOCK:
             block["ended"], block["end_reason"] = span.end.isoformat(), facts["class"]
             ended.append(block["id"])
@@ -803,7 +840,7 @@ def close(root, week_start, readiness=None, sleep=None, deep=False, dry_run=Fals
     rendered = _save(inst, ledger, block_state, dry_run)
     raised = _flags(block_state, entries[-1], deep_report, words, inst.decisions)
     for review in reviews:
-        raised += _session_flags(inst, review)
+        raised += _session_flags(inst, review) + _fatigue_flags(inst, review)
     return {"weeks": entries, "replaced": replaced, "ended": ended, "block": block_state,
             "status_line": status_line_for(block_state, ceiling, ledger, inst.decisions),
             "deep_review": deep_report, "reviews": reviews, "flags": raised,

@@ -1,4 +1,4 @@
-from coach import constraints, niggles, paths, program
+from coach import constraints, dates, niggles, paths, program
 from coach.commands import arg, command
 from coach.errors import UsageError, ValidationError
 from coach.library import Library
@@ -34,6 +34,23 @@ def _constraints(args, reason):
     return [niggles.parse_constraint(text, reason) for text in args.constraint]
 
 
+def _report_day(args, ctx):
+    """The day the report describes: --date, else today; never after today."""
+    today = ctx.today()
+    if args.date is None:
+        return today
+    try:
+        day = dates.parse_date(args.date)
+    except ValueError as exc:
+        raise ValidationError(f"--date: {exc}") from None
+    if day > today:
+        raise ValidationError(f"--date {day} is after today ({today}): date a report to when it happened")
+    return day
+
+
+_DATE_ARG = arg("--date", metavar="D", help="the day the report describes, YYYY-MM-DD (default today); a week's "
+                                            "fatigue check counts only reports dated inside it")
+
 _APPLIES_ARGS = (
     arg("--pattern", help="movement pattern(s) it affects, comma-separated or repeated; \"\" clears", **_LIST),
     arg("--exercise", help="library exercise id(s) it affects, comma-separated or repeated; \"\" clears", **_LIST),
@@ -61,7 +78,8 @@ def list_niggles(args, ctx):
 @command("niggles add", help="Log a new niggle, the movements it affects and the load limits it sets",
          args=(arg("--area", metavar="TEXT", help="where it is, e.g. \"left knee\""),
                arg("--status", choices=niggles.STATUSES, default="watching", help="default watching"),
-               arg("--note", metavar="TEXT", help="today's report, one line"),
+               arg("--note", metavar="TEXT", help="the report, one line"),
+               _DATE_ARG,
                *_APPLIES_ARGS),
          writes=True)
 def add(args, ctx):
@@ -71,8 +89,8 @@ def add(args, ctx):
     if args.area is None or not args.area.strip():
         raise UsageError("--area must say where the niggle is")
     doc, row = niggles.add(
-        niggles.load(ctx.root, library), args.area, ctx.today(), args.status, patterns or [], exercises or [],
-        kinds or [], _constraints(args, args.area.strip()) or [],
+        niggles.load(ctx.root, library), args.area, _report_day(args, ctx), args.status, patterns or [],
+        exercises or [], kinds or [], _constraints(args, args.area.strip()) or [],
         constrain_while if constrain_while is not None else niggles.DEFAULT_CONSTRAIN_WHILE, args.note, args.notes)
     niggles.save(ctx.root, doc, args.dry_run, library)
     return {"niggle": row, "written": not args.dry_run}
@@ -81,10 +99,11 @@ def add(args, ctx):
 @command("niggles update", help="Record a check-in report on a niggle (status, note, mention) or change what it "
                                 "applies to and its limits",
          args=(arg("id", metavar="ID", help="niggle id, e.g. n-0001"),
-               arg("--status", choices=niggles.STATUSES, help="its status as of today"),
-               arg("--note", metavar="TEXT", help="today's report, one line"),
-               arg("--mention", action="store_true", help="the athlete reported it today: bump mentions and last "
-                                                          "noted (once a day)"),
+               arg("--status", choices=niggles.STATUSES, help="its status as of the report's day"),
+               arg("--note", metavar="TEXT", help="the report, one line"),
+               arg("--mention", action="store_true", help="the athlete reported it: bump mentions and last noted "
+                                                          "(once a day)"),
+               _DATE_ARG,
                arg("--area", metavar="TEXT", help="rename where it is"),
                arg("--clear-constraints", action="store_true", help="remove every constraint"),
                *_APPLIES_ARGS),
@@ -100,20 +119,21 @@ def update(args, ctx):
     if args.clear_constraints and args.constraint:
         raise UsageError("--clear-constraints and --constraint together: give the constraints to keep instead")
     found = [] if args.clear_constraints else _constraints(args, (args.area or current["area"]).strip())
-    doc, row = niggles.update(doc, args.id, ctx.today(), args.status, args.note, args.mention, area=args.area,
-                              notes=args.notes, patterns=patterns, exercises=exercises, activity_kinds=kinds,
-                              constraints=found, constrain_while=constrain_while)
+    doc, row = niggles.update(doc, args.id, _report_day(args, ctx), args.status, args.note, args.mention,
+                              area=args.area, notes=args.notes, patterns=patterns, exercises=exercises,
+                              activity_kinds=kinds, constraints=found, constrain_while=constrain_while)
     niggles.save(ctx.root, doc, args.dry_run, library)
     return {"niggle": row, "written": not args.dry_run}
 
 
 @command("niggles resolve", help="Mark a niggle resolved; the row is kept, since a recurrence is the signal",
          args=(arg("id", metavar="ID", help="niggle id, e.g. n-0001"),
-               arg("--note", metavar="TEXT", help="today's report, one line")),
+               arg("--note", metavar="TEXT", help="the report, one line"),
+               _DATE_ARG),
          writes=True)
 def resolve(args, ctx):
     library = Library.load(ctx.root)
-    doc, row = niggles.resolve(niggles.load(ctx.root, library), args.id, ctx.today(), args.note)
+    doc, row = niggles.resolve(niggles.load(ctx.root, library), args.id, _report_day(args, ctx), args.note)
     niggles.save(ctx.root, doc, args.dry_run, library)
     return {"niggle": row, "written": not args.dry_run}
 

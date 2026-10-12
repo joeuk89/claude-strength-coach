@@ -1150,7 +1150,7 @@ def _core_flags(ctx, entry, exercise, sets, exposures, active, line_flag, mode):
         cap = min(caps) if caps else None
         if patterns.is_compound(entry) or cap is not None:
             prescribed = newest.prescribed
-            if patterns.rpe_drift(newest.sets, prescribed, cap):
+            if patterns.rpe_drift(newest.sets, prescribed, cap, newest.load_mode):
                 found.append(line_flag("rpe_drift", f"{ctx.exercise.name}: two or more working sets on "
                                                     f"{newest.date.isoformat()} were logged 1 or more RPE over target"))
         if newest.suspect:

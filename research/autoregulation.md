@@ -91,7 +91,7 @@ superseded_by = "rn:autoregulation.7"
 
 [[claims]]
 n = 4
-text = "A compound lift drifts when logged RPE is 1 or more over target on 2 or more working sets of one exposure, and drift in two sessions running is a fatigue signal."
+text = "A compound lift drifts when logged RPE is 1 or more over target on 2 or more working sets of one exposure, each set judged against its own prescribed set and none extra, heavier, longer or with more reps than prescribed. Drift in two sessions running is a fatigue signal only outside deload, light and return work and after an earlier exposure at the prescription that did not drift; without one it reads as load calibration."
 basis = "heuristic"
 sources = ["larsen-2021"]
 status = "current"
@@ -130,7 +130,7 @@ confidence = "low"
 | 1 | RPE targets anchored to reps in reserve (RPE 10 is 0 reps in reserve, RPE 9 is 1) are a usable way to prescribe and adjust load, giving strength gains at least similar to percentage-of-1RM loading. | evidence | hickmott-2022, helms-2018, larsen-2021, zourdos-2016 | current |
 | 2 | Reps-in-reserve ratings are more accurate close to failure and in sets of 12 reps or fewer than far from failure or in long sets. | evidence | halperin-2022, helms-2016 | current |
 | 3 | Reps-in-reserve ratings are expected to grow more accurate as a lifter gains experience with the scale, so a novice's RPE targets carry more error. | heuristic (low confidence) | zourdos-2016, helms-2016, halperin-2022 | retired 2026-10-11, see rn:autoregulation.7 |
-| 4 | A compound lift drifts when logged RPE is 1 or more over target on 2 or more working sets of one exposure, and drift in two sessions running is a fatigue signal. | heuristic (low confidence) | larsen-2021 | current |
+| 4 | A compound lift drifts when logged RPE is 1 or more over target on 2 or more working sets of one exposure, each set judged against its own prescribed set and none extra, heavier, longer or with more reps than prescribed. Drift in two sessions running is a fatigue signal only outside deload, light and return work and after an earlier exposure at the prescription that did not drift; without one it reads as load calibration. | heuristic (low confidence) | larsen-2021 | current |
 | 5 | An e1RM is computed only from a set of 12 or fewer reps to failure (reps, plus 10 minus RPE when one is logged): linear 1RM equations are advised up to 10 reps, but 12 matches the accuracy limit in claim 2 and keeps an e1RM for 10-rep lines at RPE 8. | heuristic (low confidence) | reynolds-2006, halperin-2022 | current |
 | 6 | A prescribed load whose implied RPE at the recent e1RM is above 10.5 at the fewest reps its line allows is unearned, and an RPE target is infeasible when no allowed whole rep target implies an RPE within 1 of it, a recovery RPE ceiling only when it is more than 1 too hard; an e1RM from sets logged without RPE is a lower bound that shows neither, and Epley underestimated the deadlift 1RM in untrained lifters, so both flags can misfire on hinge lifts. | heuristic (low confidence) | lesuer-1997, halperin-2022 | current |
 | 7 | Reps-in-reserve ratings do not clearly grow more accurate with training experience but do grow more accurate near failure, so a lifter new to RPE practises rating sets near failure before relying on RPE targets. | heuristic (low confidence) | halperin-2022, zourdos-2016, helms-2016 | current |
@@ -194,7 +194,12 @@ is the logic behind reading repeated over-target RPE as fatigue. The
 threshold of 1 RPE sits just above the average rating error in
 halperin-2022, and requiring two sets and two sessions filters out a
 single misjudged set. The scope (compound lifts and sets under a recovery
-cap) is this framework's choice.
+cap) is this framework's choice, and so is the eligibility: a set made
+harder than prescribed, an extra set or deliberate recovery work says
+nothing about fatigue at the prescription, and two over-target exposures
+with no earlier one at the prescription are as likely a load set too
+heavy as fatigue. No study validates these gates; they are application
+policy.
 
 **Claim 5.** reynolds-2006 tested 70 adults at 1, 5, 10 and 20RM on the
 bench press and leg press. Load fell off non-linearly as reps rose, 5RM
@@ -226,7 +231,9 @@ e1RM came from longer sets than the prescription. `unearned_load` or
   sets and on sets far from failure as rough, and don't progress or hold
   a lift on that alone.
 - `/check-in` and `/program-week` apply claim 4 to compound lifts and
-  recovery-capped sets. Isolation drift is noted, not acted on.
+  recovery-capped sets. Isolation drift is noted, not acted on. Drift
+  with no earlier exposure at the prescription is shown as calibration,
+  so the coach reviews the load instead of proposing a light week.
 - With a lifter new to RPE, have them practise rating sets near failure
   before leaning on RPE targets (claim 7). Expect ratings to run low (more
   reps left than they think) at any experience level.
