@@ -20,6 +20,8 @@
       "Bash(python3 -m coach library create:*)",
       "Bash(python3 -m coach library confirm:*)",
       "Bash(python3 -m coach library set-mode:*)",
+      "Bash(python3 -m coach library set-template:*)",
+      "Bash(python3 -m coach routines preflight:*)",
       "Bash(python3 -m coach hevy status:*)",
       "Bash(python3 -m coach hevy pull:*)",
       "Bash(python3 -m coach overlay list:*)",

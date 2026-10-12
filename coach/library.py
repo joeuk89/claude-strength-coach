@@ -107,9 +107,23 @@ class Library:
     @classmethod
     def load(cls, root):
         path = Path(root) / paths.EXERCISES
-        if not path.exists():
-            return cls(None, path)
-        return cls(jsonio.read_doc(path, "exercise_library"), path)
+        from coach.hevy.cache import HevyCache
+
+        lib = cls(jsonio.read_doc(path, "exercise_library") if path.exists() else None, path)
+        cached = HevyCache(root).read_if_valid("exercise_templates")
+        lib.resolve_templates(cached["data"] if cached else [])
+        return lib
+
+    def resolve_templates(self, templates):
+        claimed = self.template_owners()
+        for entry in self._entries.values():
+            resolution = template_resolution(entry, templates, claimed)
+            if resolution["status"] == "matched":
+                entry["hevy_template_id"] = resolution["template_id"]
+                entry["hevy_template_ids"] = [resolution["template_id"]]
+
+    def template_owners(self):
+        return {tid: entry["id"] for entry in self._entries.values() for tid in entry["hevy_template_ids"]}
 
     def _merge(self):
         errors = []
@@ -486,10 +500,22 @@ def seed(lib, routines, templates):
             guessed.append(f"{new_id}: pattern and muscles were guessed from Hevy's template for {title!r}; "
                            f"check them with python3 -m coach library show {new_id}")
         else:
+            # The athlete's own routine names this template, so it settles a title shared by several.
             proposal["action"] = _record(exercises, current.get(proposal["matched_id"]), template_id, proposal)
         proposals.append(proposal)
+    _record_title_matches(doc, Library(doc, lib.path), templates or [])
     Library(doc, lib.path)
     return proposals, doc, guessed
+
+
+def _record_title_matches(doc, lib, templates):
+    """Persist each unique cache title match, after routine templates so those take precedence."""
+    owners = lib.template_owners()
+    for entry in lib.entries():
+        resolution = template_resolution(entry, templates, owners)
+        if resolution["status"] == "matched":
+            doc["exercises"].setdefault(entry["id"], {})["hevy_template_id"] = resolution["template_id"]
+            owners[resolution["template_id"]] = entry["id"]
 
 
 def _record(exercises, entry, template_id, proposal):
@@ -511,3 +537,19 @@ def _record(exercises, entry, template_id, proposal):
     if created:
         return "created"
     return "unchanged" if own == before else "updated"
+
+
+def template_resolution(entry, templates, claimed=None):
+    explicit = entry.get("hevy_template_id")
+    known = entry.get("hevy_template_ids") or []
+    if explicit or len(known) == 1:
+        return {"status": "mapped", "template_id": explicit or known[0], "candidates": []}
+    keys = {match_key(title) for title in entry["hevy_titles"]}
+    claimed = claimed or {}
+    candidates = {item["id"]: item for item in templates if item.get("id") and
+                  claimed.get(item["id"]) in (None, entry["id"]) and
+                  (item["id"] in known or match_key(item.get("title") or "") in keys)}
+    rows = [{"id": tid, "title": item.get("title", tid)} for tid, item in sorted(candidates.items())]
+    status = "ambiguous" if len(rows) > 1 or len(known) > 1 else "matched" if rows else "missing"
+    return {"status": status, "template_id": rows[0]["id"] if status == "matched" else None,
+            "candidates": rows}

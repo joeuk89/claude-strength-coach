@@ -251,10 +251,12 @@ def overlay_library_consistency(ctx):
             template_id = line["hevy_template_id"]
             if template_id is not None and template_id not in entry["hevy_template_ids"]:
                 owner = lib.by_hevy_template_id(template_id)
-                held = f"which the library gives to {owner['id']}" if owner else "which no library entry holds"
+                held = (f"which the library gives to {owner['id']}; " if owner else
+                        "which no library entry holds; if the Hevy template cache is missing or unreadable, run "
+                        "python3 -m coach hevy pull; otherwise ")
                 results.append(Result("fail", (
                     f"{rel} {where}.hevy_template_id: {exercise_id} in {session['session_id']} names Hevy "
-                    f"template {template_id}, {held}; fix the overlay line or the library entry"
+                    f"template {template_id}, {held}fix the overlay line or the library entry"
                 ), rel))
     return results
 

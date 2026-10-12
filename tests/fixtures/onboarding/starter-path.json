@@ -75,14 +75,14 @@
         ["program", "adopt", "--input", "{root}/.coach/drafts/program.json"],
         ["propose", "week", "--week", "{week}"]
       ],
-      "coach_also": "/program-week: build, validate and render the overlay, diff the routines, present the coach's brief and wait."
+      "coach_also": "/program-week: build, validate and render the overlay, run routines preflight and the routines create preview, present the coach's brief and wait."
     },
     {
       "asked": "The coach's brief for week one. Reply \"go\" to train this.",
       "athlete": "go",
       "config": {},
       "commands": [],
-      "coach_also": "overlay approve, then routines create behind the approval gate; close out."
+      "coach_also": "overlay approve, then routines create with the previewed --expect-plan behind the approval gate; close out."
     }
   ]
 }

@@ -23,7 +23,8 @@ def overlay_hevy_drift(ctx):
         return [Result("skip", "No overlay is in force or coming up.")]
     where = overlay.path_for(ctx.root, doc["id"]).relative_to(ctx.root).as_posix()
     results = [Result("warn", f"{s['title']} on {s['date']} in overlay {doc['id']} has no Hevy routine; run "
-                              f"python3 -m coach routines create --overlay {doc['id']}.", where)
+                              f"python3 -m coach routines create --overlay {doc['id']} --dry-run and name its plan "
+                              "in the write brief.", where)
                for s in routines.unmapped_sessions(doc, ids)]
     for routine_id, session, _ in routines.plan(doc, ctx.today(), ids):
         cached = cache.routine(routine_id)

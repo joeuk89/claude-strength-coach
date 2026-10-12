@@ -3,12 +3,14 @@
 import unittest
 
 from coach import flags, validity
+from coach.hevy.cache import HevyCache
 from tests.support import run_cli
-from tests.support.history import HistoryCase, read_json, write_json
+from tests.support.history import NOW, HistoryCase, read_json, write_json
 from tests.support.skills import step_text
 
 ONE_OFF = "2026-10-13-one-off"
 LIBRARY = "data/exercises.json"
+TRAVEL_TEMPLATES = [{"id": "F0000005", "title": "Push Up"}, {"id": "F0000006", "title": "Romanian Deadlift (Dumbbell)"}]
 
 
 def one_off_draft():
@@ -23,11 +25,11 @@ def one_off_draft():
             "temporary": True,
             "location": "home",
             "exercises": [
-                {"exercise_id": "push_up", "load_mode": "bodyweight",
+                {"exercise_id": "push_up", "hevy_template_id": "F0000005", "load_mode": "bodyweight",
                  "sets": [{"type": "normal", "reps": 12, "rpe": 8, "load": 0} for _ in range(2)]},
-                {"exercise_id": "db_romanian_deadlift", "load_mode": "per_hand_x2",
+                {"exercise_id": "db_romanian_deadlift", "hevy_template_id": "F0000006", "load_mode": "per_hand_x2",
                  "sets": [{"type": "normal", "reps": 10, "rpe": 8, "load": 20} for _ in range(2)]},
-                {"exercise_id": "db_bench_press", "load_mode": "per_hand_x2",
+                {"exercise_id": "db_bench_press", "hevy_template_id": "F0000002", "load_mode": "per_hand_x2",
                  "sets": [{"type": "normal", "reps": 10, "rpe": 8, "load": 20} for _ in range(2)]},
             ],
         }],
@@ -46,6 +48,8 @@ class OneOffCase(HistoryCase):
     def setUp(self):
         super().setUp()
         self.cache()
+        cache = HevyCache(self.root)
+        cache.write_collection("exercise_templates", cache.exercise_templates() + TRAVEL_TEMPLATES, NOW)
         self.sync()
         self.draft = self.tmp / "overlay-2026-10-13.json"
         write_json(self.draft, one_off_draft())

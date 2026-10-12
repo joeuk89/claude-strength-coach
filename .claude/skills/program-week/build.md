@@ -46,15 +46,23 @@ from `overlay build --input <draft>`.
    refuses it.
 4. `python3 -m coach overlay render <id> --into <check-in record>` fills
    the region: the per-session tables the brief shows.
-5. **Hevy users:** `python3 -m coach routines diff --overlay <id>` lists
-   every routine in the span by its Hevy title, with what "go" would
-   change. A session with no routine (every temporary session, or a new
-   program session) makes it exit 1 naming the session, and then it
-   lists nothing, not even the routines that exist. Name them another
-   way: "go" creates or reuses a routine for each session the exit-1
-   message names, under its session title; every other session's
-   routine keeps its own Hevy title (`state show` maps it to the
-   session, and `.coach/cache/hevy/routines.json` holds the title).
+5. **Hevy users:** run `python3 -m coach routines preflight --overlay
+   <id>`. Settle every unresolved template, including lines in sessions
+   without routines: `library show <exercise>` and the cached templates
+   (`id` and `title` in `.coach/cache/hevy/exercise_templates.json`)
+   identify choices; `python3 -m coach library set-template <exercise>
+   <cached-id>` records the chosen mapping locally. Rebuild
+   the proposal/overlay after mapping, then preflight again until ready.
+   For sessions without routines, run `python3 -m coach routines create
+   --overlay <id> --dry-run` before approval. It names each new or reused
+   routine, any new folder, and a `plan_hash`. Orphan routines come only
+   from managed mapping history; offer leave, reuse (`--reuse
+   <session>=<routine-id>`) or retire (`routines retire --overlay <id>
+   --routine <routine-id> --dry-run`). Re-run the chosen previews and
+   retain their hashes for write.md. Run `routines diff --overlay <id>`
+   for the existing routines; if it exits 1 on unmapped sessions, use
+   the create preview plus cached titles for the other sessions. The
+   write line must name every create, reuse, retirement and folder.
 
 A tweak to the coach's brief means: change the draft, then build,
 validate, check and render again. The approval and every Hevy write and

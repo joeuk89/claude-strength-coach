@@ -575,7 +575,10 @@ def adopt(root, draft, replace=False, position=None, dry_run=False, today=None, 
         (archive / source.name).relative_to(root).as_posix()
         for source in (program.path_for(root), state_module.path_for(root)) if source.is_file()]
     pages = program.render_doc(doc, library, config.athlete.units, _status_line(root, new_state, doc))
+    from coach.external import orphan_routines
+
     result = {
+        "orphan_routines": orphan_routines(root, draft["hevy_routines"], old_state) if config.hevy.enabled else [],
         "program": paths.PROGRAM.as_posix(), "sessions": [s["id"] for s in doc["sessions"]],
         "rotation": rotation, "scheme_state": scheme_report,
         "archived": [], "written": [], "removed": [], "staged": [], "warnings": warnings,

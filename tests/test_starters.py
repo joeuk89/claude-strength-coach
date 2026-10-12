@@ -11,6 +11,7 @@ from coach import jsonio, program, research, render, routines, starters, units, 
 from coach.library import Library
 from tests.support import INSTANCES, REPO_ROOT, run_cli
 from tests.support.skills import flat, step_text
+from tests.support.templates import cache_catalogue_templates
 
 EMPTY = INSTANCES / "empty"
 NOW = "2026-10-11T18:00:00Z"
@@ -72,6 +73,23 @@ class Case(unittest.TestCase):
 
     def draft(self, root, *argv):
         return self.ok(root, "starters", "draft", *argv)["draft"]
+
+    def with_templates(self):
+        """A copy of empty/ whose Hevy cache holds a template per catalogue title."""
+        root = instance(self)
+        cache_catalogue_templates(root, NOW, prefix="STARTER")
+        return root
+
+    def adopted(self, starter_id):
+        """The starter adopted onto with_templates(), its load modes confirmed."""
+        root = self.with_templates()
+        found = self.ok(root, "starters", "draft", starter_id)
+        self.assertEqual(found["problems"], [])
+        adopted = self.ok(root, "program", "adopt", "--input", str(root / found["path"]))
+        modes = {line["exercise_id"]: line["load_mode"] for _, line in lines(found["draft"]["program"])}
+        for entry in adopted["unconfirmed"]:
+            self.ok(root, "library", "set-mode", entry["exercise_id"], modes[entry["exercise_id"]])
+        return root, found["draft"]
 
 
 class StarterFilesTest(Case):
@@ -168,18 +186,8 @@ class StarterFilesTest(Case):
 class AdoptedStarterTest(Case):
     """Each starter drafted with its default days onto a copy of empty/, adopted, rendered and proposed."""
 
-    def adopted(self, starter_id):
-        root = instance(self)
-        found = self.ok(root, "starters", "draft", starter_id)
-        self.assertEqual(found["problems"], [])
-        adopted = self.ok(root, "program", "adopt", "--input", str(root / found["path"]))
-        modes = {line["exercise_id"]: line["load_mode"] for _, line in lines(found["draft"]["program"])}
-        for entry in adopted["unconfirmed"]:
-            self.ok(root, "library", "set-mode", entry["exercise_id"], modes[entry["exercise_id"]])
-        return root, found["draft"]
-
     def test_an_adopted_starter_blocks_its_first_week_until_the_load_modes_are_confirmed(self):
-        root = instance(self)
+        root = self.with_templates()
         found = self.ok(root, "starters", "draft", "full-body-3")
         adopted = self.ok(root, "program", "adopt", "--input", str(root / found["path"]))
         self.assertTrue(adopted["unconfirmed"])

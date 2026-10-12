@@ -17,12 +17,19 @@ write line named, nothing more.
    load mode: tell the athlete why, settle it, and present the brief
    again.
 3. **An ended one-off week.** If `state show` has a `one_off` whose span
-   ended before today, run `python3 -m coach routines retire --overlay
-   <its overlay_id>`, which retitles its temporary routines `(unused)`
-   so step 4 can reuse them. Then set `one_off` to null in
+   ended before today, execute only the retirements of its temporary
+   routines named in the brief: `python3 -m coach routines retire --overlay <its overlay_id>
+   --routine <routine-id> --expect-plan <approved-retire-hash>` (repeat
+   `--routine` for each selected routine). Routines step 4 reuses stay
+   untouched until reuse. Then set `one_off` to null in
    `data/state.json` and run `python3 -m coach state show` to check it.
 4. **Hevy users.** If `routines diff` named sessions with no routine,
-   run `python3 -m coach routines create --overlay <id>` first. It gives
+   run `python3 -m coach routines create --overlay <id> --expect-plan
+   <approved-create-hash>` first, including exactly the `--reuse` choices
+   from the reviewed preview. Explicit orphan retirements use `routines
+   retire --overlay <id> --routine <id> --expect-plan <approved-retire-hash>`.
+   Run only actions the athlete's write line named. A changed plan exits
+   3: preview and present the revised brief before retrying. It gives
    each program session a routine in the program folder, and each
    temporary session one in the "One-off weeks" folder: it reuses a
    spare temporary routine before it creates one, creates the folder

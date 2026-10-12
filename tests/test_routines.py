@@ -370,7 +370,7 @@ class VerifyTest(RoutinesCase):
 ONE_OFF = "2026-10-12-one-off"
 
 
-class RetireTest(RoutinesCase):
+class OneOffCase(RoutinesCase):
     def setUp(self):
         super().setUp()
         doc = read_overlay(self.root)
@@ -382,9 +382,28 @@ class RetireTest(RoutinesCase):
         overlay.path_for(self.root, WEEKLY).unlink()
 
     def retire(self, *extra, expect=0, now="2026-10-19T08:00:00Z"):
+        if not extra and expect == 0:
+            preview = self.cli("routines", "retire", "--overlay", ONE_OFF, "--dry-run",
+                               env=dict(ENV, COACH_NOW=now))["data"]
+            extra = ("--expect-plan", preview["plan_hash"]) if preview.get("plan_hash") else ()
         return self.cli("routines", "retire", "--overlay", ONE_OFF, *extra, expect=expect,
                         env=dict(ENV, COACH_NOW=now))
 
+
+class RetireFailureTest(OneOffCase):
+    fake_class = HalvingHevy
+
+    def test_a_failed_read_back_names_each_difference_and_stops_later_retires(self):
+        preview = self.retire("--dry-run")["data"]
+        envelope = self.retire("--expect-plan", preview["plan_hash"], expect=1)
+        self.assertEqual(envelope["error"]["code"], "validation")
+        self.assertIn("(1 difference(s))", envelope["error"]["message"])
+        self.assertEqual([d["path"] for d in envelope["error"]["details"]], ["exercises[1].sets[1].weight_kg"])
+        self.assertEqual(self.put_paths, [f"/v1/routines/{R1}"])
+        self.assertEqual([r["status"] for r in envelope["data"]["routines"]], ["failed", "not_reached"])
+
+
+class RetireTest(OneOffCase):
     def test_retitles_each_temporary_routine_and_keeps_its_exercises(self):
         before = copy.deepcopy(self.fake.collection("routines"))
         data = self.retire()["data"]

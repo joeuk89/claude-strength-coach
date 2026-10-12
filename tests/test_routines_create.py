@@ -8,6 +8,7 @@ import sys
 import unittest
 
 from coach import gate, jsonio, routines, state
+from coach.hevy.cache import HevyCache
 from coach.validate import validate
 from tests.support import REPO_ROOT
 from tests.test_gate import hook_input, output
@@ -37,6 +38,10 @@ class CreateCase(RoutinesCase):
         write_state(self.root, doc)
 
     def create(self, *extra, overlay_id=WEEKLY, expect=0, env=None):
+        if not extra and expect == 0:
+            preview = self.cli("routines", "create", "--overlay", overlay_id, "--dry-run", env=env)["data"]
+            if preview.get("plan_hash"):
+                extra = ("--expect-plan", preview["plan_hash"])
         return self.cli("routines", "create", "--overlay", overlay_id, *extra, expect=expect, env=env)
 
     @property
@@ -86,10 +91,9 @@ class CreateTest(CreateCase):
     def test_unapproved_exits_3_with_no_writes(self):
         self.forget_session_b(approve=False)
         state_before = state.path_for(self.root).read_bytes()
-        for extra in ((), ("--dry-run",)):
-            envelope = self.create(*extra, expect=3)
-            self.assertEqual(envelope["error"]["code"], "refused")
-            self.assertIn("not approved", envelope["error"]["message"])
+        envelope = self.create(expect=3)
+        self.assertEqual(envelope["error"]["code"], "refused")
+        self.assertIn("not approved", envelope["error"]["message"])
         self.assertEqual(self.fake.writes, [])
         self.assertEqual(audit_lines(self.root), [])
         self.assertEqual(state.path_for(self.root).read_bytes(), state_before)
@@ -147,14 +151,17 @@ class CreateTest(CreateCase):
             stored["exercises"][0]["sets"].pop()
             return stored
         self.fake._stored_routine = drop_a_set
-        envelope = self.create(expect=1)
+        preview = self.create("--dry-run")["data"]
+        envelope = self.create("--expect-plan", preview["plan_hash"], expect=1)
         new_id = self.fake.collection("routines")[-1]["id"]
         self.assertEqual(read_state(self.root)["hevy"]["routines"][new_id], {"session_id": "session-b"})
         self.assertFalse(audit_lines(self.root)[-1]["verified"])
         self.assertEqual(envelope["data"]["routines"][0]["status"], "failed")
 
 
-class OneOffCreateTest(CreateCase):
+class OneOffCase(CreateCase):
+    """A one-off overlay of three temporary travel sessions, with spare temporary routines T1 and T2."""
+
     def setUp(self):
         super().setUp()
         doc = read_overlay(self.root)
@@ -171,6 +178,7 @@ class OneOffCreateTest(CreateCase):
             spare = copy.deepcopy(self.fake.collection("routines")[0])
             spare.update(id=routine_id, title=title, folder_id=None)
             self.fake.collection("routines").append(spare)
+            HevyCache(self.root).upsert_routine(spare)
         doc = read_state(self.root)
         doc["hevy"]["temporary_routines"] = [
             {"routine_id": T1, "overlay_id": None, "session_id": None},
@@ -178,6 +186,8 @@ class OneOffCreateTest(CreateCase):
         ]
         write_state(self.root, doc)
 
+
+class OneOffCreateTest(OneOffCase):
     def test_creates_the_folder_once_reuses_two_and_creates_one(self):
         data = self.create(overlay_id=ONE_OFF)["data"]
         self.assertEqual([path for path, _ in self.posts], ["/v1/routine_folders", "/v1/routines"])
@@ -232,6 +242,7 @@ class OneOffCreateTest(CreateCase):
 
     def test_a_spare_hevy_no_longer_has_is_skipped_and_dropped_from_state(self):
         self.fake.collection("routines")[:] = [r for r in self.fake.collection("routines") if r["id"] != T1]
+        self.cli("hevy", "pull", "--full")
         dry = self.create("--dry-run", overlay_id=ONE_OFF)["data"]
         self.assertEqual(dry["stale"], [T1])
         self.assertIn(f"Hevy no longer has temporary routine(s) {T1}", dry["summary"])
@@ -254,18 +265,35 @@ class OneOffCreateTest(CreateCase):
 
     def test_retire_finds_the_routines_through_state(self):
         self.create(overlay_id=ONE_OFF)
-        data = self.cli("routines", "retire", "--overlay", ONE_OFF,
+        preview = self.cli("routines", "retire", "--overlay", ONE_OFF, "--dry-run",
+                           env=dict(ENV, COACH_NOW="2026-10-19T08:00:00Z"))["data"]
+        data = self.cli("routines", "retire", "--overlay", ONE_OFF, "--expect-plan", preview["plan_hash"],
                         env=dict(ENV, COACH_NOW="2026-10-19T08:00:00Z"))["data"]
         self.assertEqual([r["status"] for r in data["routines"]], ["retired"] * 3)
 
 
-class CreateGateTest(CreateCase):
-    def decide(self, command, mode="default"):
-        return output(gate.decide(hook_input(command, self.root, mode), env=ENV))
+class GateMixin:
+    """The permission gate in process (`decide`) and as Claude Code runs it (`pipe`)."""
+
+    def decide(self, command, mode="default", env=None):
+        return output(gate.decide(hook_input(command, self.root, mode), env=env or ENV))
+
+    def pipe(self, command):
+        env = {k: v for k, v in os.environ.items() if not k.startswith("COACH_") and k != "HEVY_API_KEY"}
+        env.update(COACH_NOW=NOW, COACH_HEVY_FIXTURES=str(SYNTHETIC))
+        proc = subprocess.run([sys.executable, "-m", "coach", "gate", "pretooluse"],
+                              input=json.dumps(hook_input(command, self.root)), cwd=str(REPO_ROOT), env=env,
+                              capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        return output(json.loads(proc.stdout))
+
+
+class CreateGateTest(GateMixin, CreateCase):
 
     def test_an_approved_create_asks_with_the_summary(self):
         self.forget_session_b()
-        decision = self.decide(CREATE)
+        preview = self.create("--dry-run")["data"]
+        decision = self.decide(CREATE + " --expect-plan " + preview["plan_hash"])
         self.assertEqual(decision["permissionDecision"], "ask")
         reason = decision["permissionDecisionReason"]
         for text in ("routines create", "Session B", WEEKLY, "new routine"):
@@ -283,21 +311,13 @@ class CreateGateTest(CreateCase):
         self.assertEqual(self.decide(CREATE, mode="bypassPermissions")["permissionDecision"], "deny")
 
 
-class CreateHookProcessTest(CreateCase):
+class CreateHookProcessTest(GateMixin, CreateCase):
     """`python3 -m coach gate pretooluse` as Claude Code runs it, replaying the synthetic fixtures."""
-
-    def pipe(self, command):
-        env = {k: v for k, v in os.environ.items() if not k.startswith("COACH_") and k != "HEVY_API_KEY"}
-        env.update(COACH_NOW=NOW, COACH_HEVY_FIXTURES=str(SYNTHETIC))
-        proc = subprocess.run([sys.executable, "-m", "coach", "gate", "pretooluse"],
-                              input=json.dumps(hook_input(command, self.root)), cwd=str(REPO_ROOT), env=env,
-                              capture_output=True, text=True)
-        self.assertEqual(proc.returncode, 0, proc.stderr)
-        return output(json.loads(proc.stdout))
 
     def test_ask_with_the_summary_when_approved_and_deny_when_not(self):
         self.forget_session_b()
-        decision = self.pipe(CREATE)
+        preview = self.create("--dry-run")["data"]
+        decision = self.pipe(CREATE + " --expect-plan " + preview["plan_hash"])
         self.assertEqual(decision["permissionDecision"], "ask")
         self.assertIn("Session B (Thu 15 Oct): new routine in folder 1", decision["permissionDecisionReason"])
         self.forget_session_b(approve=False)

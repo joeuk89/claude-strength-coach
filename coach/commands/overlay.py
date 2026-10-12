@@ -221,6 +221,12 @@ def _approval_blocks(ctx, doc):
 def approve(args, ctx):
     doc = _load_valid(ctx, args.id)
     path = overlay.path_for(ctx.root, args.id)
+    from coach.external import hevy_requirements
+
+    external = hevy_requirements(ctx.root, doc, ctx.config.hevy.enabled)
+    if not external["ready"]:
+        raise RefusedError("Hevy exercise templates remain unresolved; repair and rebuild before approval",
+                           data={"hevy_requirements": external})
     if overlay.is_approved(doc):
         return {"id": args.id, "hash": doc["approval"]["hash"], "approved_at": doc["approval"]["approved_at"],
                 "already_approved": True, "written": False}

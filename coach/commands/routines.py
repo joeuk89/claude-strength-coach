@@ -1,4 +1,4 @@
-"""`routines` commands: diff, verify, push, create and retire an overlay's Hevy routines (contract C2, C3, C9)."""
+"""`routines` commands for an overlay's Hevy routines (contract C2, C3, C9)."""
 
 from coach import routines
 from coach.commands import arg, command
@@ -44,23 +44,38 @@ def push(args, ctx):
 
 @command(
     "routines retire",
-    help='Retitle an ended overlay\'s temporary routines "(unused)", keeping their exercises',
-    args=(_OVERLAY, _REFRESH),
+    help='Retitle named managed orphans or an ended overlay\'s temporary routines "(unused)"',
+    args=(_OVERLAY,
+          arg("--routine", action="append", default=[], help="managed orphan or ended temporary routine id"),
+          arg("--expect-plan", help="hash of the exact retirement dry-run approved in the brief")),
     writes=True,
     hevy_write=True,
     network=True,
 )
 def retire(args, ctx):
-    return routines.retire(ctx, args.overlay, args.dry_run, refresh=args.refresh)
+    return routines.retire(ctx, args.overlay, args.dry_run, routine_ids=args.routine, expect_plan=args.expect_plan)
 
 
 @command(
     "routines create",
     help="Create the Hevy routines (and the one-off folder) an approved overlay's sessions lack; ids go in state.json",
-    args=(_OVERLAY,),
+    args=(_OVERLAY,
+          arg("--reuse", action="append", default=[], metavar="SESSION=ROUTINE", help="explicit managed routine reuse"),
+          arg("--expect-plan", help="hash of the exact create dry-run approved in the brief")),
     writes=True,
     hevy_write=True,
     network=True,
 )
 def create(args, ctx):
-    return routines.create(ctx, args.overlay, args.dry_run)
+    return routines.create(ctx, args.overlay, args.dry_run, args.reuse, args.expect_plan)
+
+
+@command("routines preflight", help="List every local Hevy mapping requirement before the write brief",
+         args=(_OVERLAY,))
+def preflight(args, ctx):
+    from coach.external import hevy_requirements, orphan_routines
+
+    doc = routines._load(ctx, args.overlay)
+    report = hevy_requirements(ctx.root, doc, ctx.config.hevy.enabled)
+    report["orphan_routines"] = orphan_routines(ctx.root) if ctx.config.hevy.enabled else []
+    return report

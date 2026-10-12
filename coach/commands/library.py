@@ -146,8 +146,8 @@ def create(args, ctx):
 )
 def seed(args, ctx):
     cache = HevyCache(ctx.root)
-    if cache.read("routines") is None:
-        raise ConfigError("there are no cached Hevy routines to seed from; run python3 -m coach hevy pull first")
+    if cache.read("routines") is None and cache.read("exercise_templates") is None:
+        raise ConfigError("there are no cached Hevy routines or templates to seed from; run python3 -m coach hevy pull first")
     routines = cache.routines()
     templates = cache.exercise_templates() if cache.read("exercise_templates") is not None else None
     if templates is None:
@@ -246,3 +246,29 @@ def set_avoid(args, ctx):
     own["avoid"] = avoid
     written = _write(lib, doc, args) if previous != avoid else False
     return {"id": args.id, "avoid": avoid, "previous": previous, "written": written}
+
+
+@command(
+    "library set-template",
+    help="Choose a cached Hevy exercise template for a library exercise (local only)",
+    args=(arg("id", help="library exercise id"), arg("template_id", help="cached Hevy template id")),
+    writes=True,
+)
+def set_template(args, ctx):
+    lib = Library.load(ctx.root)
+    entry = _entry(lib, args.id)
+    templates = HevyCache(ctx.root).exercise_templates()
+    template = next((item for item in templates if item.get("id") == args.template_id), None)
+    if template is None:
+        raise ValidationError(f"Hevy template {args.template_id!r} is not in the cached template collection; "
+                              "run python3 -m coach hevy pull and choose a cached id")
+    owner = lib.by_hevy_template_id(args.template_id)
+    if owner and owner["id"] != args.id:
+        raise ValidationError(f"Hevy template {args.template_id} already belongs to {owner['id']}")
+    doc = copy.deepcopy(lib.instance)
+    own = doc["exercises"].setdefault(args.id, {})
+    previous = entry["hevy_template_id"]
+    own["hevy_template_id"] = args.template_id
+    written = _write(lib, doc, args) if doc != lib.instance else False
+    return {"id": args.id, "hevy_template_id": args.template_id, "title": template.get("title"),
+            "previous": previous, "written": written}

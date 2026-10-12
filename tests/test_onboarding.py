@@ -11,6 +11,7 @@ from coach.commands import discover
 from tests.support import FIXTURES, REPO_ROOT, run_cli, run_module
 from tests.support.config_edit import apply
 from tests.support.skills import skill_text, step_text
+from tests.support.templates import cache_catalogue_templates
 
 EXAMPLE = REPO_ROOT / "config.example.toml"
 TRANSCRIPT = FIXTURES / "onboarding" / "starter-path.json"
@@ -159,6 +160,8 @@ class WorkedExampleTest(unittest.TestCase):
         for reply in transcript["replies"]:
             text = apply(text, reply["config"])
             (root / "config.toml").write_text(text, encoding="utf-8")
+            if "hevy pull" in reply["coach_also"]:
+                cache_catalogue_templates(root, transcript["now"])
             for argv in reply["commands"]:
                 if argv == "confirm load modes":
                     self.confirm_load_modes(root, env, outputs["program adopt"])

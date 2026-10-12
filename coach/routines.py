@@ -7,13 +7,14 @@ session's routine is the overlay's `hevy_routine_id`, else the one
 overlay that is unapproved, edited after approval, blocked, ended or
 superseded, and a routine edited in the app since the cache was read. It
 writes each changed routine once, reads it back and logs whether the
-read-back matches. `create` gives a session with no routine one, under the
-same refusals, and records the new id in state.json only.
+read-back matches. `create` previews, from the cache, the routine each
+session without one would get, and writes only the plan the athlete
+approved (`--expect-plan`), recording new ids in state.json only.
 """
 
 import json
 
-from coach import dates, jsonio
+from coach import dates, external, jsonio
 from coach import overlay as overlay_module
 from coach import paths, render, units
 from coach import program as program_module
@@ -254,7 +255,8 @@ def _require_mapped(doc, ids):
         names = ", ".join(f"{s['session_id']} ({s['date']})" for s in unmapped)
         raise ValidationError(
             f"Overlay {doc['id']} has session(s) with no Hevy routine: {names}; "
-            f"run python3 -m coach routines create --overlay {doc['id']} first"
+            f"run python3 -m coach routines create --overlay {doc['id']} --dry-run and name its plan in "
+            "the write brief first"
         )
 
 
@@ -308,7 +310,7 @@ def _require_hevy(ctx):
         raise ConfigError("Hevy is turned off in config.toml ([hevy] enabled = false), so there are no routines.")
 
 
-def push_refusals(root, doc, today, ids=None):
+def push_refusals(root, doc, today, ids=None, *, require_approval=True):
     """Every reason a push of this overlay is refused, as envelope details; empty when it may go."""
     found = []
 
@@ -316,9 +318,9 @@ def push_refusals(root, doc, today, ids=None):
         found.append({"path": None, "message": message})
 
     approval = doc.get("approval")
-    if not approval:
+    if not approval and require_approval:
         refuse(f"overlay {doc['id']} is not approved; run overlay approve {doc['id']} once the athlete agrees")
-    elif not overlay_module.is_approved(doc):
+    elif approval and not overlay_module.is_approved(doc):
         refuse(f"overlay {doc['id']} was edited after approval; run overlay approve {doc['id']} again "
                "once the athlete agrees")
     for flag in overlay_module.unresolved_blocks(doc):
@@ -561,76 +563,95 @@ def push(ctx, overlay_id, dry_run, refresh=False):
             raise ValidationError(
                 f"{entry['title']} did not read back as written ({len(remaining)} difference(s)); "
                 "later routines were not written.",
-                details=[{"path": c["path"], "message": f"sent {c['after']!r}, Hevy has {c['before']!r}"}
-                         for c in remaining],
+                details=_read_back_details(remaining),
                 data=report,
             )
     return _report("push", doc, ctx, entries, writes=writes)
 
 
-def retire(ctx, overlay_id, dry_run, refresh=False):
-    """Retitle the temporary routines of an ended overlay `(unused)`, keeping their exercises."""
+def retire(ctx, overlay_id, dry_run, routine_ids=(), expect_plan=None):
+    """Retire only the named managed orphans, or an ended overlay's temporary routines."""
     _require_hevy(ctx)
     doc = _load(ctx, overlay_id)
     today = ctx.today()
-    if doc["span"]["end"] >= today.isoformat():
-        raise RefusedError(
-            f"Overlay {doc['id']} is not retired: its span runs to {doc['span']['end']}; "
-            "retire its temporary routines once it has ended."
-        )
+    if not routine_ids and doc["span"]["end"] >= today.isoformat():
+        raise RefusedError(f"Overlay {doc['id']} is not retired: its span runs to {doc['span']['end']}; "
+                           "retire its temporary routines once it has ended.")
     overlay_hash = overlay_module.approval_hash(doc)
-    temporary = {}
-    for session, routine_id in zip(doc["sessions"], session_routines(ctx.root, doc)):
-        if session.get("temporary") and routine_id:
-            temporary.setdefault(routine_id, session)
+    selected = {}
+    ended_temporary = {rid: session for session, rid in zip(doc["sessions"], session_routines(ctx.root, doc))
+                       if session.get("temporary") and rid and doc["span"]["end"] < today.isoformat()}
+    if routine_ids:
+        orphans = {r["routine_id"]: r for r in external.orphan_routines(ctx.root)}
+        for rid in dict.fromkeys(routine_ids):
+            if rid in ended_temporary:
+                selected[rid] = ended_temporary[rid]
+                continue
+            if rid not in orphans:
+                raise RefusedError(f"Routine {rid} is not an unmapped managed routine; it is left alone")
+            row = orphans[rid]
+            selected[rid] = {"session_id": row["previous_session_id"], "title": row["title"],
+                             "date": doc["span"]["start"], "exercises": []}
+        if not dry_run and not overlay_module.is_approved(doc):
+            raise RefusedError(f"Overlay {doc['id']} is not approved")
+    else:
+        selected = ended_temporary
     in_use = _routines_in_live_overlays(ctx.root, doc, today)
-    client = HevyClient.from_context(ctx)
+    in_use.update({rid: doc["id"] for rid in session_routines(ctx.root, doc)
+                   if rid and routine_ids and rid not in ended_temporary})
+    client = None if dry_run else HevyClient.from_context(ctx)
     cache = HevyCache(ctx.root, clock=ctx.now)
-    entries, writes, failure = [], 0, None
-    for routine_id, session in temporary.items():
-        entry = _entry(routine_id, session, [session["date"]], session["title"], [], "pending")
+    entries, planned = [], []
+    for rid, session in selected.items():
+        entry = _entry(rid, session, [session["date"]], session["title"], [], "pending")
         entries.append(entry)
-        if failure:
-            entry["status"] = "not_reached"
-            continue
-        if routine_id in in_use:
+        if rid in in_use:
             entry["status"] = "in_use"
-            ctx.warn(f"routine {routine_id} is left alone: overlay {in_use[routine_id]} still uses it")
+            ctx.warn(f"routine {rid} is left alone: overlay {in_use[rid]} still uses it")
             continue
-        live = _get_routine(client, routine_id)
-        if refresh and not dry_run:
-            cache.upsert_routine(live)
+        live = cache.routine(rid) if dry_run else _get_routine(client, rid)
+        if live is None:
+            raise RefusedError(f"Routine {rid} is not cached; pull and review again")
         entry["title"] = live.get("title")
         if live.get("title") == UNUSED_TITLE:
             entry["status"] = "already_retired"
             continue
         body = retire_body(live)
-        entry["changes"] = diff(body, live)
-        if dry_run:
-            entry["status"] = "would_retire"
-            continue
-        client.put(f"/v1/routines/{routine_id}", body, routine_id=routine_id, overlay_id=doc["id"],
-                   overlay_hash=overlay_hash)
+        entry.update(changes=diff(body, live), status="would_retire")
+        planned.append((entry, body, live))
+    report = _report("retire", doc, ctx, entries, dry_run=dry_run)
+    if planned:
+        report["plan_hash"] = _plan_hash(doc, "retire", [
+            {"routine_id": entry["routine_id"], "body": body, "before": _version(live)}
+            for entry, body, live in planned])
+        if expect_plan is not None or not dry_run:
+            _require_plan(report["plan_hash"], expect_plan)
+    if dry_run:
+        return report
+    writes = 0
+    for position, (entry, body, _) in enumerate(planned):
+        rid = entry["routine_id"]
+        client.put(f"/v1/routines/{rid}", body, routine_id=rid, overlay_id=doc["id"], overlay_hash=overlay_hash)
         writes += 1
-        read_back = _get_routine(client, routine_id)
+        read_back = _get_routine(client, rid)
         cache.upsert_routine(read_back)
         remaining = diff(body, read_back)
-        _append(ctx, _check_line(ctx, "retire", routine_id, doc, overlay_hash, remaining), RETIRE_SCHEMA)
-        entry["verified"] = not remaining
-        entry["status"] = "retired" if not remaining else "failed"
+        _append(ctx, _check_line(ctx, "retire", rid, doc, overlay_hash, remaining), RETIRE_SCHEMA)
+        entry.update(verified=not remaining, status="retired" if not remaining else "failed")
         if remaining:
-            failure = (entry, remaining)
-    report = _report("retire", doc, ctx, entries, dry_run=dry_run, writes=writes)
-    if failure:
-        entry, remaining = failure
-        raise ValidationError(
-            f"{entry['title']} did not read back as retired ({len(remaining)} difference(s)); "
-            "later routines were not retired.",
-            details=[{"path": c["path"], "message": f"sent {c['after']!r}, Hevy has {c['before']!r}"}
-                     for c in remaining],
-            data=report,
-        )
-    return report
+            for later, _, _ in planned[position + 1:]:
+                later["status"] = "not_reached"
+            raise ValidationError(
+                f"{entry['title']} did not read back as retired ({len(remaining)} difference(s)); "
+                "later routines were not retired.",
+                details=_read_back_details(remaining),
+                data=_report("retire", doc, ctx, entries, writes=writes),
+            )
+    return _report("retire", doc, ctx, entries, writes=writes)
+
+
+def _read_back_details(remaining):
+    return [{"path": c["path"], "message": f"sent {c['after']!r}, Hevy has {c['before']!r}"} for c in remaining]
 
 
 def _routines_in_live_overlays(root, doc, today):
@@ -645,26 +666,25 @@ def _routines_in_live_overlays(root, doc, today):
     return found
 
 
-def create(ctx, overlay_id, dry_run):
-    """Give every session with no Hevy routine one, and record each new id in state.json, never in the overlay.
+def create(ctx, overlay_id, dry_run, reuse_choices=(), expect_plan=None):
+    """Preview missing sessions locally; execute only the approved, unchanged action plan.
 
-    A temporary session reuses a temporary routine no other overlay still
-    carries before a new one is created in the one-off folder (created first
-    when state.json has none); any other session gets a new routine in the
-    program folder. A spare Hevy no longer has (404) is skipped and, unless
-    dry_run, dropped from state.json. Refuses (exit 3) as push does; a
-    read-back that differs exits 1 with the report, keeping the ids already
-    recorded.
+    Each successful external operation records its mapping before read-back,
+    so a verification failure cannot lose an already-created routine.
     """
     _require_hevy(ctx)
     doc = _load(ctx, overlay_id)
     today = ctx.today()
     ids = session_routines(ctx.root, doc)
     planned = [routine_id or _NEW + session["session_id"] for routine_id, session in zip(ids, doc["sessions"])]
-    reasons = push_refusals(ctx.root, doc, today, planned)
+    reasons = push_refusals(ctx.root, doc, today, planned, require_approval=not dry_run)
     if reasons:
         raise _refused(doc, reasons, outcome="gets no new routines")
-    overlay_hash = doc["approval"]["hash"]
+    requirements = external.hevy_requirements(ctx.root, doc)
+    if not requirements["ready"]:
+        raise RefusedError("Hevy templates remain unresolved; repair every line before the write brief",
+                           data={"hevy_requirements": requirements})
+    overlay_hash = overlay_module.approval_hash(doc)
     needed = [(key, session, carries) for key, session, carries in plan(doc, today, planned) if key.startswith(_NEW)]
     folder = {"title": ONE_OFF_FOLDER_TITLE, "id": None, "status": "not_needed"}
     if not needed:
@@ -673,14 +693,24 @@ def create(ctx, overlay_id, dry_run):
     state_doc = state_module.load(ctx.root)
     _require_program_sessions(ctx.root, doc, [session for _, session, _ in needed])
     hevy = state_doc["hevy"]
-    client = HevyClient.from_context(ctx)
+    client = None if dry_run else HevyClient.from_context(ctx)
+    cache = HevyCache(ctx.root, clock=ctx.now)
     spare = _spare_temporary(ctx.root, doc, today, hevy, ids)
+    choices = _reuse_choices(ctx.root, doc, today, needed, reuse_choices, spare)
+    spare = [rid for rid in spare if rid not in choices.values()]
     work, stale = [], []
     for _, session, carries in needed:
-        reuse, live = None, None
+        reuse = choices.get(session["session_id"])
+        live = cache.routine(reuse) if reuse else None
+        if reuse and live is None:
+            raise RefusedError(f"Chosen routine {reuse} is not cached; pull and review again")
+        if reuse and client:
+            fresh = _get_routine(client, reuse)
+            if _version(fresh) != _version(live):
+                raise RefusedError(f"Chosen routine {reuse} changed in Hevy; pull and review again")
         while session.get("temporary") and spare and live is None:
             reuse = spare.pop(0)
-            live = _live_spare(client, reuse)
+            live = cache.routine(reuse) if dry_run else _live_spare(client, reuse)
             if live is None:
                 stale.append(reuse)
                 reuse = None
@@ -703,12 +733,16 @@ def create(ctx, overlay_id, dry_run):
         entry["targets"] = [f"{line['exercise_id']}: {_target(exercise['notes'])}"
                             for line, exercise in zip(session["exercises"], body["routine"]["exercises"])]
         entries.append(entry)
+    report = _create_report(doc, ctx, entries, folder, dry_run, 0, stale)
+    report["plan_hash"] = _plan_hash(doc, "create", [
+        {"session_id": s["session_id"], "routine_id": rid, "body": body, "before": _version(live)}
+        for (s, _, rid, live), body in zip(work, bodies)],
+        folder["status"] in ("would_create", "pending"))
+    if expect_plan is not None or not dry_run:
+        _require_plan(report["plan_hash"], expect_plan)
     if dry_run:
-        return _create_report(doc, ctx, entries, folder, dry_run, 0, stale)
+        return report
 
-    if stale:
-        hevy["temporary_routines"] = [e for e in hevy["temporary_routines"] if e["routine_id"] not in stale]
-        _save_state(ctx.root, state_doc)
     writes = 0
     if folder["status"] == "pending":
         answer = client.post("/v1/routine_folders", {"routine_folder": {"title": ONE_OFF_FOLDER_TITLE}},
@@ -733,6 +767,8 @@ def create(ctx, overlay_id, dry_run):
         writes += 1
         entry["routine_id"] = routine_id
         _record(hevy, doc, session, routine_id)
+        if stale:
+            hevy["temporary_routines"] = [e for e in hevy["temporary_routines"] if e["routine_id"] not in stale]
         _save_state(ctx.root, state_doc)
         read_back = _get_routine(client, routine_id)
         cache.upsert_routine(read_back)
@@ -746,8 +782,7 @@ def create(ctx, overlay_id, dry_run):
             raise ValidationError(
                 f"{entry['title']} did not read back as written ({len(remaining)} difference(s)); "
                 "its id is recorded in state.json, and later routines were not written.",
-                details=[{"path": c["path"], "message": f"sent {c['after']!r}, Hevy has {c['before']!r}"}
-                         for c in remaining],
+                details=_read_back_details(remaining),
                 data=_create_report(doc, ctx, entries, folder, dry_run, writes, stale),
             )
     return _create_report(doc, ctx, entries, folder, dry_run, writes, stale)
@@ -776,8 +811,9 @@ def _require_program_sessions(root, doc, sessions):
 
 
 def _spare_temporary(root, doc, today, hevy, ids):
-    """Temporary routines free to reuse, in state.json order: none that carries a coming session elsewhere."""
-    busy = set(ids) | _carrying(root, doc, today)
+    """Temporary routines free to reuse, in state.json order: none a program session maps, and none that
+    carries a coming session elsewhere."""
+    busy = set(ids) | set(hevy["routines"]) | _carrying(root, doc, today)
     return [entry["routine_id"] for entry in hevy["temporary_routines"] if entry["routine_id"] not in busy]
 
 
@@ -798,13 +834,16 @@ def _carrying(root, doc, today):
 
 def _create_body(doc, session, live, folders, one_off_folder):
     if live is not None:
-        return intended_body(doc, session, live)
+        body = intended_body(doc, session, live)
+        body["routine"]["title"] = session["title"]
+        return body
     folder_id = one_off_folder if session.get("temporary") else folders["program"]
     return intended_body(doc, session, {"folder_id": folder_id})
 
 
 def _record(hevy, doc, session, routine_id):
     if not session.get("temporary"):
+        hevy["temporary_routines"] = [e for e in hevy["temporary_routines"] if e["routine_id"] != routine_id]
         hevy["routines"][routine_id] = {"session_id": session["session_id"]}
         return
     carrier = {"routine_id": routine_id, "overlay_id": doc["id"], "session_id": session["session_id"]}
@@ -838,7 +877,7 @@ def _folder_id(answer):
 
 def _create_report(doc, ctx, entries, folder, dry_run, writes, stale):
     return _report("create", doc, ctx, entries, dry_run=dry_run, writes=writes, folder=dict(folder),
-                   stale=list(stale))
+                   stale=list(stale), orphan_routines=external.orphan_routines(ctx.root))
 
 
 def _load_text(value, mode, unit, load=None):
@@ -1000,8 +1039,8 @@ def summary(report):
     overlay_id = report["overlay_id"]
     if action == "retire":
         retiring = [e for e in entries if e["status"] in ("would_retire", "retired", "failed")]
-        lines = [f"Overlay {overlay_id}: {len(retiring)} temporary routine(s) retitled \"{UNUSED_TITLE}\"."]
-        lines += [f"{e['title']} → {UNUSED_TITLE}" for e in retiring]
+        lines = [f"Overlay {overlay_id}: {len(retiring)} routine(s) retitled \"{UNUSED_TITLE}\"."]
+        lines += [f"{e['title']} ({e['routine_id']}) → {UNUSED_TITLE}" for e in retiring]
         lines += [f"{e['title'] or e['routine_id']}: left alone ({e['status'].replace('_', ' ')})"
                   for e in entries if e["status"] in ("in_use", "already_retired")]
         return "\n".join(lines)
@@ -1027,10 +1066,11 @@ def _create_summary(report):
     entries = report["routines"]
     overlay_id = report["overlay_id"]
     if not entries:
-        return f"Overlay {overlay_id} → Hevy: every session already has a routine; nothing to create."
+        return (f"Overlay {overlay_id} → Hevy: every session already has a routine; nothing to create."
+                + _orphan_summary(report))
     reused = sum(1 for entry in entries if entry["reuse"])
     lines = [f"Overlay {overlay_id} → Hevy: {len(entries) - reused} new routine(s), "
-             f"{reused} temporary routine(s) reused."]
+             f"{reused} routine(s) reused."]
     if report["stale"]:
         verb = "would be dropped from" if report["dry_run"] else "dropped from"
         lines.append(f"Hevy no longer has temporary routine(s) {', '.join(map(str, report['stale']))}; "
@@ -1048,4 +1088,45 @@ def _create_summary(report):
             folder = f" in folder {entry['folder_id']}" if entry["folder_id"] is not None else ""
             lines.append(f"{where}: new routine{folder}")
         lines += [f"  - {target}" for target in entry["targets"]]
-    return "\n".join(lines)
+    return "\n".join(lines) + _orphan_summary(report)
+
+
+def _orphan_summary(report):
+    rows = report.get("orphan_routines", [])
+    if not rows:
+        return ""
+    return "\nManaged routines now unmapped (choose leave, reuse, or retire): " + ", ".join(
+        f"{row['title']} ({row['routine_id']})" for row in rows)
+
+
+def _plan_hash(doc, action, writes, create_folder=False):
+    return jsonio.canonical_hash({"overlay_hash": overlay_module.approval_hash(doc), "action": action,
+                                  "writes": writes, "create_folder": create_folder})
+
+
+def _version(routine):
+    """What push's stale check compares, so a by-id GET matches the routine the list pull cached."""
+    if routine is None:
+        return None
+    return {"id": routine.get("id"), "updated_at": routine.get("updated_at")}
+
+
+def _require_plan(actual, expected):
+    if expected != actual:
+        raise RefusedError("The exact write plan is missing or changed; review --dry-run, name every action "
+                           "in the brief, then pass its --expect-plan hash after approval")
+
+
+def _reuse_choices(root, doc, today, needed, choices, spare):
+    sessions = {s["session_id"] for _, s, _ in needed}
+    allowed = {r["routine_id"] for r in external.orphan_routines(root)} | set(spare)
+    allowed -= _carrying(root, doc, today)
+    found = {}
+    for text in choices:
+        sid, sep, rid = text.partition("=")
+        if not sep or sid not in sessions or rid not in allowed:
+            raise RefusedError(f"Cannot reuse {text!r}: choose an unmapped session and a free managed routine")
+        if sid in found or rid in found.values():
+            raise RefusedError("Each reuse choice must name a distinct session and routine")
+        found[sid] = rid
+    return found
