@@ -223,7 +223,7 @@ class CapacityEvidenceTest(NoHevyCase):
         self.log_session("2026-10-12", bench=25, rpe=6)
         result = self.coach("propose", "week", "--week", "2026-10-19")["data"]
         bench = next(r for r in result["lines"] if r["exercise_id"] == "db_bench_press")
-        self.assertIn("27/hand", bench["text"])
+        self.assertIn("27.5/hand", bench["text"])
         self.assertIn("unavailable", bench["rationale"])
         self.assertNotIn("unearned_load", bench["flags"])
         self.approve_context(kind="weekly", decay={"days_off": 14, "band": "11-21", "load_factor": 0.95,
@@ -231,7 +231,7 @@ class CapacityEvidenceTest(NoHevyCase):
         result = self.coach("propose", "week", "--week", "2026-10-19")["data"]
         bench = next(r for r in result["lines"] if r["exercise_id"] == "db_bench_press")
         self.assertIn("2026-10-12", bench["rationale"])
-        self.assertIn("27/hand", bench["text"])
+        self.assertIn("27.5/hand", bench["text"])
         self.assertNotIn("unearned_load", bench["flags"])
 
     def test_later_overlay_does_not_reclassify_stored_exposure_provenance(self):
