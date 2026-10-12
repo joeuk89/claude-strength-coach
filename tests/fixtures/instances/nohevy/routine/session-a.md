@@ -3,12 +3,12 @@
 
 Session `session-a` · lifting · core · active
 
-Start loads in kg: where each exercise begins. Each week's loads come from the overlay.
+Start loads in kg: where each exercise began, not this week's prescription. This week's loads are in [this week's brief](../this-week.md).
 
 | Exercise | Sets × reps | RPE | Start load | Rest | Progression scheme |
 | --- | --- | --- | --- | --- | --- |
 | Back Squat (Barbell) | 3×5 | 7 | 100 | 180 s | double progression |
-| Bench Press (Dumbbell) | 3×8–10 | 8 | 25/hand (Hevy: 50) | 120 s | double progression |
+| Bench Press (Dumbbell) | 3×8–10 | 8 | 25/hand | 120 s | double progression |
 
 ## Cues and constraints
 

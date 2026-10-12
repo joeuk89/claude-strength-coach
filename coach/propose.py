@@ -78,26 +78,26 @@ def _same(a, b):
     return a is not None and b is not None and abs(a - b) < 1e-9
 
 
-def _load_text(value, mode, unit):
+def _load_text(value, mode, unit, show_hevy=True):
     if mode not in units.LOADED_MODES:
         return None
     if value is None:
         return "load to set"
-    return units.format_load(units.make_load(value, mode, unit))
+    return units.format_load(units.make_load(value, mode, unit), show_hevy=show_hevy)
 
 
-def sets_text(sets, mode, unit, with_load=True):
+def sets_text(sets, mode, unit, show_hevy=True, with_load=True):
     """The working sets in words, loads through units.format_load: "3×8 @ 24/hand (Hevy: 48) RPE 8"."""
     groups = []
     for s in sets:
         if not s.working:
             continue
-        reps = (f"{s.rep_range[0]}–{s.rep_range[1]}" if s.rep_range else
+        reps = (units.rep_range_text(*s.rep_range) if s.rep_range else
                 str(s.reps) if s.reps is not None else
                 f"{s.duration_seconds} s" if s.duration_seconds else
                 f"{units.json_number(s.distance_meters)} m" if s.distance_meters is not None else "?")
         words = f"{reps}+" if s.rep_out else reps
-        load = _load_text(s.load, mode, unit) if with_load else None
+        load = _load_text(s.load, mode, unit, show_hevy) if with_load else None
         if load:
             words += f" @ {load}"
         if s.rpe is not None:
@@ -163,6 +163,7 @@ class Run:
         self.root = Path(root)
         self.config = config
         self.unit = config.athlete.units
+        self.show_hevy = config.hevy.enabled
         self.today = today
         self.now = now
         self.program = program.load(root)
@@ -663,8 +664,8 @@ def propose_line(run, session, day, exercise, ctx_extra):
                 per_hand = "/hand" if mode in units.PER_HAND_MODES else ""
                 words.append(f"{cap_source} caps the load at {units.json_number(cap)}{per_hand}")
         sets, kit_changes, off_ladder = _rounded(sets, clipped, round_down, cut_from if load_cut else None, rounding)
-        words += [f"no ladder rung fits within it, so the line leaves the ladder at {_load_text(v, mode, run.unit)}"
-                  for v in off_ladder]
+        words += [f"no ladder rung fits within it, so the line leaves the ladder at "
+                  f"{_load_text(v, mode, run.unit, run.show_hevy)}" for v in off_ladder]
         return sets, words, kit_changes
 
     sets, constraint_words, kit_changes = limited(proposal.sets, proposal.round_down, proposal.load_cut, cut_from)
@@ -678,20 +679,20 @@ def propose_line(run, session, day, exercise, ctx_extra):
         if held is not None:
             (sets, constraint_words, kit_changes), over, verdict = held
             clauses.append(
-                f"but {_load_text(over.load, mode, run.unit)} × "
+                f"but {_load_text(over.load, mode, run.unit, run.show_hevy)} × "
                 f"{validity.reps_words(verdict.reps, validity.rep_targets(over.reps, over.rep_range))} implies "
                 f"{validity.implied_words(verdict.implied)} at {validity.estimate_words(estimate)}, so "
-                f"{_load_text(base.top_load(sets), mode, run.unit)}, the heaviest load logged on "
+                f"{_load_text(base.top_load(sets), mode, run.unit, run.show_hevy)}, the heaviest load logged on "
                 f"{source.date.isoformat()} that the e1RM model accepts, holds")
     if first_after_illness:
         adjusted.append(f"an RPE {validity.ILLNESS_RPE_CAP} cap on the first session after illness")
     if constraint_words:
         adjusted += constraint_words
     if adjusted:
-        clauses.append(f"adjusted for {', '.join(adjusted)}: {sets_text(sets, mode, run.unit)}")
-    clauses += _kit_words(kit_changes, mode, run.unit)
+        clauses.append(f"adjusted for {', '.join(adjusted)}: {sets_text(sets, mode, run.unit, run.show_hevy)}")
+    clauses += _kit_words(kit_changes, mode, run.unit, run.show_hevy)
     if cut is not None:
-        clauses.append(_cut_words(cut, mode, run.unit))
+        clauses.append(_cut_words(cut, mode, run.unit, run.show_hevy))
 
     override = None
     kept_from = _kept_override(run, ctx, session_id, exercise_id, day, transform)
@@ -717,21 +718,22 @@ def propose_line(run, session, day, exercise, ctx_extra):
             kept_adjusted.append(f"an RPE {validity.ILLNESS_RPE_CAP} cap on the first session after illness")
         kept_adjusted += kept_words
         override = {"reason": kept_from["reason"], "proposed_sets": [s.to_dict() for s in sets]}
-        scheme_text = sets_text(sets, mode, run.unit)
-        kept_text = sets_text(chosen_sets, mode, run.unit)
+        scheme_text = sets_text(sets, mode, run.unit, run.show_hevy)
+        kept_text = sets_text(chosen_sets, mode, run.unit, run.show_hevy)
         if kept_adjusted:
-            kept_text = (f"{sets_text(kept, mode, run.unit)}, adjusted for {', '.join(kept_adjusted)}: "
+            kept_text = (f"{sets_text(kept, mode, run.unit, run.show_hevy)}, adjusted for "
+                         f"{', '.join(kept_adjusted)}: "
                          f"{kept_text},")
         clauses = [f"{kept_from['words']} ({kept_from['reason'].rstrip('. ')}) kept as "
                    f"{kept_text} instead of the scheme's {scheme_text}"]
-        clauses += _kit_words(kept_kit_changes, mode, run.unit)
+        clauses += _kit_words(kept_kit_changes, mode, run.unit, run.show_hevy)
         if cut is not None:
-            clauses.append(_cut_words(cut, mode, run.unit))
+            clauses.append(_cut_words(cut, mode, run.unit, run.show_hevy))
         code, message = kept_from["flag"]
         line_flags.append(line_flag(code, f"{message}; the scheme proposed {scheme_text}"))
         sets, constraint_words = chosen_sets, kept_words
     if cut is not None and cut["held"]:
-        line_flags.append(line_flag("load_cut_held", _held_cut_words(cut, info.name, mode, run.unit),
+        line_flags.append(line_flag("load_cut_held", _held_cut_words(cut, info.name, mode, run.unit, run.show_hevy),
                                     "info" if cut["other_cuts"] and not cut["rose"] else "warn"))
 
     if constraint_words:
@@ -759,7 +761,7 @@ def propose_line(run, session, day, exercise, ctx_extra):
         "hevy_template_id": _template_id(entry),
         "load_mode": mode, "rest_seconds": exercise["rest_seconds"], "superset_id": exercise["superset_id"],
         "cues": exercise["cues"], "focus": proposal.focus, "target_note": target_note,
-        "change": change_text(previous["sets"] if previous else None, sets, mode, run.unit),
+        "change": change_text(previous["sets"] if previous else None, sets, mode, run.unit, run.show_hevy),
         "override": override,
         "provenance": {"scheme": scheme_name, "derived_from": source.ref() if source else None, "inferred": False,
                        "decay": decay, "rationale": rationale},
@@ -896,7 +898,8 @@ def _conditioning_line(run, session, day, exercise, proposal, first, rationale, 
         "exercise_id": exercise_id, "hevy_template_id": _template_id(entry), "load_mode": mode,
         "rest_seconds": exercise["rest_seconds"], "superset_id": exercise["superset_id"], "cues": exercise["cues"],
         "focus": proposal.focus if first else None, "target_note": None,
-        "change": change_text(previous["sets"] if previous else None, sets, mode, run.unit), "override": None,
+        "change": change_text(previous["sets"] if previous else None, sets, mode, run.unit, run.show_hevy),
+        "override": None,
         "provenance": {"scheme": session["scheme"]["name"], "derived_from": None, "inferred": False, "decay": None,
                        "rationale": rationale},
         "sets": [s.to_dict() for s in sets],
@@ -993,9 +996,9 @@ def _rounded(sets, clipped, round_down, cut_from, rounding):
     return tuple(found), changes, off_ladder
 
 
-def _kit_words(kit_changes, mode, unit):
-    return [f"the kit makes {_load_text(after, mode, unit)}, not {_load_text(before, mode, unit)}"
-            for before, after in kit_changes.items()]
+def _kit_words(kit_changes, mode, unit, show_hevy=True):
+    return [f"the kit makes {_load_text(after, mode, unit, show_hevy)}, "
+            f"not {_load_text(before, mode, unit, show_hevy)}" for before, after in kit_changes.items()]
 
 
 def _beyond_failure(estimate, sets):
@@ -1059,34 +1062,34 @@ def _cut_percent(cut, value):
     return units.json_number(round((cut["baseline"] - value) / cut["baseline"] * 100, 1))
 
 
-def _cut_words(cut, mode, unit):
+def _cut_words(cut, mode, unit, show_hevy=True):
     """"a 10 % cut from 80 targets 72; the kit makes 72.5, an actual 9.4 % cut": target and actual, never only the
     target."""
-    lead = (f"a {_cut_percent(cut, cut['target'])} % cut from {_load_text(cut['baseline'], mode, unit)} targets "
-            f"{_load_text(cut['target'], mode, unit)}")
+    lead = (f"a {_cut_percent(cut, cut['target'])} % cut from {_load_text(cut['baseline'], mode, unit, show_hevy)} "
+            f"targets {_load_text(cut['target'], mode, unit, show_hevy)}")
     if not cut["held"]:
-        return (f"{lead}; the kit makes {_load_text(cut['actual'], mode, unit)}, an actual "
+        return (f"{lead}; the kit makes {_load_text(cut['actual'], mode, unit, show_hevy)}, an actual "
                 f"{_cut_percent(cut, cut['actual'])} % cut")
-    held = _load_text(cut["actual"], mode, unit)
+    held = _load_text(cut["actual"], mode, unit, show_hevy)
     tail = "the set and effort cuts still apply" if cut["other_cuts"] else "no part of the cut applies"
     if cut["rose"]:
-        return (f"{lead}; the kit makes nothing at or under {_load_text(cut['baseline'], mode, unit)}, so the load "
-                f"rises to {held}, the nearest it makes, and {tail}")
+        return (f"{lead}; the kit makes nothing at or under {_load_text(cut['baseline'], mode, unit, show_hevy)}, "
+                f"so the load rises to {held}, the nearest it makes, and {tail}")
     return f"{lead}; the nearest load the kit makes no heavier than {held} is {held} itself, so the load holds " \
            f"(an actual 0 % cut) and {tail}"
 
 
-def _held_cut_words(cut, name, mode, unit):
-    actual = _load_text(cut["actual"], mode, unit)
+def _held_cut_words(cut, name, mode, unit, show_hevy=True):
+    actual = _load_text(cut["actual"], mode, unit, show_hevy)
     outcome = f"the load rises to {actual}, the nearest it makes" if cut["rose"] else f"{actual} holds"
     words = (f"{name}: the kit cannot make the {_cut_percent(cut, cut['target'])} % cut to "
-             f"{_load_text(cut['target'], mode, unit)}, so {outcome}")
+             f"{_load_text(cut['target'], mode, unit, show_hevy)}, so {outcome}")
     if cut["other_cuts"]:
         return f"{words}; the set and effort cuts still apply"
     if cut["lighter"] is None:
         return f"{words} and nothing lighter fits; no reset or cut is applied, so choose the load"
     return (f"{words}; no reset or cut is applied, so choose between holding it and "
-            f"{_load_text(cut['lighter'], mode, unit)}, a {_cut_percent(cut, cut['lighter'])} % cut")
+            f"{_load_text(cut['lighter'], mode, unit, show_hevy)}, a {_cut_percent(cut, cut['lighter'])} % cut")
 
 
 def _bounded_rung(value, rounding):
@@ -1100,7 +1103,7 @@ def _bounded_rung(value, rounding):
 FIRST_PRESCRIPTION = "first prescription"
 
 
-def change_text(before_sets, after_sets, mode, unit):
+def change_text(before_sets, after_sets, mode, unit, show_hevy=True):
     """What moved from the prior agreed prescription, or None when nothing did.
 
     The set shape (count, reps, RPE) and the top working load are compared apart:
@@ -1116,9 +1119,9 @@ def change_text(before_sets, after_sets, mode, unit):
     if mode in units.LOADED_MODES:
         before, after = base.top_load(before_sets), base.top_load(after_sets)
         if (before is None) != (after is None) or (before is not None and not _same(before, after)):
-            parts.append(f"{_load_text(before, mode, unit)} → {_load_text(after, mode, unit)}")
+            parts.append(f"{_load_text(before, mode, unit, show_hevy)} → {_load_text(after, mode, unit, show_hevy)}")
         elif not parts:
-            full = [sets_text(sets, mode, unit) for sets in (before_sets, after_sets)]
+            full = [sets_text(sets, mode, unit, show_hevy) for sets in (before_sets, after_sets)]
             if full[0] != full[1]:
                 parts.append(" → ".join(full))
     return ", ".join(parts) or None
@@ -1226,7 +1229,7 @@ def _supersedes(run, span, own_id=None):
     return newest["id"] if newest else None
 
 
-def lines_of(doc, unit):
+def lines_of(doc, unit, show_hevy=True):
     """The compact rows the coach's brief reads: one per line, loads through units.format_load."""
     rows = []
     for session in doc["sessions"]:
@@ -1234,7 +1237,7 @@ def lines_of(doc, unit):
             sets = tuple(base.SetSpec.from_dict(s, load=history.coaching_number(s.get("load"))) for s in line["sets"])
             rows.append({
                 "session_id": session["session_id"], "date": session["date"], "exercise_id": line["exercise_id"],
-                "text": sets_text(sets, line["load_mode"], unit), "change": line["change"],
+                "text": sets_text(sets, line["load_mode"], unit, show_hevy), "change": line["change"],
                 "rationale": (line.get("provenance") or {}).get("rationale"),
                 "flags": [f["code"] for f in doc["flags"]
                           if f["session_id"] == session["session_id"] and f["exercise_id"] == line["exercise_id"]],
@@ -1343,7 +1346,7 @@ def _write_built(root, built):
 def _week_result(root, config, built, dry_run):
     doc = built["doc"]
     draft_path, proposed_path, _ = proposal_paths(root, doc["id"])
-    lines = lines_of(doc, config.athlete.units)
+    lines = lines_of(doc, config.athlete.units, config.hevy.enabled)
     return {
         "id": doc["id"], "kind": built["kind"], "span": built["span"].to_json(), "draft": _relative(root, draft_path),
         "proposed": _relative(root, proposed_path), "overlay": doc, "lines": lines,
@@ -1512,8 +1515,9 @@ def override(root, config, proposal_id, session_id, exercise_id, new_sets, load,
             raise ValidationError(f"{exercise_id} is {line['load_mode']}, which carries no load")
         line["sets"] = [s.to_dict() for s in sets]
         line["override"] = {"reason": reason.strip(), "proposed_sets": before}
-        line["change"] = change_text(previous["sets"] if previous else None, sets, line["load_mode"], unit)
-        changed.append({"date": session["date"], "text": sets_text(sets, line["load_mode"], unit)})
+        line["change"] = change_text(previous["sets"] if previous else None, sets, line["load_mode"], unit,
+                                     config.hevy.enabled)
+        changed.append({"date": session["date"], "text": sets_text(sets, line["load_mode"], unit, config.hevy.enabled)})
 
     if until is not None and not standing:
         raise UsageError("--until goes with --standing")
@@ -1599,7 +1603,8 @@ def restore(root, config, proposal_id, session_id, reason, now, today, dry_run):
     if not dry_run:
         _write_proposal(root, proposal_id, draft, proposed, meta)
     return {"id": proposal_id, "session_id": session_id, "restored": [_dropped_row(e) for e in entries],
-            "flags": draft["flags"], "lines": lines_of(doc, config.athlete.units), "written": not dry_run}
+            "flags": draft["flags"], "lines": lines_of(doc, config.athlete.units, config.hevy.enabled),
+            "written": not dry_run}
 
 
 def rebuild(root, config, proposal_id, today, now, dry_run):
@@ -1627,7 +1632,8 @@ def rebuild(root, config, proposal_id, today, now, dry_run):
     built = _build_week(root, config, today, now, span, meta["kind"], meta.get("transform"), plan=plan,
                         proposal_id=proposal_id)
     new_draft = copy.deepcopy(built["draft"])
-    kept, lost = _carry_edits(root, proposal_id, draft, proposed, new_draft, config.athlete.units)
+    kept, lost = _carry_edits(root, proposal_id, draft, proposed, new_draft, config.athlete.units,
+                              config.hevy.enabled)
     doc = overlay.build(new_draft, config, root=root, now=now)
     doc["flags"] = validity.merge_flags(doc, validity.check_overlay(root, doc))
     resolved = {_flag_identity(f): f for f in draft.get("flags", []) if f.get("resolved")}
@@ -1656,7 +1662,7 @@ def _flag_identity(flag):
     return flag["code"], flag.get("session_id"), flag.get("exercise_id"), flag["message"]
 
 
-def _carry_edits(root, proposal_id, draft, proposed, new_draft, unit):
+def _carry_edits(root, proposal_id, draft, proposed, new_draft, unit, show_hevy):
     """Copy each explained line edit of `draft` onto the same session, date and exercise in `new_draft`.
 
     Returns (kept rows, lost rows). The scheme's new sets become the line's `override.proposed_sets`.
@@ -1689,7 +1695,7 @@ def _carry_edits(root, proposal_id, draft, proposed, new_draft, unit):
             previous = last_prescription(overlays, key[0], key[2], exclude=proposal_id)
             target["change"] = change_text(previous["sets"] if previous else None,
                                            tuple(base.SetSpec.from_dict(s) for s in target["sets"]),
-                                           target["load_mode"], unit)
+                                           target["load_mode"], unit, show_hevy)
             kept.append(row)
     return kept, lost
 
@@ -1723,7 +1729,7 @@ def discard(root, proposal_id, today, dry_run):
 def show(root, config, proposal_id, now):
     draft, proposed, meta = load_proposal(root, proposal_id)
     doc = overlay.build(draft, config, root=root, now=now)
-    lines = lines_of(doc, config.athlete.units)
+    lines = lines_of(doc, config.athlete.units, config.hevy.enabled)
     return {"id": proposal_id, "kind": meta["kind"], "span": meta["span"], "overlay": doc, "lines": lines,
             "lines_digest": jsonio.canonical_hash(lines), "unexplained": unexplained_changes(draft, proposed),
             "unresolved_blocks": overlay.unresolved_blocks(doc),
@@ -1938,6 +1944,33 @@ def _override_state(program_doc, plugin, slot, data, line):
     if errors:
         raise ValidationError(f"Scheme {plugin.name} returned an override state that fails its STATE schema",
                               details=[e.to_json() for e in errors])
+    return found
+
+
+def training_maxes(program_doc, state_doc, overlays, registry):
+    """[{session_id, exercise_id, scheme, load_mode, starting, current}] for each program slot whose scheme keeps a
+    training max. `current` is the stored training max, a pending one once its overlay is approved, else the
+    program's starting one: the training max the next proposal starts from, or None before either exists."""
+    by_id = {doc["id"]: doc for doc in overlays}
+    found = []
+    for session in program_doc["sessions"]:
+        for line in session["exercises"]:
+            name = line["scheme"]["name"]
+            plugin = registry.get("scheme", name)
+            if plugin is None or "training_max" not in plugins.initial_state(plugin):
+                continue
+            starting = line["scheme"]["params"].get("training_max")
+            stored = (state_doc or {}).get("scheme_state", {}).get(f"{session['id']}/{line['exercise_id']}")
+            current = None
+            if stored is not None and stored["scheme"] in (None, name):
+                data, pending = stored["data"], stored.get("pending")
+                if pending and pending["overlay_id"] in by_id and overlay.is_approved(by_id[pending["overlay_id"]]):
+                    data = pending["data"]
+                if not plugins.state_errors(plugin, data):
+                    current = data.get("training_max")
+            found.append({"session_id": session["id"], "exercise_id": line["exercise_id"], "scheme": name,
+                          "load_mode": line["load_mode"], "starting": starting,
+                          "current": starting if current is None else current})
     return found
 
 

@@ -11,7 +11,8 @@ overlay.
 
 from datetime import timedelta
 
-from coach import checkin_parts, dates, history, overlay, propose, render, stats, statusdays, validity
+from coach import checkin_parts, dates, history, overlay, program, propose, render, stats, statusdays, summaries
+from coach import validity
 from coach.errors import CoachError, UsageError
 from coach.library import Library
 
@@ -44,7 +45,14 @@ def rotation_text(inst, end):
     if not rotation or not rotation.get("position"):
         return None
     status = "confirmed" if rotation.get("confirmed") else "inferred from the schedule rule, not confirmed"
-    return f"Rotation: next week is {rotation['position']} ({status}); correct me if not."
+    position = rotation["position"]
+    following = summaries.session_after(inst.program["schedule"] if inst.program else None, position)
+    if following is None:
+        return f"Rotation: next week is {position} ({status}); correct me if not."
+    first = plan.sessions[0][1] if plan is not None and plan.sessions else following
+    names = program.page_names(inst.program, inst.library)
+    return (f"Rotation: next week starts with {names.session(first)}, after {names.session(position)} as the last "
+            f"session trained ({status}); correct me if not.")
 
 
 def _session_of(workout, routines):
@@ -441,7 +449,7 @@ def return_brief(root, config, now, proposal_id=None, overlay_id=None, reason="l
         doc, lines = shown["overlay"], shown["lines"]
     else:
         doc = overlay.load(root, overlay_id)
-        lines = propose.lines_of(doc, config.athlete.units)
+        lines = propose.lines_of(doc, config.athlete.units, config.hevy.enabled)
     library = Library.load(root)
     days_off = _days_off(root, doc)
     band = validity.band_for(days_off) if days_off is not None else None

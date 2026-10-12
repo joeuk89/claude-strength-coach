@@ -307,6 +307,7 @@ class _Checker:
         self.doc = doc
         self.config = config
         self.unit = config.athlete.units
+        self.show_hevy = config.hevy.enabled
         self.history = _History(root)
         try:
             self.library = Library.load(root)
@@ -520,7 +521,7 @@ class _Checker:
         if over:
             heaviest = max(over, key=capped_value)
             self.flag("load_cap", session, line,
-                      f"{self.where(session, line)}: {units.format_load(heaviest)} is above the {source} cap of "
+                      f"{self.where(session, line)}: {self.load_text(heaviest)} is above the {source} cap of "
                       f"{units.json_number(cap)} {self.unit}{per_hand}")
         within = [load for load in loads if load not in over]
         if available.geometry_warning:
@@ -532,12 +533,15 @@ class _Checker:
                       f"{self.where(session, line)}: {', '.join(missing)} cannot be built from "
                       f"{_kit_name(session)}; correct the load, explicit ladder rung or equipment configuration")
 
+    def load_text(self, load):
+        return units.format_load(load, show_hevy=self.show_hevy)
+
     def unbuildable(self, line, loads, available):
         missing = []
         for load in loads:
             problem = available.problem(history.coaching_number(load))
             if problem:
-                missing.append(f"{units.format_load(load)} ({problem})")
+                missing.append(f"{self.load_text(load)} ({problem})")
         return list(dict.fromkeys(missing))
 
     def feasibility(self, session, line, working, facts, evidence, ceiling):
@@ -571,7 +575,7 @@ class _Checker:
         if unearned:
             verdict, s, targets = max(unearned, key=lambda item: item[0].implied)
             self.flag("unearned_load", session, line,
-                      f"{self.where(session, line)}: {units.format_load(s['load'])} × "
+                      f"{self.where(session, line)}: {self.load_text(s['load'])} × "
                       f"{reps_words(verdict.reps, targets)} implies {implied_words(verdict.implied)} at {basis}")
         if off:
             verdict, s, targets = max(off, key=lambda item: abs(item[1]["rpe"] - item[0].implied))
@@ -581,7 +585,7 @@ class _Checker:
                 kind, implies = "RPE ceiling" if ceiling else "target RPE", "implies"
             self.flag("rpe_infeasible", session, line,
                       f"{self.where(session, line)}: {kind} {units.json_number(s['rpe'])}, but "
-                      f"{units.format_load(s['load'])} × {reps_words(verdict.reps, targets)} {implies} "
+                      f"{self.load_text(s['load'])} × {reps_words(verdict.reps, targets)} {implies} "
                       f"{implied_words(verdict.implied)} at {basis}")
         if stats.is_lower_bound(best):
             return _feasibility("lower_bound", ceiling, (

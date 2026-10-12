@@ -138,10 +138,10 @@ class GeneratedLinesTest(GeneratedLinesCase):
         line, loads, _ = self.proposed("db_bench_press")
         self.assertEqual(loads, {14})
         self.assertNotIn("unearned_load", line["flags"])
-        self.assertIn("16/hand (Hevy: 32) × 8 (the closest rep target in 8–10) implies a model result of 11.25",
+        self.assertIn("16/hand × 8 (the closest rep target in 8–10) implies a model result of 11.25",
                       line["rationale"])
-        self.assertIn("the e1RM of 19.6 from 2026-10-12, so 14/hand (Hevy: 28), the heaviest load logged",
-                      line["rationale"])
+        self.assertIn("the e1RM of 19.6 from 2026-10-12, so 14/hand, the heaviest load logged", line["rationale"])
+        self.assertNotIn("(Hevy:", line["rationale"])
         self.assertIn("3×8–10 @ 14/hand", line["text"])
 
     def test_a_fixed_rep_step_the_model_rejects_holds_the_logged_load(self):
@@ -164,7 +164,7 @@ class GeneratedLinesTest(GeneratedLinesCase):
         line, loads, _ = self.proposed("db_bench_press")
         self.assertEqual(loads, {18})
         self.assertNotIn("unearned_load", line["flags"])
-        self.assertIn("20/hand (Hevy: 40) × 10 implies a model result of 11", line["rationale"])
+        self.assertIn("20/hand × 10 implies a model result of 11", line["rationale"])
 
     def test_a_step_with_no_e1rm_says_the_model_did_not_check_it(self):
         self.log("session-a", "2026-10-12", "db_bench_press", "4x12@6*3")

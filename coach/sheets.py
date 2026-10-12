@@ -77,7 +77,7 @@ def _number(value):
 
 def _reps(set_):
     if set_.get("rep_range") is not None:
-        return f"{set_['rep_range']['start']}–{set_['rep_range']['end']}"
+        return units.rep_range_text(set_['rep_range']['start'], set_['rep_range']['end'])
     if set_.get("reps") is not None:
         return _number(set_["reps"]) + ("+" if set_.get("rep_out") else "")
     if set_.get("duration_seconds") is not None:

@@ -254,4 +254,6 @@ class MinimumReferenceTest(MinimumCase):
 
     def test_program_render_identifies_retained_coach_work(self):
         self.external(retained=True)
-        self.assertIn("Retained coach-led sessions: `pt`.", program.render_all(self.root)["routine/program.md"])
+        page = program.render_all(self.root)["routine/program.md"]
+        self.assertIn("Retained coach-led sessions: Coach-led.", page)
+        self.assertIn("Sessions: Minimum A, Minimum B. Schedule rule:", page)

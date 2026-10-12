@@ -348,8 +348,9 @@ def _sets_text(line, with_rpe, show_hevy):
     if with_rpe and show_hevy:
         return render.target_line(line)[len("Target: "):]
     text = pages.sets_text(line, show_hevy)
-    rpes = {s.get("rpe") for s in line["sets"] if overlay.is_working(s)}
-    if with_rpe and len(rpes) == 1 and None not in rpes:
+    working = [s for s in line["sets"] if overlay.is_working(s)]
+    rpes = {s.get("rpe") for s in working}
+    if with_rpe and len(rpes) == 1 and None not in rpes and not any(s.get("rep_out") for s in working):
         text += f" @ RPE {units.json_number(rpes.pop())}"
     return text
 

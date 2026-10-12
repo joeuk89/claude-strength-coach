@@ -74,8 +74,7 @@ class CheckInNumbersTest(NoHevyWeek):
 
     def test_logged_set_groups_name_their_sets(self):
         logged = self.exercise("db_bench_press")["logged"]
-        self.assertEqual(logged, "set 1: 9 @ 25/hand (Hevy: 50) @ RPE 9.5; "
-                                 "sets 2–3: 7, 6 @ 25/hand (Hevy: 50) @ RPE 8.5")
+        self.assertEqual(logged, "set 1: 9 @ 25/hand @ RPE 9.5; sets 2–3: 7, 6 @ 25/hand @ RPE 8.5")
         self.assertIn(f"under: {logged} against", self.text)
         self.assertNotIn(" + ", logged)
 
@@ -104,7 +103,7 @@ class CheckInNumbersTest(NoHevyWeek):
         self.assertAlmostEqual(row["rpe_delta"], 0.03, places=2)
         self.assertIn(f"{row['name']} hit", prepared["text"])
         self.assertNotIn(f"{row['name']} hit (", prepared["text"])
-        region_row = next(line for line in self.region().splitlines() if "| db_single_arm_row |" in line)
+        region_row = next(line for line in self.region().splitlines() if f"| {row['name']} |" in line)
         self.assertTrue(region_row.endswith("| hit |"), region_row)
 
     def test_a_lift_with_no_earlier_estimate_reads_as_a_first_estimate(self):
@@ -124,7 +123,7 @@ class CheckInNumbersTest(NoHevyWeek):
         self.assertIn("Back Squat (Barbell) 130 kg (+7)", line)
         self.assertNotIn("32.92", self.text)
         region = self.region()
-        self.assertIn("| db_bench_press | 33/hand | +1 |", region)
+        self.assertIn("| Bench Press (Dumbbell) | 33/hand | +1 |", region)
         self.assertIn("estimated one-rep max", region)
         self.assertNotIn("32.92", region)
 

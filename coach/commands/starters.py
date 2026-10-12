@@ -36,7 +36,8 @@ def list_starters(args, ctx):
     args=(arg("id", metavar="ID", help="the starter id, as starters list prints it"),),
 )
 def show(args, ctx):
-    return starters.show(args.id, Library.load(ctx.root), ctx.config.athlete.units)
+    return starters.show(args.id, Library.load(ctx.root), ctx.config.athlete.units,
+                         show_hevy=ctx.config.hevy.enabled, week_starts=ctx.config.athlete.week_starts)
 
 
 @command(

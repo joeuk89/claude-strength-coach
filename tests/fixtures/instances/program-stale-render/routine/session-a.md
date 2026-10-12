@@ -3,7 +3,7 @@
 
 Session `session-a` · lifting · core · active
 
-Start loads in kg: where each exercise begins. Each week's loads come from the overlay.
+Start loads in kg: where each exercise began, not this week's prescription. This week's loads are in [this week's brief](../this-week.md).
 
 | Exercise | Sets × reps | RPE | Start load | Rest | Progression scheme |
 | --- | --- | --- | --- | --- | --- |

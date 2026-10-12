@@ -254,9 +254,9 @@ def due(root, today):
 
 def _reps(set_):
     if set_.get("rep_range") is not None:
-        return f"{set_['rep_range']['start']}–{set_['rep_range']['end']}"
+        return units.rep_range_text(set_['rep_range']['start'], set_['rep_range']['end'])
     if set_.get("reps") is not None:
-        return _text(set_["reps"])
+        return _text(set_["reps"]) + ("+" if set_.get("rep_out") else "")
     if set_.get("duration_seconds") is not None:
         return f"{_text(set_['duration_seconds'])} s"
     if set_.get("distance_meters") is not None:
@@ -264,42 +264,43 @@ def _reps(set_):
     return "?"
 
 
-def _load(load_mode, set_):
+def _load(load_mode, set_, show_hevy=True):
     if set_.get("load"):
-        return units.format_load(set_["load"])
+        return units.format_load(set_["load"], show_hevy=show_hevy)
     if load_mode in units.LOADED_MODES:
         return render.CHOOSE_THE_LOAD
     return None
 
 
-def prescribed_text(line):
-    """`3×10 @ 22.5/hand (Hevy: 45) @ RPE 8`: a line's working sets, consecutive equal sets collapsed."""
+def prescribed_text(line, show_hevy=True):
+    """`3×10 @ 22.5/hand (Hevy: 45) @ RPE 8`: a line's working sets, consecutive equal sets collapsed.
+    A rep-out set reads `1×5+ @ 85 (stop at RPE 9)`."""
     groups = []
     for set_ in (s for s in line["sets"] if overlay.is_working(s)):
-        key = (_reps(set_), _load(line["load_mode"], set_), set_.get("rpe"))
+        key = (_reps(set_), _load(line["load_mode"], set_, show_hevy), set_.get("rpe"), bool(set_.get("rep_out")))
         if groups and groups[-1][0] == key:
             groups[-1][1] += 1
         else:
             groups.append([key, 1])
     parts = []
-    for (reps, load, rpe), count in groups:
+    for (reps, load, rpe, rep_out), count in groups:
         part = f"{count}×{reps}"
         if load:
             part += f" @ {load}"
         if rpe is not None:
-            part += f" @ RPE {_text(rpe)}"
+            part += f" (stop at RPE {_text(rpe)})" if rep_out else f" @ RPE {_text(rpe)}"
         parts.append(part)
     return " + ".join(parts) or None
 
 
-def logged_text(workout, exercise_id):
+def logged_text(workout, exercise_id, show_hevy=True):
     """`10, 10, 10 @ 22.5/hand (Hevy: 45) @ RPE 8`: the working sets logged for one exercise, or None.
     Sets that differ in load or RPE form groups named by set number: `set 1: 9 @ 25 @ RPE 9.5; sets 2–3: …`."""
     sets = [s for e in workout["exercises"] if e["exercise_id"] == exercise_id
             for s in e["sets"] if s["type"] in history.WORKING_SET_TYPES]
     groups = []
     for set_ in sets:
-        load = units.format_load(set_["load"]) if set_.get("load") else None
+        load = units.format_load(set_["load"], show_hevy=show_hevy) if set_.get("load") else None
         key = (load, set_.get("rpe"))
         if groups and groups[-1][0] == key:
             groups[-1][1].append(set_)
@@ -460,8 +461,9 @@ def _exercises(inst, kept, workouts):
         for line, result in zip(session["exercises"], row["exercises"]):
             rows.append({
                 "date": row["date"], "session_id": row["session_id"], "exercise_id": line["exercise_id"],
-                "name": inst.name(line["exercise_id"]), "prescribed": prescribed_text(line),
-                "logged": logged_text(workout, line["exercise_id"]) if workout else None,
+                "name": inst.name(line["exercise_id"]), "prescribed": prescribed_text(line, inst.config.hevy.enabled),
+                "logged": (logged_text(workout, line["exercise_id"], inst.config.hevy.enabled)
+                           if workout else None),
                 "status": result["status"], "rpe_delta": result["rpe_delta"],
             })
     return rows
@@ -1021,7 +1023,7 @@ def _region(card, record_date, unit):
             gap = rpe_gap_text(row["rpe_delta"])
             if gap:
                 result += f", {gap}"
-            lines.append(_row([render.day_label(row["date"]), row["exercise_id"], row["prescribed"], row["logged"],
+            lines.append(_row([render.day_label(row["date"]), row["name"], row["prescribed"], row["logged"],
                                result]))
     if card["notes"]:
         lines += ["", "**Notes logged:**", ""] + [f"- {_note_line(note)}" for note in card["notes"]]
@@ -1029,7 +1031,7 @@ def _region(card, record_date, unit):
         lines += ["", stats.e1rm_meaning(unit) + " Change is since the previous estimate.", "",
                   _row(["Lift", f"e1RM ({unit})", "Change", "Date"]), "| --- | --- | --- | --- |"]
         for row in card["e1rm"]:
-            lines.append(_row([row["exercise_id"], _e1rm_value(row), units.signed_whole(row["delta"]),
+            lines.append(_row([row["name"], _e1rm_value(row), units.signed_whole(row["delta"]),
                                render.short_date(row["date"])]))
     lines += _e1rm_notes(card)
     if card["flags"]:

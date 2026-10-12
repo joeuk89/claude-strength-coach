@@ -583,7 +583,8 @@ def adopt(root, draft, replace=False, position=None, dry_run=False, today=None, 
     archived = [] if archive is None else [
         (archive / source.name).relative_to(root).as_posix()
         for source in (program.path_for(root), state_module.path_for(root)) if source.is_file()]
-    pages = program.render_doc(doc, library, config.athlete.units, _status_line(root, new_state, doc))
+    pages = program.render_doc(doc, library, config.athlete.units, _status_line(root, new_state, doc),
+                               show_hevy=config.hevy.enabled, week_starts=config.athlete.week_starts)
     from coach.external import orphan_routines
 
     result = {

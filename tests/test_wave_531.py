@@ -7,7 +7,7 @@ from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
-from coach import overlay, plugins, propose, render, sheets, stats, units
+from coach import checkin, overlay, pages, plugins, propose, render, sheets, stats, units
 from coach.errors import UsageError
 from coach.plugins import base
 from tests.support.history import R_A, read_json
@@ -366,6 +366,8 @@ class RepOutSetTest(unittest.TestCase):
         self.assertIn("1×8 to failure", rows[1])
         self.assertEqual(propose.sets_text(tuple(base.SetSpec.from_dict(s, load=85) for s in line["sets"]), "total",
                                            "kg"), "1×5+ @ 85 stop at RPE 9, 1×8 @ 85")
+        self.assertEqual(pages.sets_text(line), "1×5+ @ 85 kg (stop at RPE 9) + 1×8 @ 85 kg")
+        self.assertEqual(checkin.prescribed_text(line), "1×5+ @ 85 (stop at RPE 9) + 1×8 @ 85")
 
     def test_an_overlay_rep_out_set_needs_fixed_reps_on_a_normal_set(self):
         for set_ in ({"type": "normal", "rep_range": {"start": 5, "end": 8}, "rep_out": True},

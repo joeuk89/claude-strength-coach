@@ -148,7 +148,7 @@ def current(args, ctx):
 )
 def render_region(args, ctx):
     doc = _load_valid(ctx, args.id)
-    region = render.render_week_ahead(doc)
+    region = render.render_overlay_doc(ctx.root, doc)
     if not args.into:
         return {"id": args.id, "text": region}
     target = Path(args.into)

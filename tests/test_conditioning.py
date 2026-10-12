@@ -252,7 +252,9 @@ class ProgramTest(CircuitCase):
         self.assertTrue(self.data("program", "validate")["valid"])
         self.data("program", "render")
         page = (self.root / "routine" / "circuit.md").read_text(encoding="utf-8")
-        self.assertIn("Session scheme: emom density (minutes: 10;", page)
+        self.assertIn("Session scheme: emom density (minutes 10; reps Kettlebell Swing 10, Burpee 5; reps cap "
+                      "Kettlebell Swing 12, Burpee 8).", page)
+        self.assertNotIn("{", page)
 
     def test_a_non_hold_exercise_under_a_session_scheme_fails_validate(self):
         def change(doc):

@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 
 from coach import config as config_module
-from coach import jsonio, paths, plugins, units
+from coach import jsonio, paths, plugins, summaries, units
 from coach.errors import ConfigError, ValidationError
 from coach.library import MUSCLES, Library, e1rm_supported
 from coach.validate import Error
@@ -558,15 +558,32 @@ def render_all(root):
                               "run python3 -m coach program validate",
                               details=[error.to_json() for error in errors])
     from coach import block
-    return render_doc(doc, library, config.athlete.units, block.status_line(root))
+    return render_doc(doc, library, config.athlete.units, block.status_line(root), show_hevy=config.hevy.enabled,
+                      week_starts=config.athlete.week_starts)
 
 
-def render_doc(doc, library, unit, status_line=None):
-    """{relative path: text} for a valid, normalised program document; `status_line` is the block's (C43)."""
-    pages = {PROGRAM_PAGE: render_program_page(doc, library, status_line)}
+def render_doc(doc, library, unit, status_line=None, show_hevy=True, week_starts="monday"):
+    """{relative path: text} for a valid, normalised program document; `status_line` is the block's (C43).
+
+    With `show_hevy` false, start loads leave out the Hevy value.
+    """
+    names = page_names(doc, library, unit, week_starts)
+    pages = {PROGRAM_PAGE: render_program_page(doc, library, status_line, names)}
     for session in doc["sessions"]:
-        pages[page_path(session["id"])] = render_session_page(session, library, unit)
+        pages[page_path(session["id"])] = render_session_page(session, library, unit, show_hevy, names)
     return pages
+
+
+def page_names(doc, library, unit=None, week_starts="monday"):
+    """The titles, exercise names and unit a page's plugin summaries print (`coach.summaries`)."""
+    sessions = {s["id"]: s["title"] for s in doc["sessions"]}
+    sessions.update({e["id"]: e["title"] for e in doc.get("external_sessions", [])})
+    exercises = {}
+    for session in doc["sessions"]:
+        for line in session["exercises"]:
+            entry = library.get(line["exercise_id"]) if library else None
+            exercises[line["exercise_id"]] = entry["name"] if entry else line["exercise_id"]
+    return summaries.Names(sessions, exercises, unit, week_starts)
 
 
 def sync_pages(root, pages, dry_run):
@@ -621,22 +638,9 @@ def _number(value):
     return str(units.json_number(value))
 
 
-def _params(params):
-    if not params:
-        return ""
-    return "; ".join(f"{key}: {json.dumps(value, ensure_ascii=False, sort_keys=True)}"
-                     for key, value in sorted(params.items()))
-
-
-def _named(name, params):
-    text = name.replace("_", " ")
-    detail = _params(params)
-    return f"{text} ({detail})" if detail else text
-
-
 def _reps(group):
     if group.get("rep_range") is not None:
-        return f"{group['rep_range']['start']}–{group['rep_range']['end']}"
+        return units.rep_range_text(group['rep_range']['start'], group['rep_range']['end'])
     if group.get("reps") is not None:
         return _number(group["reps"])
     if group.get("duration_seconds") is not None:
@@ -653,15 +657,15 @@ def _sets_text(group):
     return text
 
 
-def _start_load(exercise, unit):
+def _start_load(exercise, unit, show_hevy=True):
     if exercise["load_mode"] not in units.LOADED_MODES:
         return "—"
     if exercise["start_load"] is None:
         return "coach picks"
-    return units.format_load(units.make_load(exercise["start_load"], exercise["load_mode"], unit))
+    return units.format_load(units.make_load(exercise["start_load"], exercise["load_mode"], unit), show_hevy=show_hevy)
 
 
-def _exercise_rows(exercise, library, unit):
+def _exercise_rows(exercise, library, unit, show_hevy, names):
     entry = library.get(exercise["exercise_id"])
     name = entry["name"] if entry else exercise["exercise_id"]
     if exercise["superset_id"] is not None:
@@ -671,17 +675,18 @@ def _exercise_rows(exercise, library, unit):
     rows = []
     for index, group in enumerate(groups):
         rpe = _number(group["rpe"]) if group.get("rpe") is not None else ""
-        load = _start_load(exercise, unit) if index == load_row else ""
+        load = _start_load(exercise, unit, show_hevy) if index == load_row else ""
         if index == 0:
             rest = f"{exercise['rest_seconds']} s" if exercise["rest_seconds"] is not None else ""
-            scheme = _named(exercise["scheme"]["name"], exercise["scheme"]["params"])
+            scheme = summaries.scheme_text(exercise["scheme"], names, exercise["load_mode"])
             rows.append(_row([name, _sets_text(group), rpe, load, rest, scheme]))
         else:
             rows.append(_row(["", _sets_text(group), rpe, load, "", ""]))
     return rows
 
 
-def render_session_page(session, library, unit):
+def render_session_page(session, library, unit, show_hevy=True, names=None):
+    names = names or summaries.Names(unit=unit)
     lines = [header(), f"# {session['title']}", "",
              f"Session `{session['id']}` · {session['kind']} · {session['tier']} · {session['status']}"]
     if session["location"]:
@@ -689,13 +694,14 @@ def render_session_page(session, library, unit):
     if session["focus"]:
         lines += ["", f"Focus: {session['focus']}"]
     if session["scheme"] is not None:
-        lines += ["", f"Session scheme: {_named(session['scheme']['name'], session['scheme']['params'])}. It sets "
+        lines += ["", f"Session scheme: {summaries.scheme_text(session['scheme'], names)}. It sets "
                       "every exercise's sets each week; loads hold as written."]
-    lines += ["", f"Start loads in {unit}: where each exercise begins. Each week's loads come from the overlay.", ""]
+    lines += ["", f"Start loads in {unit}: where each exercise began, not this week's prescription. This week's "
+                  f"loads are in [this week's brief](../{paths.BRIEF.as_posix()}).", ""]
     lines.append(_row(["Exercise", "Sets × reps", "RPE", "Start load", "Rest", "Progression scheme"]))
     lines.append("| --- | --- | --- | --- | --- | --- |")
     for exercise in session["exercises"]:
-        lines += _exercise_rows(exercise, library, unit)
+        lines += _exercise_rows(exercise, library, unit, show_hevy, names)
 
     notes = []
     for exercise in session["exercises"]:
@@ -714,7 +720,8 @@ def _sets_by_muscle(estimated):
     return ", ".join(f"{muscle.replace('_', ' ')} {estimated[muscle]}" for muscle in MUSCLES if muscle in estimated)
 
 
-def render_program_page(doc, library=None, status_line=None):
+def render_program_page(doc, library=None, status_line=None, names=None):
+    names = names or page_names(doc, library)
     lines = [header(), f"# {doc['name']}", "", "## Sessions", ""]
     lines.append(_row(["Session", "Id", "Kind", "Tier", "Status", "Location"]))
     lines.append("| --- | --- | --- | --- | --- | --- |")
@@ -725,7 +732,8 @@ def render_program_page(doc, library=None, status_line=None):
         )]) + " |")
 
     schedule = doc["schedule"]
-    lines += ["", "## Schedule", "", f"Schedule rule: {_named(schedule['rule'], schedule['params'])}"]
+    rule = summaries.schedule_text(schedule["rule"], schedule["params"], names)
+    lines += ["", "## Schedule", "", f"Schedule rule: {rule}"]
 
     lines += ["", "## Coach-led sessions", ""]
     if doc["external_sessions"]:
@@ -740,11 +748,11 @@ def render_program_page(doc, library=None, status_line=None):
     blocks = doc["blocks"]
     lines += ["", "## Blocks and light weeks", "",
               f"Light week after at most {blocks['hard_weeks_ceiling']} completed hard weeks. "
-              f"Deload rule: {_named(blocks['deload_rule']['name'], blocks['deload_rule']['params'])}."]
+              f"Deload rule: {summaries.rule_text(blocks['deload_rule'], names)}."]
     if status_line:
         lines += ["", f"Status: {status_line}"]
 
-    lines += _priority_lines(doc, library)
+    lines += _priority_lines(doc, library, names)
     lines += ["", "## If a day is missed", ""]
     if doc["missed_day_rules"]:
         from coach import missed
@@ -770,7 +778,7 @@ def _e1rm_basis_words(doc, lift):
     return f" ({stats.TOTAL_SYSTEM_LABEL})" if modes & set(stats.BODYWEIGHT_MODES) else ""
 
 
-def _priority_lines(doc, library):
+def _priority_lines(doc, library, names):
     """The priority lifts and the minimum week, only when the program has them, so older pages stay as they were."""
     lines = []
     if doc["priority"]:
@@ -789,11 +797,12 @@ def _priority_lines(doc, library):
             lines.append(f"- {name}: {words}; floor {floor['sets']} working sets at {rpe}")
     minimum = doc["minimum_week"]
     if minimum:
+        rule = summaries.schedule_text(minimum["schedule"]["rule"], minimum["schedule"]["params"], names)
         lines += ["", "## Minimum week", "",
-                  f"Sessions: {', '.join(f'`{session_id}`' for session_id in minimum['sessions'])}. "
-                  f"Schedule rule: {_named(minimum['schedule']['rule'], minimum['schedule']['params'])}."]
+                  f"Sessions: {', '.join(names.session(session_id) for session_id in minimum['sessions'])}. "
+                  f"Schedule rule: {rule}."]
         if minimum.get("external_sessions"):
-            retained = ', '.join(f'`{external_id}`' for external_id in minimum['external_sessions'])
+            retained = ', '.join(names.session(external_id) for external_id in minimum['external_sessions'])
             lines.append(f"Retained coach-led sessions: {retained}.")
     return lines
 

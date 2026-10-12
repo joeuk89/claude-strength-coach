@@ -8,6 +8,7 @@ from coach.units import (
     from_hevy_kg,
     make_load,
     plate_breakdown,
+    rep_range_text,
     round_to_increment,
     to_hevy_kg,
 )
@@ -29,8 +30,8 @@ class MakeLoadTest(unittest.TestCase):
         ("per_hand_x2", 25, "kg", 25, 50, 50, "25/hand (Hevy: 50)"),
         ("per_hand_x2", 25, "lb", 25, 50, 22.6796, "25/hand (Hevy: 50)"),
         ("per_hand_x2", 22.5, "kg", 22.5, 45, 45, "22.5/hand (Hevy: 45)"),
-        ("single_implement", 25, "kg", 25, 25, 25, "25 (Hevy: 25)"),
-        ("single_implement", 30, "lb", 30, 30, 13.6078, "30 (Hevy: 30)"),
+        ("single_implement", 25, "kg", 25, 25, 25, "25"),
+        ("single_implement", 30, "lb", 30, 30, 13.6078, "30"),
         ("bodyweight", 0, "kg", None, 0, 0, "BW"),
         ("bodyweight", 10, "kg", None, 10, 10, "BW+10"),
         ("bodyweight", 0, "lb", None, 0, 0, "BW"),
@@ -135,7 +136,16 @@ class FormatTest(unittest.TestCase):
         self.assertEqual(format_load(make_load(22.5, "total", "kg")), "22.5")
         self.assertEqual(format_load(make_load(1.25, "total", "kg")), "1.25")
         self.assertEqual(format_load(make_load(25.0, "total", "kg")), "25")
-        self.assertEqual(format_load(make_load(1.125, "single_implement", "kg")), "1.13 (Hevy: 1.13)")
+        self.assertEqual(format_load(make_load(1.125, "single_implement", "kg")), "1.13")
+
+    def test_hevy_value_only_where_it_differs_from_the_printed_load(self):
+        self.assertEqual(format_load(make_load(30, "single_implement", "kg")), "30")
+        self.assertEqual(format_load(make_load(25, "per_hand_x2", "kg")), "25/hand (Hevy: 50)")
+        self.assertEqual(format_load(make_load(25, "per_hand_x2", "kg"), show_hevy=False), "25/hand")
+
+    def test_rep_range_with_equal_ends_reads_as_one_count(self):
+        self.assertEqual(rep_range_text(6, 6), "6")
+        self.assertEqual(rep_range_text(8, 10), "8–10")
 
     def test_none_raises(self):
         with self.assertRaises(ValueError):

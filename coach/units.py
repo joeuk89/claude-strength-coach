@@ -234,7 +234,8 @@ def one_decimal(value):
 def format_load(load, show_hevy=True):
     """The text a renderer prints for a load. Never prints a unit.
 
-    With `show_hevy` false (an athlete without Hevy) the Hevy value is left out.
+    With `show_hevy` false (an athlete without Hevy) the Hevy value is left out. A single implement's Hevy value
+    equals the printed one, so it is never repeated.
     """
     if load is None:
         raise ValueError("no load to format")
@@ -249,10 +250,15 @@ def format_load(load, show_hevy=True):
     if mode == "per_hand_x2":
         return f"{_text(load['per_hand'])}/hand{hevy}"
     if mode == "single_implement":
-        return f"{_text(load['per_hand'])}{hevy}"
+        return _text(load["per_hand"])
     if mode == "bodyweight":
         return "BW" if load["hevy_total"] == 0 else f"BW+{total}"
     return f"BW-{total} assist{hevy}"
+
+
+def rep_range_text(start, end):
+    """`8–10` for a rep range, or one count when both ends are equal: `6`."""
+    return str(json_number(start)) if start == end else f"{json_number(start)}–{json_number(end)}"
 
 
 def round_to_increment(value, increment, direction="nearest"):

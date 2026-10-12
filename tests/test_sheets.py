@@ -176,7 +176,8 @@ class BriefLinkTest(unittest.TestCase):
         self.assertNotIn("(Hevy:", nohevy)
         hevy = pages.render_brief(VALID, self.as_of)
         self.assertIn("- Bench Press 22.5 → 25/hand (Hevy: 50)\n", hevy)
-        self.assertIn("| Single Arm Row 3×10 @ 30 (Hevy: 30) |", hevy)
+        self.assertIn("| Single Arm Row 3×10 @ 30 |", hevy)
+        self.assertNotIn("30 (Hevy: 30)", hevy)
 
 
 if __name__ == "__main__":
