@@ -2739,9 +2739,9 @@ and `plugins test` runs them. Loaded with
   explicit.
   `base.missed` is True when a logged working set fell short of its
   prescribed reps, and None for unknown prescriptions and for
-  `base.incomplete` exposures, those logging fewer working sets than a
-  known prescription asked for: a set never logged is not a failed
-  attempt. Progression history
+  `base.incomplete` exposures (those logging fewer working sets than a
+  known prescription asked for) with no short set: a set never logged is
+  not a failed attempt. Progression history
   matches the session, exercise and load mode; e1RM and layoff evidence
   remain exercise-wide. The three-exposure stall heuristic compares equal
   working-set counts with known metrics: more load (less assistance), more
@@ -2755,7 +2755,14 @@ and `plugins test` runs them. Loaded with
   exposures running through `through`. A count at `misses_before_reset`
   proposes the reset and is kept, so the reset is proposed again (in a
   later run, or for the slot's later session in the same run) until an
-  exposure after `through` is judged; that exposure starts a new count.
+  exposure after `through` is judged. The first such exposure starts a
+  new count when its prescribed top load is below the top load logged at
+  `through` (a reset, or a lower override, was trained); otherwise the
+  count runs on, so a reset trained at the old load, or a running count
+  that a lowered limit reaches, still resets. When either load is
+  unknown, a count at the limit starts a new count and a lower one runs
+  on. Before new training, a changed `misses_before_reset` re-reads the
+  stored count: a kept reset under a raised limit proposes a hold.
   A stored count of 0 whose `through` is a missed newest exposure,
   written by older versions after a reset, counts as a kept reset.
   An incomplete exposure with no short set holds the load, leaves the

@@ -1302,8 +1302,11 @@ def _override_state(program_doc, plugin, slot, data, line):
                      if e["exercise_id"] == exercise_id), None)
     if exercise is None or exercise["scheme"]["name"] != plugin.name:
         return data
-    params, _ = plugins.merged_params(plugin, exercise["scheme"]["params"])
-    found = hook(params, dict(data), tuple(base.SetSpec.from_dict(s) for s in line["sets"]))
+    params, errors = plugins.merged_params(plugin, exercise["scheme"]["params"])
+    if errors:
+        raise ValidationError(f"Scheme {plugin.name} params fail its PARAMS schema",
+                              details=[e.to_json() for e in errors])
+    found = hook(params, dict(data), tuple(base.working([base.SetSpec.from_dict(s) for s in line["sets"]])))
     errors = plugins.state_errors(plugin, found)
     if errors:
         raise ValidationError(f"Scheme {plugin.name} returned an override state that fails its STATE schema",

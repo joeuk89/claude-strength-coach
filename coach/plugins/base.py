@@ -430,7 +430,8 @@ def usable_oldest_first(exposures, after=None):
 
 def missed(exposure):
     """True when a logged working set fell short of its prescribed reps, False when every prescribed set was logged
-    at them, and None when that is unknown: the historical prescription is unknown, or the exposure is `incomplete`.
+    at them, and None when that is unknown: the historical prescription is unknown, or the exposure is `incomplete`
+    with no short set.
 
     A set that was never logged is not a failed attempt: it may have been skipped for time.
     """

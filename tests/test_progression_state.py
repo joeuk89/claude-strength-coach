@@ -21,9 +21,9 @@ RUNGS = [{"name": "30 kg assist", "load": 30}, {"name": "25 kg assist", "load": 
 
 
 def prescribed(day, reps, sets=THREE_EIGHTS, load=100, workout_id=None):
-    """An exposure logging one working set per entry of `reps` at `load`, against the prescription `sets`."""
+    """An exposure logging one working set per entry of `reps` at `load`, against the prescription `sets` at `load`."""
     found = exposure(day, [(load, r, 8) for r in reps], workout_id=workout_id)
-    return replace(found, prescribed=base.expand(sets))
+    return replace(found, prescribed=base.with_load(base.expand(sets), load))
 
 
 def linear(exposures, state=None, limit=1, sets=THREE_EIGHTS):
@@ -111,6 +111,50 @@ class LinearResetStateTest(unittest.TestCase):
         hit = prescribed(date(2026, 10, 5), (8, 8, 8), load=105)
         climbed = linear([hit], state={"misses": 0, "through": "2026-10-05"})
         self.assertEqual({load for load, _ in loads_and_reps(climbed)}, {107.5})
+
+    def test_a_lowered_limit_resets_a_running_count_that_reaches_it(self):
+        two_running = {"misses": 2, "through": "2026-10-05"}
+        old_miss = prescribed(date(2026, 10, 5), (8, 8, 6))
+        before_training = linear([old_miss], limit=2, state=two_running)
+        self.assertEqual({load for load, _ in loads_and_reps(before_training)}, {90})
+        third_miss = prescribed(date(2026, 10, 12), (8, 8, 6))
+        for limit in (2, 3):
+            with self.subTest(limit=limit):
+                proposal = linear([third_miss, old_miss], limit=limit, state=two_running)
+                self.assertEqual({load for load, _ in loads_and_reps(proposal)}, {90})
+                self.assertEqual(proposal.state, {"misses": 3, "through": "2026-10-12"})
+
+    def test_a_trained_reset_starts_a_new_count_after_the_limit_is_raised(self):
+        kept_reset = {"misses": 2, "through": "2026-10-05"}
+        miss = prescribed(date(2026, 10, 5), (5, 5, 5), load=105)
+        missed_at_reset = prescribed(date(2026, 10, 12), (8, 8, 6), load=94.5)
+        held = linear([missed_at_reset, miss], limit=3, state=kept_reset)
+        self.assertEqual({load for load, _ in loads_and_reps(held)}, {94.5})
+        self.assertEqual(held.state, {"misses": 1, "through": "2026-10-12"})
+
+    def test_a_limit_raised_before_new_training_rereads_a_kept_reset_as_a_hold(self):
+        miss = prescribed(date(2026, 10, 5), (5, 5, 5), load=105)
+        reread = linear([miss], limit=3, state={"misses": 2, "through": "2026-10-05"})
+        self.assertEqual({load for load, _ in loads_and_reps(reread)}, {105})
+        self.assertIn("miss 2 of 3", reread.rationale)
+
+    def test_a_reset_ignored_for_the_old_load_keeps_counting(self):
+        kept_reset = {"misses": 2, "through": "2026-10-05"}
+        miss = prescribed(date(2026, 10, 5), (5, 5, 5), load=105)
+        missed_again = prescribed(date(2026, 10, 12), (5, 5, 5), load=105)
+        reset = linear([missed_again, miss], limit=2, state=kept_reset)
+        self.assertEqual({load for load, _ in loads_and_reps(reset)}, {94.5})
+        self.assertEqual(reset.state, {"misses": 3, "through": "2026-10-12"})
+        hit = prescribed(date(2026, 10, 12), (8, 8, 8), load=105)
+        climbed = linear([hit, miss], limit=2, state=kept_reset)
+        self.assertEqual({load for load, _ in loads_and_reps(climbed)}, {107.5})
+        self.assertEqual(climbed.state, {"misses": 0, "through": "2026-10-12"})
+
+    def test_a_kept_reset_without_the_through_exposure_starts_a_new_count(self):
+        missed_at_reset = prescribed(date(2026, 10, 12), (8, 8, 6), load=94.5)
+        held = linear([missed_at_reset], limit=2, state={"misses": 2, "through": "2026-10-05"})
+        self.assertEqual({load for load, _ in loads_and_reps(held)}, {94.5})
+        self.assertEqual(held.state, {"misses": 1, "through": "2026-10-12"})
 
     def test_misses_judged_together_with_no_reset_between_them_still_reset(self):
         misses = [prescribed(date(2026, 10, day), (8, 8, 6)) for day in (12, 8, 5)]
