@@ -133,8 +133,15 @@ status days: `python3 -m coach status-days add --kind ill|injured|travel
 out `--to` while it is still going on; `status-days end <id> --date D`
 closes it later, `status-days withdraw <id> --reason <text>` takes back
 a wrong one). An ill status day in the gap brings in the illness return
-rule, exactly as an `ill` miss tag does. Then run `checkin prepare`
-again: the card now carries the reply.
+rule, exactly as an `ill` miss tag does. A race or other goal event the
+reply names goes in with `python3 -m coach events add --id <slug> --title
+<name> --date D --priority A|B|C` (`--activity`, `--distance-km`,
+`--planned-id` when it is a planned activity). The Events field asks for
+each pending decision: record the window the athlete agrees with `events
+window <id> --from D --to D --rationale <why>` (or `--none`), and a result
+with `python3 -m coach events complete <id> --result <text>`. An event's
+window is always one the athlete agreed, with its reason. Then run
+`checkin prepare` again: the card now carries the reply.
 
 **At most one follow-up turn**, and only for a gap that blocks
 programming: an unresolved rotation position, a new niggle's severity,

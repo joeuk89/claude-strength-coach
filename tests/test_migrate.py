@@ -90,8 +90,8 @@ def snapshot(root):
 class DiscoveryTest(unittest.TestCase):
     def test_framework_registry_owns_the_json_documents(self):
         reg = migrate.registry()
-        self.assertEqual(sorted(reg.documents), ["annotations", "blocks", "decisions", "exercise_library", "followups",
-                                               "history_month", "meal_plan", "niggles", "overlay", "program", "state",
+        self.assertEqual(sorted(reg.documents), ["annotations", "blocks", "decisions", "events", "exercise_library",
+                                               "followups", "history_month", "meal_plan", "niggles", "overlay", "program", "state",
                                                "status_days"])
         self.assertEqual(reg.documents["program"].files, ("data/program.json",))
         for document in reg.documents.values():

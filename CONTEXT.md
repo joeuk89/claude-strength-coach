@@ -515,6 +515,22 @@ the gap before a session brings in the illness return rule, exactly as
 an `ill` miss tag does; travel only explains the gap.
 _Avoid_: sick day, day off (a rest day is not a status day), miss tag
 
+**Goal event**:
+A dated race or other event the athlete trains towards, with a stable id,
+a priority (`A` the goal, `B` and `C` lesser) and a status: active,
+completed (with its result) or cancelled. It stays as history once done.
+Linked to a planned activity, it is that activity: the logged run counts
+once. It never pauses or resets the block count.
+_Avoid_: race goal, target race (when meaning the record)
+
+**Event window**:
+The days before a goal event the athlete agreed to keep lighter, with
+the reason, or an agreed decision to keep none. No window is ever
+assumed; until one is agreed the event carries a pending decision. A
+heavy lower session inside the window is flagged for review, never
+changed automatically.
+_Avoid_: taper (when no window was agreed), taper rule
+
 **Cardio tier**:
 Who owns the run plan: `count` (no plan; logged cardio is only counted),
 `review` (an outside plan or the athlete's, reconciled against what was

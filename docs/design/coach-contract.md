@@ -95,7 +95,8 @@ coach/                       # framework: synced to instances
   cardio.py                  # weekly load, bouts, reconcile, cardio flags               (R-43)
   interference.py            # program rules, heavy lower, lead-in days, emitted-code check (R-44a)
   statusdays.py              # status days                                               (R-43)
-  weekflags/<name>.py        # week-level flag providers: cardio (R-43), interference (R-44a)
+  events.py                  # goal events, agreed windows, views, proposal flags        (R-47)
+  weekflags/<name>.py        # week-level flag providers: cardio (R-43), interference (R-44a), events (R-47)
 config.example.toml          # framework: every key, commented                           (R-10, then each item adds its tables)
 research/<id>.md             # framework: template research notes                        (R-32b1-b3, R-46)
 tests/                       # template only, never synced
@@ -260,6 +261,8 @@ Phase 2 to 4 command inventory. No command here writes to Hevy.
 | `cardio associate ACTIVITY_ID (--planned-id ID \| --clear)` | R-43 | W |
 | `status-days list [--active]` | R-43 | |
 | `status-days add`, `status-days end ID --date D`, `status-days withdraw ID --reason TEXT` | R-43 | W |
+| `events list [--all]` | R-47 | |
+| `events add`, `events update ID`, `events window ID`, `events complete ID --result TEXT`, `events cancel ID --reason TEXT` | R-47 | W |
 | `interference list`, `interference check (--week W \| --span A..B)` | R-44a | |
 
 ## C3. Output envelope and exit codes
@@ -769,6 +772,7 @@ none and `bodyweight`, `assisted`, `duration` or `distance`; band and
 | `data/followups.json`, `data/niggles.json` | open questions; niggles with constraints | committed | R-27 |
 | `data/blocks.json` | block ledger | committed | R-31 |
 | `data/status-days.json` | status days | committed | R-43 |
+| `data/events.json` | goal events and their agreed windows (C55) | committed | R-47 |
 | `data/log/workouts.jsonl` | manual lifting log for athletes without Hevy, append-only | committed | R-40c |
 | `data/activity/activities.jsonl`, `planned.jsonl`, `sync.json` | activity records, planned activities, sync map (C29) | committed | R-42a and adapters |
 | `data/activity/associations.json` | explicit activity-to-plan IDs (C49), schema `activity_associations` v1 | committed | R-43 |
@@ -1500,6 +1504,7 @@ Unless stated, each is a copy of `valid/` plus what is listed.
 | `hevy-stale/` | R-12 | the same with the last pull at 2026-10-09T12:00:00Z (54 hours) |
 | `cardio/` | R-43 | see C50 |
 | `cardio-invalid/` | R-43 | not a copy of `valid/`: its config with `[cardio] spike_ratio = 1.0` and `sleep_debt_nights = 8`, and a `data/status-days.json` with a row ending before it starts and two open-ended `injured` rows |
+| `events-invalid/` | R-47 | not a copy of `valid/`: a config with only `[athlete] units`, and a `data/events.json` whose active `autumn-10k` (2026-10-21) has a window ending 2026-10-22, after the event, and whose completed `club-5k` has no result |
 | `activity-bad-record/` | R-42a | not a copy of `valid/`: the valid config and an `activities.jsonl` whose line 2 has an unknown field `heart_zone` |
 | `activity-wellness-misplaced/` | R-42a | not a copy of `valid/`: the valid config (`wellness_in_git` left false) and the wellness file at `data/activity/wellness.jsonl` |
 | `research-bad/` | R-32a | not a copy of `valid/`: the valid config; `fixture-dose` with a hand-edited claims table; `fixture-broken` with two claims numbered 1; `fixture-old` expired 2026-10-01 (area `sleep`); `reference/fixture-guide.md` citing a missing claim |
@@ -2415,6 +2420,8 @@ Reserved codes:
 | `status_active` | warn, info | R-43 | | A status day overlaps the span (warn ill/injured, info travel). |
 | `niggle_link` | warn | R-43 | | Activity of a kind an active niggle applies to. |
 | `conditioning_dropped` | info, warn | R-44b | | An optional conditioning session was dropped from the proposal (info), or a core one would have been (warn). |
+| `event_window_heavy_lower` | warn | R-47 | | A heavy squat or hinge session falls inside a goal event's agreed window; review it with the athlete. |
+| `event_window_pending` | info | R-47 | | An upcoming goal event has no agreed event window; agree one or record none. |
 
 ## C21. Overlay v2: line provenance (R-24 bumps; R-23a fills; R-21a, R-22, R-25 read)
 
@@ -4604,7 +4611,9 @@ def contribute(ctx: CardContext) -> Contribution | None
   those notes is a niggle to track; due follow-ups as facts;
   `niggle_escalate`), R-30a and R-31
   (`tier_reasons`), R-43 (part `cardio`: `runs`, `sleep` stated from
-  activity sources, and the week-flag providers' flags; C49).
+  activity sources, and the week-flag providers' flags; C49), R-47 (part
+  `events`: each active event's line as a fact, an `Events` field asking
+  for pending decisions, results recorded in the window as facts; C55).
 
 **Record skeleton.** `checkin skeleton --date D [--tier T] [--overlay ID]`
 writes `check-ins/D.md` when absent (exit 1 when present, unless
@@ -7022,7 +7031,8 @@ Later items add a provider when they own a fact the coach should see at
 session start: R-21b (next check-in runs in catch-up mode), R-23a (an
 unfinalised proposal draft), R-27 (follow-ups due, aggravated niggles),
 R-31 (light week proposed), R-32a (expired research notes), R-33a
-(nutrition override expiring), R-42a (source sync age).
+(nutrition override expiring), R-42a (source sync age), R-47 (goal
+events: countdown, agreed window and pending decisions; order 45, C55).
 
 The `checkin` and `program` providers read `coach.pages.header_facts`
 (C38) and stop computing those facts themselves (R-25 made the switch;
@@ -7068,6 +7078,7 @@ rule (hooks run outside the permission layer); `status` gets one. R-15's
   | `profile.md` | `bare_hevy_values`, `research_citations` |
   | `data/hevy/writes.jsonl` | `schema_versions` |
   | `data/activity/*.jsonl`, `data/activity/sync.json`, `data/activity/associations.json`, `.coach/activity/wellness.jsonl` | `activity_records_valid`, `activity_wellness_location` |
+  | `data/events.json` | `events_valid` |
   | `data/nutrition/readings.json` | `nutrition_readings` |
   | `data/nutrition/plans/*.json` | `meal_plans`, `meal_plan_render_fresh` |
   | `nutrition/plans/*.md` | `meal_plan_render_fresh` |
@@ -7169,6 +7180,87 @@ set-avoid ID --clear` (W, `--dry-run`), `library list --avoided`.
   uses one.
 - The proposal step never swaps exercises; swaps stay the coach's call.
 
+## C55. Goal events and agreed windows (R-47; R-21a, R-23a, R-26b read)
+
+`data/events.json` (schema `events` v1, a migration-runner document,
+`coach/migrations/events/`):
+
+```json
+{"schema_version": 1,
+ "events": [
+   {"id": "autumn-10k", "title": "Autumn 10K", "date": "2026-10-21", "activity": "run",
+    "distance_meters": 10000, "priority": "A", "status": "active", "planned_id": null,
+    "window": {"start": "2026-10-15", "end": "2026-10-20", "rationale": "keep the legs fresh",
+               "agreed_at": "2026-10-11T18:00:00Z"},
+    "result": null, "note": null, "created_at": "2026-10-11T18:00:00Z",
+    "changes": [{"at": "2026-10-11T18:00:00Z", "change": "window 2026-10-15 to 2026-10-20 agreed",
+                 "reason": "keep the legs fresh"}]}
+ ]}
+```
+
+- `id` is a slug the coach picks (`^[a-z0-9]+(-[a-z0-9]+)*$`), stable and
+  never reused, cancelled events included. `date` is the event's local
+  date. `activity` is a C30 kind or null; `distance_meters` is null or
+  metres. `priority` `A` (the goal event), `B` or `C`. `status`
+  `active`, `completed` (with `result`) or `cancelled`. Rows are never
+  deleted: a completed or cancelled event is history and refuses every
+  change. `changes` records each edit in order.
+- **Window.** `window` null means the decision is pending: no window is
+  assumed, of any length. An agreed window has `start ≤ end ≤ date` and a
+  rationale; `start` and `end` both null record an agreed decision to keep
+  no window. There is no taper transform: a window changes no load,
+  session or block count.
+- **Planned activity.** `planned_id` names a live C30 planned activity on
+  the event's date, of the event's kind when one is set; one plan links
+  at most one active event. The event adds no bout: the plan and the
+  activity that reconciles with it (C49) are the training, so a linked
+  race logged as a run counts once. Setting a link, or changing a linked
+  event's date or activity, needs `[activity] enabled` (exit 5
+  otherwise); other edits of a linked event do not.
+- **Pending decisions** (`coach.events.pending(row, today)`): `result`
+  once an active event's date has passed, else `window` while `window`
+  is null.
+- Commands: `events add --id ID --title T --date D --priority A|B|C
+  [--activity K] [--distance-km|--distance-mi|--distance-m X]
+  [--planned-id ID] [--note T]` (a duplicate id exits 1, a bad date or
+  priority exits 2); `events update ID [fields] [--planned-id ID |
+  --unlink] [--reason T]` (a new date clears the window and a linked plan
+  left on the old date, listed in `data.cleared`); `events window ID
+  (--from D --to D | --none | --clear) [--rationale T]` (a rationale is
+  required to agree); `events complete ID --result T` (exit 1 before the
+  event's date); `events cancel ID --reason T`; `events list [--all]`
+  (active events, or every one). Each writing command returns `{event,
+  path, written}` and accepts `--dry-run`.
+- **Views** (`coach.events.views(root, today, include_all=False)`): events
+  ordered by date, priority, then id, each with `days_to_go`, `pending`,
+  `window_sessions` (heavy lower sessions the overlays in force plan in
+  the agreed window from today on) and `link` (`{planned_id, status,
+  activity_id}` from `cardio reconcile` for the event's week; status null
+  when it cannot be judged). Several events are each shown with their own
+  priority and window; none is selected over another.
+- Status provider `events` (C52, order 45): one line per active event
+  (date, countdown, window or pending decision, sessions to review), at
+  most three lines, the last pointing at `events list` when more exist.
+  `attention` when a decision is pending or a session sits in a window.
+- Card part `events` (C36): each active event's line as a fact (catch-up
+  cards included), an `Events` field asking for each pending decision,
+  and a fact for each event completed in the window.
+- Week-flag provider `events` (C49), proposal mode only: for each active
+  event dated on or after both the span start and today,
+  `event_window_pending` (info) while its window decision is pending, and `event_window_heavy_lower` (warn,
+  `session_id` the session) for each draft session in the agreed window
+  that is heavy lower. Heavy lower is C51's definition with the
+  program's `quality_before_heavy_lower` thresholds, else 7 and 6
+  (`coach.interference.heavy_lower_params`,
+  `coach.interference.is_heavy_lower_session`). The message names the
+  event, its date, the window, its rationale and the session. The flag
+  is settled through the ordinary route: `propose resolve` with the
+  reason, or `propose override`. Nothing is moved, dropped or changed.
+- Events and windows are not week kinds: block accounting (C42, C43),
+  light weeks and one-off weeks keep their own rules. Check
+  `events_valid`: schema, unique ids, real dates, each window inside its
+  event, `result` exactly on completed events, one active event per plan.
+
 ---
 
 ## Build order and ownership
@@ -7229,3 +7321,4 @@ athlete's instance, a real key, a live session or a purchase):
 | R-40a (#28) | R-26a, R-41a, R-41b, R-33a, R-40b | Onboarding: config, six-question profile, program pick. Reads R-42a's `[activity]` when merged. |
 | R-40d (#60) | R-40a, with R-40b, R-40c, R-41a, R-41b | Human: live onboarding trial. Last of R-40. |
 | R-46 (#34) | R-42a, R-43, R-44a, R-32a, R-23a, and a maintainer go-ahead | needs-info. Program tier for running. |
+| R-47 (#178) | R-42a, R-43, R-44a | Goal events and agreed windows (C55). |
