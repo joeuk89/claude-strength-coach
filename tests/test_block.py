@@ -12,7 +12,7 @@ from unittest import mock
 from coach import block, flags, jsonio, program, structure
 from coach.validate import validate
 from tests.support import INSTANCES, REPO_ROOT, VALID, run_cli
-from tests.support.history import prescribe_fixture_history, read_json, write_json
+from tests.support.history import log_at_prescription, prescribe_fixture_history, read_json, write_json
 from tests.support.skills import skill_text
 
 BLOCK = INSTANCES / "block"
@@ -315,6 +315,7 @@ class TriggerTest(BlockCase):
 
     def test_rpe_drift_on_squat_in_the_last_two_session_a_workouts_makes_it_a_deload(self):
         prescribe_fixture_history(self.root)
+        log_at_prescription(self.root, ("bb_back_squat",))
         self.init(3)
         for day in ("2026-09-28", "2026-10-05"):
             self.set_rpe(day, "bb_back_squat", 8.5)

@@ -33,7 +33,8 @@ class _Read:
                 "session_id": self.exposure.session_id, "intent": self.intent, "verdict": self.verdict,
                 "why": self.why, "compared_sets": reading.compared if reading else 0,
                 "over_sets": list(reading.over) if reading else [],
-                "set_aside": [{"set": n, "reason": why} for n, why in reading.set_aside] if reading else []}
+                "set_aside": [{"set": n, "reason": why} for n, why in reading.set_aside] if reading else [],
+                "below_prescription": [{"set": n, "reason": why} for n, why in reading.below] if reading else []}
 
 
 def intent_of(inst, exposure):
@@ -71,7 +72,7 @@ def _read(inst, exposure, entry):
     elif reading is not None and reading.steady:
         verdict = "steady"
     elif reading is not None:
-        why = "too_few_compared"
+        why = "below_prescription" if reading.compared >= patterns.DRIFT_MIN_SETS else "too_few_compared"
     return _Read(exposure, intent, cap, in_scope, reading, verdict, why)
 
 
@@ -79,9 +80,10 @@ def drift_review(inst, span):
     """Per compound or recovery-capped lift whose newest exposure is in `span`, how its two newest exposures read.
 
     `status`: `drift` when both drifted against their own prescriptions and an earlier exposure of the same load
-    mode was at the prescription without drifting (the trigger); `calibration` when both drifted with no such
-    exposure before them; `not_counted` when the logged RPE ran over target on enough sets but the sets were set
-    aside or an exposure was not comparable. Lifts with none of these are left out.
+    mode was steady (`DriftReading.steady`: enough sets at the full prescription, none drifting), the trigger;
+    `calibration` when both drifted with no such exposure before them; `not_counted` when the logged RPE ran over
+    target on enough sets but the sets were set aside or an exposure was not comparable. Lifts with none of these
+    are left out.
     """
     by_exercise = {}
     for exposure in inst.run().exposures():
@@ -131,15 +133,16 @@ def _looked_over(read):
     return over >= patterns.DRIFT_MIN_SETS
 
 
-def flares(inst, span, through):
-    """Each niggle aggravated at some point from `span.start` through `through`, from its dated history (C27).
+def flares(inst, span):
+    """Each niggle aggravated at some point in `span`, from its dated history (C27).
 
     A row already aggravated when the week began counts from that entry; a later status never erases an aggravated
-    entry inside the window, and a flare that settled before the week began does not count.
+    entry inside the week, and a flare dated before or after the week does not count. A report made after the week
+    counts only when it was dated to the day the flare happened.
     """
     if not niggles.exists(inst.root):
         return []
-    start, end = span.start.isoformat(), through.isoformat()
+    start, end = span.start.isoformat(), span.end.isoformat()
     found = []
     for row in niggles.load(inst.root, inst.library)["niggles"]:
         before = [entry for entry in row["history"] if entry["date"] < start]

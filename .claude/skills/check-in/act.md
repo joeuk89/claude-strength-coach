@@ -21,6 +21,10 @@
   <patterns> --note "<report>"` (`--exercise` and `--activity-kinds`
   name anything else it affects). Repeat mention: `python3 -m coach
   niggles update <id> --mention --status <status> --note "<report>"`.
+  A status the athlete reports for an earlier day (it flared Tuesday)
+  takes `--date <that day>`, in date order: a flare counts toward a
+  closed week's niggle trigger only when dated inside that week, so after
+  a dated report run `block close` for that week again (analyze.md).
   Confirmed gone: `python3 -m coach niggles resolve <id>`, which **keeps
   the row**: recurrence is the signal this log exists to catch. Agree
   with the athlete the limit an active niggle sets and add it with

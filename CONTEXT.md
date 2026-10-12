@@ -188,8 +188,8 @@ reports, RPE drift on a compound lift two sessions running, a niggle
 aggravated under load at any point in the week, and poor sleep for most
 of the week. Drift counts only sets matched to their own prescription and
 no harder than it, outside deload, light and return work, after an
-earlier exposure at the prescription that did not drift; without one it
-is **calibration**, not a trigger. Poor sleep is measured from tracker or
+earlier exposure at the full prescription (no lighter or shorter sets)
+that did not drift; without one it is **calibration**, not a trigger. Poor sleep is measured from tracker or
 diary nights alike; how the athlete felt is readiness, and only a
 reasoned override replaces the measurement. A run spike is reviewed but
 never a trigger. Two in a week propose a light week; one is a watch.

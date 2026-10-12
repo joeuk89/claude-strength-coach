@@ -129,3 +129,24 @@ def prescribe_fixture_history(root):
                 workout["session_id"] = session_id
                 workout["overlay_id"] = by_day[workout["date"]]
         write_json(path, doc)
+
+
+def log_at_prescription(root, exercise_ids):
+    """Set each logged working set of `exercise_ids` to the load its overlay prescribed at that position."""
+    working = ("normal", "dropset", "failure")
+    for path in (Path(root) / "data/history").glob("????-??.json"):
+        doc = read_json(path)
+        for workout in doc["workouts"]:
+            if not workout.get("overlay_id"):
+                continue
+            plan = read_json(Path(root) / "data/overlays" / f"{workout['overlay_id']}.json")
+            session = next(s for s in plan["sessions"] if s["session_id"] == workout["session_id"])
+            for exercise in workout["exercises"]:
+                if exercise["exercise_id"] not in exercise_ids:
+                    continue
+                line = next(e for e in session["exercises"] if e["exercise_id"] == exercise["exercise_id"])
+                targets = [s["load"] for s in line["sets"] if s["type"] in working]
+                logged = [s for s in exercise["sets"] if s["type"] in working]
+                for set_, load in zip(logged, targets):
+                    set_.update(load=copy.deepcopy(load), weight_kg=float(load["hevy_kg"]))
+        write_json(path, doc)

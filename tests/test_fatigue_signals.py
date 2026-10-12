@@ -3,11 +3,11 @@
 import json
 import unittest
 
-from coach import dates, overlay, patterns
+from coach import checkin, dates, overlay, patterns
 from coach.activity import records
 from coach.plugins.base import LoggedSet, SetSpec
 from tests.support import INSTANCES
-from tests.support.history import prescribe_fixture_history, read_json, write_json
+from tests.support.history import log_at_prescription, prescribe_fixture_history, read_json, write_json
 from tests.support.skills import step_text
 from tests.test_activity_store import wellness
 from tests.test_block import NOW, BlockCase, codes
@@ -59,6 +59,26 @@ class DriftReadingTest(unittest.TestCase):
                                          load_mode="per_hand_x2")
         self.assertEqual((reading.over, reading.set_aside), ((1,), ((2, "more_reps"),)))
 
+    def test_lighter_or_short_sets_can_show_drift_but_never_steadiness(self):
+        lighter = patterns.drift_reading([logged(7, load=40)] * 3, [target()] * 3, load_mode="total")
+        self.assertEqual((lighter.compared, lighter.below), (3, ((1, "lighter"), (2, "lighter"), (3, "lighter"))))
+        self.assertFalse(lighter.steady)
+        short = patterns.drift_reading([logged(7, reps=3)] * 3, [target()] * 3, load_mode="total")
+        self.assertEqual(short.below, ((1, "fewer_reps"), (2, "fewer_reps"), (3, "fewer_reps")))
+        self.assertFalse(short.steady)
+        self.assertTrue(patterns.drift_reading([logged(8.5, load=40)] * 2, [target()] * 2, load_mode="total").drifted)
+        mixed = patterns.drift_reading([logged(7), logged(7), logged(7, load=90)], [target()] * 3, load_mode="total")
+        self.assertEqual(mixed.below, ((3, "lighter"),))
+        self.assertTrue(mixed.steady)
+
+    def test_more_assistance_or_a_range_bottom_missed_is_below_the_prescription(self):
+        assisted = patterns.drift_reading([logged(7, load=30)] * 2, [target(load=20)] * 2, load_mode="assisted")
+        self.assertEqual(assisted.below, ((1, "lighter"), (2, "lighter")))
+        ranged = [target(reps=None, rep_range=(8, 10), load=25)] * 2
+        reading = patterns.drift_reading([logged(7, load=25, reps=8), logged(7, load=25, reps=7)], ranged,
+                                         load_mode="per_hand_x2")
+        self.assertEqual(reading.below, ((2, "fewer_reps"),))
+
     def test_a_recovery_cap_lowers_the_target(self):
         self.assertTrue(patterns.rpe_drift([logged(7)] * 2, [target(rpe=8)] * 2, capped=6, load_mode="total"))
 
@@ -99,6 +119,7 @@ class ComparableDriftTest(FatigueCase):
     def setUp(self):
         super().setUp()
         prescribe_fixture_history(self.root)
+        log_at_prescription(self.root, (SQUAT, BENCH))
 
     def test_two_first_ever_over_target_exposures_are_calibration_not_drift(self):
         self.drop_squats(EARLIER_SQUATS)
@@ -130,6 +151,18 @@ class ComparableDriftTest(FatigueCase):
         self.assertEqual([(e["date"], e["verdict"], e["over_sets"]) for e in lift["exposures"]],
                          [("2026-10-05", "drift", [1, 2, 3]), ("2026-09-28", "drift", [1, 2, 3])])
         self.assertNotIn("drift_calibration", codes(data))
+
+    def test_an_earlier_exposure_below_the_prescription_is_no_baseline(self):
+        self.drop_squats(EARLIER_SQUATS[:-1])
+        self.drift_squat()
+        for change in (lambda n, s: s.update(rpe=7, load=total(40)), lambda n, s: s.update(rpe=7, reps=3)):
+            with self.subTest(change=change):
+                self.set_sets("2026-09-21", SQUAT, change)
+                data = self.close()
+                self.assertNotIn("rpe_drift", data["weeks"][-1]["triggers"])
+                lift = self.lift(data)
+                self.assertEqual((lift["status"], lift["baseline"]), ("calibration", None))
+                self.set_sets("2026-09-21", SQUAT, lambda n, s: s.update(load=total(100), reps=5))
 
     def test_sets_logged_heavier_than_prescribed_do_not_prove_drift(self):
         for day in DRIFT_DAYS:
@@ -262,6 +295,35 @@ class NiggleHistoryTest(FatigueCase):
         self.assertNotIn("niggle", data["weeks"][-1]["triggers"])
         self.assertIn("niggle", data["weeks"][-2]["triggers"])
 
+    def test_a_flare_after_the_week_does_not_fire_it(self):
+        self.niggle(("2026-10-01", "watching"), ("2026-10-13", "aggravated"))
+        data = self.close("2026-W41", now="2026-10-14T09:00:00Z")
+        self.assertNotIn("niggle", data["weeks"][-1]["triggers"])
+        self.assertEqual(data["reviews"][-1]["fatigue"]["niggle"], [])
+
+    def test_a_late_check_in_dates_an_in_week_flare_to_when_it_happened(self):
+        self.niggle(("2026-10-01", "watching"))
+        monday = "2026-10-12T09:00:00Z"
+        self.data("niggles", "update", "n-0001", "--status", "aggravated", "--date", "2026-10-08", now=monday)
+        self.data("niggles", "update", "n-0001", "--status", "watching", "--mention", now=monday)
+        data = self.close("2026-W41", now=monday)
+        self.assertIn("niggle", data["weeks"][-1]["triggers"])
+        flare, = data["reviews"][-1]["fatigue"]["niggle"]
+        self.assertEqual((flare["aggravated_on"], flare["status_now"]), (["2026-10-08"], "watching"))
+
+    def test_a_report_date_is_not_in_the_future_or_before_the_newest_entry(self):
+        self.niggle(("2026-10-05", "watching"))
+        self.coach("niggles", "update", "n-0001", "--status", "aggravated", "--date", "2026-10-12", expect=1)
+        self.coach("niggles", "update", "n-0001", "--status", "aggravated", "--date", "2026-10-04", expect=1)
+        self.coach("niggles", "add", "--area", "elbow", "--date", "2026-10-12", expect=1)
+        row = self.data("niggles", "add", "--area", "elbow", "--status", "aggravated", "--date", "2026-10-07")["niggle"]
+        self.assertEqual((row["first_noted"], row["history"][0]["date"]), ("2026-10-07", "2026-10-07"))
+
+    def test_the_check_in_dates_a_report_of_an_earlier_flare(self):
+        act = " ".join(step_text("check-in", "act.md").split())
+        self.assertIn("--date <that day>", act)
+        self.assertIn("only when dated inside that week", act)
+
     def test_a_flare_persisting_into_the_week_counts(self):
         self.niggle(("2026-10-02", "aggravated"))
         flare, = self.close()["reviews"][-1]["fatigue"]["niggle"]
@@ -306,6 +368,12 @@ class MeasuredSleepTest(FatigueCase):
                          ("ok", "override", "diary hours were time in bed"))
         self.assertEqual((evidence["reason"], evidence["measured"]["value"]),
                          ("diary hours were time in bed", "poor"))
+
+    def test_the_check_in_asks_for_and_enters_nightly_hours(self):
+        self.assertIn("hours asleep each night", checkin.SLEEP_ASK)
+        analyze = " ".join(step_text("check-in", "analyze.md").split())
+        self.assertIn("wellness add --date <night> --sleep-hours <h>", analyze)
+        self.assertIn("`[activity]` off: `reference/nutrition-sleep.md`", analyze)
 
     def test_too_few_nights_or_a_period_mean_stay_unknown(self):
         self.nights(6.4, "manual", days=["2026-10-09", "2026-10-10", "2026-10-11"])

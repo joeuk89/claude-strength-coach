@@ -31,13 +31,13 @@ athlete hit the prescribed load × reps @ RPE?
   `reference/runner-review.md` for its strength and fuelling claims,
   using the Sunday reply. Otherwise skip runner-specific research and
   fuelling questions.
-- Notable sets: PRs, rep-range top-outs due a load raise, anything way off.
-- RPE drift: check only **compound lifts** (multi-joint squat, hinge,
-  lunge, press and pull patterns) and sets under a **recovery cap**: 1+
-  RPE over target on 2+ working sets of one exposure, each set against
-  its own prescribed set (extra, heavier, longer or more-rep sets and
-  deload, light or return work prove nothing). Isolation drift gets one
-  summary line in the record and drives no decision.
+- Notable sets: PRs, rep-range top-outs due a load increase, anything way
+  off prescription.
+- RPE drift: only **compound lifts** (multi-joint squat, hinge, lunge, press
+  and pull patterns) and sets under a **recovery cap**: 1+ RPE over target on
+  2+ working sets of one exposure, each against its own prescribed set (extra,
+  heavier, longer or more-rep sets and deload, light or return work prove
+  nothing). Isolation drift gets one record line and drives no decision.
 - Priority work: `python3 -m coach structure priority` gives each priority
   lift's KPI now, its trend, and its exposures per week against plan. Name
   each `priority_exposures_missed` flag (a planned exposure missed with no
@@ -75,7 +75,8 @@ athlete hit the prescribed load × reps @ RPE?
   <field> --value <v>` for a mistyped value. Say which prescriptions
   were derived from the bad data.
 - Exercise drift vs. the plan: offer `/hevy-sync` if structural (Hevy only).
-- Intensity honesty: the RPE drift check on every exposure in the window.
+- Intensity honesty: the RPE drift check on each exposure in the window;
+  sustained drift is drift in consecutive exposures of one lift.
 - Session durations vs. the time limits in `profile.md`, junk volume.
 - Weekly balance: does the program's balance picture still match what's
   actually being trained?
@@ -98,24 +99,23 @@ athlete hit the prescribed load × reps @ RPE?
   open row's status with the athlete; list each `chronic` row in Block
   planning without asking for a resolution: it is a lasting limitation.
 
-**Both tiers — the hard-week count.** Enter the Sleep field's nightly
-hours (`python3 -m coach wellness add --date <night> --sleep-hours <h>`),
-then run `python3 -m coach block close --week <this week> --readiness
-poor|ok` (from the reply and workout notes, "felt fine" included; leave it
-out when the reply doesn't say; `--deep` on a deep check-in). Sleep is
-measured from tracker or diary nights; override it only with `--sleep
-poor|ok --sleep-reason "<why>"`. It classes every week since the last
-close (`CLAUDE.md` "Coaching principles" → Fatigue management), updates
-the count, checks the four fatigue triggers (each review's `fatigue` names
-the dates, sets and source behind them) and proposes, watches or skips a
-light week. It writes `data/blocks.json` and `block` in `data/state.json`,
-re-renders `routine/program.md`, and prints the `status_line`,
-`deep_review`, the block flags and each week's `reviews`. The hard-week
-gate counts fatigue, not a met prescription: quote each `summary`, and
-take `reps_missed`, `effort_above_target`, `effort_below_target`,
-`drift_calibration` and `recovery_ceiling_exceeded` into the load review.
-Run it again for the same week after a correction or a niggle status
-change (act.md): a second close replaces its entry.
+**Both tiers — the hard-week count.** Enter the Sleep field's nightly hours
+(`python3 -m coach wellness add --date <night> --sleep-hours <h>`;
+`[activity]` off: `reference/nutrition-sleep.md`), then run `python3 -m
+coach block close --week <this week> --readiness poor|ok` (from the reply
+and workout notes, "felt fine" included; left out when they don't say;
+`--deep` on a deep check-in). Only `--sleep poor|ok --sleep-reason "<why>"`
+overrides the measured sleep. It classes every week since the last close
+(`CLAUDE.md` "Coaching principles" → Fatigue management), updates the count,
+checks the four fatigue triggers (each review's `fatigue` names their
+evidence) and proposes, watches or skips a light week. It writes
+`data/blocks.json` and `block` in `data/state.json`, re-renders
+`routine/program.md`, and prints the `status_line`, `deep_review`, the block
+flags and each week's `reviews`. The hard-week gate counts fatigue, not a
+met prescription: quote each `summary`, and take `reps_missed`,
+`effort_above_target`, `effort_below_target`, `drift_calibration` and
+`recovery_ceiling_exceeded` into the load review. Run it again after a
+correction or a niggle report (act.md): a second close replaces its entry.
 
 **Both tiers — adherence.** Adherence = sessions trained ÷ sessions
 planned over the **trailing four ordinary weeks**:

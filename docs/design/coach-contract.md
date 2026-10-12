@@ -2803,8 +2803,11 @@ a set past the last prescribed one (`extra`), heavier than prescribed
 `bodyweight` and `assisted`), with more reps than the top of its target,
 longer, with no target RPE, no load in a loaded mode, or no logged RPE is
 set aside. `compared` counts the rest, `over` their positions 1 or more
-RPE over target (the cap lowers every target), `drifted` is two or more
-over, and `steady` is two or more compared and not drifted.
+RPE over target (the cap lowers every target), and `below` those logged
+lighter (more assistance for `assisted`), with fewer reps than the bottom
+of their target, or shorter. `drifted` is two or more over; `steady` is
+two or more compared sets not `below`, and not drifted. A `below` set can
+show drift but never steadiness.
 
 **Schedules.** `plan(ctx)` returns dated sessions for a span and the
 rotation it implies:
@@ -3564,11 +3567,14 @@ is the single function R-23a's pipeline, R-31's niggle trigger and R-43's
   `aggravated` from a better one (the entry before it is `watching`,
   `easing` or `resolved`). It is a week-level flag in `propose week` and
   the R-21a card, and `niggles list` gives each row's `escalate` reason.
-- `history` holds one entry per check-in day: `niggles update ID
-  [--status S] [--note T] [--mention]` adds today's entry, or replaces
-  it when today already has one. `--mention` bumps `mentions` and
-  `last_noted` once a day. `niggles resolve ID` sets `resolved`. The
-  newest entry's status equals `status`.
+- `history` holds one entry per report day: `niggles update ID
+  [--status S] [--note T] [--mention] [--date D]` adds the entry for `D`
+  (default today), or replaces it when that day already has one.
+  `--mention` bumps `mentions` and `last_noted` once a day. `niggles
+  resolve ID [--date D]` sets `resolved`; `niggles add --date D` dates
+  `first_noted` and the first entry. `--date` dates a report to the day
+  it describes: after today, or before the row's newest entry, exits 1.
+  The newest entry's status equals `status`.
 - Whether a row's constraints apply on a date reads its status on that
   date: the newest `history` entry on or before it (none: not yet
   noted). `coach.niggles.active_constraints(doc, entry, on_date)` returns
@@ -6309,9 +6315,10 @@ Flags (registered in `coach/flags/block.py`; rows in C20):
   `calibration` (flag `drift_calibration`), not a trigger. Niggle
   (`fatigue.flares`): a row whose history has an `aggravated` entry
   dated in the week, or whose newest entry before the week is
-  `aggravated`; for the week closed today or later the window runs to
-  today, so a report recorded at that check-in counts. A later status
-  never erases the entry. Sleep (`fatigue.sleep_reading`, reading
+  `aggravated`. An entry dated after the week never counts for it; a
+  check-in held after the week dates the athlete's report to when the
+  flare happened (`niggles update --date`, C27). A later status never
+  erases the entry. Sleep (`fatigue.sleep_reading`, reading
   `coach.cardio.sleep_evidence(root, span)`, C49): `poor` or `ok` by the
   `sleep_debt` rule over nightly tracker and diary hours, a period mean
   counting for no night; `unknown` without an activity source or with
@@ -6380,7 +6387,8 @@ Flags (registered in `coach/flags/block.py`; rows in C20):
   `not_counted` when the logged RPE ran over target on enough sets that
   were set aside or not comparable, with its two exposures' `date`,
   `workout_id`, `session_id`, `intent`, `verdict`, `why`,
-  `compared_sets`, `over_sets` and `set_aside`, and the `baseline`
+  `compared_sets`, `over_sets`, `set_aside` and `below_prescription`, and
+  the `baseline`
   exposure), `niggle` (each flare's `id`, `area`, `aggravated_on`,
   `aggravated_since`, `status_now`) and `sleep` (`value`, `source`,
   `reason`, and `measured`: the reading with its nights, their sources

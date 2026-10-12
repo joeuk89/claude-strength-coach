@@ -386,12 +386,11 @@ def _sleep_words(sleep):
 def _signals(inst, span, readiness, sleep, sleep_reason, target):
     """(signals, fired triggers, detail words, evidence) for one closed week.
 
-    Readiness and a sleep override apply to the target week only. The niggle window runs to today for the target
-    week, so a report recorded at the check-in that closes it counts.
+    Readiness and a sleep override apply to the target week only.
     """
     drift = fatigue.drift_review(inst, span)
     drifting = _drift_words(drift)
-    flared = fatigue.flares(inst, span, max(span.end, inst.today) if target else span.end)
+    flared = fatigue.flares(inst, span)
     readiness = (readiness if target else None) or "unknown"
     measured = fatigue.sleep_reading(inst.root, span)
     if target and sleep:
