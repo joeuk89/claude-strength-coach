@@ -575,21 +575,15 @@ def apply_constraints(sets, active, newest_load, direction):
 class _Ceiling(NamedTuple):
     """Why a line's RPE is a ceiling, and the e1RM that turns it into a load limit or why none can."""
 
-    why: str
+    why: str | None
     estimate: dict | None
     unchecked: str | None
     hold: float | None
     hold_date: str | None
 
 
-def _ceiling_why(kind, decay, first_after_illness, active):
-    """What makes a line's RPE a ceiling rather than a target (the prescription check's rule, C22), or None."""
-    caps = [c for c in active if c["kind"] == "rpe_cap"]
-    if caps:
-        return ", ".join(dict.fromkeys(f"{c['source']} RPE cap {units.json_number(c['value'])}" for c in
-                                       _strictest_first(caps)))
-    if first_after_illness:
-        return "the first session after illness"
+def _week_ceiling(kind, decay):
+    """What makes every set's RPE on a line a ceiling rather than a target (C22), or None."""
     if decay is not None:
         return "the return band"
     if kind == "deload":
@@ -597,9 +591,21 @@ def _ceiling_why(kind, decay, first_after_illness, active):
     return None
 
 
-def _ceiling_for(why, mode, evidence, source):
-    if why is None:
-        return None
+def _lowering_caps(sets, active, first_after_illness):
+    """The recovery caps that lower some working set's RPE in `sets`, as words, or None.
+
+    A cap the set already meets leaves its RPE the program's target, so it gives the set no ceiling.
+    """
+    caps = [c for c in _strictest_first(active)
+            if c["kind"] == "rpe_cap" and _rpe_lowered(sets, base.rpe_capped(sets, c["value"]))]
+    if caps:
+        return ", ".join(dict.fromkeys(f"{c['source']} RPE cap {units.json_number(c['value'])}" for c in caps))
+    if first_after_illness and _rpe_lowered(sets, base.rpe_capped(sets, validity.ILLNESS_RPE_CAP)):
+        return "the first session after illness"
+    return None
+
+
+def _ceiling_for(mode, evidence, source):
     estimate = evidence["estimate"]
     unchecked = None
     if mode not in validity.FEASIBILITY_MODES:
@@ -609,19 +615,20 @@ def _ceiling_for(why, mode, evidence, source):
     elif stats.is_lower_bound(estimate):
         unchecked = (f"{validity.estimate_words(estimate)}, which cannot show how hard a load is for a ceiling")
     hold = source.top_load if source is not None else None
-    return _Ceiling(why, None if unchecked else estimate, unchecked, hold,
+    return _Ceiling(None, None if unchecked else estimate, unchecked, hold,
                     source.date.isoformat() if source is not None else None)
 
 
-def _under_ceiling(sets, ceiling, capped, mode, direction, unit):
-    """(sets, {index: load limit}, indices to report, words, why the ceiling is unchecked or None) for a ceiling line.
+def _under_ceiling(sets, ceiling, bound, capped, mode, direction, unit):
+    """(sets, {index: load limit}, indices to report, words, why the ceiling is unchecked or None) for the `bound`
+    sets, whose RPE is a ceiling; `capped` are those a recovery cap or the illness cap lowered.
 
-    With an e1RM the model accepts, each working set over the heaviest load its RPE allows for its fewest reps comes
-    down to it, and a set past the model's range that the model still shows too hard takes fewer reps (_fewer_reps).
-    Without one, a line under a recovery cap or the illness cap goes no further than the derived-from load: the cap
-    stays a limit the athlete applies, and the coach reviews the load.
+    With an e1RM the model accepts, each bound working set over the heaviest load its RPE allows for its fewest reps
+    comes down to it, and a set past the model's range that the model still shows too hard takes fewer reps
+    (_fewer_reps). Without one, a capped set goes no further than the derived-from load: the cap stays a limit the
+    athlete applies, and the coach reviews the load.
     """
-    limits, beyond = _ceiling_limits(sets, ceiling.estimate) if ceiling.estimate else ({}, {})
+    limits, beyond = _ceiling_limits(sets, ceiling.estimate, bound) if ceiling.estimate else ({}, {})
     sets, fewer, words = _fewer_reps(sets, beyond, ceiling, mode, unit) if beyond else (sets, {}, [])
     limits.update(fewer)
     beyond = {i: v for i, v in beyond.items() if i not in fewer}
@@ -645,7 +652,7 @@ def _under_ceiling(sets, ceiling, capped, mode, direction, unit):
         return sets, limits, lowered, words, (f"{lead}, and no logged load to hold; stop each set at the ceiling and "
                                               "choose the load with the athlete")
     held, changed = _clip(sets, ceiling.hold, direction)
-    changed = {i for i in changed if ceiling.unchecked or i in beyond}
+    changed = {i for i in changed if i in capped and (ceiling.unchecked or i in beyond)}
     sets = tuple(held[i] if i in changed else s for i, s in enumerate(sets))
     return sets, limits, lowered | changed, words, (
         f"{lead}, so the load goes no further than {_load_text(ceiling.hold, mode, unit)}, logged "
@@ -668,7 +675,7 @@ def _fewer_reps(sets, beyond, ceiling, mode, unit):
             continue
         covered = math.floor(stats.MAX_REPS_TO_FAILURE - (10 - rpe))
         found[index] = replace(s, reps=covered, rep_range=None)
-        limits[index] = stats.load_for(estimate["e1rm"], covered, rpe)
+        limits[index] = _load_limit(estimate, covered, rpe)
         words.append(f"{validity.estimate_words(estimate)} puts {_load_text(s.load, mode, unit)} × "
                      f"{validity.reps_words(verdict.reps, targets)} at {validity.implied_words(verdict.implied)}, over "
                      f"the RPE {units.json_number(rpe)} ceiling, and the e1RM model reaches at most {covered} reps at "
@@ -722,23 +729,28 @@ def _over_limit(load, limit):
 
 
 def _rpe_lowered(before, after):
-    """Whether a cap changed some working set's RPE, giving it a ceiling it did not already have."""
-    return any(a.rpe != b.rpe for a, b in zip(before, after) if b.working)
+    """The indices of the working sets whose RPE a cap changed, giving them a ceiling they did not already have."""
+    return {i for i, (b, a) in enumerate(zip(before, after)) if b.working and a.rpe != b.rpe}
 
 
-def _ceiling_limits(sets, estimate):
+def _load_limit(estimate, reps, rpe):
+    # Kept to the e1RM's own 0.01, so the load an e1RM was measured at is its limit, not a hair over it.
+    return round(stats.load_for(estimate["e1rm"], reps, rpe), 2)
+
+
+def _ceiling_limits(sets, estimate, bound):
     """({index: heaviest load the model allows at the set's RPE for its fewest reps}, {index: (reps, RPE) past the
-    model's range}) for the working sets of a ceiling line."""
+    model's range}) for the `bound` working sets of a ceiling line."""
     limits, beyond = {}, {}
     for index, s in enumerate(sets):
         targets = validity.rep_targets(s.reps, s.rep_range)
-        if not s.working or s.load is None or s.rpe is None or not targets:
+        if index not in bound or not s.working or s.load is None or s.rpe is None or not targets:
             continue
         fewest = min(targets)
         if stats.reps_to_failure(fewest, s.rpe) > stats.MAX_REPS_TO_FAILURE:
             beyond[index] = (fewest, s.rpe)
         else:
-            limits[index] = stats.load_for(estimate["e1rm"], fewest, s.rpe)
+            limits[index] = _load_limit(estimate, fewest, s.rpe)
     return limits, beyond
 
 
@@ -836,8 +848,8 @@ def propose_line(run, session, day, exercise, ctx_extra):
         available_loads(run.library, run.config, exercise_id, mode, location) if mode in units.LOADED_MODES else None,
         min(ceilings, default=None), floor, source.top_load if source is not None else None, info.load_direction,
         rungs)
-    ceiling = _ceiling_for(_ceiling_why(ctx_extra["kind"], decay, first_after_illness, active), mode, evidence,
-                           source)
+    week_ceiling = _week_ceiling(ctx_extra["kind"], decay)
+    ceiling = _ceiling_for(mode, evidence, source)
 
     def limited(sets, round_down, load_cut, cut_from):
         """Constraints, the illness cap, caps, RPE ceilings and rounding: what every load passes after its scheme.
@@ -850,6 +862,8 @@ def propose_line(run, session, day, exercise, ctx_extra):
         if first_after_illness:
             sets = base.rpe_capped(sets, validity.ILLNESS_RPE_CAP)
         capped = _rpe_lowered(uncapped, sets)
+        why = _lowering_caps(uncapped, active, first_after_illness) or week_ceiling
+        bound = set(range(len(sets))) if week_ceiling else capped
         if cap is not None:
             sets, changed = _clip(sets, cap)
             if changed:
@@ -857,9 +871,9 @@ def propose_line(run, session, day, exercise, ctx_extra):
                 per_hand = "/hand" if mode in units.PER_HAND_MODES else ""
                 words.append(f"{cap_source} caps the load at {units.json_number(cap)}{per_hand}")
         limits, lowered, unchecked = {}, set(), None
-        if ceiling is not None:
-            sets, limits, lowered, ceiling_words, unchecked = _under_ceiling(sets, ceiling, capped, mode,
-                                                                             info.load_direction, run.unit)
+        if why is not None:
+            sets, limits, lowered, ceiling_words, unchecked = _under_ceiling(
+                sets, ceiling._replace(why=why), bound, capped, mode, info.load_direction, run.unit)
             clipped.update(lowered)
             words += ceiling_words
         sets, kit_changes, off_ladder = _rounded(sets, clipped, round_down, cut_from if load_cut else None, rounding)
@@ -957,7 +971,9 @@ def propose_line(run, session, day, exercise, ctx_extra):
     elif scheme_rep_out and override is None and clauses[0] == scheme_clause:
         clauses.insert(1, "no + set this week")
 
-    line_flags += _core_flags(ctx, entry, exercise, sets, exposures, active, line_flag, mode, day)
+    line_flags += _core_flags(ctx, entry, exercise, sets, exposures,
+                              lambda on: constraints_module.active(run.root, session_id, exercise_id, on), line_flag,
+                              mode, day)
     evidence_clause, evidence_flags = _evidence(run, plugin, transform, line_flag)
     line_flags += evidence_flags
     if evidence_clause:
@@ -1091,7 +1107,7 @@ def _conditioning_line(run, session, day, exercise, proposal, first, rationale, 
     first_after_illness = ctx_extra["illness"] is not None and day == ctx_extra["first_day"]
     if first_after_illness:
         sets = base.rpe_capped(sets, validity.ILLNESS_RPE_CAP)
-    capped = _rpe_lowered(uncapped, sets)
+    why = _lowering_caps(uncapped, active, first_after_illness)
     try:
         cap, cap_source = cap_for(run.config, exercise_id, mode, session["location"]) \
             if mode in units.LOADED_MODES else (None, None)
@@ -1106,8 +1122,7 @@ def _conditioning_line(run, session, day, exercise, proposal, first, rationale, 
         return flags.make(code, session_id=session_id, exercise_id=exercise_id, message=message)
 
     found = [line_flag("constraint_applied", "; ".join(words))] if words else []
-    why = _ceiling_why(None, None, first_after_illness, active)
-    if why is not None and capped:
+    if why is not None:
         found.append(line_flag("rpe_ceiling_unchecked", (
             f"{entry.get('name', exercise_id)}: {why} cannot be checked against an e1RM on a conditioning line, whose "
             f"load holds as written ({_load_text(load, mode, run.unit) if mode in units.LOADED_MODES else 'no load'});"
@@ -1348,7 +1363,7 @@ def change_text(before_sets, after_sets, mode, unit, show_hevy=True):
     return ", ".join(parts) or None
 
 
-def _core_flags(ctx, entry, exercise, sets, exposures, active, line_flag, mode, day):
+def _core_flags(ctx, entry, exercise, sets, exposures, active_on, line_flag, mode, day):
     found = []
     if mode in units.LOADED_MODES and any(s.working and s.load is None for s in sets):
         found.append(line_flag(first_loads.CODE, first_loads.message(ctx.exercise.name, day.isoformat(),
@@ -1370,7 +1385,7 @@ def _core_flags(ctx, entry, exercise, sets, exposures, active, line_flag, mode, 
                                           f"{', '.join(dates_stalled)} (a coaching heuristic, not a diagnosis)"))
     newest = base.newest(exposures)
     if newest is not None:
-        caps = [c["value"] for c in active if c["kind"] == "rpe_cap"]
+        caps = [c["value"] for c in active_on(newest.date) if c["kind"] == "rpe_cap"]
         cap = min(caps) if caps else None
         if patterns.is_compound(entry) or cap is not None:
             prescribed = newest.prescribed

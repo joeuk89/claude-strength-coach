@@ -13,15 +13,15 @@ WEEK = "2026-W42"
 SQUAT_E1RM = 120.33
 MODEL_CODES = ("rpe_infeasible", "unearned_load")
 
-FIVE_MORE_PLUGIN = '''
-"""A synthetic scheme that adds 5 to the derived-from top load."""
+STEP_PLUGIN = '''
+"""A synthetic scheme that adds a fixed step to the derived-from top load."""
 
 from coach.plugins import base
 
 API = 1
 KIND = "scheme"
-NAME = "custom_five_more"
-SUMMARY = "Proposes the derived-from top load plus 5."
+NAME = "custom_step"
+SUMMARY = "Proposes the derived-from top load plus a fixed step."
 PARAMS = {"schema": {"type": "object", "additionalProperties": False, "properties": {}}, "defaults": {}}
 STATE = {"schema": base.EMPTY_SCHEMA, "initial": {}}
 FLAGS = {}
@@ -30,8 +30,8 @@ CITES = ()
 
 def propose(ctx):
     source = base.baseline(ctx.exposures)
-    sets = base.with_load(base.expand(ctx.slot.sets), (source.top_load or 0) + 5)
-    return base.Proposal(sets=sets, rationale="Five more", derived_from=source, state={})
+    sets = base.with_load(base.expand(ctx.slot.sets), (source.top_load or 0) + STEP)
+    return base.Proposal(sets=sets, rationale="One step more", derived_from=source, state={})
 
 
 def decay(ctx, proposal, days_off):
@@ -75,24 +75,34 @@ class CeilingCase(BlockCase):
                             change(logged)
             write_json(path, doc)
 
+    def prescribe_squat_rpe(self, rpe):
+        def edit(doc):
+            for session in doc["sessions"]:
+                for exercise in session["exercises"]:
+                    if exercise["exercise_id"] == "bb_back_squat":
+                        for prescribed in exercise["sets"]:
+                            prescribed["rpe"] = rpe
+        self.edit("data/program.json", edit)
+
     def edit_config(self, old, new):
         path = self.root / "config.toml"
         text = path.read_text(encoding="utf-8")
         self.assertIn(old, text)
         path.write_text(text.replace(old, new, 1), encoding="utf-8")
 
-    def use_plugin(self, exercise_id):
+    def use_plugin(self, exercise_id, step=5):
         plugins = self.root / "plugins"
         (plugins / "schemes").mkdir(parents=True, exist_ok=True)
-        (plugins / "schemes" / "custom_five_more.py").write_text(textwrap.dedent(FIVE_MORE_PLUGIN), encoding="utf-8")
+        (plugins / "schemes" / "custom_step.py").write_text(
+            textwrap.dedent(STEP_PLUGIN).replace("+ STEP)", f"+ {step})"), encoding="utf-8")
         (plugins / "tests").mkdir(parents=True, exist_ok=True)
-        (plugins / "tests" / "test_custom_five_more.py").write_text(PLUGIN_TEST, encoding="utf-8")
+        (plugins / "tests" / "test_custom_step.py").write_text(PLUGIN_TEST, encoding="utf-8")
 
         def edit(doc):
             for session in doc["sessions"]:
                 for exercise in session["exercises"]:
                     if exercise["exercise_id"] == exercise_id:
-                        exercise["scheme"] = {"name": "custom_five_more", "params": {}}
+                        exercise["scheme"] = {"name": "custom_step", "params": {}}
         self.edit("data/program.json", edit)
 
 
@@ -124,8 +134,48 @@ class ModelCeilingTest(CeilingCase):
         self.assertEqual((self.loads(doc, "bb_back_squat"), self.rpes(doc, "bb_back_squat")), ({95}, {7}))
         self.assertNotIn("rpe_ceiling_unchecked", line_codes(doc, "bb_back_squat"))
 
+    def test_a_cap_at_or_above_the_line_rpe_leaves_a_progression_with_a_valid_e1rm_alone(self):
+        self.use_plugin("bb_back_squat", step=2.5)
+        before = self.propose()
+        self.assertEqual((self.loads(before, "bb_back_squat"), self.rpes(before, "bb_back_squat")), ({97.5}, {7}))
+        for value in (7, 8):
+            with self.subTest(cap=value):
+                self.data("niggles", "add", "--area", f"synthetic knee {value}", "--status", "chronic", "--exercise",
+                          "bb_back_squat", "--constraint", f"rpe_cap={value}")
+                doc = self.propose()
+                self.assertEqual(find_line(doc, "bb_back_squat")["sets"], find_line(before, "bb_back_squat")["sets"])
+                for code in ("stalled", "rpe_ceiling_unchecked"):
+                    self.assertNotIn(code, line_codes(doc, "bb_back_squat"))
+                self.assertNotIn("allows at most", find_line(doc, "bb_back_squat")["provenance"]["rationale"])
+
+    def test_a_cap_that_does_not_lower_the_rpe_leaves_the_model_check_as_without_it(self):
+        self.use_plugin("bb_back_squat", step=5)
+        before = self.propose()
+        self.cap("bb_back_squat", value=8, status="chronic")
+        doc = self.propose()
+        self.assertEqual(find_line(doc, "bb_back_squat")["sets"], find_line(before, "bb_back_squat")["sets"])
+        self.assertEqual(self.loads(doc, "bb_back_squat"), {100})
+        self.assertEqual([c for c in line_codes(doc, "bb_back_squat") if c in MODEL_CODES],
+                         [c for c in line_codes(before, "bb_back_squat") if c in MODEL_CODES])
+
+    def test_a_limit_a_hair_under_a_kit_load_lands_on_that_load(self):
+        self.prescribe_squat_rpe(8)
+        self.use_plugin("bb_back_squat", step=5)
+        self.cap("bb_back_squat", value=7)
+        doc = self.propose()
+        self.assertGreater(95, stats.load_for(SQUAT_E1RM, 5, 7))
+        self.assertEqual((self.loads(doc, "bb_back_squat"), self.rpes(doc, "bb_back_squat")), ({95}, {7}))
+        self.assertIn("allows at most 95 for 5 reps, so 95", find_line(doc, "bb_back_squat")["provenance"]["rationale"])
+        for code in MODEL_CODES + ("rpe_ceiling_unchecked",):
+            self.assertNotIn(code, line_codes(doc, "bb_back_squat"))
+
+    def test_a_cap_added_after_the_newest_exposure_does_not_make_its_sets_drift(self):
+        self.cap("bb_back_squat")
+        self.assertNotIn("rpe_drift", line_codes(self.propose(), "bb_back_squat"))
+
     def test_the_illness_cap_lowers_the_load_too(self):
         self.edit_squat_sets(lambda logged: logged.update(rpe=8))
+        self.prescribe_squat_rpe(8)
         self.data("history", "annotate", "--kind", "miss", "--date", "2026-10-10", "--session", "session-b",
                   "--tag", "ill")
         doc = self.propose()

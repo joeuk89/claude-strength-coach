@@ -2471,7 +2471,7 @@ Reserved codes:
 | `linear_below_start` | info | R-23a | | Linear reset fell below the starting load; review progression without automatic adjustment. |
 | `load_cut_held` | info, warn | R-23a | | A reset, return-band or deload load cut that the kit cannot make holds the load, and the rationale gives the target and actual cut. Info when the line's set or effort cuts still apply; warn when nothing is cut, naming the next lighter load the kit makes so the coach chooses, or when the kit makes nothing that light and the load rises. |
 | `wave_review` | warn | R-23a | | A 5/3/1 wave week was trained but a wave set fell short of its reps or its load, or past its RPE cap: the week repeats and no training-max raise is earned; review the training max with the athlete (a coaching heuristic). |
-| `rpe_drift` | warn | R-23a | | Compound or recovery-capped exercise: logged RPE at least 1 over target on two or more working sets of the last exposure, each against its own prescribed set and no harder (`coach.patterns.drift_reading`). |
+| `rpe_drift` | warn | R-23a | | Compound or recovery-capped exercise: logged RPE at least 1 over target on two or more working sets of the last exposure, each against its own prescribed set and no harder (`coach.patterns.drift_reading`), with the recovery caps in force on that exposure's date. |
 | `range_effort_mismatch` | warn | R-23a | | Double progression held a load whose derived-from exposure had a working set below its set group's rep range or 2 or more RPE over target; review a lighter load or a different rep range. |
 | `return_week` | info | R-23a | | Decay applied; names the band and days off. A lifting line's flag adds the load change (`loads × 0.9`, or `assistance held` on an `assisted` line), the set change and any RPE cap. |
 | `return_after_illness` | block | R-23a | | An `ill` miss or status day in the gap: the coach resolves it only once the athlete confirms `SYMPTOM_FREE_HOURS` (48) hours symptom-free, and ending the ill status day does not; first session capped at RPE `ILLNESS_RPE_CAP` (7). Overlays written before it blocked keep their `warn`. |
@@ -3567,21 +3567,23 @@ niggle rows (C27):
   a niggle's flare limit says so with its date. Under a standing override
   (C25) the flag follows the kept sets the line delivers. It never removes or swaps an
   exercise; swaps are the coach's call.
-- **RPE ceilings change the work.** On a line whose RPE is a ceiling
-  (C22: an `rpe_cap`, the first session after illness, a return band or
-  a `deload`-kind week), every working set's load is at most
-  `coach.stats.load_for(e1rm, fewest reps, its RPE)` at the line's C22
-  model evidence, then rounds down to the kit; the rationale and
-  `constraint_applied` give the model load and the kit's. A load already
-  under it is never raised, and the ordinary line is untouched. This
+- **RPE ceilings change the work.** A ceiling set is every working set
+  of a return-band line or a `deload`-kind week, and each set whose RPE
+  an `rpe_cap` or the illness cap lowered. A cap the set already meets
+  leaves its RPE the program's target, so its progression and model check
+  stay as they are without the cap. Each ceiling set's load is at most
+  `coach.stats.load_for(e1rm, fewest reps, its RPE)` to 0.01 at the
+  line's C22 model evidence, then rounds down to the kit; the rationale
+  and `constraint_applied` give the model load and the kit's. A load
+  already under it is never raised, and the ordinary line is untouched. This
   needs an estimate the model accepts: a `total`, `per_hand_x2` or
   `single_implement` line, an estimate that is not a lower bound, and
   reps-to-failure within the model's 12. A set past those 12 reps that
   `judge_set(..., ceiling=True)` still finds too hard or unearned (the
   check's verdict) drops to the most reps the model covers at its RPE,
   `floor(12 − (10 − RPE))`, whose load limit then applies; the words name
-  the implied RPE and the new reps. Otherwise, when an `rpe_cap` or
-  the illness cap lowered the line's RPE, each load goes no further than
+  the implied RPE and the new reps. Otherwise, each set whose RPE an
+  `rpe_cap` or the illness cap lowered goes no further than
   the derived-from exposure's top load and `rpe_ceiling_unchecked`
   (warn) says why the ceiling cannot be checked and asks the coach to
   review the load; with no logged load, the proposed load stands under
