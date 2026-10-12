@@ -91,7 +91,7 @@ _INCREMENT_BEFORE = re.compile(r"\b(?:step|increment)\s+(?:is|of|:)\s*$", re.IGN
 _INCREMENT_AFTER = re.compile(r"\s*(?:cable\s+)?(?:steps?|increments?)\b", re.IGNORECASE)
 
 
-def measurement_spans(text):
+def _measurement_spans(text):
     """Associate a measurement subject with its first figure and numeric continuations."""
     spans = [(match.start(), match.end()) for pattern in (_EQUIPMENT_LIMIT, _MEASUREMENT_SUFFIX)
              for match in pattern.finditer(text)]
@@ -126,7 +126,7 @@ def bare_figures(text, load_column=False):
     in its chain, says per hand or gives the Hevy value.
     """
     bare = []
-    measurements = measurement_spans(text)
+    measurements = _measurement_spans(text)
     for chain in _chains(text, _figures(text)):
         if any(f.two_number or f.rpe for f in chain):
             continue
@@ -174,8 +174,14 @@ class Mentions:
                   "kettlebells": "kettlebell", "barbells": "barbell"}
     _SPELLINGS = {"dumbbell": r"(?:dumbbells?|dbs?)", "barbell": r"(?:barbells?|bb)",
                   "kettlebell": r"(?:kettlebells?|kb)", "cable": r"cables?"}
-    _EQUIPMENT_WORD = r"(?:dumbbells?|dbs?|barbells?|bb|kettlebells?|kb|cables?|machine|band|bodyweight)"
-    _BEFORE_EQUIPMENT = re.compile(rf"\b({_EQUIPMENT_WORD})(?:-based)?\s+(?:for\s+)?$", re.IGNORECASE)
+    _KINDS = {"smith": "smith_machine", "smith machine": "smith_machine", "trap bar": "trap_bar",
+              "hex bar": "trap_bar", "ez bar": "ez_bar", "bands": "band"}
+    _EQUIPMENT_WORD = (r"(?:dumbbells?|dbs?|barbells?|bb|kettlebells?|kb|cables?|smith(?:[\s-]+machine)?|machine"
+                       r"|bands?|bodyweight|landmine|(?:trap|hex|ez)[\s-]+bar)")
+    _BEFORE_EQUIPMENT = re.compile(
+        rf"\b({_EQUIPMENT_WORD})(?:-based)?\s+(?:for\s+)?"
+        r"(?:(?!(?:and|but|or|then|plus|while|whereas)\b)[a-z]+\s+){0,2}$", re.IGNORECASE,
+    )
     _AFTER_EQUIPMENT = re.compile(
         rf"(?:\b(?:on|using|with)\s+(?:the\s+)?(?:\d+(?:\.\d+)?\s*(?:kg|lb)s?\s*)?|\(\s*)"
         rf"({_EQUIPMENT_WORD})\b", re.IGNORECASE,
@@ -266,29 +272,37 @@ class Mentions:
         named = {self._EQUIPMENT.get(word, word) for word in words}
         return named & {"dumbbell", "barbell", "kettlebell", "cable", "machine", "band", "bodyweight"}
 
+    @classmethod
+    def _kind(cls, word):
+        word = re.sub(r"[\s-]+", " ", word.lower())
+        return cls._KINDS.get(word, cls._EQUIPMENT.get(word, word))
+
     def _equipment(self, text, match, end, measurements, ambiguous):
+        """(attached, describing): equipment written onto the mention, and all equipment describing it."""
         named = self._named_equipment(match)
         if named:
-            return named
+            return set(), named
         before = self._BEFORE_EQUIPMENT.search(text[:match.start()])
-        modifiers = [(before, 0)] if before else []
+        modifiers = [(before, 0, True)] if before else []
         after = text[match.end():end]
-        modifiers += [(m, match.end()) for m in self._AFTER_EQUIPMENT.finditer(after)
-                      if m.group(1).lower() != "bodyweight"]
+        modifiers += [(m, match.end(), m.group(0).startswith("(") and not after[:m.start()].strip())
+                      for m in self._AFTER_EQUIPMENT.finditer(after) if m.group(1).lower() != "bodyweight"]
         if ambiguous:
-            modifiers += [(m, match.end()) for m in self._EQUIPMENT_STEP.finditer(after)]
-        return {self._EQUIPMENT.get(m.group(1).lower(), m.group(1).lower()) for m, offset in modifiers
-                if not any(start <= offset + m.start(1) < stop for start, stop in measurements)}
+            modifiers += [(m, match.end(), False) for m in self._EQUIPMENT_STEP.finditer(after)]
+        kept = [(self._kind(m.group(1)), attached) for m, offset, attached in modifiers
+                if not any(start <= offset + m.start(1) < stop for start, stop in measurements)]
+        return {kind for kind, attached in kept if attached}, {kind for kind, _ in kept}
 
     def find(self, text):
         """[(start, end, exercise, mode)] in order; mode is None when the mention is ambiguous.
 
         A dumbbell word before a movement the library does not name, or
         names only for other equipment, is a `per_hand_x2` mention named by
-        its own words.
+        its own words. Other equipment written onto a movement that no
+        variant uses leaves the mention ambiguous.
         """
         found = []
-        measurements = measurement_spans(text)
+        measurements = _measurement_spans(text)
         matches = list(self._pattern.finditer(text))
         for index, match in enumerate(matches):
             end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
@@ -299,7 +313,10 @@ class Mentions:
                 found.append((match.start(), match.end(), match.group(0), PER_HAND_X2))
                 continue
             owners = [entry for entry, owned in candidates if owned] or [entry for entry, _ in candidates]
-            equipment = self._equipment(text, match, end, measurements, ambiguous=len(candidates) > 1)
+            attached, equipment = self._equipment(text, match, end, measurements, ambiguous=len(candidates) > 1)
+            if attached and all(entry["equipment"] not in attached for entry, _ in candidates):
+                found.append((match.start(), match.end(), match.group(0), None))
+                continue
             entries = [entry for entry, _ in candidates if entry["equipment"] in equipment] or owners
             modes = {e["effective_load_mode"] or e["load_mode_default"] for e in entries}
             mode = next(iter(modes)) if len(modes) == 1 else None

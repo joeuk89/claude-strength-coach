@@ -273,6 +273,22 @@ class PostToolUseTest(unittest.TestCase):
                 self.assertEqual(response["decision"], "block")
                 self.assertIn("bare_hevy_values", response["reason"])
 
+    def test_other_equipment_at_a_dumbbell_only_movement_does_not_block(self):
+        for text, blocked in (("barbell lunges 40 kg", False), ("Smith machine lunges 40 kg", False),
+                              ("cable hammer curls 20 kg", False), ("barbell step-ups 40 kg", False),
+                              ("dumbbell lunges 16 kg", True), ("lunges 16 kg", True)):
+            with self.subTest(text=text):
+                root = copy_of(self, VALID)
+                profile = root / "profile.md"
+                profile.write_text(text, encoding="utf-8")
+                code, response, _ = run_hook("posttooluse", root, edit_input(profile))
+                self.assertEqual(code, 0)
+                if blocked:
+                    self.assertEqual(response["decision"], "block")
+                    self.assertIn("bare_hevy_values", response["reason"])
+                else:
+                    self.assertIsNone(response)
+
     def test_equipment_profile_write_does_not_block(self):
         root = copy_of(self, VALID)
         profile = root / "profile.md"

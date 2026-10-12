@@ -1368,13 +1368,16 @@ conjunctions (`and`, `but`, `or`, `then`, `plus`, `while`, `whereas`,
 alone or combined, as in `, and then`) end a clause. A clause starts a
 new statement only when, before its first load, it names an exercise or
 a movement word that ends two or more library movement names (`curl`,
-`press`, `row`, `squat` and the like). So an unmatched exercise does not
-inherit the one before it (`DB bench 20/hand and leg curl 25 kg`,
-`. If leg curl 25 kg moves fast`, `3 sets of leg curl at 25 kg`). Any
-other clause on the same line continues the statement before it, across
-commas, conjunctions and sentence ends, and its figures keep that
-statement's exercise: `, 3x12 @ 14 kg`, `, keeping 20 kg`, `, about 20 kg`,
-`. If fresh, 22 kg`, `. Go heavier: 16 kg`. A clause that opens with a
+`press`, `row`, `squat` and the like), so `DB bench 20/hand and leg curl
+25 kg`, `. If leg curl 25 kg moves fast` and `3 sets of leg curl at 25 kg`
+each start a new statement. Any other clause on the same line continues
+the statement before it, across commas, conjunctions and sentence ends,
+and its figures keep that statement's exercise: `, 3x12 @ 14 kg`,
+`, keeping 20 kg`, `, about 20 kg`, `. If fresh, 22 kg`, `. Go heavier:
+16 kg`. That includes an exercise the library does not know whose words
+end in no such movement word (`, landmine 30 kg`, `. Sled 100 kg`): it
+continues the statement, and its figures are checked against the
+exercise before it. A clause that opens with a
 load instruction (`, raise to 22 kg`, `, next week 22.5 kg`) always
 continues.
 Library names, aliases, Hevy titles and ids identify exercises, and so
@@ -1392,11 +1395,16 @@ equipment (`DB split squat`, `dumbbell deadlift`); a dumbbell entry the
 library knows resolves through it (`DB row` is a single implement). A dumbbell word with no
 movement after it (`dumbbells up to 30 kg`) names no exercise.
 Equipment modifiers attached to the exercise (`cable lateral raise`,
-`lateral raise on the cable machine`) select the matching variant; a
-modifier that matches no variant leaves the owner in place. Equipment
-words belonging to another exercise or a bodyweight measurement do not
-change its mode. An unresolved or unmatched exercise never inherits an
-earlier exercise's mode. No library load modes are changed to interpret prose.
+`lateral raise on the cable machine`) select the matching variant.
+Equipment written onto the movement, up to two words before it or in a
+parenthesis right after it, that no variant uses makes the mention
+ambiguous, so it is not checked (`barbell lunges 40 kg`, `Smith machine
+lunges`, `cable hammer curls`). A later modifier that matches no variant
+leaves the owner in place (`Arnold press 20 kg on the machine days`).
+Equipment words belonging to another exercise or a bodyweight
+measurement do not change its mode. A mention the library cannot
+resolve to one mode is not checked. No library load modes are changed
+to interpret prose.
 
 A table row's figures belong to the exercise named before them on the
 row, else to the exercise in the row's exercise cell (the column headed

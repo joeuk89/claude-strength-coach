@@ -514,6 +514,21 @@ class BareHevyValuesTest(unittest.TestCase):
                 code, results, _ = check(tmp.root, "bare_hevy_values")
                 self.assertEqual(code, expected, failures(results, "bare_hevy_values"))
 
+    def test_other_equipment_named_at_a_dumbbell_only_movement_is_not_a_dumbbell_load(self):
+        with TempCopy() as tmp:
+            for text in ("barbell lunges 40 kg", "barbell lunge 40 kg", "Smith machine lunges 40 kg",
+                         "Barbell reverse lunges 3x8 at 40 kg", "barbell walking lunges 40 kg",
+                         "kettlebell lunges 16 kg", "landmine lunges 20 kg", "cable hammer curls 20 kg",
+                         "barbell step-ups 40 kg", "trap bar lunges 60 kg", "EZ bar hammer curls 20 kg"):
+                with self.subTest(text=text):
+                    self.assertEqual(self.flagged(tmp, text), [])
+            for text, exercise in (("dumbbell lunges 16 kg", "db_lunge"), ("lunges 16 kg", "db_lunge"),
+                                   ("hammer curls 14 kg", "db_hammer_curl"),
+                                   ("barbell lunges 40 kg, then hammer curls 14 kg", "db_hammer_curl")):
+                with self.subTest(text=text):
+                    [(_, found)] = self.flagged(tmp, text)
+                    self.assertEqual(found, exercise)
+
     def test_an_unmatched_equipment_word_does_not_hide_a_single_variant_load(self):
         with TempCopy() as tmp:
             tmp.write("profile.md", "Arnold press 20 kg on the machine days")
@@ -606,7 +621,8 @@ class BareHevyValuesTest(unittest.TestCase):
                                            ("Arnold press 3x12. Go heavier: 16 kg.", "16 kg", arnold),
                                            ("DB bench 20/hand, push to 22 kg", "22 kg", bench),
                                            ("DB bench 20/hand, raise to 22 kg", "22 kg", bench),
-                                           ("DB bench 3 or 4 sets at 20 kg", "20 kg", bench)):
+                                           ("DB bench 3 or 4 sets at 20 kg", "20 kg", bench),
+                                           ("DB bench 20/hand, landmine 30 kg", "30 kg", bench)):
                 with self.subTest(text=text):
                     self.assertEqual(self.flagged(tmp, text), [(repr(figure), exercise)])
 
@@ -619,6 +635,9 @@ class BareHevyValuesTest(unittest.TestCase):
                          "DB bench 20/hand, dumbbells up to 30 kg",
                          "Equipment: dumbbell bench up to 30 kg.",
                          "DB bench 20/hand. Weighed 74 kg this morning.",
+                         "DB bench 20/hand. Weigh-in 74 kg.",
+                         "Kit: DB bench up to 30 kg.",
+                         "DB bench 20/hand, bodyweight 73 or 74 kg",
                          "Dumbbell squat stand in the garage, 100 kg capacity."):
                 with self.subTest(text=text):
                     self.assertEqual(self.flagged(tmp, text), [])
@@ -783,6 +802,8 @@ class LoadFigureTest(unittest.TestCase):
             "the cable step is 5 kg and move to 8 kg": ["8 kg"],
             "bodyweight 73 kg; move to 8 kg": ["8 kg"],
             "bodyweight 73 kg and move to 8 kg": ["8 kg"],
+            "bodyweight 73 or 74 kg": [],
+            "bodyweight 73 or 74 kg; move to 8 kg": ["8 kg"],
             "bodyweight fell 2 kg; move to 8 kg per hand": [],
             "bodyweight dropped by 2 kg and move to 8 kg": ["8 kg"],
             "bodyweight went from 75 kg to 73 kg and move to 8 kg": ["8 kg"],
