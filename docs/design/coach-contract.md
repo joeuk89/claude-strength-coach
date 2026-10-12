@@ -1338,7 +1338,9 @@ JSONPath or line, and the offending value.
 weight unit (`50 kg`), a number in a table column whose header says
 load, weight, kg or lb (and not Hevy), or a number in an arrow chain
 (`45 → 50`). Its interpretation is explicit when it, or another figure
-in its chain, says per hand (`/hand`, `per hand`, `each`) or gives the
+in its chain, says per hand (`/hand`, `per hand`, `each`, `in each
+hand`, `in both hands`, `per arm`, `per side`, `per dumbbell`), weighs a
+dumbbell (`a pair of 12 kg dumbbells`, `the 24 kg DBs`), or gives the
 Hevy value (`(Hevy: 50)`). Per-hand-only wording is valid whether Hevy
 is enabled or disabled. With Hevy enabled, diagnostics show the
 two-number form first and per-hand wording as the minimum; with Hevy
@@ -1362,52 +1364,52 @@ and override reasons.
 The check reads a `per_hand_x2` overlay line's `target_note`, `change`,
 `cues`, `focus` and `override.reason`, and the prose of `profile.md` and
 `check-ins/*.md` outside rendered regions. Overlay text and override
-authoring use the same load-figure parser. In free prose a figure
-belongs to an exercise named before it in its statement. Punctuation and
-conjunctions (`and`, `but`, `or`, `then`, `plus`, `while`, `whereas`,
-alone or combined, as in `, and then`) end a clause. A clause starts a
-new statement only when, before its first load, it names an exercise or
-a movement word that ends two or more library movement names (`curl`,
-`press`, `row`, `squat` and the like), so `DB bench 20/hand and leg curl
-25 kg`, `. If leg curl 25 kg moves fast` and `3 sets of leg curl at 25 kg`
-each start a new statement. Any other clause on the same line continues
-the statement before it, across commas, conjunctions and sentence ends,
-and its figures keep that statement's exercise: `, 3x12 @ 14 kg`,
-`, keeping 20 kg`, `, about 20 kg`, `. If fresh, 22 kg`, `. Go heavier:
-16 kg`. That includes an exercise the library does not know whose words
-end in no such movement word and name no equipment (`. Sled 100 kg`): it
-continues the statement, and its figures are checked against the
-exercise before it. A clause that opens with a
-load instruction (`, raise to 22 kg`, `, next week 22.5 kg`) always
-continues.
+authoring use the same load-figure parser.
+
+Free prose fails safe: a figure is reported only when one dumbbell
+exercise unambiguously owns it. A figure belongs to an exercise named
+before it in its statement. Punctuation and conjunctions (`and`, `but`,
+`or`, `then`, `plus`, `while`, `whereas`, alone or combined, as in `,
+and then`) end a clause. A clause continues the statement before it,
+across commas, conjunctions and sentence ends, only when every word
+before its first load, outside a bodyweight measurement, is
+prescription wording: sets, reps, RPE, rest, tempo, warm-ups, load
+instructions and conditions (`, 3x12 @ 14 kg`, `, keeping 20 kg`,
+`, rest 90 s, 22 kg`, `. If fresh, 22 kg`, `. Go heavier: 16 kg`,
+`, next week 22.5 kg`). Any other clause starts a new statement (`and
+leg curl 25 kg`, `. Sled 100 kg`, `. Dumbbells at home go up to 24
+kg`), and when it names no exercise its figures are not checked.
+
 Library names, aliases, Hevy titles and ids identify exercises, and so
 does an entry's name without its parenthetical equipment (`Lateral Raise
 (Cable)` gives `lateral raise`). Hyphens and spaces match each other,
 `DB` and `dumbbells` are spellings of `dumbbell`, and a final plural
 matches (`DB step-ups`, `DB curls`). A phrase also matches every variant
-of the movement it names (`RDL with dumbbells` finds the dumbbell RDL).
-An entry that lists the phrase as its own name, alias, Hevy title or id
-owns it; a phrase only derived for variants with different load modes
-is ambiguous and is not checked. A dumbbell word followed by movement
-words the library uses names a `per_hand_x2` exercise when no entry
-matches (`DB incline press 22 kg`) or every entry it matches uses other
-equipment (`DB split squat`, `dumbbell deadlift`); a dumbbell entry the
-library knows resolves through it (`DB row` is a single implement). A dumbbell word with no
-movement after it (`dumbbells up to 30 kg`) names no exercise.
-Equipment named anywhere in a statement selects the matching variants
-of its exercise (`cable lateral raise`, `lateral raise 10 kg on the
-cable machine`, `lateral raise with 10 kg dumbbells`). A `per_hand_x2`
+of the movement it names. An entry that lists the phrase as its own
+name, alias, Hevy title or id owns it; a phrase only derived for
+variants with different load modes is ambiguous and is not checked.
+Equipment inside the matched phrase picks among the variants (`DB RDL`
+finds the dumbbell RDL, `cable lateral raise` the cable one); equipment
+elsewhere in the statement never picks a dumbbell variant (`RDL with
+dumbbells 30 kg` and `Bench press 80 kg, dumbbells for accessories`
+keep the barbell entries that own `RDL` and `bench press`). A dumbbell
+word followed by movement words the library uses names a `per_hand_x2`
+exercise when no entry matches (`DB incline press 22 kg`) or every
+entry it matches uses other equipment (`DB split squat`, `dumbbell
+deadlift`); a dumbbell entry the library knows resolves through it
+(`DB row` is a single implement). A dumbbell word with no movement
+after it (`dumbbells up to 30 kg`) names no exercise. A `per_hand_x2`
 exercise is checked only when its statement names no equipment other
 than dumbbells. Barbells, cables, machines, kettlebells, bands, a
 landmine, a vest, plates, a sandbag, a backpack, a medicine ball or
 assistance anywhere in the statement make it ambiguous, and it is not
-checked (`barbell lunges 40 kg`, `lunges with a 10 kg vest`, `lunges 40
-kg (barbell)`, `Arnold press 20 kg on the machine days`, `DB bench
-20/hand, landmine 30 kg`). Equipment inside a bodyweight measurement
-does not count, and `bodyweight` itself is a measurement word, not
-equipment (`Arnold press 20 kg with bodyweight stable` is checked). A
-mention the library cannot resolve to one mode is not checked. No
-library load modes are changed to interpret prose.
+checked (`barbell lunges 40 kg`, `lunges with a 10 kg vest`, `lateral
+raise 10 kg on the cable machine`, `Arnold press 20 kg on the machine
+days`). Equipment inside a bodyweight measurement does not count, and
+`bodyweight` itself is a measurement word, not equipment (`Arnold press
+20 kg with bodyweight stable` is checked). A mention the library cannot
+resolve to one mode is not checked. No library load modes are changed
+to interpret prose.
 
 A table row's figures belong to the exercise named before them on the
 row, else to the exercise in the row's exercise cell (the column headed

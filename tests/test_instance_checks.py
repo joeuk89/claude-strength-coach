@@ -597,6 +597,13 @@ class LoadFigureTest(unittest.TestCase):
             "add 2.5 kg": ["2.5 kg"],
             "25 kg each": [],
             "25 lb per hand": [],
+            "move to 8 kg in each hand": [],
+            "move to 8 kg in both hands": [],
+            "move to 8 kg per arm": [],
+            "move to 8 kg a side": [],
+            "move to 8 kg per dumbbell": [],
+            "a pair of 8 kg dumbbells": [],
+            "the 8 kg DBs": [],
             "25 (Hevy: 50)": [],
             "Hevy: 50": [],
             "on 2026-10-11": [],
@@ -616,6 +623,8 @@ class LoadFigureTest(unittest.TestCase):
             "DB bench 20/hand or leg curl 25 kg": ["DB bench 20/hand ", " leg curl 25 kg"],
             "DB bench 20/hand. If leg curl 25 kg moves fast, go heavier.":
                 ["DB bench 20/hand", " If leg curl 25 kg moves fast, go heavier"],
+            "DB bench 20/hand. Sled 100 kg.": ["DB bench 20/hand", " Sled 100 kg"],
+            "DB bench, tempo 3-1-1, rest 90 s, 22 kg": ["DB bench, tempo 3-1-1, rest 90 s, 22 kg"],
         }
         mentions = load_statements.Mentions(Library())
         for text, expected in cases.items():

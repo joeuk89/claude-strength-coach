@@ -26,7 +26,8 @@ _CONJUNCTIONS = tuple(
 )
 
 LOAD_STATEMENTS = (
-    # The brief's acceptance examples.
+    # Equipment descriptions, measurements and per-hand wording that pass,
+    # and a dumbbell load that does not take the loads of the exercises after it.
     ("Home only: adjustable dumbbells, 2–20 kg per hand in 2 kg steps.", {}),
     ("dumbbells 5–40 kg per hand in 2.5 kg steps. Plates down to 1.25 kg", {}),
     ("cables and dumbbells to 30 kg.", {}),
@@ -39,6 +40,23 @@ LOAD_STATEMENTS = (
     ("dumbbells up to 30 kg per hand.", {}),
     ("DB bench 20 kg per hand.", {}),
     ("DB bench 20 kg per hand, leg curl 25 kg.", {}),
+    ("Bench press 80 kg. Dumbbells go up in 2.5 kg at the gym.", {}),
+
+    # Per-hand and per-dumbbell wording states the load in each hand.
+    ("Walking lunges holding 12 kg in each hand", {}),
+    ("lunges with 12 kg in each hand", {}),
+    ("Bulgarian split squats, 14 kg in each hand", {}),
+    ("Bulgarian split squat 3x8 with 14 kg in each hand", {}),
+    ("Hammer curls 12 kg in both hands", {}),
+    ("Hammer curls 12 kg per arm", {}),
+    ("Hammer curls 12 kg each arm", {}),
+    ("DB bench 20 kg per side", {}),
+    ("DB bench 20 kg per dumbbell", {}),
+    ("Step-ups holding a pair of 12 kg dumbbells", {}),
+    ("Lunges limited by the 24 kg dumbbells at home.", {}),
+    ("lateral raise with 10 kg dumbbells", {}),
+    ("lateral raises with 10 kg dumbbells", {}),
+    ("DB bench 20/hand. 20 kg dumbbells at home.", {}),
 
     # Real bare dumbbell loads.
     ("DB bench 20 kg", {BENCH: "20 kg"}),
@@ -80,8 +98,18 @@ LOAD_STATEMENTS = (
     ("dumbbells over 30 kg are too heavy", {}),
     ("dumbbell rack: 2-20 kg in 2 kg steps", {}),
     ("DB set to 30 kg.", {}),
+    ("Heaviest dumbbell pair is 32 kg.", {}),
+    ("Dumbbell rack goes to 40 kg.", {}),
+    ("Dumbbells max 30 kg.", {}),
+    ("Dumbbells: 2.5 kg jumps up to 40 kg.", {}),
+    ("DB bench 20/hand. Dumbbells at home go up to 24 kg.", {}),
+    ("DB bench 20/hand. Heaviest dumbbells are 30 kg.", {}),
+    # Known limit: a movement word inside equipment prose names that exercise.
+    ("Dumbbells pull from the rack at 20 kg max", {"Dumbbells pull": "20 kg"}),
+    ("Dumbbells step up in 2 kg jumps up to 20 kg.", {STEP_UP: "2 kg, 20 kg"}),
 
-    # A clause continues its statement unless it names a new movement.
+    # A clause continues its statement only when everything before its first load is
+    # prescription wording: sets, reps, RPE, rest, tempo, warm-ups, load instructions, conditions.
     *_CONJUNCTIONS,
     ("DB bench, move to 20 kg.", {BENCH: "20 kg"}),
     ("DB bench then move to 20 kg.", {BENCH: "20 kg"}),
@@ -112,6 +140,11 @@ LOAD_STATEMENTS = (
     ("DB bench 20 kg per hand, so 22 kg next week", {BENCH: "22 kg"}),
     ("DB bench 20/hand, which means 22 kg next", {BENCH: "22 kg"}),
     ("DB bench 20/hand, rising to 22 kg", {BENCH: "22 kg"}),
+    ("DB bench 20/hand, next week 22 kg", {BENCH: "22 kg"}),
+    ("DB bench 20/hand and then 22 kg.", {BENCH: "22 kg"}),
+    ("DB bench 20/hand, then move to 22.5 kg.", {BENCH: "22.5 kg"}),
+    ("DB bench 20/hand, when fresh go to 22 kg", {BENCH: "22 kg"}),
+    ("DB bench: work up to 50 kg by December.", {BENCH: "50 kg"}),
     ("Incline DB press, 3 × 10, 22 kg", {"db_incline_bench_press": "22 kg"}),
     ("Arnold press, 3x12, 14 kg, 90 s rest", {ARNOLD: "14 kg"}),
     ("DB bench: 4 sets of 8-10 reps, RPE 8, 22 kg", {BENCH: "22 kg"}),
@@ -151,13 +184,22 @@ LOAD_STATEMENTS = (
     ("Arnold press, 2 warm-up sets then 14 kg", {ARNOLD: "14 kg"}),
     ("Arnold press 3x12. Go heavier: 16 kg.", {ARNOLD: "16 kg"}),
 
-    # Known limit: an unknown exercise with no equipment word and no shared movement word
-    # continues the statement before it, so its load is checked against that exercise.
-    ("DB bench 20/hand. Sled 100 kg.", {BENCH: "100 kg"}),
-    ("DB bench 20/hand and sled drag 40 kg", {BENCH: "40 kg"}),
-    ("DB bench 20/hand, Turkish get-up 16 kg", {BENCH: "16 kg"}),
-    ("DB bench 20/hand. Reverse hyper 30 kg.", {BENCH: "30 kg"}),
-    ("DB bench 20/hand. 20 kg dumbbells at home.", {BENCH: "20 kg"}),
+    # A clause with any other words starts a new statement; when it names no
+    # exercise the library resolves, its loads are not checked.
+    ("DB bench 20/hand. Sled 100 kg.", {}),
+    ("DB bench 20/hand and sled drag 40 kg", {}),
+    ("DB bench 20/hand, Turkish get-up 16 kg", {}),
+    ("DB bench 20/hand. Reverse hyper 30 kg.", {}),
+    ("DB bench 20/hand, then farmer carry 30 kg", {}),
+    ("DB bench 20/hand and calves 80 kg", {}),
+    ("DB bench 20/hand, tricep kickbacks 8 kg", {}),
+    ("DB bench 20/hand; DB pullover 15 kg", {}),
+    ("DB bench 20/hand, chin-ups +10 kg", {}),
+    ("DB bench 20/hand. Weighed 74 kg after the session.", {}),
+    ("DB bench 20 kg, barbell bench 80 kg", {BENCH: "20 kg"}),
+    ("DB bench 20 kg, landmine 30 kg", {BENCH: "20 kg"}),
+    ("DB bench 22 kg. The cable station is usually busy.", {BENCH: "22 kg"}),
+    ("DB bench 22 kg, rest 2 min. Use the bar for warm-ups.", {BENCH: "22 kg"}),
 
     # Dumbbell wording names the dumbbell exercise.
     ("dumbbell romanian deadlifts 30 kg", {RDL: "30 kg"}),
@@ -169,6 +211,10 @@ LOAD_STATEMENTS = (
     ("dumbbell bench 20 kg", {BENCH: "20 kg"}),
     ("DB flyes 10 kg", {"db_fly": "10 kg"}),
     ("DB step-ups 15 kg", {STEP_UP: "15 kg"}),
+    ("DB curl 12 kg", {"db_curl": "12 kg"}),
+    ("DB incline 22 kg", {"DB incline": "22 kg"}),
+    ("dumbbell press 20 kg", {"dumbbell press": "20 kg"}),
+    ("DB split squat 16 kg", {"DB split squat": "16 kg"}),
     ("DB press 20 kg", {"DB press": "20 kg"}),
     ("DB incline press 22 kg", {"DB incline press": "22 kg"}),
     ("DB split squats 16 kg", {"DB split squats": "16 kg"}),
@@ -184,15 +230,25 @@ LOAD_STATEMENTS = (
     ("Incline with DBs at 22 kg", {}),
     ("DB 20 kg presses", {}),
     ("DB pressing felt heavy at 22 kg", {}),
+    ("Dumbbell pullover 15 kg", {}),
+    ("Dumbbells: 20 kg x 10 for presses", {}),
 
-    # Equipment selects a variant of a shared movement.
+    # Only equipment inside the exercise's own phrase selects a variant of a shared
+    # movement; elsewhere in the statement it never turns a lift into its dumbbell variant.
     ("dumbbell lateral raise 10 kg", {LATERAL: "10 kg"}),
+    ("dumbbell romanian deadlift 30 kg", {RDL: "30 kg"}),
+    ("RDL with dumbbells 30 kg", {}),
+    ("Bench press 80 kg, dumbbells for accessories.", {}),
+    ("Bench press 80 kg with dumbbell rows after.", {}),
+    ("Squat 100 kg, then dumbbell accessories.", {}),
+    ("Bench press 80 kg. 20 kg dumbbells at home.", {}),
+    ("Bench press 80 kg. Dumbbells at home go up to 24 kg.", {}),
+    ("Romanian deadlift 60 kg; dumbbells only go to 24 kg at home.", {}),
+    ("Lateral raise on the cable: 10 kg", {}),
     ("cable lateral raise 10 kg", {}),
     ("lateral raise (cable) 10 kg", {}),
     ("cable-based lateral raise 10 kg", {}),
     ("lateral raise 10 kg on the cable machine", {}),
-    ("lateral raise with 10 kg dumbbells", {LATERAL: "10 kg"}),
-    ("lateral raises with 10 kg dumbbells", {LATERAL: "10 kg"}),
     ("lateral raise 10 kg using dumbbells", {LATERAL: "10 kg"}),
     ("dumbbells for lateral raise 10 kg", {LATERAL: "10 kg"}),
     ("rear delt fly on the machine 30 kg", {}),
@@ -203,9 +259,11 @@ LOAD_STATEMENTS = (
     ("lunges (dumbbell) 16 kg", {LUNGE: "16 kg"}),
     ("lunges with dumbbells 16 kg", {LUNGE: "16 kg"}),
     ("lunges with a dumbbell 16 kg", {LUNGE: "16 kg"}),
+    ("reverse lunges 16 kg", {LUNGE: "16 kg"}),
     ("barbell lunges 40 kg, then hammer curls 14 kg", {HAMMER: "14 kg"}),
 
-    # Other equipment anywhere in the statement means it is not checked as a dumbbell load.
+    # Other equipment anywhere in the statement means it is not checked as a dumbbell load,
+    # even when that equipment belongs to another clause of the statement.
     ("barbell lunges 40 kg", {}),
     ("barbell lunge 40 kg", {}),
     ("Smith machine lunges 40 kg", {}),
@@ -286,4 +344,10 @@ LOAD_STATEMENTS = (
     ("step-ups with a 10 kg backpack", {}),
     ("lunges holding a 6 kg medicine ball", {}),
     ("band-assisted lunges 10 kg", {}),
+    ("landmine reverse lunges 20 kg", {}),
+    ("Lunges: warm up on the Smith machine, then 16 kg", {}),
+    ("DB bench 22 kg; use the 1.25 kg plates.", {}),
+    ("DB bench 22 kg with a spotter's assistance.", {}),
+    ("DB bench 22 kg on machine-free days.", {}),
+    ("DB bench 20 kg with a barbell warm-up", {}),
 )
