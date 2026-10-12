@@ -27,8 +27,8 @@ def prepare(args, ctx):
     if problem:
         ctx.warn(f"no return week on the catch-up card: {problem}")
     if card["unsynced"]:
-        ctx.warn(f"{card['unsynced']} workout(s) in the window are not in data/history yet; the card reads them "
-                 "from the Hevy cache. Run python3 -m coach history sync before writing the record")
+        ctx.warn(f"{card['unsynced']} workout(s) in the window are new or changed since data/history was synced; "
+                 "the card reads them from their source. Run python3 -m coach history sync before writing the record")
     return {"card": card, "text": checkin.card_text(card, ctx.config.athlete.units)}
 
 
@@ -68,9 +68,9 @@ def skeleton(args, ctx):
     report = checkin.skeleton(ctx.root, day, args.tier, args.overlay, args.refresh, args.dry_run, ctx.now())
     unsynced = checkin.unsynced_in_window(ctx.root, day, ctx.now())
     if unsynced:
-        ctx.warn(f"{len(unsynced)} workout(s) in the window are not in data/history yet, so the "
-                 f"{checkin.REGION_KIND} region leaves them out; run python3 -m coach history sync, then "
-                 f"checkin skeleton --date {day} --refresh")
+        ctx.warn(f"{len(unsynced)} workout(s) in the window are new or changed since data/history was synced, so "
+                 f"the {checkin.REGION_KIND} region does not show them as they are; run python3 -m coach history "
+                 f"sync, then checkin skeleton --date {day} --refresh")
     report["unsynced"] = len(unsynced)
     return report
 

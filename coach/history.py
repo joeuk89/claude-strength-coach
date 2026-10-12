@@ -402,14 +402,10 @@ def _write_months(root, before, after, dry_run):
     return written
 
 
-def sync(root, now=None, dry_run=False):
-    """Resolve new and changed source workouts into the month files; report what changed."""
-    env = _Env.load(root, now)
-    before = stored_workouts(root)
-    stored = {r["workout_id"]: r for r in before}
+def _from_sources(root, env, stored):
+    """(records by id, added, updated, removed): the stored records with every source's current workouts applied."""
     records = dict(stored)
-    added, updated, removed, reinterpreted = [], [], [], []
-
+    added, updated, removed = [], [], []
     for name, module in history_sources.discover().items():
         found = module.workouts(root)
         if found is None:
@@ -429,6 +425,15 @@ def sync(root, now=None, dry_run=False):
             if record["source"] == name and workout_id not in seen:
                 del records[workout_id]
                 removed.append(workout_id)
+    return records, added, updated, removed
+
+
+def sync(root, now=None, dry_run=False):
+    """Resolve new and changed source workouts into the month files; report what changed."""
+    env = _Env.load(root, now)
+    before = stored_workouts(root)
+    records, added, updated, removed = _from_sources(root, env, {r["workout_id"]: r for r in before})
+    reinterpreted = []
 
     touched = set(added) | set(updated)
     for workout_id, record in sorted(records.items()):
@@ -484,15 +489,6 @@ def _set_differences(before, after):
                 found.append({"workout_id": before["workout_id"], "date": before["date"],
                               "exercise_id": new["exercise_id"] or old["exercise_id"], "title": new_exercise["title"],
                               "set_index": new_set["index"], "before": old, "after": new})
-    return found
-
-
-def _unsynced(root, env, stored_ids):
-    found = []
-    for module in history_sources.discover().values():
-        for source_workout in module.workouts(root) or []:
-            if source_workout.workout_id not in stored_ids:
-                found.append(resolve(source_workout, env, version=module.version(source_workout)))
     return found
 
 
@@ -554,15 +550,20 @@ def _started_by(record, as_of, env):
 def workouts(root, since=None, until=None, include_unsynced=False, now=None, as_of=None):
     """Resolved workouts with annotations applied, oldest first.
 
-    With include_unsynced, source workouts not yet in a month file are
-    resolved in memory and returned with `unsynced: true`; nothing is written.
+    With include_unsynced, the sources are read as `sync` would apply them,
+    in memory: new and changed workouts come back with `unsynced: true`,
+    and a stored workout its source no longer has (a voided manual entry)
+    is left out; nothing is written.
     With `as_of`, only workouts started and annotations created by then count.
     """
     env = _Env.load(root, now, as_of)
-    records = [dict(r, unsynced=False) for r in stored_workouts(root)]
+    stored = {r["workout_id"]: r for r in stored_workouts(root)}
     if include_unsynced:
-        stored_ids = {r["workout_id"] for r in records}
-        records += [dict(r, unsynced=True) for r in _unsynced(root, env, stored_ids)]
+        found, added, updated, _ = _from_sources(root, env, stored)
+        fresh = set(added) | set(updated)
+        records = [dict(r, unsynced=workout_id in fresh) for workout_id, r in found.items()]
+    else:
+        records = [dict(r, unsynced=False) for r in stored.values()]
     since = str(since) if since else None
     until = str(until) if until else None
     chosen = [r for r in sorted(records, key=_sort_key)

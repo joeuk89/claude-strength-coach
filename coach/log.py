@@ -4,6 +4,8 @@
 workout, and a `void` line that removes one. A correction is a void plus a
 new entry. Each set's `value` is the athlete's own number (per hand for
 `per_hand_x2`), never a Hevy value; history builds load objects from it.
+Each line records what the athlete reported: a rep range, a rep-out
+minimum or an RPE target is a prescription, never a logged count or effort.
 """
 
 import json
@@ -12,7 +14,7 @@ from pathlib import Path
 
 from coach import dates, history, jsonio, overlay, paths, program, render, units
 from coach.activity.records import append_lines
-from coach.errors import RefusedError, ValidationError
+from coach.errors import CoachError, RefusedError, ValidationError
 from coach.validate import Error, validate
 
 SCHEMAS = {"workout": "manual_workout_line", "void": "manual_void_line"}
@@ -103,13 +105,114 @@ def _nearest(sessions, day):
 
 def _draft_set(set_):
     load = set_.get("load")
-    return {"type": set_["type"], "reps": set_.get("reps"), "rpe": None,
+    reps = None if set_.get("rep_out") else set_.get("reps")
+    return {"type": set_["type"], "reps": reps, "rpe": None,
             "value": history.coaching_number(load) if load else None,
             "duration_seconds": set_.get("duration_seconds"), "distance_meters": set_.get("distance_meters")}
 
 
-def prefill(root, config, session_id, day):
-    """A workout line without `id` and `logged_at`, as the overlay in force on `day` prescribes `session_id`."""
+def _set_numbers(numbers):
+    """`set 2`, `sets 1–3` or `sets 1, 3`: one-based set numbers as a reader names them."""
+    if len(numbers) == 1:
+        return f"set {numbers[0]}"
+    if numbers == list(range(numbers[0], numbers[-1] + 1)):
+        return f"sets {numbers[0]}–{numbers[-1]}"
+    return "sets " + ", ".join(str(n) for n in numbers)
+
+
+def _range_text(rep_range):
+    return f"{rep_range['start']}–{rep_range['end']}"
+
+
+def _open_reps(set_):
+    """Why a planned set's reps are not a count to prefill (its range or rep-out minimum), or None when they are."""
+    if set_.get("rep_range") is not None:
+        return f"the plan was a range ({_range_text(set_['rep_range'])}), not a count"
+    if set_.get("rep_out"):
+        return (f"the plan was a + set (at least {units.json_number(set_['reps'])}, then more up to the RPE stop), "
+                "not a count")
+    return None
+
+
+def _name(library, exercise_id):
+    entry = library.get(exercise_id)
+    return entry["name"] if entry else exercise_id
+
+
+def _grouped(pairs):
+    """[(key, [set numbers])] from (key, set number) pairs, keys in first-seen order."""
+    groups = {}
+    for key, number in pairs:
+        groups.setdefault(key, []).append(number)
+    return list(groups.items())
+
+
+def _prefilled(mode, set_, open_reps):
+    """The fields `_draft_set` fills from one prescribed working set, as a reader names them."""
+    fields = []
+    if not open_reps and mode not in NO_REPS_MODES and set_.get("reps") is not None:
+        fields.append("reps")
+    if set_.get("load") is not None:
+        fields.append("load")
+    if set_.get("duration_seconds") is not None:
+        fields.append("duration")
+    if set_.get("distance_meters") is not None:
+        fields.append("distance")
+    return tuple(fields)
+
+
+def _asks(name, line, working):
+    """What the athlete must tell the coach about one prefilled exercise before `log add` (C46 `ask`)."""
+    found = []
+    mode = line["load_mode"]
+
+    def ask(field, numbers, prescribed, message):
+        found.append({"exercise_id": line["exercise_id"], "field": field, "sets": numbers,
+                      "prescribed": prescribed, "message": f"{name} {_set_numbers(numbers)}: {message}"})
+
+    ranged = {n: s["rep_range"] for n, s in enumerate(working, 1)
+              if mode not in NO_REPS_MODES and s.get("rep_range") is not None}
+    rep_outs = {n: s["reps"] for n, s in enumerate(working, 1)
+                if mode not in NO_REPS_MODES and s.get("rep_out") and s.get("reps") is not None}
+    for (start, end), numbers in _grouped(((r["start"], r["end"]), n) for n, r in ranged.items()):
+        rep_range = {"start": start, "end": end}
+        ask("reps", numbers, rep_range,
+            f"ask for the reps done in each set; the plan is a range ({_range_text(rep_range)}), which is not a "
+            "count, so reps stay null until the athlete gives them")
+    for minimum, numbers in _grouped((m, n) for n, m in rep_outs.items()):
+        ask("reps", numbers, {"at_least": minimum},
+            f"ask for the reps done; the plan is a + set (at least {units.json_number(minimum)}, then more up to "
+            "the RPE stop), which is not a count, so reps stay null until the athlete gives them")
+    unloaded = [n for n, s in enumerate(working, 1) if mode in units.LOADED_MODES and s.get("load") is None]
+    if unloaded:
+        used = "the added load they used (0 for bodyweight alone)" if mode == "bodyweight" else "what they used"
+        ask("value", unloaded, None,
+            f"no load was prescribed ({render.CHOOSE_THE_LOAD}), so value stays null until the athlete says "
+            f"{used}; ask for it")
+    for fields, numbers in _grouped((_prefilled(mode, s, n in ranged or n in rep_outs), n)
+                                    for n, s in enumerate(working, 1)):
+        if fields:
+            ask("as_written", numbers, list(fields),
+                f"{' and '.join(fields)} {'is' if len(fields) == 1 else 'are'} prefilled as written; keep "
+                f"{'it' if len(fields) == 1 else 'them'} only when the athlete confirms they did exactly that, "
+                "otherwise ask what they did")
+    for (target, stop), numbers in _grouped(((s.get("rpe"), bool(s.get("rep_out"))), n)
+                                            for n, s in enumerate(working, 1)):
+        word = "stop" if stop else "target"
+        if target is None:
+            aim = "no RPE target was set"
+        elif stop:
+            aim = f"the plan said stop at {units.json_number(target)}"
+        else:
+            aim = f"the target was {units.json_number(target)}"
+        ask("rpe", numbers, target,
+            f"ask how hard each set felt (RPE; {aim}); leave rpe null when the athlete cannot say, never the {word}")
+    return found
+
+
+def prefill(root, config, session_id, day, library):
+    """(draft, ask): a workout line without `id` and `logged_at`, as the overlay in force on `day` prescribes
+    `session_id`, and what the athlete must still say about it."""
     docs = overlay.list(root)
     found = overlay.pick_in_force(docs, day)
     if found is None:
@@ -122,14 +225,16 @@ def prefill(root, config, session_id, day):
         raise ValidationError(f"Overlay {doc['id']}, in force on {day}, has no session {session_id}; its sessions "
                               f"are {known}")
     session = _nearest(sessions, day)
-    exercises = []
+    exercises, asks = [], []
     for line in session["exercises"]:
-        working = [_draft_set(s) for s in line["sets"] if s.get("type") != "warmup"]
+        working = [s for s in line["sets"] if s.get("type") != "warmup"]
         if working:
             exercises.append({"exercise_id": line["exercise_id"], "load_mode": line["load_mode"],
-                              "unit": config.athlete.units, "notes": "", "sets": working})
-    return {"schema_version": 1, "kind": "workout", "date": day, "session_id": session_id,
-            "overlay_id": doc["id"], "duration_minutes": None, "notes": "", "exercises": exercises}
+                              "unit": config.athlete.units, "notes": "", "sets": [_draft_set(s) for s in working]})
+            asks += _asks(_name(library, line["exercise_id"]), line, working)
+    draft = {"schema_version": 1, "kind": "workout", "date": day, "session_id": session_id,
+             "overlay_id": doc["id"], "duration_minutes": None, "notes": "", "exercises": exercises}
+    return draft, asks
 
 
 class Slots:
@@ -169,6 +274,49 @@ def _slot_line(session, exercise_id):
     return next((e for e in session["exercises"] if e["exercise_id"] == exercise_id), None)
 
 
+def _working_slot_sets(slot):
+    return [s for s in slot["sets"] if overlay.is_working(s)] if slot else []
+
+
+def _planned_set(planned, logged_sets, index):
+    """The prescribed working set a logged set lines up with, counting working sets only; {} when there is none."""
+    if logged_sets[index]["type"] == "warmup":
+        return {}
+    position = sum(1 for s in logged_sets[:index] if s["type"] != "warmup")
+    return planned[position] if position < len(planned) else {}
+
+
+def _unknown_effort(line, slots, library):
+    """Warnings for working sets logged without an RPE: their effort is unknown, never the prescribed target."""
+    found = []
+    session = slots.session(line)
+    for exercise in line["exercises"]:
+        numbers = [n for n, s in enumerate(exercise["sets"], 1) if s["type"] != "warmup" and s["rpe"] is None]
+        if not numbers:
+            continue
+        planned = _working_slot_sets(_slot_line(session, exercise["exercise_id"]))
+        targets = {_planned_set(planned, exercise["sets"], n - 1).get("rpe") for n in numbers} - {None}
+        assumed = (f"; the target ({', '.join(str(units.json_number(t)) for t in sorted(targets))}) is not assumed"
+                   if targets else "")
+        found.append(f"rpe_unknown: {_name(library, exercise['exercise_id'])} {_set_numbers(numbers)} logged "
+                     f"without an RPE, so effort was not recorded{assumed}")
+    return found
+
+
+def _unknown_load(line, library):
+    """Warnings for working sets on a loaded mode logged without a load (bodyweight alone needs none)."""
+    found = []
+    for exercise in line["exercises"]:
+        if exercise["load_mode"] not in units.LOADED_MODES or exercise["load_mode"] == "bodyweight":
+            continue
+        numbers = [n for n, s in enumerate(exercise["sets"], 1) if s["type"] != "warmup" and s["value"] is None]
+        if numbers:
+            found.append(f"load_unknown: {_name(library, exercise['exercise_id'])} {_set_numbers(numbers)} logged "
+                         f"without a load on a {exercise['load_mode']} exercise, so the load was not recorded; "
+                         "ask what they used (a correction is a void plus a new entry)")
+    return found
+
+
 def problems(line, slots, library, config, today):
     """Plain-sentence problems with a schema-valid workout line, each with its JSONPath."""
     found = []
@@ -204,10 +352,13 @@ def problems(line, slots, library, config, today):
         if expected and mode != expected:
             source = "its slot in the overlay" if slot else "the exercise library"
             problem(f"{where}.load_mode", f"{exercise_id} is logged as {mode}, but {source} says {expected}")
+        planned = _working_slot_sets(slot)
         for s_index, set_ in enumerate(exercise["sets"]):
             set_where = f"{where}.sets[{s_index}]"
             if set_["reps"] is None and mode not in NO_REPS_MODES:
-                problem(f"{set_where}.reps", f"{exercise_id} set {s_index + 1} has no reps; fill in what was done")
+                open_reps = _open_reps(_planned_set(planned, exercise["sets"], s_index))
+                why = f"; {open_reps}, so ask for the reps done" if open_reps else "; fill in what was done"
+                problem(f"{set_where}.reps", f"{exercise_id} set {s_index + 1} has no reps{why}")
             if set_["value"] is not None and mode in NO_LOAD_MODES:
                 problem(f"{set_where}.value", f"{exercise_id} is a {mode} exercise, which carries no load; "
                                               "value must be null")
@@ -298,18 +449,35 @@ def add(root, config, library, draft, today, now, again=False, dry_run=False):
         if twin:
             raise RefusedError(f"{twin['id']} already logs {line['session_id']} on {line['date']}; void it and add "
                                "the corrected workout, or pass --again for a second workout that day")
-    warnings = _looks_like_total(line, slots)
+    warnings = (_looks_like_total(line, slots) + _unknown_load(line, library)
+                + _unknown_effort(line, slots, library))
     if config.hevy.enabled:
         warnings.append("hevy_enabled: Hevy is on ([hevy] enabled = true); if this workout is also in Hevy, "
                         "history counts it twice, so void this entry")
+    synced = None
     if not dry_run:
         append_lines(path(root), [line])
+        synced = _sync_history(root, now, f"{line['id']} is logged", warnings)
     return {"id": line["id"], "summary": summary(line, slots.title(line), library), "line": line,
-            "path": label(), "written": not dry_run, "dry_run": dry_run}, warnings
+            "path": label(), "written": not dry_run, "dry_run": dry_run, "history": synced}, warnings
+
+
+def _sync_history(root, now, done, warnings):
+    """Resolve the log into history at once, so pages and block counts read the change (C17 `history sync`)."""
+    try:
+        report = history.sync(root, now)
+    except CoachError as exc:
+        step = ("fix that problem, then run python3 -m coach history sync; do not repeat this log command, "
+                "which is already written")
+        warnings.append(f"history_not_synced: {done}, but history sync failed ({exc.message}), so weekly pages "
+                        f"and block counts do not show it yet; {step}")
+        return {"synced": False, "error": exc.message, "next_step": step}
+    return {"synced": True,
+            **{key: report[key] for key in ("added", "updated", "removed", "reinterpreted", "unresolved")}}
 
 
 def void(root, workout_id, reason, now, dry_run=False):
-    """Append a void line for a live workout."""
+    """Append a void line for a live workout; return (data, warnings)."""
     if not reason.strip():
         raise ValidationError("--reason must not be empty")
     found = lines(root)
@@ -319,9 +487,11 @@ def void(root, workout_id, reason, now, dry_run=False):
         raise ValidationError(f"{workout_id} is already void")
     line = {"schema_version": 1, "kind": "void", "id": workout_id, "logged_at": _timestamp(now),
             "reason": reason.strip()}
+    warnings, synced = [], None
     if not dry_run:
         append_lines(path(root), [line])
-    return {"void": line, "path": label(), "written": not dry_run, "dry_run": dry_run}
+        synced = _sync_history(root, now, f"{workout_id} is void", warnings)
+    return {"void": line, "path": label(), "written": not dry_run, "dry_run": dry_run, "history": synced}, warnings
 
 
 def check(root, library, config, today):
