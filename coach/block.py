@@ -438,6 +438,8 @@ DEEP_REASON_WORDS = {"first_close": "no deep check-in on record", "six_weeks": "
                      "catch_up_deferred": "a catch-up check-in deferred the deep review",
                      "light_week_proposed": "a light week is being proposed",
                      "restructure_required": "the adherence trigger fired"}
+# The card derives these from the same records, so they only add words when its own record reasons are empty.
+RECORD_DEEP_REASONS = ("first_close", "six_weeks", "catch_up_deferred")
 
 
 def _flags(block_state, entry, deep, words=None):

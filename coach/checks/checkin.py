@@ -24,7 +24,9 @@ def checkin_records(ctx):
                 f"{rel}: the first line is not a Check-in or Program start title; "
                 "the record is excluded from review timing; fix the title line"), rel))
         elif title[0].isoformat() != path.stem:
-            results.append(Result("warn", f"{rel}: the title is dated {title[0]}, the file name {path.stem}", rel))
+            results.append(Result("warn", (
+                f"{rel}: the title is dated {title[0]}, the file name {path.stem}; "
+                "the record is excluded from review timing"), rel))
     return results
 
 

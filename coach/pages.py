@@ -560,7 +560,7 @@ def render_dashboard(root, as_of, view=None):
     if view.state:
         status.append(block_module.status_line(view.root) or f"Block: {view.state['block']['id']}")
     records = [r for r in checkin.records(view.root) if r.date <= view.today]
-    completed = [r for r in records if r.tier != checkin.PROGRAM_START]
+    completed = [r for r in checkin.reviews(view.root) if r.date <= view.today]
     if completed:
         last = completed[-1]
         status.append(f"Last check-in: [{render.day_label(last.date)} ({last.tier})]({last.path.as_posix()})")
@@ -606,7 +606,7 @@ def _weeks_text(count):
 def _links(records):
     found = ["[This week's brief](this-week.md)", "[Progress](progress.md)"]
     if records:
-        label = "Program start" if records[-1].tier == checkin.PROGRAM_START else "Latest check-in"
+        label = "Program start" if records[-1].kind == checkin.PROGRAM_START else "Latest check-in"
         found.append(f"[{label}]({records[-1].path.as_posix()})")
     found += [f"[Program]({paths.ROUTINE_PROGRAM_PAGE.as_posix()})",
               f"[All check-ins]({paths.CHECKINS_DIR.as_posix()}/)", f"[How this works]({TEMPLATE_README})"]

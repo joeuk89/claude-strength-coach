@@ -35,7 +35,9 @@ WORD_CEILINGS = {"weekly": 600, "deep": 1000, "catch-up": 600}    # heuristics, 
 CARD_VERSION = 3
 TIERS = ("weekly", "deep", "catch-up")
 CARD_TIERS = ("weekly", "deep")
+CHECK_IN = "check-in"
 PROGRAM_START = "program-start"
+UNRECOGNISED = "unrecognised"
 CATCH_UP = "catch_up"
 TIER_OF_MODE = {CATCH_UP: "catch-up"}
 REGION_KIND = "week-review"
@@ -95,22 +97,28 @@ def _signed(value):
 @dataclass(frozen=True)
 class Record:
     date: date
-    tier: str
+    tier: str | None
     path: Path
+    kind: str = CHECK_IN
 
     def to_json(self):
         return {"date": self.date.isoformat(), "tier": self.tier, "path": self.path.as_posix()}
 
 
 def parse_title(line):
-    """(date, tier or None); program starts use `PROGRAM_START`, legacy check-ins have no tier."""
+    """(date, tier or None, kind) from a record's first line, or None when it does not parse.
+
+    A legacy Check-in title and a Program start title have no tier."""
     match = _TITLE.match(line or "") or _START_TITLE.match(line or "")
     if not match:
         return None
     try:
-        return dates.parse_date(match.group(1)), (PROGRAM_START if match.re is _START_TITLE else match.group(2))
+        day = dates.parse_date(match.group(1))
     except ValueError:
         return None
+    if match.re is _START_TITLE:
+        return day, None, PROGRAM_START
+    return day, match.group(2), CHECK_IN
 
 
 def first_line(path):
@@ -123,7 +131,8 @@ def is_record_name(name):
 
 
 def records(root):
-    """Valid check-in and program-start records, oldest first; legacy check-in titles count as deep."""
+    """Every dated record, oldest first: check-ins (a legacy title counts as deep), program starts, and
+    `UNRECOGNISED` records whose title does not parse or names another date."""
     directory = Path(root) / paths.CHECKINS_DIR
     found = []
     for path in sorted(directory.glob("*.md")) if directory.is_dir() else []:
@@ -134,16 +143,20 @@ def records(root):
             day = dates.parse_date(match.group(1))
         except ValueError:
             continue
+        rel = paths.CHECKINS_DIR / path.name
         title = parse_title(first_line(path))
         if title is None or title[0] != day:
-            continue
-        tier = title[1] or "deep"
-        found.append(Record(day, tier, paths.CHECKINS_DIR / path.name))
+            found.append(Record(day, None, rel, UNRECOGNISED))
+        elif title[2] == PROGRAM_START:
+            found.append(Record(day, None, rel, PROGRAM_START))
+        else:
+            found.append(Record(day, title[1] or "deep", rel))
     return found
 
 
 def reviews(root):
-    return [record for record in records(root) if record.tier != PROGRAM_START]
+    """The completed check-ins among `records`: the only records review timing counts."""
+    return [record for record in records(root) if record.kind == CHECK_IN]
 
 
 @dataclass(frozen=True)
@@ -168,8 +181,7 @@ def _cadence(root):
 
 
 def deep_reasons(found, day):
-    """Why a check-in on `day` runs deep, given the records before it; empty when weekly will do."""
-    found = [record for record in found if record.tier != PROGRAM_START]
+    """Why a check-in on `day` runs deep, given the reviews before it; empty when weekly will do."""
     if not found:
         return ["first check-in"]
     deep = [r for r in found if r.tier == "deep"]
@@ -182,8 +194,7 @@ def deep_reasons(found, day):
 
 
 def deferred_reason(found):
-    """"deferred from catch-up <date>" when the newest records are catch-ups and a deep review was due at one."""
-    found = [record for record in found if record.tier != PROGRAM_START]
+    """"deferred from catch-up <date>" when the newest reviews are catch-ups and a deep review was due at one."""
     for index in range(len(found) - 1, -1, -1):
         record = found[index]
         if record.tier != "catch-up":
@@ -199,9 +210,8 @@ def catch_up_after_days():
 
 
 def mode_for(found, day):
-    """(mode, deep reasons) for a check-in on `day` after the records `found`: catch-up after a long gap, which
+    """(mode, deep reasons) for a check-in on `day` after the reviews `found`: catch-up after a long gap, which
     never runs deep, else deep when one is due or a catch-up deferred one, else weekly."""
-    found = [record for record in found if record.tier != PROGRAM_START]
     reasons = deep_reasons(found, day)
     deferred = deferred_reason(found)
     if deferred:
@@ -212,9 +222,9 @@ def mode_for(found, day):
 
 
 def first_review_anchor(root):
-    """Later setup records and block rollovers cannot postpone the earliest persisted start."""
+    """The earliest persisted program start, or None; a later setup record or block rollover never postpones it."""
     from coach import block
-    starts = [record.date for record in records(root) if record.tier == PROGRAM_START]
+    starts = [record.date for record in records(root) if record.kind == PROGRAM_START]
     ledger = block.load(root)
     starts += [dates.parse_date(item["started"]) for item in (ledger or {}).get("blocks", []) if item["started"]]
     state_doc = history.load_optional(state, root)
@@ -350,7 +360,7 @@ def _window(inst, found, end):
     elif inst.overlays:
         start = min(dates.parse_date(doc["span"]["start"]) for doc in inst.overlays)
     else:
-        start = end
+        start = first_review_anchor(inst.root) or end
     return dates.Span(min(start, end), end)
 
 
@@ -619,11 +629,12 @@ def _build(root, today, until=None, tier=None, now=None, live=True, parts=True, 
     window = _window(inst, found, end)
     mode, reasons = mode_for(found, end)
     if deep_review_reasons:
-        from coach.block import DEEP_REASON_WORDS
+        from coach.block import DEEP_REASON_WORDS, RECORD_DEEP_REASONS
         unknown = set(deep_review_reasons) - DEEP_REASON_WORDS.keys()
         if unknown:
             raise ValueError(f"unknown deep review reasons: {', '.join(sorted(unknown))}")
-        reasons = list(dict.fromkeys(reasons + [DEEP_REASON_WORDS[r] for r in deep_review_reasons]))
+        added = [r for r in deep_review_reasons if not (reasons and r in RECORD_DEEP_REASONS)]
+        reasons = list(dict.fromkeys(reasons + [DEEP_REASON_WORDS[r] for r in added]))
         if mode != CATCH_UP:
             mode = "deep"
     if tier == "weekly":
@@ -1039,7 +1050,8 @@ def skeleton(root, record_date, tier=None, overlay_id=None, refresh=False, dry_r
         title = parse_title(before.split("\n", 1)[0])
         if title is None or title[0] != day:
             raise ValidationError(f"{rel.as_posix()} has an invalid record title; fix it before refreshing")
-        tier = (title[1] or "deep") if tier is None else tier
+        if tier is None and title[2] == CHECK_IN:
+            tier = title[1] or "deep"
         found_reviews = reviews(root)
         newest = bool(found_reviews and found_reviews[-1].date == day)
         for region_id, start, end in reversed(render.find_regions(text, REGION_KIND)):

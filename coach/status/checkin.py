@@ -12,7 +12,8 @@ def checkin_status(ctx):
         if due is None:
             return Section("checkin", ["No check-in recorded yet; the first due date is unknown."], facts)
         level = "attention" if due <= ctx.today().isoformat() else "info"
-        return Section("checkin", [f"No check-in recorded yet; the first is due {due} (deep)."], facts, level)
+        line = f"No check-in recorded yet; the first is due {due} ({facts['tier']})."
+        return Section("checkin", [line], facts, level)
     since = facts["days_since"]
     ago = "today" if since == 0 else f"{since} day{'s' if since != 1 else ''} ago"
     runs = "catch-up" if facts["mode"] == "catch_up" else facts["tier"]

@@ -48,7 +48,7 @@ class ReviewContextTest(HistoryCase):
                 self.assertIn("Last check-in: none yet", dashboard)
                 if setup:
                     self.assertIn("[Program start](check-ins/2026-10-11.md)", dashboard)
-                    self.assertEqual(checkin.records(self.root)[0].tier, "program-start")
+                    self.assertEqual(checkin.records(self.root)[0].kind, checkin.PROGRAM_START)
 
     def test_configured_cadence_changes_first_due_with_and_without_setup(self):
         with (self.root / "config.toml").open("a", encoding="utf-8") as handle:
@@ -99,11 +99,28 @@ class ReviewContextTest(HistoryCase):
                            ("2026-10-12", "# Check-in — 2026-10-13 (deep)"),
                            ("2026-10-14", "# Check-in — 2026-10-14 (other)")):
             self.record(day, title)
-        self.assertEqual(checkin.records(self.root), [])
+        self.assertEqual([r.kind for r in checkin.records(self.root)], [checkin.UNRECOGNISED] * 3)
+        self.assertEqual(checkin.reviews(self.root), [])
         self.assertEqual(len([r for r in self.checks("checkin_records") if r["status"] == "warn"]), 3)
         self.assertEqual(checkin.due(self.root, date(2026, 10, 18)).mode, "first")
         self.record("2026-10-18", "# Check-in — 2026-10-18")
         self.assertEqual([(r.date, r.tier) for r in checkin.reviews(self.root)], [(date(2026, 10, 18), "deep")])
+
+    def test_without_any_start_the_first_due_date_is_unknown(self):
+        (self.root / "data/state.json").unlink()
+        status = self.status("2026-10-18")
+        self.assertEqual((status["level"], status["lines"]),
+                         ("info", ["No check-in recorded yet; the first due date is unknown."]))
+        self.assertIsNone(status["data"]["due_date"])
+        dashboard = pages.render_dashboard(self.root, dates.parse_timestamp("2026-10-18T18:00:00Z"))
+        self.assertIn("First check-in date unknown (deep)", dashboard)
+
+    def test_first_window_starts_at_adoption_when_no_overlay_exists(self):
+        for path in (self.root / "data/overlays").glob("*.json"):
+            path.unlink()
+        self.record("2026-10-11", "# Program start — 2026-10-11")
+        card = self.coach("checkin", "prepare", "--until", "2026-10-18")["data"]["card"]
+        self.assertEqual(card["window"], {"start": "2026-10-11", "end": "2026-10-18"})
 
     def test_refresh_refuses_a_malformed_record_without_changing_it(self):
         path = self.record("2026-10-11", "# Notes")
@@ -120,8 +137,8 @@ class ReviewContextTest(HistoryCase):
             self.coach("checkin", "skeleton", "--date", "2026-10-18", "--refresh")
         self.assertEqual(len(checkin.reviews(self.root)), 1)
         self.assertEqual(checkin.due(self.root, date(2026, 10, 19)).due_date, date(2026, 10, 25))
-        self.assertEqual(checkin.deep_reasons(checkin.records(self.root), date(2026, 11, 28)), [])
-        self.assertIn("42 days ago", checkin.deep_reasons(checkin.records(self.root), date(2026, 11, 29))[0])
+        self.assertEqual(checkin.deep_reasons(checkin.reviews(self.root), date(2026, 11, 28)), [])
+        self.assertIn("42 days ago", checkin.deep_reasons(checkin.reviews(self.root), date(2026, 11, 29))[0])
 
     def test_cardio_and_overlay_regions_stay_in_their_sections_and_preserve_prose(self):
         self.coach("checkin", "skeleton", "--date", "2026-10-18", "--tier", "deep")
@@ -173,6 +190,18 @@ class ReviewContextTest(HistoryCase):
         self.assertNotIn("asked for", result["text"])
         weekly = self.coach("checkin", "prepare", "--until", "2026-10-18", "--tier", "weekly", *args)["data"]["card"]
         self.assertEqual((weekly["mode"], weekly["tier_reasons"]), ("weekly", []))
+
+    def test_a_deep_reason_leaves_a_catch_up_card_in_catch_up(self):
+        self.record("2026-10-01", "# Check-in — 2026-10-01 (deep)")
+        card = self.coach("checkin", "prepare", "--until", "2026-10-18",
+                          "--deep-reason", "light_week_proposed")["data"]["card"]
+        self.assertEqual((card["mode"], card["deep_deferred"]), ("catch_up", True))
+        self.assertIn("deep review deferred (a light week is being proposed)", card["tier_reasons"])
+
+    def test_record_derived_block_reasons_do_not_repeat_the_card_reasons(self):
+        args = ("--deep-reason", "first_close", "--deep-reason", "light_week_proposed")
+        card = self.coach("checkin", "prepare", "--until", "2026-10-18", *args)["data"]["card"]
+        self.assertEqual(card["tier_reasons"], ["first check-in", "a light week is being proposed"])
 
     def test_only_a_pure_explicit_deep_request_says_asked_for(self):
         self.record("2026-10-11", "# Check-in — 2026-10-11 (deep)")

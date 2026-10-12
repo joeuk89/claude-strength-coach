@@ -4266,14 +4266,17 @@ reply.
 **Records.** A check-in record is `check-ins/YYYY-MM-DD.md` whose first line
 is `# Check-in — YYYY-MM-DD (<tier>)`, tier `weekly`, `deep` or `catch-up`.
 A valid Check-in title with no tier marker counts as deep (legacy handling).
-`# Program start — YYYY-MM-DD` identifies setup, with tier `program-start`.
-Both must match the filename date. Unrecognised or mismatched titles warn
-and are excluded from review timing; other filenames are ignored.
-`records` includes setup for record links and publishing; `reviews` excludes it.
+`# Program start — YYYY-MM-DD` identifies setup (kind `program-start`, no
+tier). Both titles must match the filename date; a title that does not
+parse or names another date warns and gives kind `unrecognised`. Other
+filenames are ignored. `records` returns every kind, so record links,
+missed-session lines and publishing still find setup and unrecognised
+records; `reviews` returns kind `check-in` only, and only reviews count
+for review timing.
 
 ```python
-coach.checkin.records(root) -> list[Record]        # Record(date, tier, path), oldest first
-coach.checkin.reviews(root) -> list[Record]        # completed check-ins only
+coach.checkin.records(root) -> list[Record]        # Record(date, tier, path, kind), oldest first
+coach.checkin.reviews(root) -> list[Record]        # kind "check-in" only
 coach.checkin.due(root, today) -> Due
 # Due(last: Record | None, days_since: int | None, due_date: date | None,
 #     overdue_days: int, mode: "first" | "weekly" | "deep" | "catch_up", tier_reasons: list[str])
@@ -4313,21 +4316,23 @@ and `render_card` would capture R-33b's `card` regions.
   Before the first review, anchor it to the earliest known start across
   Program start records, ledger block starts and `state.block.started`
   (set on adoption). A later setup record or block rollover cannot postpone
-  an earlier known adoption. Block dates are legacy provenance fallbacks;
-  a dedicated adoption provenance field can replace them. Without an anchor,
-  the date is unknown. Setup-day status is informational until the due date;
+  an earlier known adoption. Block dates are legacy provenance fallbacks.
+  Without an anchor, the date is unknown. Setup-day status is informational until the due date;
   the first actual review is still deep. The 42-day clock starts at that review.
 - `checkin prepare --deep-reason CODE` (repeatable) carries the block preview's
   `deep_review.reasons` into the card using `block.DEEP_REASON_WORDS`.
   It supplies a deep reason without overriding catch-up or `--tier weekly`;
-  `--tier deep` explicitly selects deep. Only an explicit deep request with
+  `--tier deep` explicitly selects deep. The record-derived codes
+  (`block.RECORD_DEEP_REASONS`) add no words when the card's own record
+  reasons already apply. Only an explicit deep request with
   no record, block or card-part reason displays "asked for".
 
 **Card document** (`checkin prepare` → `data.card`; `data.text` is the
 markdown from `coach.checkin.card_text(card)`). It reads history with
-`include_unsynced=True` (C17). The last record is the newest one dated
+`include_unsynced=True` (C17). The last record is the newest review dated
 before the window end, so re-running `prepare` after writing today's
-record gives the same card:
+record gives the same card. With no review, the window starts at the
+earliest overlay, else at the first-review anchor, else on the end day:
 
 ```json
 {
