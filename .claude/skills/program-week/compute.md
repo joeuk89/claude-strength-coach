@@ -108,11 +108,11 @@ week still cuts it. A per-exercise **focus** from check-in findings ("slow the
 eccentric") may go into the draft line; every changed line needs an `override`
 reason. An approved override onto a rung moves the ladder to that rung.
 
-Each active niggle's constraints are already on every matching line, named in
-`constraint_applied`; `python3 -m coach niggles constraints` lists them. A
-`niggle_escalate` flag means recommend a qualified professional and keep
-programming around it, never diagnose; a `followup_due` flag names a follow-up
-to raise with the athlete.
+Each niggle's standing and flare limits are already on its lines, and a load the e1RM puts
+over an RPE ceiling comes down (`constraint_applied`; `python3 -m coach niggles
+constraints`). `rpe_ceiling_unchecked`: no e1RM or kit meets the ceiling; agree the load and
+override the line, or keep the flag (step 4). `niggle_escalate`: recommend a qualified
+professional, never diagnose. `followup_due`: raise it.
 
 ## 4. Keep a flag
 

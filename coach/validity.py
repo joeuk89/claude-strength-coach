@@ -389,7 +389,9 @@ class _Checker:
         band = band_for(facts["days_off"]) if facts["days_off"] is not None else None
         derived, inferred = self.derived_from(session_date, line)
         evidence = self.history.evidence(line["exercise_id"], session_date)
-        ceiling = self.rpe_ceiling(session, session_date, line, illness)
+        working = [s for s in line["sets"] if overlay.is_working(s)]
+        ceiling_of = self.rpe_ceiling(session, session_date, line, illness)
+        ceiling = _line_ceiling([ceiling_of(s) for s in working])
         row = {
             "session_id": session["session_id"], "date": session["date"], "exercise_id": line["exercise_id"],
             "days_off": facts["days_off"], "band": band.id if band else None, "derived_from": derived,
@@ -400,26 +402,33 @@ class _Checker:
         first_load = (session["session_id"], line["exercise_id"]) in self.no_data
         if first_load and first_loads.missing_load(line):
             return
-        working = [s for s in line["sets"] if overlay.is_working(s)]
         self.stale(session, line, working, facts, band, derived, illness, coach_set=first_load and not derived)
         self.caps_and_kit(session, line)
-        row["feasibility"] = self.feasibility(session, line, working, facts, evidence, ceiling)
+        row["feasibility"] = self.feasibility(session, line, working, facts, evidence, ceiling, ceiling_of)
 
     def rpe_ceiling(self, session, session_date, line, illness):
-        """Why the line's RPE is a ceiling for recovery work rather than a target to reach, or None."""
+        """A function giving why a working set's RPE is a ceiling for recovery work rather than a target, or None.
+
+        A recovery cap makes a ceiling of an RPE at or over it, or a missing one: the overlay cannot tell an RPE the
+        cap lowered from one that already met it. An RPE under every cap stays a target.
+        """
         if self.doc["kind"] == "deload":
-            return "a deload, light or return week"
+            return lambda s: "a deload, light or return week"
         if (line.get("provenance") or {}).get("decay"):
-            return "a return-band line"
+            return lambda s: "a return-band line"
+        caps = []
         if illness and session["date"] == illness[0]:
-            return "the first session after illness"
+            caps.append((ILLNESS_RPE_CAP, "the first session after illness"))
         try:
             active = constraints.active(self.root, session["session_id"], line["exercise_id"], session_date)
         except ValidationError:
             active = []
-        if any(c["kind"] == "rpe_cap" for c in active):
-            return "an RPE cap constraint"
-        return None
+        caps += [(c["value"], "an RPE cap constraint") for c in active if c["kind"] == "rpe_cap"]
+
+        def why(set_):
+            rpe = set_.get("rpe")
+            return next((words for value, words in caps if rpe is None or rpe >= value - 1e-9), None)
+        return why
 
     def stale(self, session, line, working, facts, band, derived, illness, coach_set=False):
         """R-24's stale-prescription problems. A `coach_set` first load derives from no exposure, so the
@@ -547,7 +556,7 @@ class _Checker:
                 missing.append(f"{self.load_text(load)} ({problem})")
         return list(dict.fromkeys(missing))
 
-    def feasibility(self, session, line, working, facts, evidence, ceiling):
+    def feasibility(self, session, line, working, facts, evidence, ceiling, ceiling_of):
         """Flag what the e1RM model, or without it the load-step guard, finds; return the line's feasibility row."""
         sets = [(s, history.coaching_number(s["load"]), _targets(s)) for s in working
                 if self.sound(line, s.get("load"))]
@@ -569,7 +578,8 @@ class _Checker:
                 "cannot show a load beyond failure"))
         unearned, off = [], []
         for s, load, targets in sets:
-            verdict = judge_set(best, load, targets, s.get("rpe"), ceiling is not None or bool(s.get("rep_out")))
+            verdict = judge_set(best, load, targets, s.get("rpe"),
+                                ceiling_of(s) is not None or bool(s.get("rep_out")))
             if verdict.unearned:
                 unearned.append((verdict, s, targets))
             elif verdict.off:
@@ -585,7 +595,7 @@ class _Checker:
             if s.get("rep_out"):
                 kind, implies = "stop at RPE", "already implies"
             else:
-                kind, implies = "RPE ceiling" if ceiling else "target RPE", "implies"
+                kind, implies = "RPE ceiling" if ceiling_of(s) else "target RPE", "implies"
             self.flag("rpe_infeasible", session, line,
                       f"{self.where(session, line)}: {kind} {units.json_number(s['rpe'])}, but "
                       f"{self.load_text(s['load'])} × {reps_words(verdict.reps, targets)} {implies} "
@@ -622,11 +632,22 @@ class _Checker:
                       f"against a {cap} min cap")
 
 
+def _line_ceiling(whys):
+    """(why, ceiling sets, working sets) when some working set's RPE is a ceiling, else None."""
+    found = [why for why in whys if why is not None]
+    return (found[0], len(found), len(whys)) if found else None
+
+
 def _feasibility(status, ceiling, message):
     """A prescription-check line's model verdict: `checked`, `lower_bound`, `unavailable` or `not_judged`, and
-    whether its RPE is a target or a recovery ceiling."""
+    whether its RPE is a target or a recovery ceiling (on any working set)."""
     if ceiling:
-        message += f" Its RPE is a ceiling ({ceiling}), so only a load too hard for it is flagged."
+        why, count, total = ceiling
+        if count < total:
+            message += (f" Its RPE is a ceiling on {count} of {total} working sets ({why}), so only a load too hard "
+                        "for it is flagged on those.")
+        else:
+            message += f" Its RPE is a ceiling ({why}), so only a load too hard for it is flagged."
     return {"status": status, "rpe": "ceiling" if ceiling else "target", "message": message}
 
 

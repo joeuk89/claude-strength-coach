@@ -25,7 +25,7 @@ R23A_CODES = {"prescription_unknown": ("warn",), "incomplete_exposure": ("warn",
               "return_week": ("info",), "return_after_illness": ("block",), "ill_day_excluded": ("info",),
               "constraint_applied": ("info",),
               "override_standing": ("info",), "override_kept": ("info",), "scheme_reset": ("warn",),
-              "rotation_unconfirmed": ("warn",), "wave_review": ("warn",)}
+              "rotation_unconfirmed": ("warn",), "wave_review": ("warn",), "rpe_ceiling_unchecked": ("warn",)}
 
 FIXED_LOAD_PLUGIN = '''
 """A synthetic scheme that proposes one load from its params."""

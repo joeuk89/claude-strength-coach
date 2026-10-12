@@ -1,5 +1,6 @@
 """Niggles as data: `coach niggles`, niggle load constraints in `propose week`, escalation (contract C26, C27)."""
 
+import copy
 import json
 import shutil
 import tempfile
@@ -44,20 +45,24 @@ def decay(ctx, proposal, days_off):
 '''
 
 
+VERSION = 2
+
+
 def niggle(niggle_id="n-0001", status="watching", patterns=(), exercises=(), constraints=(), history=None,
            constrain_while=("aggravated", "watching"), area="synthetic left knee"):
-    history = history or [{"date": "2026-10-11", "status": status, "note": None}]
+    history = history or [{"date": "2026-10-11", "status": status, "note": None, "flare_constraints": None}]
+    found = [dict({"value": None, "reason": area}, **c) for c in constraints]
     return {"id": niggle_id, "area": area, "first_noted": history[0]["date"], "last_noted": history[-1]["date"],
             "mentions": len(history), "status": status, "notes": None,
             "applies_to": {"patterns": list(patterns), "exercises": list(exercises), "activity_kinds": []},
-            "constraints": [dict({"value": None, "reason": area}, **c) for c in constraints],
+            "standing": [{"from": history[0]["date"], "constraints": found, "confirm": None}] if found else [],
             "constrain_while": list(constrain_while), "history": history}
 
 
 def entries(*statuses):
     """One weekly history entry per status, the first on 2026-08-02."""
-    return [{"date": (date(2026, 8, 2) + timedelta(weeks=i)).isoformat(), "status": s, "note": None}
-            for i, s in enumerate(statuses)]
+    return [{"date": (date(2026, 8, 2) + timedelta(weeks=i)).isoformat(), "status": s, "note": None,
+             "flare_constraints": None} for i, s in enumerate(statuses)]
 
 
 class NiggleCase(HistoryCase):
@@ -65,7 +70,7 @@ class NiggleCase(HistoryCase):
         return self.root / "data" / "niggles.json"
 
     def write_niggles(self, *rows):
-        write_json(self.path(), {"schema_version": 1, "niggles": list(rows)})
+        write_json(self.path(), {"schema_version": VERSION, "niggles": list(rows)})
 
     def rows(self):
         return {row["id"]: row for row in read_json(self.path())["niggles"]}
@@ -82,10 +87,11 @@ class AddTest(NiggleCase):
                          ("2026-10-11", "2026-10-11", 1, "watching"))
         self.assertEqual(row["applies_to"], {"patterns": ["squat", "lunge"], "exercises": ["db_bench_press"],
                                              "activity_kinds": []})
-        self.assertEqual(row["constraints"], [{"kind": "rpe_cap", "value": 7, "reason": "synthetic left knee"}])
+        self.assertEqual(row["standing"], [{"from": "2026-10-11", "confirm": None, "constraints": [
+            {"kind": "rpe_cap", "value": 7, "reason": "synthetic left knee"}]}])
         self.assertEqual(row["constrain_while"], ["aggravated", "watching"])
         self.assertEqual(row["history"], [{"date": "2026-10-11", "status": "watching",
-                                           "note": "deep flexion under load"}])
+                                           "note": "deep flexion under load", "flare_constraints": None}])
 
     def test_a_misspelt_pattern_exits_1_listing_the_valid_patterns(self):
         envelope = self.coach("niggles", "add", "--pattern", "squatt", expect=1)
@@ -131,7 +137,8 @@ class UpdateTest(NiggleCase):
         self.coach("niggles", "update", "n-0001", "--mention", "--note", "sharper", env=later)
         row = self.rows()["n-0001"]
         self.assertEqual((row["mentions"], row["last_noted"], row["status"]), (2, "2026-10-18", "aggravated"))
-        self.assertEqual(row["history"][-1], {"date": "2026-10-18", "status": "aggravated", "note": "sharper"})
+        self.assertEqual(row["history"][-1], {"date": "2026-10-18", "status": "aggravated", "note": "sharper",
+                                              "flare_constraints": None})
         self.assertEqual(len(row["history"]), 2)
 
     def test_applies_to_and_constraints_change_without_a_history_entry(self):
@@ -139,17 +146,18 @@ class UpdateTest(NiggleCase):
                    "--constraint", "load_cap=60", "--constrain-while", "aggravated,watching,easing")
         row = self.rows()["n-0001"]
         self.assertEqual(row["applies_to"]["patterns"], ["hinge"])
-        self.assertEqual([c["kind"] for c in row["constraints"]], ["no_added_load", "load_cap"])
+        self.assertEqual([c["kind"] for c in row["standing"][-1]["constraints"]], ["no_added_load", "load_cap"])
         self.assertEqual(row["constrain_while"], ["aggravated", "watching", "easing"])
         self.assertEqual(len(row["history"]), 1)
         self.coach("niggles", "update", "n-0001", "--clear-constraints")
-        self.assertEqual(self.rows()["n-0001"]["constraints"], [])
+        self.assertEqual(self.rows()["n-0001"]["standing"][-1]["constraints"], [])
 
     def test_resolve_keeps_the_row(self):
         self.coach("niggles", "resolve", "n-0001", "--note", "gone", env={"COACH_NOW": "2026-10-25T18:00:00Z"})
         row = self.rows()["n-0001"]
         self.assertEqual(row["status"], "resolved")
-        self.assertEqual(row["history"][-1], {"date": "2026-10-25", "status": "resolved", "note": "gone"})
+        self.assertEqual(row["history"][-1], {"date": "2026-10-25", "status": "resolved", "note": "gone",
+                                              "flare_constraints": None})
 
     def test_an_unknown_id_exits_1(self):
         self.coach("niggles", "update", "n-0009", "--mention", expect=1)
@@ -189,14 +197,93 @@ class ConstraintsCommandTest(NiggleCase):
         data = self.coach("niggles", "constraints")["data"]
         self.assertEqual(data["lines"], [{
             "session_id": "session-a", "exercise_id": "bb_back_squat",
-            "constraints": [{"kind": "rpe_cap", "value": 7, "reason": "synthetic left knee", "source": "n-0001"}]}])
+            "constraints": [{"kind": "rpe_cap", "value": 7, "reason": "synthetic left knee", "source": "n-0001",
+                             "scope": "standing", "since": "2026-10-11"}]}])
         self.assertEqual(self.coach("niggles", "constraints", "--session", "session-b")["data"]["lines"], [])
         self.coach("niggles", "constraints", "--session", "session-z", expect=1)
 
 
+def on(day):
+    return {"COACH_NOW": f"{day}T18:00:00Z"}
+
+
+class DatedLimitsTest(NiggleCase):
+    """A chronic squat limit of RPE 8, a flare to RPE 7 on 2026-10-06, settled on 2026-10-09."""
+
+    def setUp(self):
+        super().setUp()
+        self.coach("niggles", "add", "--area", "synthetic lower back", "--status", "chronic", "--exercise",
+                   "bb_back_squat", "--constraint", "rpe_cap=8", env=on("2026-10-01"))
+        self.coach("niggles", "update", "n-0001", "--status", "aggravated", "--mention", "--flare-constraint",
+                   "rpe_cap=7", env=on("2026-10-06"))
+
+    def squat_limits(self, *extra, day="2026-10-11"):
+        data = self.coach("niggles", "constraints", *extra, env=on(day))["data"]
+        found = [line for line in data["lines"] if line["exercise_id"] == "bb_back_squat"]
+        return [(c["kind"], c["value"], c["scope"], c["since"], c["source"]) for line in found
+                for c in line["constraints"]]
+
+    def settle(self, day="2026-10-09"):
+        self.coach("niggles", "update", "n-0001", "--status", "chronic", "--note", "settled", env=on(day))
+
+    def test_the_flare_adds_its_limit_beside_the_standing_one(self):
+        self.assertEqual(self.squat_limits(day="2026-10-07"), [
+            ("rpe_cap", 8, "standing", "2026-10-01", "n-0001"), ("rpe_cap", 7, "flare", "2026-10-06", "n-0001")])
+        row = self.rows()["n-0001"]
+        self.assertEqual(row["standing"][-1]["constraints"][0]["value"], 8)
+        self.assertEqual(row["history"][-1]["flare_constraints"][0]["value"], 7)
+
+    def test_settling_restores_the_standing_limit_and_the_flare_date_still_reads_the_flare(self):
+        self.settle()
+        self.assertEqual(self.squat_limits(), [("rpe_cap", 8, "standing", "2026-10-01", "n-0001")])
+        self.assertEqual(self.squat_limits("--date", "2026-10-06"), [
+            ("rpe_cap", 8, "standing", "2026-10-01", "n-0001"), ("rpe_cap", 7, "flare", "2026-10-06", "n-0001")])
+        self.assertEqual(self.squat_limits("--date", "2026-09-30"), [])
+
+    def test_a_later_report_in_the_same_flare_keeps_its_limit(self):
+        self.coach("niggles", "update", "n-0001", "--mention", "--note", "still sore", env=on("2026-10-08"))
+        self.assertIn(("rpe_cap", 7, "flare", "2026-10-06", "n-0001"), self.squat_limits(day="2026-10-08"))
+        self.coach("niggles", "update", "n-0001", "--clear-flare-constraints", "--note", "easing",
+                   env=on("2026-10-10"))
+        self.assertEqual(self.squat_limits(), [("rpe_cap", 8, "standing", "2026-10-01", "n-0001")])
+
+    def test_a_flare_limit_without_a_report_is_refused_so_it_never_counts_as_a_check_in(self):
+        for change in (("--flare-constraint", "rpe_cap=6"), ("--clear-flare-constraints",)):
+            with self.subTest(change=change):
+                self.coach("niggles", "update", "n-0001", *change, env=on("2026-10-08"), expect=1)
+        row = self.coach("niggles", "list", env=on("2026-10-08"))["data"]["niggles"][0]
+        self.assertEqual([entry["date"] for entry in row["history"]], ["2026-10-01", "2026-10-06"])
+
+    def test_an_explicit_standing_edit_persists_past_later_flares(self):
+        self.settle()
+        self.coach("niggles", "update", "n-0001", "--constraint", "rpe_cap=7.5", env=on("2026-10-10"))
+        self.coach("niggles", "update", "n-0001", "--status", "aggravated", "--flare-constraint", "rpe_cap=6",
+                   env=on("2026-10-13"))
+        self.settle("2026-10-16")
+        self.assertEqual(self.squat_limits(day="2026-10-17"), [("rpe_cap", 7.5, "standing", "2026-10-10", "n-0001")])
+        self.assertEqual(self.squat_limits("--date", "2026-10-07", day="2026-10-17"), [
+            ("rpe_cap", 8, "standing", "2026-10-01", "n-0001"), ("rpe_cap", 7, "flare", "2026-10-06", "n-0001")])
+
+    def test_resolving_ends_every_limit_and_takes_no_flare_limit(self):
+        self.coach("niggles", "update", "n-0001", "--status", "resolved", "--flare-constraint", "rpe_cap=6",
+                   env=on("2026-10-10"), expect=1)
+        self.coach("niggles", "resolve", "n-0001", env=on("2026-10-10"))
+        self.assertEqual(self.squat_limits(), [])
+        self.assertEqual(self.squat_limits("--date", "2026-10-06")[1][2], "flare")
+
+    def test_list_shows_the_limits_in_force_today(self):
+        row = self.coach("niggles", "list", env=on("2026-10-07"))["data"]["niggles"][0]
+        self.assertEqual([(c["value"], c["scope"]) for c in row["in_force"]], [(8, "standing"), (7, "flare")])
+        self.assertIsNone(row["confirm"])
+
+    def test_a_standing_edit_cannot_be_backdated_and_a_bad_date_exits_2(self):
+        self.coach("niggles", "update", "n-0001", "--constraint", "rpe_cap=7", env=on("2026-09-30"), expect=1)
+        self.coach("niggles", "constraints", "--date", "2026-13-01", expect=2)
+
+
 class ProposalConstraintTest(ProposeCase):
     def write_niggles(self, *rows):
-        write_json(self.root / "data" / "niggles.json", {"schema_version": 1, "niggles": list(rows)})
+        write_json(self.root / "data" / "niggles.json", {"schema_version": VERSION, "niggles": list(rows)})
 
     def set_pattern(self, exercise_id, pattern):
         self.edit_json("data/exercises.json", lambda doc: doc["exercises"][exercise_id].update(pattern=pattern))
@@ -264,6 +351,29 @@ class ProposalConstraintTest(ProposeCase):
         self.write_niggles(niggle(status="easing", history=entries("watching", "watching", "easing")))
         self.assertEqual(self.niggle_flags(self.propose("--dry-run")["overlay"], "niggle_escalate"), [])
 
+    def test_the_strictest_of_two_niggles_binds_and_both_stay_in_force(self):
+        self.edit_program(lambda doc: self.slot(doc, "session-a", "bb_back_squat")["sets"][0].update(rpe=8))
+        self.write_niggles(niggle(patterns=["squat"], constraints=[{"kind": "rpe_cap", "value": 7}]),
+                           niggle("n-0002", exercises=["bb_back_squat"], constraints=[{"kind": "rpe_cap", "value": 6}],
+                                  area="synthetic right hip"))
+        doc = self.propose("--dry-run")["overlay"]
+        self.assertEqual({s["rpe"] for s in working(find_line(doc, "bb_back_squat"))}, {6})
+        [flag] = [f for f in doc["flags"] if f["code"] == "constraint_applied" and f["exercise_id"] == "bb_back_squat"]
+        self.assertIn("n-0002 RPE cap 6 (synthetic right hip)", flag["message"])
+        lines = self.coach("niggles", "constraints")["data"]["lines"]
+        squat = next(line for line in lines if line["exercise_id"] == "bb_back_squat")
+        self.assertEqual(sorted((c["source"], c["value"]) for c in squat["constraints"]), [("n-0001", 7), ("n-0002", 6)])
+
+    def test_a_flare_limit_tighter_than_the_standing_one_binds(self):
+        self.edit_program(lambda doc: self.slot(doc, "session-a", "bb_back_squat")["sets"][0].update(rpe=8))
+        row = niggle(status="aggravated", exercises=["bb_back_squat"], constraints=[{"kind": "rpe_cap", "value": 7.5}],
+                     history=[{"date": "2026-10-11", "status": "aggravated", "note": None,
+                               "flare_constraints": [{"kind": "rpe_cap", "value": 6.5, "reason": "synthetic knee"}]}])
+        self.write_niggles(row)
+        doc = self.propose("--dry-run")["overlay"]
+        self.assertEqual({s["rpe"] for s in working(find_line(doc, "bb_back_squat"))}, {6.5})
+        self.assertIn("flare limit from 2026-10-11", " ".join(f["message"] for f in self.niggle_flags(doc)))
+
     def test_an_invalid_niggles_file_stops_the_proposal(self):
         self.write_niggles(niggle(patterns=["squatt"]))
         envelope = self.propose("--dry-run", expect=1)
@@ -285,7 +395,7 @@ class ImportTest(NiggleCase):
                            "deep flexion under load"),
                           ("n-0002", "Synthetic lower back", "2026-08-03", "2026-08-17", 2, "resolved", None)])
         for row in data["niggles"]:
-            self.assertEqual(row["constraints"], [])
+            self.assertEqual(row["standing"], [])
             self.assertEqual(row["applies_to"], {"patterns": [], "exercises": [], "activity_kinds": []})
         self.assertEqual(data["lines"], [{"index": 1, "text": "Synthetic left shoulder: no overhead pressing."},
                                          {"index": 2, "text": "Synthetic right wrist, mostly settled."}])
@@ -305,7 +415,7 @@ class ImportTest(NiggleCase):
         self.assertEqual(len(chronic), 1)
         self.assertEqual(chronic[0]["area"], "Synthetic left shoulder: no overhead pressing.")
         self.assertEqual(chronic[0]["applies_to"], {"patterns": [], "exercises": [], "activity_kinds": []})
-        self.assertEqual(chronic[0]["constraints"], [])
+        self.assertEqual(chronic[0]["standing"], [])
         self.assertEqual(len(data["niggles"]), 3)
         self.assertNotIn("Synthetic right wrist, mostly settled.", [r["area"] for r in data["niggles"]])
 
@@ -322,6 +432,69 @@ class ImportTest(NiggleCase):
         (self.root / "profile.md").write_text(text, encoding="utf-8")
         envelope = self.coach("niggles", "import", "--from-profile", "--dry-run", expect=1)
         self.assertIn("Synthetic left knee", json.dumps(envelope["error"]))
+
+
+V1_ROWS = [
+    {"id": "n-0001", "area": "synthetic lower back", "first_noted": "2026-09-01", "last_noted": "2026-10-06",
+     "mentions": 2, "status": "aggravated", "notes": None,
+     "applies_to": {"patterns": [], "exercises": ["bb_back_squat"], "activity_kinds": []},
+     "constraints": [{"kind": "rpe_cap", "value": 7, "reason": "synthetic lower back"}],
+     "constrain_while": ["aggravated", "watching"],
+     "history": [{"date": "2026-09-01", "status": "chronic", "note": None},
+                 {"date": "2026-10-06", "status": "aggravated", "note": "flared"}]},
+    {"id": "n-0002", "area": "synthetic left knee", "first_noted": "2026-09-14", "last_noted": "2026-09-14",
+     "mentions": 1, "status": "watching", "notes": None,
+     "applies_to": {"patterns": ["lunge"], "exercises": [], "activity_kinds": []},
+     "constraints": [{"kind": "load_cap", "value": 20, "reason": "synthetic left knee"}],
+     "constrain_while": ["aggravated", "watching"],
+     "history": [{"date": "2026-09-14", "status": "watching", "note": None}]},
+    {"id": "n-0003", "area": "synthetic wrist", "first_noted": "2026-09-14", "last_noted": "2026-09-14",
+     "mentions": 1, "status": "watching", "notes": None,
+     "applies_to": {"patterns": [], "exercises": [], "activity_kinds": []}, "constraints": [],
+     "constrain_while": ["aggravated", "watching"],
+     "history": [{"date": "2026-09-14", "status": "watching", "note": None}]},
+]
+
+
+class MigrationTest(NiggleCase):
+    def setUp(self):
+        super().setUp()
+        write_json(self.path(), {"schema_version": 1, "niggles": copy.deepcopy(V1_ROWS)})
+
+    def test_one_limit_list_becomes_a_standing_version_and_a_flared_row_asks_for_confirmation(self):
+        report = self.coach("migrate", "run")["data"]
+        rows = self.rows()
+        self.assertEqual(read_json(self.path())["schema_version"], VERSION)
+        knee, wrist, back = rows["n-0002"], rows["n-0003"], rows["n-0001"]
+        self.assertEqual(knee["standing"], [{"from": "2026-09-14", "constraints": V1_ROWS[1]["constraints"],
+                                             "confirm": None}])
+        self.assertEqual(wrist["standing"], [])
+        self.assertEqual(back["standing"][0]["constraints"], V1_ROWS[0]["constraints"])
+        self.assertEqual(back["standing"][0]["from"], "2026-09-01")
+        self.assertIn("confirm", back["standing"][0]["confirm"])
+        self.assertIn("niggles update n-0001 --constraint", back["standing"][0]["confirm"])
+        self.assertEqual({entry["flare_constraints"] for row in rows.values() for entry in row["history"]}, {None})
+        self.assertEqual(list(back), ["id", "area", "first_noted", "last_noted", "mentions", "status", "notes",
+                                      "applies_to", "standing", "constrain_while", "history"])
+        self.assertTrue(any("n-0001" in note for note in report["notes"]))
+        self.assertFalse(any("n-0002" in note for note in report["notes"]))
+
+    def test_no_limit_is_weakened_on_any_date(self):
+        self.coach("migrate", "run")
+        for day in ("2026-09-01", "2026-10-06", "2026-10-11"):
+            with self.subTest(day=day):
+                lines = self.coach("niggles", "constraints", "--date", day)["data"]["lines"]
+                squat = next(line for line in lines if line["exercise_id"] == "bb_back_squat")
+                self.assertEqual([(c["kind"], c["value"]) for c in squat["constraints"]], [("rpe_cap", 7)])
+
+    def test_status_asks_to_confirm_the_standing_limit_until_it_is_set(self):
+        self.coach("migrate", "run")
+        sections = {s["id"]: s for s in self.coach("status")["data"]["sections"]}
+        self.assertIn("n-0001", sections["niggles"]["data"]["confirm"])
+        self.assertTrue(any("confirm these are the standing limits" in line for line in sections["niggles"]["lines"]))
+        self.coach("niggles", "update", "n-0001", "--constraint", "rpe_cap=8")
+        sections = {s["id"]: s for s in self.coach("status")["data"]["sections"]}
+        self.assertEqual(sections["niggles"]["data"]["confirm"], [])
 
 
 class RegistryTest(unittest.TestCase):
@@ -358,7 +531,7 @@ class CheckTest(unittest.TestCase):
 
 class CardPartTest(CheckinCase):
     def test_the_niggles_field_names_open_rows_and_due_follow_ups_are_facts(self):
-        write_json(self.root / "data" / "niggles.json", {"schema_version": 1, "niggles": [
+        write_json(self.root / "data" / "niggles.json", {"schema_version": VERSION, "niggles": [
             niggle("n-0001", "watching", history=entries("watching", "watching", "watching")),
             niggle("n-0002", "chronic", area="synthetic left shoulder", history=entries("chronic")),
             niggle("n-0003", "resolved", area="synthetic lower back", history=entries("resolved"))]})
@@ -380,7 +553,7 @@ class CardPartTest(CheckinCase):
 
 class StatusTest(HistoryCase):
     def test_due_follow_ups_and_aggravated_niggles_need_attention(self):
-        write_json(self.root / "data" / "niggles.json", {"schema_version": 1, "niggles": [
+        write_json(self.root / "data" / "niggles.json", {"schema_version": VERSION, "niggles": [
             niggle("n-0001", "aggravated", history=entries("watching", "aggravated"))]})
         self.coach("followups", "add", "--text", "Re-test pull-up ladder", "--review-at", "2026-10-11",
                    "--source", "chat")
@@ -392,9 +565,9 @@ class StatusTest(HistoryCase):
         self.assertIn("qualified professional", " ".join(sections["niggles"]["lines"]))
 
     def test_the_aggravated_line_says_whether_a_limit_is_in_force(self):
-        history = [{"date": "2026-10-11", "status": "aggravated", "note": None}]
+        history = [{"date": "2026-10-11", "status": "aggravated", "note": None, "flare_constraints": None}]
         cap = [{"kind": "rpe_cap", "value": 7}]
-        write_json(self.root / "data" / "niggles.json", {"schema_version": 1, "niggles": [
+        write_json(self.root / "data" / "niggles.json", {"schema_version": VERSION, "niggles": [
             niggle("n-0001", "aggravated", history=history, area="synthetic left knee"),
             niggle("n-0002", "aggravated", history=history, constraints=cap, area="synthetic right hip"),
             niggle("n-0003", "aggravated", history=history, constraints=cap, constrain_while=["watching"],
@@ -426,7 +599,14 @@ class SkillTest(unittest.TestCase):
         self.assertIn("without asking for a resolution", deep)
 
     def test_program_week_reads_niggle_constraints_from_the_proposal(self):
-        self.assertIn("python3 -m coach niggles constraints", self.read("program-week"))
+        text = self.read("program-week")
+        self.assertIn("python3 -m coach niggles constraints", text)
+        self.assertIn("`rpe_ceiling_unchecked`: no e1RM or kit meets the ceiling", text)
+
+    def test_check_in_keeps_a_flare_limit_apart_from_the_standing_one(self):
+        act = " ".join(step_text("check-in", "act.md").split())
+        self.assertIn("--status aggravated --flare-constraint rpe_cap=6", act)
+        self.assertIn("Never tighten `--constraint` for a flare.", act)
 
 
 if __name__ == "__main__":

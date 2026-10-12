@@ -310,7 +310,15 @@ _Avoid_: cap (ambiguous with a load cap); RPE ceiling names the wider idea
 A recovery line's RPE read as a limit, not a target to reach: on a light
 or return week, a line decayed to a return band, the first session after
 illness, or a line under a recovery cap. The e1RM model check never calls
-work under it too easy; it flags only a load too hard for it.
+work under it too easy; it flags only a load too hard for it. The
+proposal lowers a load the e1RM puts over the ceiling, or cuts the reps
+when they lie past the model's range and the load is still too hard.
+With no e1RM the model accepts, a set whose RPE a recovery cap or the
+illness cap lowered goes no further than the last load logged, and the
+coach reviews it. A set under the cap has no ceiling from it: its RPE
+stays a target and its load is unchanged. A set exactly at the cap keeps
+its load too, but the prescription check reads its RPE as a ceiling,
+since it cannot tell it from one the cap lowered.
 _Avoid_: recovery cap (one source of it), target RPE
 
 **Niggle**:
@@ -318,8 +326,11 @@ An ache or minor injury worth watching for recurrence, logged in
 `data/niggles.json` with the movement patterns and exercises it affects
 and its status: aggravated, watching, easing, resolved, or **chronic**
 for a lasting limitation. While it is aggravated or watching (always,
-when chronic) its load limits (a recovery cap, no added load, a load
-cap) apply to every matching line the proposal step writes. A niggle is
+when chronic) its **standing limits** (a recovery cap, no added load, a
+load cap) apply to every matching line the proposal step writes. A
+**flare limit** is a tighter limit set for one flare: it lasts until the
+status changes, and then the standing limits are what remain. Every
+limit is dated, so a past date reads the limits in force then. A niggle is
 never deleted, never diagnosed, and one reported three check-ins
 running, or worsening to aggravated, means recommending a qualified
 professional (never for a chronic niggle, a known lasting limitation).

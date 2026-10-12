@@ -27,11 +27,17 @@
   a dated report run `block close` for that week again (analyze.md).
   Confirmed gone: `python3 -m coach niggles resolve <id>`, which **keeps
   the row**: recurrence is the signal this log exists to catch. Agree
-  with the athlete the limit an active niggle sets and add it with
-  `--constraint` (`rpe_cap=7`, the recovery cap; `no_added_load`;
-  `load_cap=<n>`): `propose week` applies it to every matching line
-  while the status is `aggravated` or `watching` (always, for `chronic`)
-  and names the niggle in `constraint_applied`. Escalate — recommend a
+  with the athlete the limit an active niggle sets. A lasting limit is a
+  standing one: `--constraint` (`rpe_cap=7`, the recovery cap;
+  `no_added_load`; `load_cap=<n>`), applied while the status is
+  `aggravated` or `watching` (always, for `chronic`). A tighter limit for
+  this flare only goes with the status report: `--status aggravated
+  --flare-constraint rpe_cap=6`; it ends when the status changes, and
+  the standing limit returns. Never tighten `--constraint` for a flare.
+  `propose week` brings each capped load to what the e1RM allows and
+  names the niggle in `constraint_applied`. A `niggles` status line
+  asking to confirm a limit: agree it with the athlete and set it again
+  with `--constraint`. Escalate — recommend a
   qualified professional and program around it meanwhile, never
   diagnose — when `python3 -m coach niggles list` gives a row an
   `escalate` reason (three check-ins running, or worse to

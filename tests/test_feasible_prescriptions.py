@@ -183,9 +183,12 @@ class GeneratedLinesTest(GeneratedLinesCase):
             sets=[{"count": 3, "type": "normal", "reps": 10, "rpe": 8}]))
         self.log("session-a", "2026-10-12", "db_bench_press", "18x10@6,20x9@10*2")
         line, loads, _ = self.proposed("db_bench_press", "--kind", "deload")
-        self.assertEqual(loads, {20})
+        self.assertEqual(loads, {18})
         self.assertIn("the standard deload", line["rationale"])
         self.assertNotIn("model accepts", line["rationale"])
+        self.assertIn("the e1RM model reaches at most 8 reps at RPE 6, so 8 reps", line["rationale"])
+        self.assertNotIn("unearned_load", line["flags"])
+        self.assertNotIn("rpe_infeasible", line["flags"])
 
     def test_with_no_logged_load_the_model_accepts_the_scheme_load_stays_flagged(self):
         self.edit_slot("db_bench_press", lambda slot: slot.update(
@@ -278,10 +281,14 @@ class CheckTest(CheckCase):
         self.log_bench("2026-10-12", 22.5, 10, 8)
         self.coach("history", "annotate", "--kind", "miss", "--date", "2026-10-15", "--session", "session-b",
                    "--tag", "ill")
-        flags, row = self.check(self.bench_sets(2, 18.5, 6, reps=8))
+        flags, row = self.check(self.bench_sets(2, 18.5, 7, reps=8))
         self.assertEqual(flags, [])
         self.assertEqual(row["feasibility"]["rpe"], "ceiling")
         self.assertIn("the first session after illness", row["feasibility"]["message"])
+        flags, row = self.check(self.bench_sets(2, 18.5, 6, reps=8))
+        self.assertEqual([f["code"] for f in flags], ["rpe_infeasible"])
+        self.assertIn("target RPE 6", flags[0]["message"])
+        self.assertEqual(row["feasibility"]["rpe"], "target")
 
     def test_an_rpe_cap_constraint_makes_the_rpe_a_ceiling(self):
         self.log_bench("2026-10-12", 22.5, 10, 8)
@@ -293,6 +300,31 @@ class CheckTest(CheckCase):
         flags, row = self.check(self.bench_sets(2, 18.5, 6, reps=8))
         self.assertEqual(flags, [])
         self.assertEqual(row["feasibility"]["rpe"], "ceiling")
+
+    def cap_bench(self, value):
+        path = self.root / "data/program.json"
+        doc = read_json(path)
+        slot = next(e for s in doc["sessions"] for e in s["exercises"] if e["exercise_id"] == "db_bench_press")
+        slot["constraints"] = [{"kind": "rpe_cap", "value": value, "reason": "synthetic elbow"}]
+        write_json(path, doc)
+
+    def test_a_set_under_an_rpe_cap_keeps_its_rpe_a_target(self):
+        self.log_bench("2026-10-12", 22.5, 10, 8)
+        self.cap_bench(7)
+        flags, row = self.check(self.bench_sets(2, 18.5, 6, reps=8))
+        self.assertEqual([f["code"] for f in flags], ["rpe_infeasible"])
+        self.assertIn("target RPE 6, but", flags[0]["message"])
+        self.assertEqual(row["feasibility"]["rpe"], "target")
+        self.assertNotIn("ceiling", row["feasibility"]["message"])
+
+    def test_a_line_part_under_an_rpe_cap_judges_each_set_by_its_own_reading(self):
+        self.log_bench("2026-10-12", 22.5, 10, 8)
+        self.cap_bench(7)
+        flags, row = self.check(self.bench_sets(1, 18.5, 7, reps=8) + self.bench_sets(1, 18.5, 6, reps=8))
+        self.assertEqual([f["code"] for f in flags], ["rpe_infeasible"])
+        self.assertIn("target RPE 6, but", flags[0]["message"])
+        self.assertEqual(row["feasibility"]["rpe"], "ceiling")
+        self.assertIn("ceiling on 1 of 2 working sets (an RPE cap constraint)", row["feasibility"]["message"])
 
     def test_work_over_a_recovery_ceiling_is_still_flagged(self):
         self.log_bench("2026-10-12", 22.5, 10, 8)

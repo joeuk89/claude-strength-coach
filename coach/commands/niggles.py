@@ -28,10 +28,10 @@ def _constrain_while(args):
     return niggles.check_statuses(found) if found is not None else None
 
 
-def _constraints(args, reason):
-    if args.constraint is None:
+def _constraints(texts, reason):
+    if texts is None:
         return None
-    return [niggles.parse_constraint(text, reason) for text in args.constraint]
+    return [niggles.parse_constraint(text, reason) for text in texts]
 
 
 def _report_day(args, ctx):
@@ -56,7 +56,11 @@ _APPLIES_ARGS = (
     arg("--exercise", help="library exercise id(s) it affects, comma-separated or repeated; \"\" clears", **_LIST),
     arg("--activity-kinds", metavar="K[,K...]", help="activity kinds it affects (run, ride, ...); \"\" clears"),
     arg("--constraint", action="append", metavar="KIND[=VALUE]",
-        help="a load limit while it is active: rpe_cap=7, no_added_load, load_cap=20; repeat for several"),
+        help="a standing load limit from the report's day, while its status applies it: rpe_cap=7, "
+             "no_added_load, load_cap=20; repeat for several; replaces the standing limits"),
+    arg("--flare-constraint", action="append", metavar="KIND[=VALUE]",
+        help="a temporary load limit from the report's day until the status changes, on top of the standing "
+             "ones: rpe_cap=6; repeat for several"),
     arg("--constrain-while", metavar="S[,S...]",
         help="statuses its constraints apply in (default aggravated,watching)"),
     arg("--notes", metavar="TEXT", help="its standing notes"),
@@ -69,7 +73,9 @@ _APPLIES_ARGS = (
 def list_niggles(args, ctx):
     today = ctx.today()
     doc = niggles.load(ctx.root)
-    rows = [dict(row, constraints_active=niggles.constraints_active(row, today), escalate=niggles.escalation(row))
+    rows = [dict(row, constraints_active=niggles.constraints_active(row, today),
+                 in_force=niggles.constraints_on(row, today), confirm=niggles.unconfirmed(row, today),
+                 escalate=niggles.escalation(row))
             for row in doc["niggles"]
             if (not args.open or niggles.is_open(row)) and (args.status is None or row["status"] == args.status)]
     return {"today": today.isoformat(), "niggles": rows, "flags": niggles.escalate_flags(doc)}
@@ -90,8 +96,9 @@ def add(args, ctx):
         raise UsageError("--area must say where the niggle is")
     doc, row = niggles.add(
         niggles.load(ctx.root, library), args.area, _report_day(args, ctx), args.status, patterns or [],
-        exercises or [], kinds or [], _constraints(args, args.area.strip()) or [],
-        constrain_while if constrain_while is not None else niggles.DEFAULT_CONSTRAIN_WHILE, args.note, args.notes)
+        exercises or [], kinds or [], _constraints(args.constraint, args.area.strip()) or [],
+        constrain_while if constrain_while is not None else niggles.DEFAULT_CONSTRAIN_WHILE, args.note, args.notes,
+        _constraints(args.flare_constraint, args.area.strip()))
     niggles.save(ctx.root, doc, args.dry_run, library)
     return {"niggle": row, "written": not args.dry_run}
 
@@ -105,7 +112,9 @@ def add(args, ctx):
                                                           "(once a day)"),
                _DATE_ARG,
                arg("--area", metavar="TEXT", help="rename where it is"),
-               arg("--clear-constraints", action="store_true", help="remove every constraint"),
+               arg("--clear-constraints", action="store_true",
+                   help="remove every standing limit from the report's day"),
+               arg("--clear-flare-constraints", action="store_true", help="end the flare's limits on the report's day"),
                *_APPLIES_ARGS),
          writes=True)
 def update(args, ctx):
@@ -118,8 +127,13 @@ def update(args, ctx):
         raise ValidationError(f"No niggle {args.id} in {paths.NIGGLES}")
     if args.clear_constraints and args.constraint:
         raise UsageError("--clear-constraints and --constraint together: give the constraints to keep instead")
-    found = [] if args.clear_constraints else _constraints(args, (args.area or current["area"]).strip())
-    doc, row = niggles.update(doc, args.id, _report_day(args, ctx), args.status, args.note, args.mention,
+    if args.clear_flare_constraints and args.flare_constraint:
+        raise UsageError("--clear-flare-constraints and --flare-constraint together: give the flare limits to keep "
+                         "instead")
+    reason = (args.area or current["area"]).strip()
+    found = [] if args.clear_constraints else _constraints(args.constraint, reason)
+    flare = [] if args.clear_flare_constraints else _constraints(args.flare_constraint, reason)
+    doc, row = niggles.update(doc, args.id, _report_day(args, ctx), args.status, args.note, args.mention, flare,
                               area=args.area, notes=args.notes, patterns=patterns, exercises=exercises,
                               activity_kinds=kinds, constraints=found, constrain_while=constrain_while)
     niggles.save(ctx.root, doc, args.dry_run, library)
@@ -165,20 +179,26 @@ def import_profile(args, ctx):
     return {"niggles": rows, "lines": lines, "written": bool(rows) and not args.dry_run}
 
 
-@command("niggles constraints", help="Each program line a niggle constrains today, with the constraints",
-         args=(arg("--session", metavar="S", help="one program session only"),))
+@command("niggles constraints", help="Each program line a niggle constrains on a date (today by default), with the "
+                                     "standing and flare limits in force then",
+         args=(arg("--session", metavar="S", help="one program session only"),
+               arg("--date", metavar="YYYY-MM-DD", help="the date to read; default today")))
 def niggle_constraints(args, ctx):
     doc = program.load(ctx.root)
     sessions = [s for s in doc["sessions"] if args.session in (None, s["id"])]
     if args.session is not None and not sessions:
         raise ValidationError(f"No session {args.session} in {paths.PROGRAM}")
     today = ctx.today()
+    try:
+        day = dates.parse_date(args.date) if args.date is not None else today
+    except ValueError as exc:
+        raise UsageError(f"--date: {exc}") from None
     lines = []
     for session in sessions:
         for exercise in session["exercises"]:
-            found = [c for c in constraints.active(ctx.root, session["id"], exercise["exercise_id"], today)
+            found = [c for c in constraints.active(ctx.root, session["id"], exercise["exercise_id"], day)
                      if c["source"] != "slot"]
             if found:
                 lines.append({"session_id": session["id"], "exercise_id": exercise["exercise_id"],
                               "constraints": found})
-    return {"today": today.isoformat(), "lines": lines}
+    return {"today": today.isoformat(), "date": day.isoformat(), "lines": lines}

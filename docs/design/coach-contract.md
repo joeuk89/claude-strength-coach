@@ -2471,16 +2471,17 @@ Reserved codes:
 | `linear_below_start` | info | R-23a | | Linear reset fell below the starting load; review progression without automatic adjustment. |
 | `load_cut_held` | info, warn | R-23a | | A reset, return-band or deload load cut that the kit cannot make holds the load, and the rationale gives the target and actual cut. Info when the line's set or effort cuts still apply; warn when nothing is cut, naming the next lighter load the kit makes so the coach chooses, or when the kit makes nothing that light and the load rises. |
 | `wave_review` | warn | R-23a | | A 5/3/1 wave week was trained but a wave set fell short of its reps or its load, or past its RPE cap: the week repeats and no training-max raise is earned; review the training max with the athlete (a coaching heuristic). |
-| `rpe_drift` | warn | R-23a | | Compound or recovery-capped exercise: logged RPE at least 1 over target on two or more working sets of the last exposure, each against its own prescribed set and no harder (`coach.patterns.drift_reading`). |
+| `rpe_drift` | warn | R-23a | | Compound or recovery-capped exercise: logged RPE at least 1 over target on two or more working sets of the last exposure, each against its own prescribed set and no harder (`coach.patterns.drift_reading`), with the recovery caps in force on that exposure's date. |
 | `range_effort_mismatch` | warn | R-23a | | Double progression held a load whose derived-from exposure had a working set below its set group's rep range or 2 or more RPE over target; review a lighter load or a different rep range. |
 | `return_week` | info | R-23a | | Decay applied; names the band and days off. A lifting line's flag adds the load change (`loads × 0.9`, or `assistance held` on an `assisted` line), the set change and any RPE cap. |
 | `return_after_illness` | block | R-23a | | An `ill` miss or status day in the gap: the coach resolves it only once the athlete confirms `SYMPTOM_FREE_HOURS` (48) hours symptom-free, and ending the ill status day does not; first session capped at RPE `ILLNESS_RPE_CAP` (7). Overlays written before it blocked keep their `warn`. |
 | `ill_day_excluded` | info | R-23a | | An `ill` status day covers a session's date, so the proposal leaves the session out; the message names the session, date and row. |
-| `constraint_applied` | info | R-23a | | A cap, a slot constraint or a niggle constraint changed the proposal. |
+| `constraint_applied` | info | R-23a | | A cap, a slot constraint, a niggle constraint or an RPE ceiling the e1RM model turns into a load or rep limit changed the proposal. |
 | `override_standing` | info | R-23a | | A standing override was applied again instead of the scheme's proposal. |
 | `override_kept` | info | R-23a | | An override approved for this session in the overlay in force (a one-week override included) was kept instead of the scheme's proposal. |
 | `scheme_reset` | warn | R-23a | | A slot's scheme changed; its state restarted. |
 | `rotation_unconfirmed` | warn | R-23a | | The schedule rule advanced the rotation without confirmation. |
+| `rpe_ceiling_unchecked` | warn | R-23a | | A line's RPE ceiling cannot become a load limit: no e1RM the model accepts (C26), so a load whose RPE an `rpe_cap` or the illness cap lowered goes no further than the derived-from load; or the kit makes nothing under the limit, so the kit's lightest load stands. The coach reviews the load with the athlete; nothing claims the ceiling is met. |
 | `niggle_escalate` | warn | R-27 | | Niggle reported three check-ins running, or worse: recommend a qualified professional. |
 | `followup_due` | info | R-27 | | An open follow-up is past its review date. |
 | `evidence_expired` | info | R-32 (module `coach/flags/research.py` added by R-23a) | | A plugin's cited research note has expired; the rationale says the evidence is under review. |
@@ -2648,8 +2649,11 @@ coach.validity.estimate_minutes(root, session) -> int
   A recovery line's RPE is a **ceiling**, flagged only when the implied
   RPE at the fewest reps is more than 1 above it: a `deload`-kind
   overlay (deload, light and return weeks), a line with
-  `provenance.decay`, the first session after illness and a line under
-  an active C26 `rpe_cap` (rn:deloads.9). A rep-out set's `rpe` is its
+  `provenance.decay`, and, on the first session after illness or a line
+  under an active C26 `rpe_cap`, each set whose RPE is missing or at or
+  over that cap (rn:deloads.9); a set under every cap keeps its RPE a
+  target. The line's `feasibility` names how many working
+  sets read a ceiling when only some do. A rep-out set's `rpe` is its
   cap, not a target (C10), so it is judged as a ceiling on any line,
   never for being lighter. A lower-bound estimate (C18)
   never shows a load beyond failure or too hard for its RPE; the
@@ -3265,7 +3269,7 @@ propose week  ──►  .coach/proposals/<id>.json (+ .proposed.json)  ──�
 3. Per exercise line: build `SchemeContext`; `propose`; then decay
    (when `days_off` > 10), the deload transform (kind `deload`: the
    program's `blocks.deload_rule`, or `--transform NAME` for this run),
-   constraints, caps, rounding. A standing override (C25) active on the
+   constraints, caps, RPE ceilings (C26), rounding. A standing override (C25) active on the
    session's date replaces the scheme's sets before decay and runs the
    same steps, so the transform applies once to the sets the line
    delivers. Without one, an override on the session's line in the
@@ -3289,7 +3293,7 @@ propose week  ──►  .coach/proposals/<id>.json (+ .proposed.json)  ──�
    prescription`.
 4. Core flags: `no_data`, `stalled`, `rpe_drift`, `convention_slip`,
    `return_week`, `return_after_illness`, `constraint_applied`,
-   `override_standing`, `override_kept`, `scheme_reset`,
+   `rpe_ceiling_unchecked`, `override_standing`, `override_kept`, `scheme_reset`,
    `rotation_unconfirmed`.
 5. Build through `coach.overlay.build` and run `coach.validity.check_overlay`.
    - 5a. Week-level flags (R-43): every provider in `coach/weekflags/`
@@ -3552,17 +3556,49 @@ niggle rows (C27):
 {"kind": "load_cap", "value": 20, "reason": "elbow"}
 ```
 
-- `rpe_cap`: every working set's RPE target at most `value`. This is the
-  glossary's **recovery cap** (R-05); `rpe_drift` scope includes these sets.
+- `rpe_cap`: every working set's RPE at most `value`, a ceiling rather
+  than a target. This is the glossary's **recovery cap** (R-05);
+  `rpe_drift` scope includes these sets.
 - `no_added_load`: working load at most the newest non-excluded
   exposure's load (no progression in load; reps may still progress).
 - `load_cap`: working load at most `value` (coaching number, athlete units).
 - On a slot, a constraint applies to that line. On a niggle, it applies
   to every line whose exercise matches `applies_to` (C27).
 - The core clips the proposal and raises `constraint_applied` naming the
-  source (`slot`, `cap`, or the niggle id). Under a standing override
+  source (`slot`, `cap`, or the niggle id). Several constraints of one
+  kind all stay in force and the strictest binds; the flag names it, and
+  a niggle's flare limit says so with its date. Under a standing override
   (C25) the flag follows the kept sets the line delivers. It never removes or swaps an
   exercise; swaps are the coach's call.
+- **RPE ceilings change the work.** A ceiling set is every working set
+  of a return-band line or a `deload`-kind week, and each set whose RPE
+  an `rpe_cap` or the illness cap lowered. A cap the set already meets
+  leaves its RPE the program's target, so its load stays as it is without
+  the cap. Two readers still see the cap there: double progression holds
+  an isolation line logged over its target RPE while any `rpe_cap` is in
+  force, and the C22 check reads an RPE equal to a cap as a ceiling,
+  because the overlay cannot tell it from one the cap lowered. The check
+  reads an RPE under every cap as a target. Each ceiling set's load is at most
+  `coach.stats.load_for(e1rm, fewest reps, its RPE)` to 0.01 at the
+  line's C22 model evidence, then rounds down to the kit; the rationale
+  and `constraint_applied` give the model load and the kit's. A load
+  already under it is never raised, and the ordinary line is untouched. This
+  needs an estimate the model accepts: a `total`, `per_hand_x2` or
+  `single_implement` line, an estimate that is not a lower bound, and
+  reps-to-failure within the model's 12. A set past those 12 reps that
+  `judge_set(..., ceiling=True)` still finds too hard or unearned (the
+  check's verdict) drops to the most reps the model covers at its RPE,
+  `floor(12 − (10 − RPE))`, whose load limit then applies; the words name
+  the implied RPE and the new reps. Otherwise, each set whose RPE an
+  `rpe_cap` or the illness cap lowered goes no further than
+  the derived-from exposure's top load and `rpe_ceiling_unchecked`
+  (warn) says why the ceiling cannot be checked and asks the coach to
+  review the load; with no logged load, the proposed load stands under
+  the same flag. When the kit makes nothing under the model's load, the
+  kit's lightest load stands under `rpe_ceiling_unchecked`. Nothing
+  claims a ceiling is met without the model, and rounding never goes
+  above a hard cap. A conditioning line's load holds as written, so a
+  binding cap there raises `rpe_ceiling_unchecked` too.
 - "Constraint" here means a load limit on an exercise. Session placement
   rules are **interference rules** (C51), a separate plugin kind.
 
@@ -3609,14 +3645,18 @@ is the single function R-23a's pipeline, R-31's niggle trigger and R-43's
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "niggles": [
     {"id": "n-0001", "area": "left knee", "first_noted": "2026-09-14", "last_noted": "2026-10-11",
      "mentions": 3, "status": "watching", "notes": "deep flexion under load",
      "applies_to": {"patterns": ["squat", "lunge"], "exercises": [], "activity_kinds": ["run"]},
-     "constraints": [{"kind": "rpe_cap", "value": 7, "reason": "left knee"}],
+     "standing": [{"from": "2026-09-14", "confirm": null,
+                   "constraints": [{"kind": "rpe_cap", "value": 7, "reason": "left knee"}]}],
      "constrain_while": ["aggravated", "watching"],
-     "history": [{"date": "2026-10-11", "status": "watching", "note": "quiet on squats at RPE 7"}]}
+     "history": [{"date": "2026-10-04", "status": "aggravated", "note": "sharp on the descent",
+                  "flare_constraints": [{"kind": "rpe_cap", "value": 6, "reason": "left knee"}]},
+                 {"date": "2026-10-11", "status": "watching", "note": "quiet on squats at RPE 7",
+                  "flare_constraints": null}]}
   ]
 }
 ```
@@ -3630,8 +3670,24 @@ is the single function R-23a's pipeline, R-31's niggle trigger and R-43's
 - `applies_to.patterns` use the R-11 pattern enum; `exercises` are
   library ids; `activity_kinds` use the C30 activity kind enum (R-43 reads
   it for `niggle_link`; `niggles add|update` take `--activity-kinds`).
-  Constraints are active while `status` is in `constrain_while` (default
-  `["aggravated", "watching"]`).
+  **Standing limits** are active while `status` is in `constrain_while`
+  (default `["aggravated", "watching"]`).
+- **Dated limits (v2).** `standing` holds dated versions, one per date in
+  date order: each `{from, constraints, confirm}` replaces the standing
+  limits from `from` on, and a date before the first has none. A history
+  entry's `flare_constraints` (null: no change) sets a **flare's limits**,
+  which hold for the run of consecutive entries with that entry's status
+  (a later entry in the run may replace them; `[]` ends them) and end
+  when the status changes. They apply on top of the standing limits
+  whatever `constrain_while` says, so when a flare settles the standing
+  limits are what remain. A `resolved` entry carries none.
+- The v1 → v2 migration makes a row's one list its standing version from
+  its first history entry, so no date loses a limit, and invents no
+  earlier one. Version 1 could not tell a flare's tightened limit from
+  the standing one, so a row with limits and an `aggravated` entry gets a
+  `confirm` question; the migration report and the `niggles` status
+  provider ask the coach to confirm the standing limits, and setting them
+  again (`--constraint`) answers it.
 - `niggle_escalate` (warn) when the last three check-in entries in
   `history` are all `aggravated` or `watching`, or the status moved to
   `aggravated` from a better one (the entry before it is `watching`,
@@ -3644,20 +3700,28 @@ is the single function R-23a's pipeline, R-31's niggle trigger and R-43's
   resolve ID [--date D]` sets `resolved`; `niggles add --date D` dates
   `first_noted` and the first entry. `--date` dates a report to the day
   it describes: after today, or before the row's newest entry, exits 1.
-  The newest entry's status equals `status`.
-- Whether a row's constraints apply on a date reads its status on that
-  date: the newest `history` entry on or before it (none: not yet
-  noted). `coach.niggles.active_constraints(doc, entry, on_date)` returns
-  the matching constraints with `source` set to the niggle id; a row
-  matches a library entry by `applies_to.exercises` (its id) or
+  Limits given with the report are dated from `D` too. The newest entry's
+  status equals `status`.
+- Whether a row's limits apply on a date reads its status, standing
+  version and flare on that date: the newest `history` entry on or before
+  it (none: not yet noted). `coach.niggles.active_constraints(doc, entry,
+  on_date)` returns every matching limit with `source` set to the niggle
+  id, `scope` `standing` or `flare`, and `since` the date it was set; a
+  row matches a library entry by `applies_to.exercises` (its id) or
   `applies_to.patterns` (its pattern). `niggles constraints [--session
-  S]` lists each program line a niggle constrains today.
+  S] [--date D]` lists each program line a niggle constrains on a date
+  (today by default), so a past date reads the limits in force then;
+  `niggles list` gives each row's `in_force` limits and `confirm`.
 - `niggles add|update` set `applies_to` with `--pattern`, `--exercise`
-  and `--activity-kinds` (comma-separated; an empty value clears) and
-  constraints with `--constraint KIND[=VALUE]` (repeatable; `reason` is
-  the niggle's area; `update --clear-constraints` removes them). An
-  unknown pattern, exercise id, activity kind or constraint exits 1
-  naming the valid values. Check `niggles_schema` fails on the same.
+  and `--activity-kinds` (comma-separated; an empty value clears), the
+  standing limits from the report's day with `--constraint KIND[=VALUE]`
+  (repeatable; `reason` is the niggle's area; `update --clear-constraints`
+  removes them from that day; a date before the newest version exits 1)
+  and a flare's limits with `--flare-constraint KIND[=VALUE]` on that
+  day's history entry (`update --clear-flare-constraints` ends them; with
+  status `resolved` it exits 1). An unknown pattern, exercise id,
+  activity kind or constraint exits 1 naming the valid values. Check
+  `niggles_schema` fails on the same.
 - R-31 reads `aggravated` as its "niggle under load" fatigue trigger.
 - `niggles import --from-profile [--chronic I[,I...]] [--dry-run]`
   parses the template's `### Niggle log` table (`Area · First noted ·
@@ -3676,7 +3740,7 @@ is the single function R-23a's pipeline, R-31's niggle trigger and R-43's
   each open row; due follow-ups as facts; `followup_due` and
   `niggle_escalate` flags) and the C52 status providers `followups`
   (order 55, due items) and `niggles` (order 56, aggravated and
-  escalating rows), both at `attention`. Checks: `followups_schema`,
+  escalating rows and standing limits to confirm), both at `attention`. Checks: `followups_schema`,
   `niggles_schema`. Both files are migration-runner documents (C16).
 
 ## C28. Research notes and claim ids (R-32a owns; R-32b, R-32c, R-23a, R-46 read)
