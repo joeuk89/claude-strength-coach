@@ -181,14 +181,22 @@ class OutOfRangeCeilingTest(CeilingCase):
         self.assert_capped_row(7, 9)
 
     def test_a_lighter_load_the_model_cannot_show_too_hard_keeps_its_reps_and_stays_unchecked(self):
-        self.cap("db_single_arm_row")
+        self.cap("db_single_arm_row", value=5)
         doc = self.propose("--kind", "deload")
         row = working(find_line(doc, "db_single_arm_row"))
-        self.assertEqual({(s["reps"], s["rpe"], coaching(s["load"])) for s in row}, {(10, 6, 27.5)})
+        self.assertEqual({(s["reps"], s["rpe"], coaching(s["load"])) for s in row}, {(10, 5, 27.5)})
         for code in MODEL_CODES:
             self.assertNotIn(code, line_codes(doc, "db_single_arm_row"))
         flag = line_flag(doc, "db_single_arm_row", "rpe_ceiling_unchecked")
-        self.assertIn("the e1RM model does not reach 10 reps at RPE 6", flag["message"])
+        self.assertIn("the e1RM model does not reach 10 reps at RPE 5, so its finding that the load is not too hard "
+                      "for the ceiling lies outside its validated range", flag["message"])
+
+    def test_a_deload_row_its_cap_does_not_lower_is_neither_held_nor_flagged(self):
+        self.cap("db_single_arm_row", value=6)
+        doc = self.propose("--kind", "deload")
+        row = working(find_line(doc, "db_single_arm_row"))
+        self.assertEqual({(s["reps"], s["rpe"], coaching(s["load"])) for s in row}, {(10, 6, 27.5)})
+        self.assertNotIn("rpe_ceiling_unchecked", line_codes(doc, "db_single_arm_row"))
         self.assertNotIn("reaches at most", find_line(doc, "db_single_arm_row")["provenance"]["rationale"])
 
 
@@ -252,6 +260,30 @@ class UncheckedCeilingTest(CeilingCase):
         self.assertIn("a lower bound", flag["message"])
         self.assertIn("goes no further than 95, logged 2026-10-05", flag["message"])
         self.assertNotIn("allows at most", find_line(doc, "bb_back_squat")["provenance"]["rationale"])
+
+    def test_a_cap_above_an_unrated_line_rpe_leaves_its_progression_alone(self):
+        self.edit_squat_sets(lambda logged: logged.update(rpe=None))
+        self.use_plugin("bb_back_squat")
+        self.cap("bb_back_squat", value=8, status="chronic")
+        doc = self.propose()
+        self.assertEqual((self.loads(doc, "bb_back_squat"), self.rpes(doc, "bb_back_squat")), ({100}, {7}))
+        self.assertNotIn("rpe_ceiling_unchecked", line_codes(doc, "bb_back_squat"))
+
+    def test_a_cap_above_a_bodyweight_line_rpe_raises_no_flag(self):
+        before = self.rpes(self.propose(), "pull_up")
+        self.cap("pull_up", value=9.5, status="chronic")
+        doc = self.propose()
+        self.assertEqual(self.rpes(doc, "pull_up"), before)
+        self.assertNotIn("rpe_ceiling_unchecked", line_codes(doc, "pull_up"))
+
+    def test_the_illness_cap_on_an_unrated_line_already_at_rpe_7_leaves_its_progression_alone(self):
+        self.edit_squat_sets(lambda logged: logged.update(rpe=None))
+        self.use_plugin("bb_back_squat")
+        self.data("history", "annotate", "--kind", "miss", "--date", "2026-10-10", "--session", "session-b",
+                  "--tag", "ill")
+        doc = self.propose()
+        self.assertEqual((self.loads(doc, "bb_back_squat"), self.rpes(doc, "bb_back_squat")), ({100}, {7}))
+        self.assertNotIn("rpe_ceiling_unchecked", line_codes(doc, "bb_back_squat"))
 
     def test_with_no_squat_history_the_start_load_stands_for_the_coach_to_review(self):
         for path in sorted((self.root / "data" / "history").glob("2026-*.json")):

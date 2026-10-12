@@ -2481,7 +2481,7 @@ Reserved codes:
 | `override_kept` | info | R-23a | | An override approved for this session in the overlay in force (a one-week override included) was kept instead of the scheme's proposal. |
 | `scheme_reset` | warn | R-23a | | A slot's scheme changed; its state restarted. |
 | `rotation_unconfirmed` | warn | R-23a | | The schedule rule advanced the rotation without confirmation. |
-| `rpe_ceiling_unchecked` | warn | R-23a | | A line's RPE ceiling cannot become a load limit: no e1RM the model accepts (C26), so a capped load goes no further than the derived-from load; or the kit makes nothing under the limit, so the kit's lightest load stands. The coach reviews the load with the athlete; nothing claims the ceiling is met. |
+| `rpe_ceiling_unchecked` | warn | R-23a | | A line's RPE ceiling cannot become a load limit: no e1RM the model accepts (C26), so a load whose RPE an `rpe_cap` or the illness cap lowered goes no further than the derived-from load; or the kit makes nothing under the limit, so the kit's lightest load stands. The coach reviews the load with the athlete; nothing claims the ceiling is met. |
 | `niggle_escalate` | warn | R-27 | | Niggle reported three check-ins running, or worse: recommend a qualified professional. |
 | `followup_due` | info | R-27 | | An open follow-up is past its review date. |
 | `evidence_expired` | info | R-32 (module `coach/flags/research.py` added by R-23a) | | A plugin's cited research note has expired; the rationale says the evidence is under review. |

@@ -633,7 +633,8 @@ def _under_ceiling(sets, ceiling, capped, mode, direction, unit):
     if ceiling.unchecked:
         why = ceiling.unchecked
     elif beyond:
-        why = "; ".join(f"the e1RM model does not reach {reps} reps at RPE {units.json_number(rpe)}"
+        why = "; ".join(f"the e1RM model does not reach {reps} reps at RPE {units.json_number(rpe)}, so its finding "
+                        "that the load is not too hard for the ceiling lies outside its validated range"
                         for reps, rpe in sorted(set(beyond.values())))
     else:
         return sets, limits, lowered, words, None
@@ -718,6 +719,11 @@ def _within_ceiling(sets, limits, lowered, ceiling, rounding, mode, unit):
 def _over_limit(load, limit):
     # An e1RM is stored to 0.01, so the load it was measured at can come back a hair over its own limit.
     return load > limit + 0.01
+
+
+def _rpe_lowered(before, after):
+    """Whether a cap changed some working set's RPE, giving it a ceiling it did not already have."""
+    return any(a.rpe != b.rpe for a, b in zip(before, after) if b.working)
 
 
 def _ceiling_limits(sets, estimate):
@@ -832,17 +838,18 @@ def propose_line(run, session, day, exercise, ctx_extra):
         rungs)
     ceiling = _ceiling_for(_ceiling_why(ctx_extra["kind"], decay, first_after_illness, active), mode, evidence,
                            source)
-    capped = first_after_illness or any(c["kind"] == "rpe_cap" for c in active)
 
     def limited(sets, round_down, load_cut, cut_from):
         """Constraints, the illness cap, caps, RPE ceilings and rounding: what every load passes after its scheme.
 
         (sets, words, kit changes, why the line's RPE ceiling is unchecked or None).
         """
+        uncapped = sets
         sets, clipped, words = apply_constraints(sets, active, newest.top_load if newest else None,
                                                  info.load_direction)
         if first_after_illness:
             sets = base.rpe_capped(sets, validity.ILLNESS_RPE_CAP)
+        capped = _rpe_lowered(uncapped, sets)
         if cap is not None:
             sets, changed = _clip(sets, cap)
             if changed:
@@ -1078,11 +1085,13 @@ def _conditioning_line(run, session, day, exercise, proposal, first, rationale, 
         load = base.top_load(previous["sets"]) if previous else None
         load = exercise["start_load"] if load is None else load
     sets = tuple(replace(s, load=load) for s in proposal.lines[exercise_id])
+    uncapped = sets
     active = constraints_module.active(run.root, session_id, exercise_id, day)
     sets, clipped, words = apply_constraints(sets, active, load, -1 if mode == "assisted" else 1)
     first_after_illness = ctx_extra["illness"] is not None and day == ctx_extra["first_day"]
     if first_after_illness:
         sets = base.rpe_capped(sets, validity.ILLNESS_RPE_CAP)
+    capped = _rpe_lowered(uncapped, sets)
     try:
         cap, cap_source = cap_for(run.config, exercise_id, mode, session["location"]) \
             if mode in units.LOADED_MODES else (None, None)
@@ -1098,7 +1107,7 @@ def _conditioning_line(run, session, day, exercise, proposal, first, rationale, 
 
     found = [line_flag("constraint_applied", "; ".join(words))] if words else []
     why = _ceiling_why(None, None, first_after_illness, active)
-    if why is not None:
+    if why is not None and capped:
         found.append(line_flag("rpe_ceiling_unchecked", (
             f"{entry.get('name', exercise_id)}: {why} cannot be checked against an e1RM on a conditioning line, whose "
             f"load holds as written ({_load_text(load, mode, run.unit) if mode in units.LOADED_MODES else 'no load'});"

@@ -312,9 +312,10 @@ or return week, a line decayed to a return band, the first session after
 illness, or a line under a recovery cap. The e1RM model check never calls
 work under it too easy; it flags only a load too hard for it. The
 proposal lowers a load the e1RM puts over the ceiling, or cuts the reps
-when they lie past the model's range and the load is still too hard;
-with no e1RM the model accepts, a capped load goes no further than the
-last one logged and the coach reviews it.
+when they lie past the model's range and the load is still too hard.
+With no e1RM the model accepts, a line whose RPE a recovery cap or the
+illness cap lowered goes no further than the last load logged, and the
+coach reviews it; a line already at or under the cap keeps its progression.
 _Avoid_: recovery cap (one source of it), target RPE
 
 **Niggle**:
