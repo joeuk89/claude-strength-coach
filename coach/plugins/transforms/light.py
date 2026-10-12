@@ -28,4 +28,4 @@ def apply(ctx, proposal):
     count = len(base.working(proposal.sets))
     sets = base.keep_working(proposal.sets, max(1, round(count * ctx.params["set_factor"])))
     sets = base.lightened(sets, ctx.params["load_factor"], proposal.derived_from, ctx.exercise.load_direction)
-    return replace(proposal, sets=base.rpe_capped(sets, ctx.params["rpe_cap"]), round_down=True)
+    return replace(proposal, sets=base.rpe_capped(sets, ctx.params["rpe_cap"]), load_cut=True)

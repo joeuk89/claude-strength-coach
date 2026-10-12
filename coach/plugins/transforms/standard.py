@@ -5,9 +5,9 @@ from coach.plugins import base
 API = 1
 KIND = "transform"
 NAME = "standard"
-SUMMARY = ("Keeps two thirds of each line's working sets (at least one), takes 10 % off the loads and puts every "
-           "set at RPE 6; bodyweight work is cut by sets and taken further from failure, and assisted work keeps "
-           "its assistance.")
+SUMMARY = ("Keeps two thirds of each line's working sets (at least one), aims 10 % off the loads (the kit's "
+           "nearest load no heavier) and puts every set at RPE 6; bodyweight work is cut by sets and taken further "
+           "from failure, and assisted work keeps its assistance.")
 PARAMS = {
     "schema": {
         "type": "object", "additionalProperties": False,

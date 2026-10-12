@@ -89,7 +89,7 @@ status = "current"
 
 [[claims]]
 n = 3
-text = "The return week after a layoff goes by days off: up to 10 no change; 11–21 loads −5 % and one working set fewer per exercise; 22–42 loads −10 % and one working set fewer; 43+ a re-test with every load −15 % from its pre-layoff working load, one working set fewer and every set at RPE 7 or below."
+text = "The return week after a layoff goes by days off: up to 10 no change; 11–21 loads −5 % and one working set fewer per exercise; 22–42 loads −10 % and one working set fewer; 43+ a re-test with every load −15 % from its pre-layoff working load, one working set fewer and every set at RPE 7 or below. The load cuts are targets before rounding to the kit."
 basis = "heuristic"
 sources = ["bosquet-2013", "mujika-padilla-2000"]
 status = "current"
@@ -118,7 +118,7 @@ status = "current"
 | --- | --- | --- | --- | --- |
 | 1 | Maximal strength changes little in the first 2 weeks without training, and the loss becomes significant between the third and fourth week and keeps growing with time off. | evidence | bosquet-2013, nuckols-2022 | current |
 | 2 | Muscle size holds through a 1-week break and is partly lost over longer ones, such as 10 weeks without training. | evidence | coleman-2024, halonen-2024 | current |
-| 3 | The return week after a layoff goes by days off: up to 10 no change; 11–21 loads −5 % and one working set fewer per exercise; 22–42 loads −10 % and one working set fewer; 43+ a re-test with every load −15 % from its pre-layoff working load, one working set fewer and every set at RPE 7 or below. | heuristic (low confidence) | bosquet-2013, mujika-padilla-2000 | current |
+| 3 | The return week after a layoff goes by days off: up to 10 no change; 11–21 loads −5 % and one working set fewer per exercise; 22–42 loads −10 % and one working set fewer; 43+ a re-test with every load −15 % from its pre-layoff working load, one working set fewer and every set at RPE 7 or below. The load cuts are targets before rounding to the kit. | heuristic (low confidence) | bosquet-2013, mujika-padilla-2000 | current |
 | 4 | After a mild illness with symptoms above the neck only, training restarts once the athlete has been 48 hours symptom-free, with every exercise in the first session back capped at RPE 7, whatever the gap; fever, chest symptoms or other whole-body symptoms mean checking with a qualified professional before training again. | heuristic (low confidence) | schwellnus-2022, snyders-2022 | current |
 | 5 | Strength and size lost during a layoff come back faster than they were first gained. | evidence | halonen-2024, ogasawara-2013, nuckols-2022 | current |
 
@@ -175,8 +175,11 @@ corrected within a week. For the 43+ band, mujika-padilla-2000 reports
 that strength-trained athletes lose only 7 to 12 % of their force over 8
 to 12 weeks without training. The −15 % re-test starts below that loss,
 so the re-test stays submaximal and the logged RPE sets the next week's
-loads. The figures match `CLAUDE.md` "Coaching principles" → Return
-after a layoff.
+loads. No source sets how a cut rounds to the loads a gym has, so the
+percentages are targets: the line takes the nearest load the kit makes
+no heavier than the pre-layoff load. On a coarse step that can hold the
+load, and the set cut and any RPE cap still ease the week. The figures
+match `CLAUDE.md` "Coaching principles" → Return after a layoff.
 
 **Claim 4.** schwellnus-2022 sets out a staged, criteria-based return
 after a respiratory infection. An athlete with mild symptoms, mostly in

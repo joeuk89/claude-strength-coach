@@ -79,9 +79,9 @@ def propose(ctx):
         if (ctx.slot.start_load is not None
                 and (new_load - ctx.slot.start_load) * ctx.exercise.load_direction < 0):
             review = (base.flag(ctx, "linear_below_start",
-                                f"Linear reset to {base.load_words(ctx, new_load)} is below the program's "
+                                f"Linear reset target {base.load_words(ctx, new_load)} is below the program's "
                                 f"starting load {base.load_words(ctx, ctx.slot.start_load)}; review progression"),)
-        resets = f"the load resets to {base.number(factor * 100)} % of {base.load_words(ctx, load)}"
+        resets = f"the reset targets {base.number(factor * 100)} % of {base.load_words(ctx, load)}"
         rationale = f"Linear: prescribed reps missed {misses} exposures running, so {resets}"
         if _incomplete(source):
             logged = _sets_logged(source)
@@ -91,7 +91,7 @@ def propose(ctx):
                 f"{ctx.exercise.name}: {logged}, so no miss is counted, but the {misses} misses already counted "
                 "still reset the load (a coaching heuristic)")),)
         return base.Proposal(sets=base.with_load(sets, new_load), rationale=rationale, derived_from=source,
-                             state=state, round_down=True, flags=review)
+                             state=state, load_cut=True, flags=review)
     if _incomplete(source):
         return _incomplete_hold(ctx, sets, source, misses, state)
     if misses:

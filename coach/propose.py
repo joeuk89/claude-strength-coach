@@ -507,6 +507,8 @@ def propose_line(run, session, day, exercise, ctx_extra):
     )
     proposal = plugin.module.propose(ctx)
     _check_proposal(plugin, proposal)
+    scheme_sets = proposal.sets
+    cut_from = _cut_from(proposal)
     clauses = [proposal.rationale.rstrip(". ")]
     evidence = run.model_evidence(exercise_id, day)
     if evidence["reason"] == "over_rep_cap":
@@ -554,7 +556,7 @@ def propose_line(run, session, day, exercise, ctx_extra):
         min(ceilings, default=None), floor, source.top_load if source is not None else None, info.load_direction,
         rungs)
 
-    def limited(sets, round_down):
+    def limited(sets, round_down, load_cut, cut_from):
         """Constraints, the illness cap, caps and rounding: what every load passes after its scheme."""
         sets, clipped, words = apply_constraints(sets, active, newest.top_load if newest else None,
                                                  info.load_direction)
@@ -566,14 +568,15 @@ def propose_line(run, session, day, exercise, ctx_extra):
                 clipped.update(changed)
                 per_hand = "/hand" if mode in units.PER_HAND_MODES else ""
                 words.append(f"{cap_source} caps the load at {units.json_number(cap)}{per_hand}")
-        sets, kit_changes, off_ladder = _rounded(sets, clipped, round_down, rounding)
+        sets, kit_changes, off_ladder = _rounded(sets, clipped, round_down, cut_from if load_cut else None, rounding)
         words += [f"no ladder rung fits within it, so the line leaves the ladder at {_load_text(v, mode, run.unit)}"
                   for v in off_ladder]
-        kit_words = [f"the kit makes {_load_text(after, mode, run.unit)}, not {_load_text(before, mode, run.unit)}"
-                     for before, after in kit_changes.items()]
-        return sets, words, kit_words
+        return sets, words, kit_changes
 
-    sets, constraint_words, kit_words = limited(proposal.sets, proposal.round_down)
+    sets, constraint_words, kit_changes = limited(proposal.sets, proposal.round_down, proposal.load_cut, cut_from)
+    cut = _load_cut(cut_from, proposal, scheme_sets, sets, kit_changes, rounding) if proposal.load_cut else None
+    if cut is not None:
+        kit_changes.pop(cut["target"], None)
     if first_after_illness:
         adjusted.append(f"an RPE {validity.ILLNESS_RPE_CAP} cap on the first session after illness")
     if constraint_words:
@@ -581,16 +584,20 @@ def propose_line(run, session, day, exercise, ctx_extra):
         adjusted += constraint_words
     if adjusted:
         clauses.append(f"adjusted for {', '.join(adjusted)}: {sets_text(sets, mode, run.unit)}")
-    clauses += kit_words
+    clauses += [f"the kit makes {_load_text(after, mode, run.unit)}, not {_load_text(before, mode, run.unit)}"
+                for before, after in kit_changes.items()]
+    if cut is not None:
+        clauses.append(_cut_words(cut, mode, run.unit))
 
     override = None
     last = ctx.last_override
     if last is not None and last["standing"]:
         chosen = base.Proposal(sets=tuple(base.SetSpec.from_dict(s) for s in last["chosen_sets"]), rationale="kept",
                                derived_from=source, state={})
+        chosen_cut_from = _cut_from(chosen)
         if decay is not None:
             chosen = plugin.module.decay(ctx, chosen, days_off)
-        chosen_sets, _, _ = limited(chosen.sets, chosen.round_down)
+        chosen_sets, _, _ = limited(chosen.sets, chosen.round_down, chosen.load_cut, chosen_cut_from)
         override = {"reason": last["reason"], "proposed_sets": [s.to_dict() for s in sets]}
         scheme_text = sets_text(sets, mode, run.unit)
         clauses = [f"standing override until {last['until']} ({last['reason'].rstrip('. ')}) kept as "
@@ -598,6 +605,9 @@ def propose_line(run, session, day, exercise, ctx_extra):
         line_flags.append(line_flag("override_standing", f"Standing override {last['id']} until {last['until']} "
                                                          f"kept; the scheme proposed {scheme_text}"))
         sets = chosen_sets
+    elif cut is not None and cut["held"]:
+        line_flags.append(line_flag("load_cut_held", _held_cut_words(cut, info.name, mode, run.unit),
+                                    "info" if cut["other_cuts"] and not cut["rose"] else "warn"))
 
     line_flags += _core_flags(ctx, entry, exercise, sets, exposures, active, line_flag, mode)
     evidence_clause, evidence_flags = _evidence(run, plugin, transform, line_flag)
@@ -764,12 +774,14 @@ class _Rounding(NamedTuple):
     rungs: tuple[float, ...]
 
 
-def _rounded(sets, clipped, round_down, rounding):
+def _rounded(sets, clipped, round_down, cut_from, rounding):
     """(sets, {requested: selected}, off-ladder loads): each load snapped to the kit, never past a cap (C23).
 
-    A load no heavier than the derived-from load rounds toward the lighter lift: down, or up for assistance,
-    where more assistance is a lighter lift. An explicit ladder rung stays exact; a clipped rung moves to the
-    nearest rung inside the bounds, else leaves the ladder.
+    A cut from `cut_from` takes the nearest load no heavier than it, ties to the lighter. A clipped
+    load, an effort ceiling (`round_down`) or any other load no heavier than the derived-from load rounds toward
+    the lighter lift: down, or up for assistance, where more assistance is a lighter lift; a cap or an effort
+    ceiling wins over a cut. An explicit ladder rung stays exact; a clipped rung moves to the nearest rung inside
+    the bounds, else leaves the ladder.
     """
     if rounding.available is None:
         return tuple(replace(s, load=None) for s in sets), {}, []
@@ -788,11 +800,15 @@ def _rounded(sets, clipped, round_down, rounding):
                 continue
             leaves_ladder = index in clipped
         derived = rounding.derived
-        lighter = (round_down or index in clipped
-                   or (derived is not None and (value - derived) * rounding.load_direction <= 1e-9))
-        direction = ("down" if rounding.load_direction > 0 else "up") if lighter else "nearest"
+        at_most_derived = derived is not None and (value - derived) * rounding.load_direction <= 1e-9
         floor, cap = rounding.floor, rounding.cap
-        selected = rounding.available.select(value, direction, cap)
+        cut = cut_from is not None
+        if cut and rounding.load_direction > 0 and not (round_down or index in clipped):
+            direction, selected = "cut", rounding.available.select_cut(value, cut_from, cap)
+        else:
+            lighter = round_down or cut or index in clipped or at_most_derived
+            direction = ("down" if rounding.load_direction > 0 else "up") if lighter else "nearest"
+            selected = rounding.available.select(value, direction, cap)
         if selected is None and direction != "nearest":
             # Nothing on the lighter side (below the lightest dumbbell, the bare bar): the nearest load in the cap.
             selected = rounding.available.select(value, "nearest", cap)
@@ -806,6 +822,67 @@ def _rounded(sets, clipped, round_down, rounding):
             off_ladder.append(value)
         found.append(replace(s, load=units.json_number(max(0, value))))
     return tuple(found), changes, off_ladder
+
+
+def _cut_from(proposal):
+    """The top load a cut of this proposal is measured from: the derived-from load for a cut the scheme made itself
+    (a linear reset), else the lower of the scheme's top load and the derived-from load, which `lightened` cuts."""
+    source = proposal.derived_from
+    derived = source.top_load if source is not None else None
+    if proposal.load_cut:
+        return derived
+    return min((v for v in (base.top_load(proposal.sets), derived) if v is not None), default=None)
+
+
+def _load_cut(baseline, proposal, scheme_sets, sets, kit_changes, rounding):
+    """How the kit moved the top load of a line its scheme or week cut from `baseline`, or None.
+
+    Assistance is never cut, and a top load a cap or constraint moved is reported by them instead.
+    """
+    target, actual = base.top_load(proposal.sets), base.top_load(sets)
+    if (rounding.load_direction < 0 or baseline is None or target is None or actual is None
+            or target >= baseline - 1e-9 or target not in kit_changes):
+        return None
+    before, after = base.working(scheme_sets), base.working(sets)
+    other_cuts = len(after) < len(before) or any(
+        a.rpe is not None and (b.rpe is None or a.rpe < b.rpe) for a, b in zip(after, before))
+    lighter = rounding.available.select(target, "down", rounding.cap)
+    return {"baseline": baseline, "target": target, "actual": actual, "held": actual >= baseline - 1e-9,
+            "rose": actual > baseline + 1e-9, "other_cuts": other_cuts, "lighter": lighter}
+
+
+def _cut_percent(cut, value):
+    return units.json_number(round((cut["baseline"] - value) / cut["baseline"] * 100, 1))
+
+
+def _cut_words(cut, mode, unit):
+    """"a 10 % cut from 80 targets 72; the kit makes 72.5, an actual 9.4 % cut": target and actual, never only the
+    target."""
+    lead = (f"a {_cut_percent(cut, cut['target'])} % cut from {_load_text(cut['baseline'], mode, unit)} targets "
+            f"{_load_text(cut['target'], mode, unit)}")
+    if not cut["held"]:
+        return (f"{lead}; the kit makes {_load_text(cut['actual'], mode, unit)}, an actual "
+                f"{_cut_percent(cut, cut['actual'])} % cut")
+    held = _load_text(cut["actual"], mode, unit)
+    tail = "the set and effort cuts still apply" if cut["other_cuts"] else "no part of the cut applies"
+    if cut["rose"]:
+        return (f"{lead}; the kit makes nothing at or under {_load_text(cut['baseline'], mode, unit)}, so the load "
+                f"rises to {held}, the nearest it makes, and {tail}")
+    return f"{lead}; the nearest load the kit makes no heavier than {held} is {held} itself, so the load holds " \
+           f"(an actual 0 % cut) and {tail}"
+
+
+def _held_cut_words(cut, name, mode, unit):
+    actual = _load_text(cut["actual"], mode, unit)
+    outcome = f"the load rises to {actual}, the nearest it makes" if cut["rose"] else f"{actual} holds"
+    words = (f"{name}: the kit cannot make the {_cut_percent(cut, cut['target'])} % cut to "
+             f"{_load_text(cut['target'], mode, unit)}, so {outcome}")
+    if cut["other_cuts"]:
+        return f"{words}; the set and effort cuts still apply"
+    if cut["lighter"] is None:
+        return f"{words} and nothing lighter fits; no reset or cut is applied, so choose the load"
+    return (f"{words}; no reset or cut is applied, so choose between holding it and "
+            f"{_load_text(cut['lighter'], mode, unit)}, a {_cut_percent(cut, cut['lighter'])} % cut")
 
 
 def _bounded_rung(value, rounding):

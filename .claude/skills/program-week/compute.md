@@ -15,22 +15,19 @@ Run `python3 -m coach history sync`, then the proposal for the mode:
   show`, run the command it would print: `python3 -m coach propose week
   --kind deload --week <label>`, adding `--transform light` for a light
   week or `--transform return` for a return week, such as a return after
-  illness; write.md records the week after "go". A deload applies the
-  program's deload rule (`blocks.deload_rule` in `program show`) to
-  every program session in the span; the standard rule keeps two thirds of each line's working
-  sets, takes 10 % off loads from the current working weights and puts
-  every set at RPE 6 (rn:deloads.9); these numbers are a coaching
-  heuristic. It cuts bodyweight work by sets and takes it further from
-  failure. Its sessions are temporary (`"temporary": true`, titled
-  "Deload — <session title>") and keep their program session ids. Keep
-  the program's priority protocols alive at a reduced dose (ladders
-  resumed, not restarted). Remind the athlete to tell any coach or PT
-  it's a deload week, and deload whatever the profile says moves with
-  the lifting (conditioning and the like). A week back after illness
-  follows the return rule in `CLAUDE.md` "Coaching principles": its
-  illness conditions (when training may restart, the first session's
-  cap, when the athlete checks with a qualified professional first)
-  and, after a long gap, its matching band.
+  illness; write.md records the week after "go". A deload applies the program's deload
+  rule (`blocks.deload_rule` in `program show`) to every program session in the span;
+  the standard rule keeps two thirds of each line's working sets, takes 10 % off the
+  current working loads (a target before the kit rounds it) and puts every set at RPE 6
+  (rn:deloads.9); these numbers are a coaching heuristic. It cuts bodyweight work by
+  sets and takes it further from failure. Its sessions are temporary (`"temporary":
+  true`, titled "Deload — <session title>") and keep their program session ids. Keep the
+  program's priority protocols alive at a reduced dose (ladders resumed, not restarted).
+  Remind the athlete to tell any coach or PT it's a deload week, and deload whatever the
+  profile says moves with the lifting (conditioning and the like). A week back after
+  illness follows the return rule in `CLAUDE.md` "Coaching principles": its illness
+  conditions (when training may restart, the first session's cap, when the athlete
+  checks with a qualified professional first) and, after a long gap, its matching band.
 - **minimum:** validate the configured minimum and write its plan as
   [short-week.md](short-week.md) says, then `python3 -m coach propose
   week --week <label> --plan <the path structure minimum printed>`
@@ -97,6 +94,9 @@ and the rotation position, and settle its flags:
   Else the load holds: ask whether the missing sets were skipped or
   failed. A failed set is a miss: at the limit, override the line to the
   reset load (step 3); below it, name the miss at the next check-in.
+- `load_cut_held` (the kit cannot make a reset, return or deload cut, so
+  the load holds; the rationale gives target and actual): at warn nothing
+  else was cut, so agree holding it or the lighter load it names (step 3).
 - `no_data` (set the first load with the athlete), `stalled`,
   `constraint_applied`, `override_standing`, `scheme_reset`,
   `rotation_unconfirmed` (state the position for confirmation, as

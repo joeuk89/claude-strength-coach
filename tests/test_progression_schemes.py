@@ -445,7 +445,7 @@ class Wave531Test(unittest.TestCase):
         ctx = self.wave(state)
         deloaded = scheme("wave_531").module.deload(ctx, run(ctx))
         self.assertEqual(self.shape(deloaded), [(40, 5, "normal"), (50, 5, "normal"), (60, 5, "normal")])
-        self.assertTrue(deloaded.round_down)
+        self.assertTrue(deloaded.load_cut)
 
     def test_a_return_band_lowers_the_training_max(self):
         source = exposure(date(2026, 9, 14), [(65, 5, None), (75, 5, None), (85, 8, None)])
@@ -454,7 +454,7 @@ class Wave531Test(unittest.TestCase):
         decayed = scheme("wave_531").module.decay(ctx, run(ctx), 28)
         self.assertEqual(decayed.state["training_max"], 90)
         self.assertEqual(self.shape(decayed), [(63, 3, "normal"), (72, 3, "normal")])
-        self.assertTrue(decayed.round_down)
+        self.assertTrue(decayed.load_cut)
 
     def test_a_retest_band_caps_rpe_and_the_derived_from_load(self):
         source = exposure(date(2026, 8, 1), [(60, 5, None)] * 2)
