@@ -357,9 +357,12 @@ def state_errors(plugin, data):
 
 
 def _supported_path(registry, mode):
-    """Where a slot of `mode` can go instead: a held duration changed by override, else the schemes that take it."""
-    if mode == "duration" and registry.get("scheme", "hold") is not None:
-        return '; use hold, and change the duration with propose override --sets "2x35s rpe7"'
+    """Where a slot of `mode` can go instead: hold for a timed or distance line, else the schemes that take it."""
+    if registry.get("scheme", "hold") is not None:
+        if mode == "duration":
+            return '; use hold, and change the duration with propose override --sets "2x35s rpe7"'
+        if mode == "distance":
+            return "; use hold, which repeats the program's distance"
     names = [name for name in registry.names("scheme")
              if mode in (getattr(registry.get("scheme", name).module, "LOAD_MODES", None) or units.LOAD_MODES)]
     return f"; schemes that program it: {', '.join(names)}" if names else ""

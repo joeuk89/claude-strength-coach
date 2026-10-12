@@ -92,8 +92,10 @@ def _mismatch(ctx, source, program_sets, load):
     if over:
         rpe, target = max(over)
         found.append(f"RPE {base.number(rpe)} against the target RPE {base.number(target)}")
+    band = ctx.exercise.load_mode == "band"
+    held, easier = ("the band", "an easier band") if band else ("the load", "a lighter load")
     message = (f"{ctx.exercise.name}: {source.date.isoformat()} logged {' and '.join(found)} {_where(ctx, load)}; "
-               f"holding the load at the program's range does not make it reachable, so review a lighter load or a "
+               f"holding {held} at the program's range does not make it reachable, so review {easier} or a "
                f"different rep range with the athlete")
     return base.flag(ctx, "range_effort_mismatch", message)
 

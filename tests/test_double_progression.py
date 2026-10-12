@@ -160,6 +160,13 @@ class BandAndModesTest(unittest.TestCase):
         self.assertIn("a harder band", top.rationale)
         self.assertIn("the band holds", held.rationale)
 
+    def test_a_band_mismatch_asks_for_an_easier_band(self):
+        held = propose(PULL_APART, program(3, 12, 15), [(None, 10, 7)] * 3)
+        [message] = [f["message"] for f in held.flags if f["code"] == "range_effort_mismatch"]
+        self.assertIn("on the band; holding the band at the program's range does not make it reachable", message)
+        self.assertIn("review an easier band or a different rep range", message)
+        self.assertNotIn("load", message)
+
     def test_programs_every_load_mode_but_duration_and_distance(self):
         self.assertEqual(set(double_progression.LOAD_MODES),
                          {"total", "per_hand_x2", "single_implement", "bodyweight", "assisted", "band"})
@@ -171,10 +178,14 @@ PLANK = {"exercise_id": "plank", "load_mode": "duration",
          "start_load": None}
 
 
-class DurationSlotTest(ProposeCase):
+class ExtraSlotCase(ProposeCase):
+    """The valid instance with `extra_slot` added to session-b as its third exercise."""
+
+    extra_slot = None
+
     def setUp(self):
         super().setUp()
-        self.edit_program(lambda doc: doc["sessions"][1]["exercises"].append(dict(PLANK)))
+        self.edit_program(lambda doc: doc["sessions"][1]["exercises"].append(dict(self.extra_slot)))
 
     def override(self, exercise, spec, expect=0):
         envelope = self.coach("propose", "override", "--proposal", FIRST_ID, "--session", "session-b",
@@ -182,11 +193,19 @@ class DurationSlotTest(ProposeCase):
                               expect=expect)
         return envelope["data"] if expect == 0 else envelope
 
-    def test_double_progression_on_a_duration_slot_fails_validate_and_names_a_supported_path(self):
-        self.set_scheme("session-b", "plank", "double_progression")
+    def refusal(self, exercise_id):
+        """The validate message for setting `exercise_id` on double progression."""
+        self.set_scheme("session-b", exercise_id, "double_progression")
         envelope = self.coach("program", "validate", expect=1)
         details = {d["path"]: d["message"] for d in envelope["error"]["details"]}
-        message = details["$.sessions[1].exercises[2].scheme.name"]
+        return details["$.sessions[1].exercises[2].scheme.name"]
+
+
+class DurationSlotTest(ExtraSlotCase):
+    extra_slot = PLANK
+
+    def test_double_progression_on_a_duration_slot_fails_validate_and_names_a_supported_path(self):
+        message = self.refusal("plank")
         self.assertIn("this slot is duration", message)
         self.assertIn("hold", message)
         self.assertIn('propose override --sets "2x35s rpe7"', message)
@@ -212,6 +231,31 @@ class DurationSlotTest(ProposeCase):
             with self.subTest(spec=spec):
                 envelope = self.override(exercise, spec, expect=code)
                 self.assertIn(spec.split(",")[0].strip() if code == 2 else exercise, envelope["error"]["message"])
+        self.assertEqual(self.snapshot(), before)
+
+
+ROW = {"exercise_id": "rowing_machine", "load_mode": "distance",
+       "sets": [{"count": 1, "type": "normal", "distance_meters": 2000, "rpe": 6}], "rest_seconds": 60,
+       "superset_id": None, "cues": None, "constraints": [], "scheme": {"name": "hold", "params": {}},
+       "start_load": None}
+
+
+class DistanceSlotTest(ExtraSlotCase):
+    extra_slot = ROW
+
+    def test_double_progression_on_a_distance_slot_names_hold_alone(self):
+        message = self.refusal("rowing_machine")
+        self.assertIn("this slot is distance; use hold, which repeats the program's distance", message)
+        self.assertNotIn("linear", message)
+
+    def test_sets_on_a_distance_line_refuse_without_writes(self):
+        self.propose()
+        before = self.snapshot()
+        for spec in ("1x10 rpe6", "1x600s rpe6"):
+            with self.subTest(spec=spec):
+                envelope = self.override("rowing_machine", spec, expect=1)
+                self.assertIn("rowing_machine is a distance line, and --sets takes reps or seconds, not a distance",
+                              envelope["error"]["message"])
         self.assertEqual(self.snapshot(), before)
 
 

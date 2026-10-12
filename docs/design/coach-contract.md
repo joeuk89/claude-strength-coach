@@ -2684,12 +2684,13 @@ and `plugins test` runs them. Loaded with
   one of the derived-from exposure's working sets, up to the program's
   set count, fell below the range's bottom or was logged 2 or more RPE
   over its target (`base.RPE_STEP_BACK`, the framework's existing
-  step-back distance; a coaching heuristic, not a research threshold). The flag asks the coach to review a
-  lighter load or a different rep range; restating the range never
-  claims it is reachable. `LOAD_MODES` leaves out `duration` and
-  `distance`, which it cannot progress. A refused slot's message names
-  the path that works: for `duration`, `hold` and a `propose override
-  --sets "2x35s rpe7"`; otherwise the schemes that program the mode.
+  step-back distance; a coaching heuristic, not a research threshold).
+  The flag asks the coach to review a lighter load or a different rep
+  range; restating the range never claims it is reachable. `LOAD_MODES`
+  leaves out `duration` and `distance`, which it cannot progress. A
+  refused slot's message names the path that works: for `duration`,
+  `hold` and a `propose override --sets "2x35s rpe7"`; for `distance`,
+  `hold`; otherwise the schemes that program the mode.
   Band work has no load to add: at the top of the range the line holds
   and its rationale asks the coach for a harder band.
 - The pipeline reads caps through `coach.checks.instance.cap_for(config,
@@ -2889,8 +2890,9 @@ constrained mode) stay coach-built through `overlay build`.
   `duration` line, `COUNTxSECONDSs[ rpeN]` (`"2x35s rpe7"`), which
   replace the line's working sets and keep its warm-ups, or `--load N`.
   A spec mixing reps and seconds, or a timed group with a range or a
-  load, exits 2; seconds on any other line, or reps on a `duration`
-  line, exit 1. Both refuse before anything is written. It re-runs
+  load, exits 2; seconds on any other line, reps on a `duration` line
+  or any `--sets` on a `distance` line exit 1. Both refuse before
+  anything is written. It re-runs
   the R-24 check and stores the merged flags in the draft, so a block an
   override creates can be resolved there. A standing override's decision
   is appended when the command runs.

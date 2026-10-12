@@ -135,7 +135,9 @@ def parse_sets(spec):
 
 
 def _metric_problem(exercise_id, mode, sets):
-    """Why `sets` do not fit a line of `mode`: a duration line takes seconds, any other line no seconds."""
+    """Why `sets` do not fit a line of `mode`: seconds go on a duration line only, and nothing on a distance line."""
+    if mode == "distance":
+        return f"{exercise_id} is a distance line, and --sets takes reps or seconds, not a distance"
     timed = any(s.duration_seconds is not None for s in sets if s.working)
     if mode == "duration" and not timed:
         return f'{exercise_id} is a duration line, so --sets takes seconds, e.g. "2x35s rpe7"'

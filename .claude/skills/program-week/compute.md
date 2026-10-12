@@ -42,13 +42,14 @@ in the athlete's units and the load mode's own number. Each scheme reads
 the log: double progression keeps the program's rep range and target
 RPE and adds the increment once every set reaches the top of the range
 (at or under target RPE, except uncapped isolation work), missed reps
-hold, and loads never derive from an open convention slip. The core then decays a lift past its validity window
-to its return band, caps every set of the first session after illness
-at RPE 7, applies the slot's load constraints and the caps and kit at
-the session's location, and rounds each load to the kit. It writes an
-editable draft (`.coach/proposals/<id>.json`) and prints `data.lines`:
-per line its sets (loads through `units format`), the `change`, a
-one-sentence `rationale` and its flags.
+hold, and loads never derive from an open convention slip. The core
+then decays a lift past its validity window to its return band, caps
+every set of the first session after illness at RPE 7, applies the
+slot's load constraints and the caps and kit at the session's location,
+and rounds each load to the kit. It writes an editable draft
+(`.coach/proposals/<id>.json`) and prints `data.lines`: per line its
+sets (loads through `units format`), the `change`, a one-sentence
+`rationale` and its flags.
 
 ## 2. Read every line against the check-in
 
@@ -99,12 +100,13 @@ and the rotation position, and settle its flags:
 
 Run `python3 -m coach propose override --proposal <id> --session
 <session> --exercise <exercise> (--sets "3x5@95 rpe7" | --load <n>)
---reason "<why>"`; a timed hold takes seconds, `--sets "2x35s rpe7"`. Add `--standing` (and `--until <date>`, eight weeks
-at most; four by default) when the change should hold in later weeks —
-a niggle, an agreed hold — so the scheme stops proposing it away. A
-per-exercise **focus** drawn from check-in findings ("slow the
-eccentric") may go into the draft line, with an `override` reason
-saying why; any line changed without a reason is refused.
+--reason "<why>"`; a timed hold takes seconds, `--sets "2x35s rpe7"`.
+Add `--standing` (and `--until <date>`, eight weeks at most; four by
+default) when the change should hold in later weeks — a niggle, an
+agreed hold — so the scheme stops proposing it away. A per-exercise
+**focus** drawn from check-in findings ("slow the eccentric") may go
+into the draft line, with an `override` reason saying why; any line
+changed without a reason is refused.
 
 Niggle limits are already in the proposal: `propose week` applies each
 active niggle's constraints to every matching line and names the niggle
