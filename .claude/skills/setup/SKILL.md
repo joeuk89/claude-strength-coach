@@ -91,8 +91,8 @@ Apply corrections and later disclosures the same way before proceeding or comple
 
 Skip the program when `data/program.json` exists. Otherwise follow
 [program.md](program.md): `python3 -m coach starters list`, the
-**new-program** skill's three-path offer, the chosen path, `python3 -m
-coach program adopt`, and the one load-mode confirmation.
+**new-program** skill's three-path offer, the chosen path, the one
+load-mode confirmation, then `python3 -m coach program adopt`.
 
 Before week one, follow [commit.md](commit.md) for the reviewed setup
 commit and upstream. Then run the **program-week** skill: `python3 -m

@@ -57,9 +57,9 @@ their yes, record every row with `python3 -m coach library set-mode
 its load modes before the import, so its table holds only exercises
 added while finishing the draft. Never ask about the table again.
 
-**A corrected row needs its start load's basis.** A row set to another
-mode than its draft line makes adopt exit 1, naming the slot. For each
-such row with a start load, ask what its number meant: in the line's
+**A corrected row needs its start load's basis.** A row set to a
+different mode from its draft line makes adopt exit 1, naming the slot.
+For each such row with a start load, ask what its number meant: in the line's
 old mode or the corrected one ("was 20 the total, or 20 per hand?").
 Run `python3 -m coach program reconcile-mode <id> --input
 .coach/drafts/program.json` with `--basis old` (the number was in the

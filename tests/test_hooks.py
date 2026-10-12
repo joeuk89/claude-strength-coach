@@ -328,6 +328,7 @@ class PathMapTest(unittest.TestCase):
         self.assertIn("nutrition_template", hooks.checks_for("config.toml"))
         self.assertIn("nutrition_template", hooks.checks_for("nutrition/menu/oats.md"))
         self.assertIn("overlay_library_consistency", hooks.checks_for("data/exercises.json"))
+        self.assertIn("program_exercise_ids", hooks.checks_for("data/exercises.json"))
         for check_id in ("overlay_library_consistency", "dangling_routine_ids"):
             self.assertIn(check_id, hooks.checks_for("data/overlays/2026-10-12-weekly.json"))
 

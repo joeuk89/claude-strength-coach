@@ -206,7 +206,7 @@ def mismatch_message(row):
     command = f"python3 -m coach {RECONCILE_COMMAND} {row['exercise_id']}"
     start = row["start_load"]
     where = f"{row['exercise_id']} in session {row['session_id']} is {row['load_mode']}"
-    if isinstance(start, (int, float)) and not isinstance(start, bool) and row["confirmed"] in units.LOADED_MODES:
+    if _is_number(start) and row["confirmed"] in units.LOADED_MODES:
         number = units.format_number(start)
         return (f"{where} with start_load {number}, but the library's confirmed load mode is {row['confirmed']}. "
                 f"Ask whether {number} was meant as {row['load_mode']} or {row['confirmed']}, then run {command} "
@@ -222,16 +222,18 @@ def load_mode_errors(doc, library):
 
 
 def reconciled(doc, exercise_id, confirmed, basis, unit):
-    """(a copy of `doc` with every `exercise_id` line in `confirmed` mode, the changes made).
+    """(a copy of `doc` with every `exercise_id` line in `confirmed` mode, the changes made, warnings).
 
     With basis "old" a start load is converted from the line's mode by
     `units.convert_mode`; with "confirmed" its number already meant the
     confirmed mode and stays. A mode that carries no load takes no start load.
+    Scheme params keep their numbers; under basis "old" each load among them
+    that would convert to another number gets a warning.
     """
     if basis not in BASES:
         raise ValueError(f"basis must be one of {', '.join(BASES)}, found {basis!r}")
     doc = copy.deepcopy(doc)
-    changes = []
+    changes, warnings = [], []
     for s_index, e_index, session, line in slots(doc):
         if line.get("exercise_id") != exercise_id or line.get("load_mode") == confirmed:
             continue
@@ -242,9 +244,47 @@ def reconciled(doc, exercise_id, confirmed, basis, unit):
         elif basis == "old" and before["load_mode"] in units.LOADED_MODES:
             start = units.convert_mode(start, before["load_mode"], confirmed, unit)
         line["load_mode"], line["start_load"] = confirmed, start
-        changes.append({"path": f"$.sessions[{s_index}].exercises[{e_index}]", "session_id": session.get("id"),
+        path = f"$.sessions[{s_index}].exercises[{e_index}]"
+        changes.append({"path": path, "session_id": session.get("id"),
                         "from": before, "to": {"load_mode": confirmed, "start_load": start}})
-    return doc, changes
+        if basis == "old":
+            warnings += _kept_scheme_loads(path, line, before["load_mode"], confirmed, unit)
+    return doc, changes, warnings
+
+
+_SCHEME_LOAD_PARAMS = ("increment", "training_max", "increment_upper", "increment_lower")
+
+
+def _scheme_loads(line):
+    """(JSONPath suffix, number) for each load among the line's scheme params."""
+    scheme = line.get("scheme")
+    params = scheme.get("params") if isinstance(scheme, dict) else None
+    if not isinstance(params, dict):
+        return []
+    found = [(f".scheme.params.{key}", params[key]) for key in _SCHEME_LOAD_PARAMS if _is_number(params.get(key))]
+    rungs = params.get("rungs")
+    for index, rung in enumerate(rungs if isinstance(rungs, list) else []):
+        if isinstance(rung, dict) and _is_number(rung.get("load")):
+            found.append((f".scheme.params.rungs[{index}].load", rung["load"]))
+    return found
+
+
+def _kept_scheme_loads(path, line, from_mode, to_mode, unit):
+    if from_mode not in units.LOADED_MODES or to_mode not in units.LOADED_MODES:
+        return []
+    warnings = []
+    for suffix, value in _scheme_loads(line):
+        converted = units.convert_mode(value, from_mode, to_mode, unit)
+        if converted != value:
+            warnings.append(f"{path}{suffix} keeps the number {units.format_number(value)}, which now reads as "
+                            f"{to_mode}; the same load in its old mode, {from_mode}, is "
+                            f"{units.format_number(converted)} {to_mode}. Ask the athlete which they meant and edit "
+                            "the param to match")
+    return warnings
+
+
+def _is_number(value):
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
 def _structure(doc):

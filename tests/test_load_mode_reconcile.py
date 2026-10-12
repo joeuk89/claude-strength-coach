@@ -189,6 +189,51 @@ class TwoSessionsTest(Case):
         self.assertTrue(any("duration_seconds" in d["message"] for d in error["details"]), error)
         self.assertEqual(snapshot(self.root), before)
 
+    def test_old_basis_names_scheme_loads_it_leaves_in_the_old_mode(self):
+        doc = read(self.program)
+        for _, line in cable_fly_lines(doc):
+            line["scheme"] = {"name": "linear", "params": {"increment": 5}}
+        write(self.program, doc)
+        envelope = self.ok(self.root, "program", "reconcile-mode", "cable_fly", "--basis", "old")
+        kept = [w for w in envelope["warnings"] if "scheme.params.increment" in w]
+        self.assertEqual(len(kept), 2, envelope["warnings"])
+        for needle in ("$.sessions[0].exercises[2].scheme.params.increment", "5", "per_hand_x2", "2.5"):
+            self.assertIn(needle, kept[0])
+        self.assertEqual({line["scheme"]["params"]["increment"] for _, line in cable_fly_lines(read(self.program))},
+                         {5})
+
+    def test_confirmed_basis_reads_scheme_loads_in_the_confirmed_mode_too(self):
+        doc = read(self.program)
+        for _, line in cable_fly_lines(doc):
+            line["scheme"] = {"name": "linear", "params": {"increment": 5}}
+        write(self.program, doc)
+        envelope = self.ok(self.root, "program", "reconcile-mode", "cable_fly", "--basis", "confirmed")
+        self.assertFalse([w for w in envelope["warnings"] if "scheme.params" in w], envelope["warnings"])
+
+    def test_an_unknown_id_is_refused(self):
+        before = snapshot(self.root)
+        error = self.fails(self.root, "program", "reconcile-mode", "no_such_lift", "--basis", "old")["error"]
+        self.assertIn("library search", error["message"])
+        self.assertEqual(snapshot(self.root), before)
+
+    def test_two_corrected_exercises_reconcile_one_at_a_time(self):
+        doc = read(self.program)
+        for session in doc["sessions"]:
+            session["exercises"].append(dict(session["exercises"][-1], exercise_id="db_lateral_raise"))
+        write(self.program, doc)
+        self.ok(self.root, "library", "set-mode", "db_lateral_raise", "per_hand_x2")
+
+        first = self.ok(self.root, "program", "reconcile-mode", "cable_fly", "--basis", "old")
+        self.assertTrue(first["data"]["written"])
+        self.assertEqual(first["data"]["rendered"], [])
+        self.assertTrue(any("not rendered" in w for w in first["warnings"]), first)
+        self.fails(self.root, "check", "--only", "routine_render_fresh")
+
+        second = self.ok(self.root, "program", "reconcile-mode", "db_lateral_raise", "--basis", "old")["data"]
+        self.assertTrue(second["rendered"])
+        self.ok(self.root, "program", "validate")
+        self.ok(self.root, "check", "--only", "routine_render_fresh,program_exercise_ids")
+
     def test_an_unconfirmed_exercise_cannot_be_reconciled(self):
         library = read(self.root / "data" / "exercises.json")
         library["exercises"]["cable_fly"]["load_mode"] = None
@@ -235,6 +280,13 @@ class ConfirmReportsSlotsTest(Case):
         data = self.ok(root, "library", "confirm", "cable_fly")["data"]
         self.assertEqual([(s["session_id"], s["confirmed"]) for s in data["program_slots"]], [("push", "per_hand_x2")])
 
+    def test_an_unreadable_program_still_records_the_mode(self):
+        root = self.adopted_ppl()
+        (root / "data" / "program.json").write_text("{not json", encoding="utf-8")
+        data = self.ok(root, "library", "set-mode", "cable_fly", "per_hand_x2")["data"]
+        self.assertEqual(data["program_slots"], [])
+        self.assertEqual(read(root / "data" / "exercises.json")["exercises"]["cable_fly"]["load_mode"], "per_hand_x2")
+
 
 class SkillTextTest(unittest.TestCase):
     def test_setup_records_the_table_before_adopt_and_asks_the_basis_of_a_corrected_row(self):
@@ -245,6 +297,19 @@ class SkillTextTest(unittest.TestCase):
         self.assertIn("program reconcile-mode <id> --input .coach/drafts/program.json", adopt)
         for needle in ("--basis old", "--basis confirmed", "The athlete's answer picks the basis", "program_slots"):
             self.assertIn(needle, adopt)
+
+    def test_setup_lists_the_load_mode_confirmation_before_adopt(self):
+        step = flat(step_text("setup", "SKILL.md"))
+        step = step[step.index("## 5. Program, then week one"):]
+        self.assertLess(step.index("the one load-mode confirmation"), step.index("coach program adopt"))
+
+    def test_a_weekly_mismatch_from_a_corrected_mode_is_reconciled_on_the_athletes_basis(self):
+        text = flat(step_text("program-week", "build.md"))
+        flag = text[text.index("`load_mode_mismatch` (block)"):]
+        flag = flag[:flag.index("`rpe_infeasible`")]
+        for needle in ("library set-mode", "the old or new mode", "program reconcile-mode <id> --basis old|confirmed"):
+            self.assertIn(needle, flag)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -110,40 +110,30 @@ def reconcile_mode(args, ctx):
     if confirmed is None:
         raise ValidationError(f"{args.id} has no confirmed load mode to reconcile to; ask the athlete how it is "
                               f"loaded and run python3 -m coach library set-mode {args.id} MODE first")
-    if args.input:
-        path, prefix = Path(args.input), "$.program"
-        container = program_drafts.read_draft(path)
-        if not isinstance(container, dict) or not isinstance(container.get("program"), dict):
-            raise ValidationError(f"{path} is not a program draft: it has no program object")
-        doc = container["program"]
-    else:
-        path, prefix = program.path_for(ctx.root), "$"
-        container = doc = program.read_json(path)
-    shown = args.input or paths.PROGRAM.as_posix()
+    target = _ReconcileTarget(args.input, ctx.root)
 
     try:
-        new_doc, changes = program.reconciled(doc, args.id, confirmed, args.basis, ctx.config.athlete.units)
+        new_doc, changes, warnings = program.reconciled(target.doc, args.id, confirmed, args.basis,
+                                                        ctx.config.athlete.units)
     except ValueError as exc:
         raise ValidationError(f"cannot convert a start load of {args.id}: {exc}") from None
-    result = {"path": shown, "exercise_id": args.id, "load_mode": confirmed, "basis": args.basis,
+    for warning in warnings:
+        ctx.warn(f"{target.shown}: {warning}")
+    result = {"path": target.shown, "exercise_id": args.id, "load_mode": confirmed, "basis": args.basis,
               "changed": changes, "written": False, "rendered": []}
     if not changes:
         return result
-    added = _problem_set(new_doc, ctx, library) - _problem_set(doc, ctx, library)
+    added = _problem_set(new_doc, ctx, library) - _problem_set(target.doc, ctx, library)
     if added:
-        details = [Error(prefix + where[1:], message).to_json() for where, message in sorted(added)]
+        details = [Error(target.prefix + where[1:], message).to_json() for where, message in sorted(added)]
         raise ValidationError(f"Reconciling {args.id} to {confirmed} would make the program invalid; nothing was "
                               "written", details=details)
     if args.dry_run:
         return result
 
-    if args.input:
-        container = dict(container, program=new_doc)
-        jsonio.write_doc(path, container, False)
-    else:
-        jsonio.write_doc(path, new_doc, False)
+    target.write(new_doc)
     result["written"] = True
-    if not args.input:
+    if target.renders:
         try:
             pages = program.render_all(ctx.root)
         except ValidationError as exc:
@@ -151,3 +141,23 @@ def reconcile_mode(args, ctx):
         else:
             result["rendered"] = program.sync_pages(ctx.root, pages, dry_run=False)["written"]
     return result
+
+
+class _ReconcileTarget:
+    """The program reconcile-mode reads and writes: a draft's `program` with --input, else data/program.json."""
+
+    def __init__(self, input_path, root):
+        self.renders = input_path is None
+        if self.renders:
+            self.path, self.prefix, self.shown = program.path_for(root), "$", paths.PROGRAM.as_posix()
+            self._container = self.doc = program.read_json(self.path)
+            return
+        self.path, self.prefix, self.shown = Path(input_path), "$.program", input_path
+        self._container = program_drafts.read_draft(self.path)
+        if not isinstance(self._container, dict) or not isinstance(self._container.get("program"), dict):
+            raise ValidationError(f"{self.path} is not a program draft: it has no program object")
+        self.doc = self._container["program"]
+
+    def write(self, new_doc):
+        written = new_doc if self.renders else dict(self._container, program=new_doc)
+        jsonio.write_doc(self.path, written, False)

@@ -62,7 +62,7 @@ def _write(lib, doc, args):
 
 
 def _program_slots(ctx, lib, ids):
-    """Lines of data/program.json left in another mode than the one `lib` confirms for `ids`, each with a warning."""
+    """Lines of data/program.json in a different mode from the one `lib` confirms for `ids`, each with a warning."""
     if not program.exists(ctx.root):
         return []
     try:

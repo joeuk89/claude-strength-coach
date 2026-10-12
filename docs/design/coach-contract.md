@@ -697,9 +697,10 @@ none and `bodyweight`, `assisted`, `duration` or `distance`; band and
   `load_mode_proposed` to `load_mode`; `library set-mode ID MODE` records
   the athlete's answer directly, and an invalid mode exits 1 listing the
   eight. Both return `data.program_slots`, the `data/program.json` lines
-  of those exercises left in another mode (each with `path`,
-  `session_id`, `exercise_id`, `load_mode`, `confirmed`, `start_load`
-  and a warning), even when the mode was already recorded.
+  of those exercises left in a different mode from the confirmed one
+  (each with `path`, `session_id`, `exercise_id`, `load_mode`,
+  `confirmed` and `start_load`; each also adds a warning to
+  `warnings`), even when the mode was already recorded.
 - Checks: `library_valid` (catalogue and instance file validate; one
   `fail` per problem, with its JSONPath) and `load_modes_confirmed`
   (every exercise in the cached Hevy routines and in every overlay has a
@@ -1615,9 +1616,23 @@ rewrites that program draft's `program`; otherwise `data/program.json`,
 then renders the pages. Lines already in the confirmed mode are left
 alone, so a second run changes nothing. It never touches history,
 overlays, check-ins or state; scheme params and scheme state keep their
-numbers. `data` carries `path`, `exercise_id`, `load_mode`, `basis`,
-`changed` (`[{path, session_id, from, to}]`, each side
-`{load_mode, start_load}`), `written` and `rendered`.
+numbers. Under `--basis old`, each scheme param load (`increment`,
+`training_max`, `increment_upper`, `increment_lower`, a rung's `load`)
+that would convert to another number adds a warning naming its JSONPath,
+its number and the converted one, so the agent asks the athlete before
+editing it. When the pages cannot render (another exercise still
+mismatched, say) it writes the program, warns and leaves `rendered`
+empty; reconciling the last mismatch renders them. `data` carries
+`path`, `exercise_id`, `load_mode`, `basis`, `changed`
+(`[{path, session_id, from, to}]`, each side `{load_mode,
+start_load}`), `written` and `rendered`.
+
+A standing mismatch makes the program invalid for every reader that
+validates it against the library, so each exits 1 until it is
+reconciled: `program validate`, `program render`, `program adopt`,
+`structure balance --program`, and everything built on the proposal run
+(`propose week`, `schedule plan`, `block close`). The check-in catch-up
+rotation line then falls back to the rotation in `data/state.json`.
 
 **Rendered pages.** `coach.program.render_all(root) -> {path: text}` gives
 `routine/program.md` (sessions with links, schedule rule, coach-led
