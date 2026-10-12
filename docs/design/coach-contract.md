@@ -44,6 +44,7 @@ coach/                       # framework: synced to instances
   library.py                                                                             (R-11)
   hevy/{client,transport,cache,ratelimit,anonymise,envfile,pull,record}.py              (R-12)
   overlay.py, render.py                                                                  (R-13)
+  summaries.py               # plugin settings in words for athlete pages, rotation wording
   routines.py                # diff, push, verify, retire; create                        (R-14, R-14b)
   external.py                # Hevy mapping requirements, managed orphan routines        (R-14)
   gate.py                    # PreToolUse hook logic                                     (R-15)
@@ -543,7 +544,7 @@ slot, not of its name. Enum (from R-11):
 |---|---|---|---|---|
 | `total` | null | load on the bar/stack | `weight_kg` | `80` |
 | `per_hand_x2` | one dumbbell | 2 × per_hand | `weight_kg` | `25/hand (Hevy: 50)` |
-| `single_implement` | the one implement | = per_hand | `weight_kg` | `25 (Hevy: 25)` |
+| `single_implement` | the one implement | = per_hand | `weight_kg` | `25` |
 | `bodyweight` | null | added load, 0 if none | `weight_kg` | `BW` or `BW+10` |
 | `assisted` | null | assistance | `weight_kg` | `BW-20 assist (Hevy: 20)` |
 | `band` | — | — | none | load is null |
@@ -1098,7 +1099,13 @@ for every non-GET request, success or failure, once its retries are over.
   (R-32a), `card <slug>` (R-33b), `cardio <week label>` (R-43).
 - Freshness means the bytes equal a fresh render. Each renderer exposes
   `render_<kind>(root, id) -> str` so `coach check` can compare; R-13's is
-  `coach.render.render_overlay(root, id)`. The region's bytes run from the
+  `coach.render.render_overlay(root, id)`. It reads the instance's
+  library and config, as `overlay render` does: the Exercise column
+  prints library names (the overlay keeps ids) and, with `[hevy] enabled`
+  false, loads leave out the Hevy value. The check-in's week-review
+  region (C36) does the same in its Exercise and Lift columns and its
+  prescribed and logged texts, where a rep-out set reads `1×5+ @ 85
+  (stop at RPE 9)`. The region's bytes run from the
   start of the begin marker to the end of the end marker.
 - `coach.render.find_regions(text, kind)` and `coach.render.splice_region(text,
   kind, id, region, heading="## The week ahead")` (R-13) find and replace
@@ -1473,7 +1480,7 @@ files to it; nobody edits another item's files.
 | routines | `00000000-0000-4000-8000-000000000001` "Session A" (squat, DB bench); `...0002` "Session B" (row, pull-up) |
 | sessions | `session-a`, `session-b` |
 | program and state (R-17a) | `data/program.json`: Session A squat 3×5 RPE 7 from 100, DB bench 3×8–10 RPE 8 from 25/hand; Session B row 3×10 RPE 8 from 30, pull-up 3×8 RPE 8 at BW; `fixed_weekdays` mon/thu; no external sessions; `data/state.json` mapping both C14 routines, folder 1; `routine/` pages rendered from it |
-| overlay | `2026-10-12-weekly`, span 2026-10-12 to 2026-10-18, approved; Session A 2026-10-12 (squat 100, DB bench 25/hand (Hevy: 50)), Session B 2026-10-15 (row 30 (Hevy: 30), pull-up BW); built from `tests/fixtures/overlay/draft-kg.json` |
+| overlay | `2026-10-12-weekly`, span 2026-10-12 to 2026-10-18, approved; Session A 2026-10-12 (squat 100, DB bench 25/hand (Hevy: 50)), Session B 2026-10-15 (row 30, pull-up BW); built from `tests/fixtures/overlay/draft-kg.json` |
 | check-in (R-13) | `check-ins/2026-10-11.md` holding the rendered region of `2026-10-12-weekly` |
 | profile (R-26b) | `profile.md`: two lines of synthetic prose, no load figures and no claim references, so `status` sees a set-up instance |
 | `COACH_NOW` | `2026-10-11T18:00:00Z` |
@@ -1847,10 +1854,21 @@ rotation line then falls back to the rotation in `data/state.json`.
 sessions, block ceiling and deload rule, missed-day rules) and
 `routine/<session id>.md` for every session (one table row per set
 group; start loads through `units.format_load` on the first working
-group's row; cues and constraints listed below). It renders from
-`data/program.json`, the exercise library (names) and `[athlete] units`
-only, never from state, so a weekly state change never makes a page
-stale. The one exception is the block status line (C43) on
+group's row, without the Hevy value when `[hevy] enabled` is false;
+cues and constraints listed below). A session page labels its loads as
+where each exercise began, not this week's prescription, and links to
+`this-week.md` for this week's loads. Schedule rules, progression and
+session schemes and deload rules print through `coach.summaries`:
+session titles and exercise names instead of ids, a fixed-weekday
+schedule in week order (`fixed weekdays: Mon Session A · Thu Session
+B`), settings in words with null settings left out, and never JSON. A
+scheme's `training_max` param reads `starting training max 180 kg`;
+the training max in use is on `progress.md` (C38). A rep range whose
+ends are equal prints one count (`3×6`) here and on every athlete page
+(`units.rep_range_text`). It renders from `data/program.json`, the
+exercise library (names), `[athlete] units` and `week_starts` and
+`[hevy] enabled` only, never from state, so a weekly state change never
+makes a page stale. The one exception is the block status line (C43) on
 `routine/program.md`, which reads `data/state.json` and
 `data/blocks.json`; every `block` command that writes re-renders that
 page. Each page starts with the C11 header naming `data/program.json`
@@ -5066,7 +5084,11 @@ as it was):
 - The rotation line (the `coach_led` field, else `next_week`; in
   catch-up mode the `next_week` question) states the position `schedule plan` infers
   for next week and whether it is confirmed; with no plannable program
-  it falls back to `state.rotation`.
+  it falls back to `state.rotation`. For `next_in_sequence`, whose
+  position is the session last trained, it names the session the plan
+  starts next week with and the last one trained: "Rotation: next week
+  starts with Session A, after Session B as the last session trained
+  (confirmed); correct me if not."
 - `questions` have the card fields' shape, `{id, n, label, prefill,
   ask}`, numbered in order: `gap`, `now`, `nutrition`, `next_week`.
   `nutrition` is the field the weekly card would ask: the nutrition
@@ -5182,7 +5204,7 @@ changed lines and moved sessions carry `missed_day_rule` (info). It runs
 
   ```
   - Missed Wed 14 Oct Session B (sleep).
-  - Rule miss-b: Single-arm row 2×10 @ 30 (Hevy: 30) added to Sat 17 Oct Session A, this week only.
+  - Rule miss-b: Single-arm row 2×10 @ 30 added to Sat 17 Oct Session A, this week only.
   - Overlay 2026-10-17-midweek; Hevy: Session A.
   ```
   The coach then runs `overlay approve` and `routines push` as for any
@@ -5328,7 +5350,11 @@ these headings:
 - …
 ```
 
-- Header: week start; `state.rotation` position and whether confirmed;
+- Header: week start; `state.rotation` position and whether confirmed
+  (a `next_in_sequence` position is the session last trained, so the
+  header reads `Starts with Session A after Session B (confirmed)` when
+  the stored week is the brief's, else `Session B last trained before
+  the week of 5 Oct (confirmed)`);
   phase (from a part; omitted until R-33a); next check-in date and tier
   (C36 `due`).
 - Focus: the overlay's `focus`, then one line per planned break (C50)
@@ -5405,7 +5431,13 @@ would make every publish stale its own dashboard.
 **Progress** (`progress.md`): the `stats.e1rm_meaning` sentence, then a
 table of every lift with a C18 series in its whole-unit display (best
 e1RM and date, latest, change over 28 days: the latest point minus
-the newest point dated at least 28 days before `as_of`); part sections
+the newest point dated at least 28 days before `as_of`); `## Training
+maxes`, only when a program slot's scheme keeps a training max: one line
+per slot naming the exercise, the session, the training max the next
+proposal starts from and its unit (`Back Squat (Barbell), Session A:
+current training max 195 kg (program start 180 kg).`), read through
+`propose.training_maxes`: the stored state, a pending one once its
+overlay is approved, else the program's starting value; part sections
 (ladder state, priority lifts); core-complete streak (current, longest,
 and the last 12 weeks as ✔/✗, – for a week with no planned core
 session); bodyweight (part, else the C35 selected bodyweight series dated
@@ -7600,7 +7632,7 @@ Providers R-26b ships:
 | `checks` | the `coach check` summary and the ids of any `fail` or `warn` |
 | `hevy` | cache age against `[hevy] cache_max_age_hours`; skipped when Hevy is disabled |
 | `overlay` | the overlay in force today (id, kind, span), else the next to start with its first session not on a planned-break day; whether it is approved, pushed and verified (a routine counts as verified when its latest `verify` line for the overlay's id and approval hash says so; Hevy off: approved only); the next one or two planned sessions (none on a planned-break day); each planned break (C50) overlapping today to the end of the coming week, with the day training resumes; and the days of the coming week neither an overlay nor a planned break covers, none when the coming week is a break week (C41 kind `break`), whose other days plan no session. With no overlay, a day on a break (today, or a coming week with no uncovered day) says none is needed rather than asking for /program-week. The coming week is the week holding tomorrow (`[athlete] week_starts`), from today on: the rest of this week, or all of next week on its last day. Invalid overlays are skipped (`checks` names them) |
-| `program` | rotation position and whether it is confirmed (R-25's `header_facts`), the confirmation date (`state.json`); the block status line (`coach.block.status_line`, C43) and `light_week` (`state.json`); `attention` when the position is unconfirmed or the light week is `proposed` or `agreed` |
+| `program` | rotation position and whether it is confirmed (R-25's `header_facts`; a `next_in_sequence` position reads `session-b last trained, session-a next`), the confirmation date (`state.json`); the block status line (`coach.block.status_line`, C43) and `light_week` (`state.json`); `attention` when the position is unconfirmed or the light week is `proposed` or `agreed` |
 | `checkin` | last check-in, days since, due date, tier and mode (`first`, `weekly`, `deep`, `catch_up`) from R-25's `header_facts` (its `data` is `header_facts`' `checkin`); `attention` when the due date is today or past, including the first review |
 
 Later items add a provider when they own a fact the coach should see at

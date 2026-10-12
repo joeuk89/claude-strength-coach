@@ -6,7 +6,9 @@ computes with a load's numbers.
 
 import re
 
+from coach import config as config_module
 from coach import dates, overlay, units
+from coach.library import Library
 from coach.units import format_load
 
 REGION_KIND = "overlay"
@@ -44,7 +46,7 @@ def _number(value):
 
 def _reps(set_):
     if set_.get("rep_range") is not None:
-        return f"{set_['rep_range']['start']}–{set_['rep_range']['end']}"
+        return units.rep_range_text(set_['rep_range']['start'], set_['rep_range']['end'])
     if set_.get("reps") is not None:
         return _number(set_["reps"]) + ("+" if set_.get("rep_out") else "")
     if set_.get("duration_seconds") is not None:
@@ -65,11 +67,11 @@ def _needs_load(exercise, set_):
     return exercise["load_mode"] in units.LOADED_MODES and set_.get("load") is None
 
 
-def _load_text(exercise, set_, with_unit):
+def _load_text(exercise, set_, with_unit, show_hevy=True):
     load = set_.get("load")
     if load is None:
         return CHOOSE_THE_LOAD if _needs_load(exercise, set_) else None
-    text = format_load(load)
+    text = format_load(load, show_hevy=show_hevy)
     if with_unit and exercise["load_mode"] == "total":
         text = f"{text} {load['unit']}"
     return text
@@ -139,7 +141,11 @@ def _unit(doc):
     return None
 
 
-def _exercise_rows(exercise):
+def _exercise_id(exercise_id):
+    return exercise_id
+
+
+def _exercise_rows(exercise, name=_exercise_id, show_hevy=True):
     notes = []
     if exercise.get("focus"):
         notes.append(f"Focus: {exercise['focus']}")
@@ -152,19 +158,24 @@ def _exercise_rows(exercise):
         sets = f"{count}×{_reps(set_)}"
         if set_.get("type") in _SET_LABELS:
             sets += f" {_SET_LABELS[set_['type']]}"
-        load = _load_text(exercise, set_, with_unit=False) or "—"
+        load = _load_text(exercise, set_, with_unit=False, show_hevy=show_hevy) or "—"
         rpe = rpe_cell(set_)
         if index == 0:
             rest = f"{exercise['rest_seconds']} s" if exercise.get("rest_seconds") is not None else ""
-            rows.append(_row([exercise["exercise_id"], sets, load, rpe, rest, exercise.get("change"),
+            rows.append(_row([name(exercise["exercise_id"]), sets, load, rpe, rest, exercise.get("change"),
                               " · ".join(notes)]))
         else:
             rows.append(_row(["", sets, load, rpe, "", "", ""]))
     return rows
 
 
-def render_week_ahead(doc):
-    """The marked week-ahead region for a check-in: per-session tables, then any flags."""
+def render_week_ahead(doc, name=None, show_hevy=True):
+    """The marked week-ahead region for a check-in: per-session tables, then any flags.
+
+    `name` turns an exercise id into the name the athlete reads; without it the id is printed. With `show_hevy`
+    false the loads leave out the Hevy value.
+    """
+    name = name or _exercise_id
     span = doc["span"]
     kind = doc["kind"].replace("_", " ")
     header = f"**Overlay** `{doc['id']}` ({kind}) · {day_label(span['start'])} – {day_label(span['end'])}"
@@ -181,7 +192,7 @@ def render_week_ahead(doc):
         lines.append(_row(["Exercise", "Sets × reps", "Load", "RPE", "Rest", "Change", "Notes"]))
         lines.append("| --- | --- | --- | --- | --- | --- | --- |")
         for exercise in session["exercises"]:
-            lines += _exercise_rows(exercise)
+            lines += _exercise_rows(exercise, name, show_hevy)
     if doc["flags"]:
         lines += ["", "**Flags**", ""]
         for flag in doc["flags"]:
@@ -197,9 +208,20 @@ def render_week_ahead(doc):
     return "\n".join(lines)
 
 
+def render_overlay_doc(root, doc):
+    """The region for an overlay document, with the instance's exercise names and Hevy setting."""
+    library = Library.load(root)
+
+    def name(exercise_id):
+        entry = library.get(exercise_id)
+        return entry["name"] if entry else exercise_id
+
+    return render_week_ahead(doc, name, config_module.load(root).hevy.enabled)
+
+
 def render_overlay(root, overlay_id):
     """A fresh render of the region for `overlay_id`, for freshness checks (C11)."""
-    return render_week_ahead(overlay.load(root, overlay_id))
+    return render_overlay_doc(root, overlay.load(root, overlay_id))
 
 
 def find_regions(text, kind):

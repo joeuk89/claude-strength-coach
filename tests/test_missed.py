@@ -18,7 +18,7 @@ ROW = "db_single_arm_row"
 FOLD = {"rule_id": "miss-b", "from_session_id": "session-b", "from_date": "2026-10-14", "scope": "one_week"}
 RECORD_LINES = [
     "- Missed Wed 14 Oct Session B (sleep).",
-    "- Rule miss-b: Single-arm row 2×10 @ 30 (Hevy: 30) added to Sat 17 Oct Session A, this week only.",
+    "- Rule miss-b: Single-arm row 2×10 @ 30 added to Sat 17 Oct Session A, this week only.",
     "- Overlay 2026-10-17-midweek; Hevy: Session A.",
 ]
 
@@ -153,11 +153,11 @@ class FoldPlanTest(MissedCase):
         self.assertEqual(sessions_of(draft), [("2026-10-17", "session-a")])
         last = draft["sessions"][0]["exercises"][-1]
         self.assertEqual(last["exercise_id"], ROW)
-        self.assertEqual(render.target_line(last), "Target: 2×10 @ 30 (Hevy: 30) @ RPE 8")
+        self.assertEqual(render.target_line(last), "Target: 2×10 @ 30 @ RPE 8")
         self.assertEqual(last["fold"], FOLD)
         self.assertEqual([line["fold"] for line in draft["sessions"][0]["exercises"][:-1]], [None, None])
         self.assertLessEqual(len(data["summary"]), 5)
-        self.assertTrue(any("2×10 @ 30 (Hevy: 30)" in line for line in data["summary"]), data["summary"])
+        self.assertTrue(any("2×10 @ 30" in line for line in data["summary"]), data["summary"])
         self.assertEqual(data["write_line"], 'Reply "go" to train this and write: Session A (Hevy).')
         rule_flags = [f for f in draft["flags"] if f["code"] == "missed_day_rule"]
         self.assertEqual([(f["session_id"], f["exercise_id"], f["severity"]) for f in rule_flags],
@@ -175,7 +175,7 @@ class FoldPlanTest(MissedCase):
                          "action": {"kind": "fold", "into": "next",
                                     "exercises": [{"exercise_id": ROW, "sets": 5, "rpe": 7}]}}])
         last = self.plan()["draft"]["sessions"][0]["exercises"][-1]
-        self.assertEqual(render.target_line(last), "Target: 3×10 @ 30 (Hevy: 30) @ RPE 7")
+        self.assertEqual(render.target_line(last), "Target: 3×10 @ 30 @ RPE 7")
 
     def test_min_days_left_must_hold(self):
         self.set_rules([{"id": "miss-b", "session_id": "session-b", "text": None, "when": {"min_days_left": 5},

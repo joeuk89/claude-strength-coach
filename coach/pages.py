@@ -19,8 +19,8 @@ from pathlib import Path
 
 from coach import block as block_module
 from coach import bodyweight
-from coach import checkin, closeout, dates, history, overlay, page_parts, paths, program, render, sheets, state, stats
-from coach import statusdays, structure, units
+from coach import checkin, closeout, dates, history, overlay, page_parts, paths, plugins, program, propose, render
+from coach import sheets, state, stats, statusdays, structure, summaries, units
 from coach import config as config_module
 from coach import flags as flags_module
 from coach.config_tables import coaching
@@ -116,9 +116,9 @@ def _row(cells):
 
 def _reps(set_):
     if set_.get("rep_range") is not None:
-        return f"{set_['rep_range']['start']}–{set_['rep_range']['end']}"
+        return units.rep_range_text(set_['rep_range']['start'], set_['rep_range']['end'])
     if set_.get("reps") is not None:
-        return _num(set_["reps"])
+        return _num(set_["reps"]) + ("+" if set_.get("rep_out") else "")
     if set_.get("duration_seconds") is not None:
         return f"{_num(set_['duration_seconds'])} s"
     if set_.get("distance_meters") is not None:
@@ -135,15 +135,19 @@ def _set_load(line, set_, show_hevy=True):
 
 
 def sets_text(line, show_hevy=True):
-    """A line's working sets in C12 Target form without RPE: `3×5 @ 100 kg`, `3×8–10 @ 25/hand (Hevy: 50)`."""
+    """A line's working sets in C12 Target form without RPE: `3×5 @ 100 kg`, `3×8–10 @ 25/hand (Hevy: 50)`.
+    A rep-out set keeps its cap, which is a stop rather than a target: `1×5+ @ 85 kg (stop at RPE 9)`."""
     groups = []
     for set_ in (s for s in line["sets"] if overlay.is_working(s)):
-        key = (_reps(set_), _set_load(line, set_, show_hevy))
+        stop = set_.get("rpe") if set_.get("rep_out") else None
+        key = (_reps(set_), _set_load(line, set_, show_hevy), stop)
         if groups and groups[-1][0] == key:
             groups[-1][1] += 1
         else:
             groups.append([key, 1])
-    text = " + ".join(f"{count}×{reps}" + (f" @ {load}" if load else "") for (reps, load), count in groups)
+    text = " + ".join(f"{count}×{reps}" + (f" @ {load}" if load else "")
+                      + (f" (stop at RPE {_num(stop)})" if stop is not None else "")
+                      for (reps, load, stop), count in groups)
     needs_load = any(s.get("load") is None and line["load_mode"] in units.LOADED_MODES
                      for s in line["sets"] if overlay.is_working(s))
     if needs_load:
@@ -400,9 +404,7 @@ class _View:
         parts = [f"**Week of {render.short_date(facts['week_start'])}**"]
         rotation = facts["rotation"]
         if rotation and rotation["position"]:
-            words = rotation["position"].replace("-", " ").replace("_", " ").split()
-            label = " ".join(w.upper() if len(w) == 1 else w.capitalize() for w in words)
-            parts.append(f"{label} ({'confirmed' if rotation['confirmed'] else 'not confirmed'})")
+            parts.append(self.rotation_label(rotation))
         phase = self.slot("brief.header.phase")
         if phase:
             parts.append(phase[-1].text)
@@ -410,6 +412,21 @@ class _View:
             parts.append("run mode")
         parts.append(_checkin_text(facts["checkin"], self.today))
         return " · ".join(parts)
+
+    def rotation_label(self, rotation):
+        """`Week B (confirmed)`, or for a sequence, which stores the session last trained, the session it starts
+        with: `Starts with Session A after Session B (confirmed)`."""
+        status = "confirmed" if rotation["confirmed"] else "not confirmed"
+        names = program.page_names(self.program or {"sessions": []}, self.library)
+        position = rotation["position"]
+        last = summaries.position_label(position, names)
+        following = summaries.session_after((self.program or {}).get("schedule"), position)
+        if following is None:
+            return f"{last} ({status})"
+        stored_week = self.state["rotation"].get("week")
+        if stored_week in (None, self.facts["week_start"]):
+            return f"Starts with {names.session(following)} after {last} ({status})"
+        return f"{last} last trained before the week of {render.short_date(stored_week)} ({status})"
 
     def key(self, session):
         """The session's first exercise and its working sets: `Back Squat 3×5 @ 100 kg`."""
@@ -659,6 +676,7 @@ def render_progress(root, as_of, view=None):
     view = view or _View(root, as_of)
     lines = [header(paths.HISTORY_DIR.as_posix() + "/", view.as_of), "# Progress", "", "## Lifts", ""]
     lines += _lifts_table(view)
+    lines += _training_maxes(view)
     for item in view.slot("progress.sections"):
         lines += ["", item.text.rstrip("\n")]
     current, longest = view.streak
@@ -695,6 +713,30 @@ def _lifts_table(view):
         rows.append(_row([view.name(exercise_id), stats.e1rm_text(best, per_hand), _long_date(best["date"]),
                           stats.e1rm_text(latest, per_hand), units.signed_whole(change)]))
     return rows + notes
+
+
+def _training_maxes(view):
+    """The training max each wave slot runs on now, named by exercise and session; nothing without such a slot."""
+    if not view.program:
+        return []
+    found = propose.training_maxes(view.program, view.state, view.overlays, plugins.load(view.root))
+    if not found:
+        return []
+    titles = {s["id"]: s["title"] for s in view.program["sessions"]}
+    loads = summaries.Names(unit=view.unit)
+    lines = ["", "## Training maxes", ""]
+    for row in found:
+        where = f"{view.name(row['exercise_id'])}, {titles.get(row['session_id'], row['session_id'])}"
+        if row["current"] is None:
+            lines.append(f"- {where}: no training max yet; the first proposal sets one from the e1RM.")
+            continue
+        text = f"- {where}: current training max {loads.load(row['current'], row['load_mode'])}"
+        if row["starting"] is not None and row["starting"] != row["current"]:
+            text += f" (program start {loads.load(row['starting'], row['load_mode'])})"
+        elif row["starting"] is not None:
+            text += ", the program's starting training max"
+        lines.append(text + ".")
+    return lines
 
 
 _SOURCE_NAMES = {"wellness": "recorded weigh-ins", "hevy": "Hevy", "nutrition": "nutrition readings"}

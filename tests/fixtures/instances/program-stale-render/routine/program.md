@@ -10,7 +10,7 @@
 
 ## Schedule
 
-Schedule rule: fixed weekdays (days: {"mon": "session-a", "thu": "session-b"})
+Schedule rule: fixed weekdays: Mon Session A · Thu Session B
 
 ## Coach-led sessions
 

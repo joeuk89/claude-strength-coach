@@ -82,9 +82,11 @@ performed **alternating** so one arm works per rep): **Hevy value = per hand**.
 
 Rules that follow:
 
-- **Never state a dumbbell load as a bare number** anywhere the athlete reads
+- **Never state a paired dumbbell load as a bare number** anywhere the athlete reads
   it — routine pages, overlays, `Target:` notes, check-in tables. Carry both: `25/hand (Hevy: 50)`. A bare `50` is ambiguous mid-set
-  and that ambiguity is what corrupts the log.
+  and that ambiguity is what corrupts the log. A single-implement load prints
+  one number (`30`): its Hevy value is the same, so a second one adds nothing.
+  With Hevy off, the per-hand figure alone (`25/hand`) is enough.
 - **Decide from how the lift is actually performed**, not from the exercise
   name. Hevy's catalogue mixes them — some one-arm variants are separate
   templates, some aren't. If the athlete alternates a curl, that set is

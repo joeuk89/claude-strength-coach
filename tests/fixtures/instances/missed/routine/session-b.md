@@ -3,11 +3,11 @@
 
 Session `session-b` · lifting · core · active
 
-Start loads in kg: where each exercise begins. Each week's loads come from the overlay.
+Start loads in kg: where each exercise began, not this week's prescription. This week's loads are in [this week's brief](../this-week.md).
 
 | Exercise | Sets × reps | RPE | Start load | Rest | Progression scheme |
 | --- | --- | --- | --- | --- | --- |
-| Single-arm row | 3×10 | 8 | 30 (Hevy: 30) | 90 s | double progression |
+| Single-arm row | 3×10 | 8 | 30 | 90 s | double progression |
 | Pull Up | 3×8 | 8 | BW | 120 s | linear |
 
 ## Cues and constraints

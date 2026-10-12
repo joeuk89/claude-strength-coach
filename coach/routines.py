@@ -894,7 +894,7 @@ def _load_text(value, mode, unit, load=None):
 
 def _reps_text(set_):
     if set_.get("rep_range"):
-        return f"{set_['rep_range']['start']}–{set_['rep_range']['end']}"
+        return units.rep_range_text(set_['rep_range']['start'], set_['rep_range']['end'])
     if set_.get("reps") is not None:
         return str(set_["reps"])
     if set_.get("duration_seconds") is not None:

@@ -41,7 +41,7 @@ class UnitsCommandTest(EnvelopeMixin, unittest.TestCase):
 
     def test_format_other_modes(self):
         cases = [
-            (("single_implement", "25", "kg"), "25 (Hevy: 25)"),
+            (("single_implement", "25", "kg"), "25"),
             (("total", "80", "kg"), "80"),
             (("bodyweight", "0", "kg"), "BW"),
             (("bodyweight", "10", "kg"), "BW+10"),

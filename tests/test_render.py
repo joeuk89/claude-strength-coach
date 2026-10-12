@@ -44,7 +44,7 @@ class HevyNoteTest(unittest.TestCase):
     def test_other_modes(self):
         doc = valid_overlay()
         self.assertEqual(note(doc, 1, 0).splitlines()[0], "Wk of 12 Oct: " + doc["focus"])
-        self.assertEqual(note(doc, 1, 0).splitlines()[1], "Target: 3×10 @ 30 (Hevy: 30) @ RPE 8")
+        self.assertEqual(note(doc, 1, 0).splitlines()[1], "Target: 3×10 @ 30 @ RPE 8")
         self.assertEqual(note(doc, 1, 1).splitlines()[0], "Target: 3×8 @ BW @ RPE 8")
 
     def test_groups_collapse_and_join(self):
@@ -116,7 +116,7 @@ class WeekAheadTest(unittest.TestCase):
 
     def test_render_is_deterministic(self):
         self.assertEqual(render.render_week_ahead(valid_overlay()), render.render_week_ahead(valid_overlay()))
-        self.assertEqual(render.render_overlay(VALID, WEEKLY), render.render_week_ahead(valid_overlay()))
+        self.assertEqual(render.render_overlay(VALID, WEEKLY), render.render_overlay_doc(VALID, valid_overlay()))
 
 
 class RegionTest(unittest.TestCase):
@@ -175,7 +175,7 @@ class RenderPurityTest(unittest.TestCase):
         ]
         calls = []
 
-        def spy(load):
+        def spy(load, show_hevy=True):
             calls.append(load)
             return f"<LOAD{len(calls)}>"
 

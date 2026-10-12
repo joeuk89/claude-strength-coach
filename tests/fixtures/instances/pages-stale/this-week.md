@@ -8,7 +8,7 @@ Heavier top set; stop 1–2 reps short of failure.
 | Day | Session | Tier | Key | Done |
 |---|---|---|---|---|
 | Mon 12 | Session A | core | Back Squat 3×5 @ 100 kg | ✔ |
-| Thu 15 | Session B | core | Single Arm Row 3×10 @ 30 (Hevy: 30) |  |
+| Thu 15 | Session B | core | Single Arm Row 3×10 @ 30 |  |
 
 ## Changed
 - Back Squat 97.5 → 100: add 2.5 from last week

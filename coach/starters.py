@@ -124,10 +124,12 @@ def listing(root, config, days=None, equipment=None, location=None, today=None, 
             "experience": experience, "recommended_id": recommended}
 
 
-def show(starter_id, library, unit, directory=STARTERS_DIR):
+def show(starter_id, library, unit, directory=STARTERS_DIR, show_hevy=True, week_starts="monday"):
     """The starter and the pages its program renders with its default days."""
     starter = load(starter_id, directory)
-    return {"starter": starter, "pages": program.render_doc(program.normalised(starter["program"]), library, unit)}
+    pages = program.render_doc(program.normalised(starter["program"]), library, unit, show_hevy=show_hevy,
+                               week_starts=week_starts)
+    return {"starter": starter, "pages": pages}
 
 
 def parse_days(text):
