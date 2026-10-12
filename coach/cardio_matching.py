@@ -1,5 +1,7 @@
 """Conservative one-to-one activity identity: disagreement remains reviewable."""
 
+from typing import NamedTuple
+
 from coach import dates
 
 QUALITY_WORDS = ("interval", "tempo", "threshold", "hill", "fartlek", "track", "race")
@@ -62,16 +64,23 @@ def _nearest(choices, basis, gaps):
     if len(choices) <= 1:
         return choices, basis
     closest = min(gaps[edge] for edge in choices)
-    return {edge for edge in choices if gaps[edge] == closest}, basis + ["date_proximity"]
+    nearest = {edge for edge in choices if gaps[edge] == closest}
+    return nearest, basis + ["date_proximity"] if len(nearest) < len(choices) else basis
 
 
-def _choose(remaining, evidence, plans, gaps):
+def _first(choices, basis, key):
+    if len(choices) <= 1:
+        return choices, basis
+    return {min(choices, key=key)}, basis + ["order"]
+
+
+def _choose(remaining, evidence, plans, activities, gaps):
     """Each plan's and each activity's preferred edges for one round of mutual matching.
 
-    An activity tied between plans of one quality takes the nearest date, and among plans on that
-    one date the lowest ID: no quality can transfer. A plan whose candidates all identify with its
-    quality pool, and fit in it, also takes the nearest date, so distance noise cannot pull
-    identical plans onto each other's runs.
+    Where every tied plan has one quality, no quality can transfer, so ties settle by date, then
+    order. A plan whose candidates all identify with its quality pool, and fit in it, takes the
+    nearest date before identity, so distance noise cannot pull identical plans onto each other's
+    runs.
     """
     by_plan, by_activity = {}, {}
     for edge in remaining:
@@ -81,9 +90,8 @@ def _choose(remaining, evidence, plans, gaps):
     activity_choices = {}
     for ai, (choices, basis) in identified.items():
         if len({_planned_quality(plans[pi]) for pi, _ in choices}) == 1:
-            choices, basis = _nearest(choices, basis, gaps)
-            if len({plans[pi]["date"] for pi, _ in choices}) == 1:
-                choices = {min(choices, key=lambda edge: plans[edge[0]]["id"])}
+            choices, basis = _first(*_nearest(choices, basis, gaps),
+                                    key=lambda edge: (plans[edge[0]]["date"], plans[edge[0]]["id"]))
         activity_choices[ai] = choices, basis
     plan_choices = {}
     for pi, edges in by_plan.items():
@@ -92,10 +100,31 @@ def _choose(remaining, evidence, plans, gaps):
                    and all(_planned_quality(plans[p]) == quality for p, _ in identified[edge[1]][0])}
         pool = {p for edge in members for p, _ in identified[edge[1]][0]}
         if members and len(members) <= len(pool):
-            plan_choices[pi] = _nearest(members, [], gaps)
+            choices, basis = _nearest(members, [], gaps)
+            if len(choices) > 1:
+                choices, split = _identify(choices, evidence)
+                basis += split
+            plan_choices[pi] = _first(choices, basis, key=lambda edge: _activity_order(activities[edge[1]]))
         else:
             plan_choices[pi] = _nearest(*_identify(edges, evidence), gaps)
     return plan_choices, activity_choices
+
+
+def _activity_order(activity):
+    return activity["local_date"], activity["start"], activity["id"]
+
+
+def _session(plan):
+    return plan["date"], plan["kind"], _planned_quality(plan)
+
+
+class Resolution(NamedTuple):
+    pairs: dict
+    basis: dict
+    plan_review: dict
+    activity_review: dict
+    candidates: set
+    duplicates: dict
 
 
 def resolve(plans, activities, move_days, associations, rpe_min):
@@ -136,11 +165,26 @@ def resolve(plans, activities, move_days, associations, rpe_min):
         else:
             reason = plan_review.get(pi) or activity_review[ai]
             plan_review[pi] = activity_review[ai] = reason
-    remaining = {edge for edge in candidates if edge[0] not in reserved_plans
+    sessions, duplicates = {}, {}
+    for pi in sorted(range(len(plans)), key=lambda i: plans[i]["id"]):
+        sessions.setdefault(_session(plans[pi]), []).append(pi)
+
+    def claim_twins(matched):
+        """Per other source, the first free plan for a matched plan's session: one session planned twice."""
+        for pi in sorted(matched, key=lambda i: plans[i]["id"]):
+            claimed = {plans[pi].get("source")}
+            for other in sessions[_session(plans[pi])]:
+                source = plans[other].get("source")
+                if source not in claimed and not (other in pairs or other in reserved_plans or other in duplicates):
+                    duplicates[other] = pi
+                    claimed.add(source)
+
+    claim_twins(pairs)
+    remaining = {edge for edge in candidates if edge[0] not in reserved_plans | set(duplicates)
                  and edge[1] not in reserved_activities}
     evidence = {edge: _evidence(plans[edge[0]], activities[edge[1]], rpe_min) for edge in remaining}
     while remaining:
-        plan_choices, activity_choices = _choose(remaining, evidence, plans, gaps)
+        plan_choices, activity_choices = _choose(remaining, evidence, plans, activities, gaps)
         accepted = []
         for pi, (choices, reasons) in plan_choices.items():
             if len(choices) != 1:
@@ -156,8 +200,10 @@ def resolve(plans, activities, move_days, associations, rpe_min):
             pairs[pi] = ai
             plan_review.pop(pi, None)
             activity_review.pop(ai, None)
+        claim_twins(pi for pi, _ in accepted)
         used = set(pairs.values())
-        remaining = {edge for edge in remaining if edge[0] not in pairs and edge[1] not in used}
+        remaining = {edge for edge in remaining if edge[0] not in pairs and edge[0] not in duplicates
+                     and edge[1] not in used}
     for pi, ai in remaining:
         plan_review[pi] = activity_review[ai] = "identity evidence is tied or conflicting; associate IDs to resolve"
-    return pairs, basis, plan_review, activity_review, candidates
+    return Resolution(pairs, basis, plan_review, activity_review, candidates, duplicates)

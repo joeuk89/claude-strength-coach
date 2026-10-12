@@ -6392,21 +6392,26 @@ for both.
   A unique candidate can match a shorter or longer completion.
 - Date proximity then settles what identity leaves tied, where no quality
   can transfer: an activity tied between plans of one quality takes the
-  unique nearest plan, or the lowest plan ID among nearest plans sharing
-  one date; a plan whose candidate activities each identify only with
-  plans of its quality, no more activities than those plans, takes the
-  unique nearest activity. So identical plans run on their days are `done`
-  despite small distance differences. A tie between plans of different
-  quality, or an equal date gap to different dates, remains ambiguous.
+  nearest plan, then the earlier plan date and lower plan ID. A plan
+  whose candidate activities each identify only with plans of its
+  quality, no more activities than those plans, takes the nearest
+  activity, then the one identity evidence prefers, then the earliest
+  start. So identical plans run on their days are `done` despite small
+  distance differences, a run between two identical plans is `moved` to
+  the earlier one, and a double day of identical plans pairs in start
+  order. A tie between plans of different quality remains ambiguous.
   Conditioning retains C48's kind precedence in matching: it is quality
   regardless of a plan's quality flag, low logged RPE or easy wording.
   Matches are one-to-one and input-order independent.
 - A matched local date is `done`; a different date is `moved`, with
   `moved_days`. Unmatched plans before today are `missed`, otherwise
-  `upcoming`; unmatched activities are `extra`. An unmatched plan from
-  another source for the same day, kind and quality as a matched plan is
-  `duplicate` (C30): it is neither missed nor a planned bout, and its
-  `review_reason` names the matched plan. Tied or conflicting candidates
+  `upcoming`; unmatched activities are `extra`. When a plan matches, the
+  first plan by ID from each other source for the same day, kind and
+  quality (conditioning always quality) is `duplicate` (C30) and leaves
+  matching, so a second activity that day cannot take it. A duplicate is
+  neither missed nor a planned bout, and its `review_reason` names the
+  matched plan; the rendered record states it as information, not a
+  review. Tied or conflicting candidates
   are `ambiguous`, with separate plan and activity rows, `candidate_ids`
   and `review_reason`. These activities inherit no plan's quality or
   estimated effort.
@@ -6424,7 +6429,8 @@ for both.
   `quality_basis` null. `match_basis` lists what decided a match:
   `explicit_association`, `unique_candidate`, or the measures that split a
   tie (`name`, `quality`, `distance_meters`, `duration_seconds`, `effort`,
-  `date_proximity`); it is empty on unmatched rows. Weekly bout JSON also
+  `date_proximity`, and `order` for the plan-date, plan-ID or start-order
+  tie-break among plans of one quality); it is empty on unmatched rows. Weekly bout JSON also
   carries `planned_id` and `match_basis` beside sRPE's estimation method. `summary` counts each status.
 - `cardio associate ACTIVITY_ID --planned-id PLANNED_ID [--dry-run]`
   stores an explicit link; `--clear` removes it. Giving neither or both

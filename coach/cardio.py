@@ -127,8 +127,9 @@ def match(planned, logged, move_days, today=None, associations=None,
     """Match only mutually unique identities; unresolved candidates never supply inferred quality."""
     plans = sorted(planned, key=lambda p: (p["date"], p["id"]))
     acts = sorted(logged, key=lambda a: (a["local_date"], a["start"], a["id"]))
-    pairs, basis, plan_review, activity_review, candidates = resolve(
-        plans, acts, move_days, associations or {}, quality_rpe_min)
+    found = resolve(plans, acts, move_days, associations or {}, quality_rpe_min)
+    pairs, plan_review, activity_review, candidates = (found.pairs, found.plan_review, found.activity_review,
+                                                       found.candidates)
     items = []
     for pi, plan in enumerate(plans):
         act = acts[pairs[pi]] if pi in pairs else None
@@ -139,13 +140,13 @@ def match(planned, logged, move_days, today=None, associations=None,
             moved = None
             status = "upcoming" if today is not None and dates.parse_date(plan["date"]) >= today else "missed"
         reason = plan_review.get(pi)
-        twin = None if act or reason else _twin(pi, plans, pairs)
         if reason:
             status = "ambiguous"
-        elif twin:
-            status, reason = "duplicate", f"duplicates {twin}, planned by another source and matched"
+        elif pi in found.duplicates:
+            status = "duplicate"
+            reason = f"duplicates {plans[found.duplicates[pi]]['id']}, planned by another source and matched"
         item = _item(status, plan, act, moved)
-        item.update(match_basis=basis.get(pi, []), review_reason=reason,
+        item.update(match_basis=found.basis.get(pi, []), review_reason=reason,
                     candidate_ids=sorted(acts[ai]["id"] for p, ai in candidates if p == pi)
                     if status == "ambiguous" else [])
         items.append(item)
@@ -160,17 +161,6 @@ def match(planned, logged, move_days, today=None, associations=None,
         if item["_activity"] is not None:
             item["quality"], item["quality_basis"] = quality_of(item["_activity"], item["_planned"], quality_rpe_min)
     return sorted(items, key=lambda i: (i["date"], i["planned_id"] or "", i["activity_id"] or ""))
-
-
-def _twin(pi, plans, pairs):
-    """The matched plan another source made for the same day, kind and quality as this one."""
-    plan = plans[pi]
-    for other in sorted(pairs):
-        twin = plans[other]
-        if (twin.get("source") != plan.get("source") and (twin["date"], twin["kind"]) == (plan["date"], plan["kind"])
-                and bool(twin["quality"]) == bool(plan["quality"])):
-            return twin["id"]
-    return None
 
 
 def _item(status, plan, act, moved):
@@ -656,7 +646,9 @@ def render_text(root, week_value, today):
                 f"{_cell(_signed_distance(delta['distance_meters'], unit))} | "
                 f"{_cell(_signed(_minutes(delta['duration_seconds'])))} |")
         for item in items:
-            if item["review_reason"]:
+            if item["status"] == "duplicate":
+                lines += ["", f"{item['planned_id']} {item['review_reason']}."]
+            elif item["review_reason"]:
                 lines += ["", f"Review {item['planned_id'] or item['activity_id']}: "
                           f"{item['review_reason']} (candidates: {', '.join(item['candidate_ids']) or 'none'})."]
     lines += [""] + ([f"- {f['severity']} `{f['code']}`: {f['message']}" for f in found] or ["No cardio flags."])

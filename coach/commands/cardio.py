@@ -37,7 +37,8 @@ def week(args, ctx):
     return cardio.week(ctx.root, span)
 
 
-@command("cardio reconcile", help="Planned activities against logged ones: done, moved, missed, upcoming, extra",
+@command("cardio reconcile",
+         help="Planned activities against logged ones: done, moved, missed, upcoming, extra, ambiguous, duplicate",
          args=(_WEEK_REQUIRED,))
 def reconcile(args, ctx):
     span = _span(ctx, week=args.week)

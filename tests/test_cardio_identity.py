@@ -408,6 +408,9 @@ class IdentityTest(CardioCase):
         bout = next(b for b in week["bouts"] if b["ref"] == "manual:r")
         self.assertEqual((week["run"]["quality"], bout["planned_id"], bout["srpe"]),
                          (1, "manual:t1", {"rpe": 7, "load": 210, "method": "planned"}))
+        text = self.data("cardio", "render", "--week", "2026-W41")["text"]
+        self.assertIn("runna:t1 duplicates manual:t1, planned by another source and matched.", text)
+        self.assertNotIn("Review runna:t1", text)
         self.assertEqual(cardio.match(tempo, [activity("manual:r", "2026-10-06", 8050)], 3),
                          cardio.match(list(reversed(tempo)), [activity("manual:r", "2026-10-06", 8050)], 3))
 
@@ -416,6 +419,81 @@ class IdentityTest(CardioCase):
         rows = cardio.match(plans, [activity("manual:r", "2026-10-06", 5000)], 3)
         self.assertEqual([(i["status"], i["planned_id"], i["activity_id"]) for i in rows],
                          [("done", "manual:am", "manual:r"), ("missed", "manual:pm", None)])
+
+    def flagged_runs(self, today="2026-10-11"):
+        from coach import config as config_module
+
+        span = dates.parse_week("2026-W41", "monday")
+        found = cardio.flag_bouts(self.root, config_module.load(self.root), span, dates.parse_date(today))
+        return [(b.ref, b.quality) for b in found if b.kind == "run"]
+
+    def test_runs_an_equal_gap_from_two_plans_of_one_quality_take_the_earlier_plan(self):
+        plans = [plan(f"manual:p{day}", f"2026-10-0{day}", 8000, True, "Intervals") for day in (5, 7)]
+        cases = ((("6", "8"), {"manual:p5": ("moved", "manual:6"), "manual:p7": ("moved", "manual:8")}, 2),
+                 (("6",), {"manual:p5": ("moved", "manual:6"), "manual:p7": ("missed", None)}, 1))
+        for days, expected, quality in cases:
+            with self.subTest(days=days):
+                self.set_records(plans, [activity(f"manual:{d}", f"2026-10-0{d}", 8000, name="Outdoor Run")
+                                         for d in days])
+                rows = self.reconcile()
+                self.assertEqual({i["planned_id"]: (i["status"], i["activity_id"]) for i in rows}, expected)
+                self.assertEqual({i["quality_basis"] for i in rows if i["activity_id"]}, {"planned"})
+                self.assertIn("order", rows[0]["match_basis"])
+                self.assertEqual(self.data("cardio", "week", "--week", "2026-W41")["run"]["quality"], quality)
+                self.assertEqual(self.flagged_runs(), [(f"manual:{d}", True) for d in days])
+
+    def test_conditioning_an_equal_gap_from_two_planned_days_still_counts_the_bout(self):
+        from coach import conditioning, config as config_module
+
+        last = {"overlay_id": "o", "session_id": "circuit", "dates": ["2026-10-05", "2026-10-07"],
+                "span": {"start": "2026-10-05", "end": "2026-10-11"}}
+        for days in (("6",), ("6", "8")):
+            with self.subTest(days=days):
+                self.set_records([], [dict(activity(f"manual:{d}", f"2026-10-0{d}", None, 720, "Circuit", 6),
+                                           kind="conditioning") for d in days])
+                found = conditioning.bouts(self.root, config_module.load(self.root), last,
+                                           dates.parse_date("2026-10-11"))
+                self.assertEqual([b["activity_id"] for b in found], [f"manual:{d}" for d in reversed(days)])
+
+    def test_a_double_day_of_identical_plans_pairs_in_start_order(self):
+        cases = ((5000, False, "Easy"), (6000, True, "Threshold"))
+        for meters, quality, title in cases:
+            with self.subTest(title=title):
+                self.set_records([plan(f"manual:{t}", "2026-10-06", meters, quality, title) for t in ("am", "pm")],
+                                 [dict(activity(f"manual:{t}", "2026-10-06", meters), start=f"2026-10-06T{h}:00:00Z")
+                                  for t, h in (("pm", "18"), ("am", "07"))])
+                rows = self.reconcile()
+                self.assertEqual([(i["status"], i["planned_id"], i["activity_id"], i["quality"], i["quality_basis"])
+                                  for i in rows],
+                                 [("done", "manual:am", "manual:am", quality, "planned"),
+                                  ("done", "manual:pm", "manual:pm", quality, "planned")])
+                self.assertEqual(rows[0]["match_basis"], ["order"])
+                week = self.data("cardio", "week", "--week", "2026-W41")
+                self.assertEqual(week["run"]["quality"], 2 if quality else 0)
+                self.assertEqual({b["srpe"]["method"] for b in week["bouts"] if b["kind"] == "run"}, {"planned"})
+                self.assertEqual(self.flagged_runs(), [("manual:am", quality), ("manual:pm", quality)])
+
+    def test_a_shakeout_beside_a_tempo_planned_by_two_sources_stays_extra(self):
+        tempo = [dict(plan(f"{source}:t1", "2026-10-06", 8000, True, title="Tempo"), source=source)
+                 for source in ("manual", "runna")]
+        self.set_records(tempo, [activity("manual:r", "2026-10-06", 8050),
+                                 dict(activity("manual:s", "2026-10-06", 3000, 1200), start="2026-10-06T18:00:00Z")])
+        rows = self.reconcile()
+        self.assertEqual([(i["status"], i["planned_id"], i["activity_id"], i["quality"], i["quality_basis"])
+                          for i in rows],
+                         [("extra", None, "manual:s", False, "none"),
+                          ("done", "manual:t1", "manual:r", True, "planned"),
+                          ("duplicate", "runna:t1", None, True, None)])
+        week = self.data("cardio", "week", "--week", "2026-W41")
+        self.assertEqual(week["run"]["quality"], 1)
+        self.assertEqual(self.flagged_runs(), [("manual:r", True), ("manual:s", False)])
+
+    def test_a_conditioning_session_planned_by_two_sources_counts_once(self):
+        plans = [dict(plan(f"{source}:c", "2026-10-06", None, quality, "Circuit"), source=source, kind="conditioning")
+                 for source, quality in (("manual", False), ("runna", True))]
+        rows = cardio.match(plans, [dict(activity("manual:a", "2026-10-06", None, 720), kind="conditioning")], 3)
+        self.assertEqual([(i["status"], i["planned_id"]) for i in rows],
+                         [("done", "manual:c"), ("duplicate", "runna:c")])
 
     def test_every_reconcile_row_has_one_shape(self):
         self.set_records([plan("manual:p", "2026-10-06", 5000), plan("manual:q", "2026-10-10", 5000, True)],
