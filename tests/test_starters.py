@@ -74,12 +74,17 @@ class Case(unittest.TestCase):
     def draft(self, root, *argv):
         return self.ok(root, "starters", "draft", *argv)["draft"]
 
-    def adopted(self, starter_id):
-        """The starter adopted, load modes confirmed, onto a copy of empty/ whose Hevy cache holds a template per catalogue title."""
+    def with_templates(self):
+        """A copy of empty/ whose Hevy cache holds a template per catalogue title."""
         root = instance(self)
         templates = [{"id": f"STARTER-{index}", "title": entry["hevy_titles"][0]}
                      for index, entry in enumerate(Library().entries()) if entry["hevy_titles"]]
         HevyCache(root).write_collection("exercise_templates", templates, NOW)
+        return root
+
+    def adopted(self, starter_id):
+        """The starter adopted onto with_templates(), its load modes confirmed."""
+        root = self.with_templates()
         found = self.ok(root, "starters", "draft", starter_id)
         self.assertEqual(found["problems"], [])
         adopted = self.ok(root, "program", "adopt", "--input", str(root / found["path"]))
@@ -184,7 +189,7 @@ class AdoptedStarterTest(Case):
     """Each starter drafted with its default days onto a copy of empty/, adopted, rendered and proposed."""
 
     def test_an_adopted_starter_blocks_its_first_week_until_the_load_modes_are_confirmed(self):
-        root = instance(self)
+        root = self.with_templates()
         found = self.ok(root, "starters", "draft", "full-body-3")
         adopted = self.ok(root, "program", "adopt", "--input", str(root / found["path"]))
         self.assertTrue(adopted["unconfirmed"])
