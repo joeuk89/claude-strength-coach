@@ -6765,22 +6765,25 @@ corrections are a `void` line plus a new entry:
   line without `id` and `logged_at`, built from the overlay in force on D
   (its session S nearest to D, so a moved session prefills too; no
   overlay, or none with S, exits 1).
-  Fixed reps and loads are filled as prescribed; a `rep_range` leaves
-  `reps` null; `rpe` and `duration_minutes` are null. Warm-up sets are
-  left out. The draft records observations only: an RPE target is never
-  a logged RPE, and a range is never a count.
+  Fixed reps and loads are filled as prescribed; a `rep_range` or a
+  rep-out set (C10) leaves `reps` null; `rpe` and `duration_minutes` are
+  null. Warm-up sets are left out. The draft records observations only:
+  an RPE target or stop is never a logged RPE, and a range or a rep-out
+  minimum is never a count.
   `data.ask` keeps the prescription beside the draft, one item per
   exercise, field and prescribed value: `{"exercise_id", "field",
   "sets", "prescribed", "message"}`, `sets` one-based over working sets.
-  `field` is `reps` for ranged sets (`prescribed` the `rep_range`: ask
-  for the reps done), `value` for sets on a loaded mode (C10) with no
+  `field` is `reps` for ranged sets (`prescribed` the `rep_range`) and
+  rep-out sets (`prescribed` `{"at_least": <the set's reps>}`), both
+  asking for the reps done; `value` for sets on a loaded mode (C10) with no
   prescribed load, "choose the load" (`prescribed` null: ask for the load
   used), `as_written` for sets with prefilled fields (`prescribed` the
   list of them, out of `reps`, `load`, `duration` and `distance`: keep
-  them only when the athlete confirms them, as "as written" does; a range
-  or a missing load is never in it), and `rpe` for every working set
-  (`prescribed` the target or null: ask for the RPE, and leave it null
-  when the athlete cannot say).
+  them only when the athlete confirms them, as "as written" does; a
+  range, a rep-out minimum or a missing load is never in it), and `rpe`
+  for every working set (`prescribed` the target, a rep-out set's stop,
+  or null: ask for the RPE, and leave it null when the athlete cannot
+  say).
 - `log add --input FILE [--again] [--dry-run]` validates and appends one
   line. Exit 1 for: an input carrying `id` or `logged_at` (`log add`
   assigns both); a schema problem; an unknown exercise id; a load mode
@@ -6791,8 +6794,9 @@ corrections are a `void` line plus a new entry:
   after today; a `value` on a null-load mode; a `unit` other than
   `[athlete] units`; a session id in neither the program nor any
   overlay; an overlay that does not exist or lacks the session. A null
-  `reps` where the overlay set had a `rep_range` names the range, so an
-  unchanged ranged draft is never recorded as measured work. Exit 3
+  `reps` where the overlay set had a `rep_range` or was a rep-out set
+  names the range or the minimum, so an unchanged draft is never
+  recorded as measured work. Exit 3
   when the date and session already have a live entry, unless `--again`
   (a workout with no session is never refused). Warning
   `looks_like_total` when a `per_hand_x2` `value` equals the `hevy_total`
@@ -6856,9 +6860,9 @@ approved yet" line and a warning. A rep-out set prints `N×5+` with
 `stop at 9` in its RPE cell (C12), and the footer then first explains
 the `+` set: at least those reps, more until the next would pass its
 RPE stop, not a set to failure. A footer says how to log: reply with
-the reps of every ranged set, the RPE when the athlete can say, and
-anything else that differed; "as written" covers fixed reps and loads
-only. Check
+the reps of every ranged or `+` set, the load used where a set says
+"choose the load", the RPE when the athlete can say, and anything else
+that differed; "as written" covers fixed reps and loads only. Check
 `sheets_render_fresh`: skip when Hevy is enabled or there is neither a
 file nor an overlay; warn when there is no file yet, or when the file
 shows another overlay than the current one; fail when the file has no

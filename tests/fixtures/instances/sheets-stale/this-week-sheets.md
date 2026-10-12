@@ -33,4 +33,4 @@ Overlay `2026-10-12-weekly` (weekly) · Mon 12 Oct – Sun 18 Oct · loads in kg
 
 ---
 
-To log a session, reply to the coach with what you did: the reps of every set with a range, the load you used where it says "choose the load", how hard each exercise felt (RPE) if you can say, and anything else that differed. "As written" covers fixed reps and loads only ("squat as written, RPE 8; bench 10, 9, 8 at RPE 9").
+To log a session, reply to the coach with what you did: the reps of every set with a range or a +, the load you used where it says "choose the load", how hard each exercise felt (RPE) if you can say, and anything else that differed. "As written" covers fixed reps and loads only ("squat as written, RPE 8; bench 10, 9, 8 at RPE 9").

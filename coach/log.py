@@ -4,8 +4,8 @@
 workout, and a `void` line that removes one. A correction is a void plus a
 new entry. Each set's `value` is the athlete's own number (per hand for
 `per_hand_x2`), never a Hevy value; history builds load objects from it.
-Each line records what the athlete reported: a rep range or an RPE target
-is a prescription, never a logged count or effort.
+Each line records what the athlete reported: a rep range, a rep-out
+minimum or an RPE target is a prescription, never a logged count or effort.
 """
 
 import json
@@ -105,7 +105,8 @@ def _nearest(sessions, day):
 
 def _draft_set(set_):
     load = set_.get("load")
-    return {"type": set_["type"], "reps": set_.get("reps"), "rpe": None,
+    reps = None if set_.get("rep_out") else set_.get("reps")
+    return {"type": set_["type"], "reps": reps, "rpe": None,
             "value": history.coaching_number(load) if load else None,
             "duration_seconds": set_.get("duration_seconds"), "distance_meters": set_.get("distance_meters")}
 
@@ -123,6 +124,16 @@ def _range_text(rep_range):
     return f"{rep_range['start']}–{rep_range['end']}"
 
 
+def _open_reps(set_):
+    """Why a planned set's reps are not a count to prefill (its range or rep-out minimum), or None when they are."""
+    if set_.get("rep_range") is not None:
+        return f"the plan was a range ({_range_text(set_['rep_range'])}), not a count"
+    if set_.get("rep_out"):
+        return (f"the plan was a + set (at least {units.json_number(set_['reps'])}, then more up to the RPE stop), "
+                "not a count")
+    return None
+
+
 def _name(library, exercise_id):
     entry = library.get(exercise_id)
     return entry["name"] if entry else exercise_id
@@ -136,10 +147,10 @@ def _grouped(pairs):
     return list(groups.items())
 
 
-def _prefilled(mode, set_, ranged):
+def _prefilled(mode, set_, open_reps):
     """The fields `_draft_set` fills from one prescribed working set, as a reader names them."""
     fields = []
-    if not ranged and mode not in NO_REPS_MODES and set_.get("reps") is not None:
+    if not open_reps and mode not in NO_REPS_MODES and set_.get("reps") is not None:
         fields.append("reps")
     if set_.get("load") is not None:
         fields.append("load")
@@ -161,26 +172,41 @@ def _asks(name, line, working):
 
     ranged = {n: s["rep_range"] for n, s in enumerate(working, 1)
               if mode not in NO_REPS_MODES and s.get("rep_range") is not None}
+    rep_outs = {n: s["reps"] for n, s in enumerate(working, 1)
+                if mode not in NO_REPS_MODES and s.get("rep_out") and s.get("reps") is not None}
     for (start, end), numbers in _grouped(((r["start"], r["end"]), n) for n, r in ranged.items()):
         rep_range = {"start": start, "end": end}
         ask("reps", numbers, rep_range,
             f"ask for the reps done in each set; the plan is a range ({_range_text(rep_range)}), which is not a "
             "count, so reps stay null until the athlete gives them")
+    for minimum, numbers in _grouped((m, n) for n, m in rep_outs.items()):
+        ask("reps", numbers, {"at_least": minimum},
+            f"ask for the reps done; the plan is a + set (at least {units.json_number(minimum)}, then more up to "
+            "the RPE stop), which is not a count, so reps stay null until the athlete gives them")
     unloaded = [n for n, s in enumerate(working, 1) if mode in units.LOADED_MODES and s.get("load") is None]
     if unloaded:
+        used = "the added load they used (0 for bodyweight alone)" if mode == "bodyweight" else "what they used"
         ask("value", unloaded, None,
             f"no load was prescribed ({render.CHOOSE_THE_LOAD}), so value stays null until the athlete says "
-            "what they used; ask for it")
-    for fields, numbers in _grouped((_prefilled(mode, s, n in ranged), n) for n, s in enumerate(working, 1)):
+            f"{used}; ask for it")
+    for fields, numbers in _grouped((_prefilled(mode, s, n in ranged or n in rep_outs), n)
+                                    for n, s in enumerate(working, 1)):
         if fields:
             ask("as_written", numbers, list(fields),
                 f"{' and '.join(fields)} {'is' if len(fields) == 1 else 'are'} prefilled as written; keep "
                 f"{'it' if len(fields) == 1 else 'them'} only when the athlete confirms they did exactly that, "
                 "otherwise ask what they did")
-    for target, numbers in _grouped((s.get("rpe"), n) for n, s in enumerate(working, 1)):
-        aim = f"the target was {units.json_number(target)}" if target is not None else "no RPE target was set"
+    for (target, stop), numbers in _grouped(((s.get("rpe"), bool(s.get("rep_out"))), n)
+                                            for n, s in enumerate(working, 1)):
+        word = "stop" if stop else "target"
+        if target is None:
+            aim = "no RPE target was set"
+        elif stop:
+            aim = f"the plan said stop at {units.json_number(target)}"
+        else:
+            aim = f"the target was {units.json_number(target)}"
         ask("rpe", numbers, target,
-            f"ask how hard each set felt (RPE; {aim}); leave rpe null when the athlete cannot say, never the target")
+            f"ask how hard each set felt (RPE; {aim}); leave rpe null when the athlete cannot say, never the {word}")
     return found
 
 
@@ -330,9 +356,8 @@ def problems(line, slots, library, config, today):
         for s_index, set_ in enumerate(exercise["sets"]):
             set_where = f"{where}.sets[{s_index}]"
             if set_["reps"] is None and mode not in NO_REPS_MODES:
-                rep_range = _planned_set(planned, exercise["sets"], s_index).get("rep_range")
-                why = (f"; the plan was a range ({_range_text(rep_range)}), not a count, so ask for the reps done"
-                       if rep_range else "; fill in what was done")
+                open_reps = _open_reps(_planned_set(planned, exercise["sets"], s_index))
+                why = f"; {open_reps}, so ask for the reps done" if open_reps else "; fill in what was done"
                 problem(f"{set_where}.reps", f"{exercise_id} set {s_index + 1} has no reps{why}")
             if set_["value"] is not None and mode in NO_LOAD_MODES:
                 problem(f"{set_where}.value", f"{exercise_id} is a {mode} exercise, which carries no load; "

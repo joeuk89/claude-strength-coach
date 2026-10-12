@@ -413,6 +413,18 @@ class ObservedNotPrescribedTest(NoHevyCase):
         self.assertEqual(as_written["prescribed"], ["reps"])
         self.assertNotIn("load", as_written["message"])
 
+    def test_a_bodyweight_choose_the_load_set_asks_for_the_added_load(self):
+        path = self.root / "data" / "overlays" / f"{WEEKLY}.json"
+        doc = read_json(path)
+        session = next(s for s in doc["sessions"] if s["session_id"] == "session-b")
+        pull_up = next(e for e in session["exercises"] if e["exercise_id"] == "pull_up")
+        for set_ in pull_up["sets"]:
+            set_["load"] = None
+        write_json(path, doc)
+        data = self.coach("log", "prefill", "--session", "session-b", "--date", "2026-10-12")["data"]
+        [load] = self.asks(data, "pull_up", "value")
+        self.assertIn("added load", load["message"])
+
     def test_a_loaded_set_logged_without_a_load_is_accepted_with_a_warning(self):
         self.choose_the_squat_load()
         envelope = self.add(self.filled())
@@ -425,6 +437,36 @@ class ObservedNotPrescribedTest(NoHevyCase):
             set_["value"] = 90
         envelope = self.add(filled, "--again")
         self.assertEqual([w for w in envelope["warnings"] if w.startswith("load_unknown")], [])
+
+    def make_the_last_squat_set_a_rep_out(self):
+        path = self.root / "data" / "overlays" / f"{WEEKLY}.json"
+        doc = read_json(path)
+        session = next(s for s in doc["sessions"] if s["session_id"] == "session-a")
+        squat = next(e for e in session["exercises"] if e["exercise_id"] == "bb_back_squat")
+        squat["sets"][-1].update(rep_out=True, rpe=9)
+        write_json(path, doc)
+
+    def test_a_rep_out_set_asks_for_the_reps_done_instead_of_prefilling_its_minimum(self):
+        self.make_the_last_squat_set_a_rep_out()
+        data = self.prefill_data()
+        self.assertEqual([(s["reps"], s["value"]) for s in self.squat(data["draft"])["sets"]],
+                         [(5, 100), (5, 100), (None, 100)])
+        [reps] = self.asks(data, "bb_back_squat", "reps")
+        self.assertEqual((reps["sets"], reps["prescribed"]), ([3], {"at_least": 5}))
+        self.assertIn("at least 5", reps["message"])
+        as_written = {tuple(a["sets"]): a["prescribed"] for a in self.asks(data, "bb_back_squat", "as_written")}
+        self.assertEqual(as_written, {(1, 2): ["reps", "load"], (3,): ["load"]})
+        stop = next(a for a in self.asks(data, "bb_back_squat", "rpe") if a["sets"] == [3])
+        self.assertEqual(stop["prescribed"], 9)
+        self.assertIn("stop at 9", stop["message"])
+        self.assertNotIn("target", stop["message"])
+
+        envelope = self.add(data["draft"], expect=1)
+        self.assertIn("at least 5", envelope["error"]["message"])
+        filled = self.filled()
+        self.squat(filled)["sets"][2]["reps"] = 7
+        self.add(filled)
+        self.assertEqual([s["reps"] for s in self.squat(self.log_lines()[-1])["sets"]], [5, 5, 7])
 
     def test_an_unchanged_ranged_draft_cannot_be_recorded(self):
         before = (self.root / LOG).read_bytes()
