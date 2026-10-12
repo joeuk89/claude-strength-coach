@@ -20,9 +20,10 @@ RUNGS = [{"name": "30 kg assist", "load": 30}, {"name": "25 kg assist", "load": 
          {"name": "20 kg assist", "load": 20}]
 
 
-def prescribed(day, reps, sets=THREE_EIGHTS, load=100, workout_id=None):
-    """An exposure logging one working set per entry of `reps` at `load`, against the prescription `sets` at `load`."""
-    found = exposure(day, [(load, r, 8) for r in reps], workout_id=workout_id)
+def prescribed(day, reps, sets=THREE_EIGHTS, load=100, workout_id=None, logged=None):
+    """An exposure logging one working set per entry of `reps` at `logged` (default `load`), against the
+    prescription `sets` at `load`."""
+    found = exposure(day, [(load if logged is None else logged, r, 8) for r in reps], workout_id=workout_id)
     return replace(found, prescribed=base.with_load(base.expand(sets), load))
 
 
@@ -141,14 +142,27 @@ class LinearResetStateTest(unittest.TestCase):
     def test_a_reset_ignored_for_the_old_load_keeps_counting(self):
         kept_reset = {"misses": 2, "through": "2026-10-05"}
         miss = prescribed(date(2026, 10, 5), (5, 5, 5), load=105)
-        missed_again = prescribed(date(2026, 10, 12), (5, 5, 5), load=105)
+        missed_again = prescribed(date(2026, 10, 12), (5, 5, 4), load=94.5, logged=105)
         reset = linear([missed_again, miss], limit=2, state=kept_reset)
         self.assertEqual({load for load, _ in loads_and_reps(reset)}, {94.5})
+        self.assertIn("resets", reset.rationale)
         self.assertEqual(reset.state, {"misses": 3, "through": "2026-10-12"})
-        hit = prescribed(date(2026, 10, 12), (8, 8, 8), load=105)
+        hit = prescribed(date(2026, 10, 12), (8, 8, 8), load=94.5, logged=105)
         climbed = linear([hit, miss], limit=2, state=kept_reset)
         self.assertEqual({load for load, _ in loads_and_reps(climbed)}, {107.5})
         self.assertEqual(climbed.state, {"misses": 0, "through": "2026-10-12"})
+
+    def test_any_lower_load_trained_after_a_running_count_starts_a_new_count(self):
+        running = {"misses": 1, "through": "2026-10-05"}
+        miss = prescribed(date(2026, 10, 5), (8, 8, 6))
+        return_week_miss = prescribed(date(2026, 10, 12), (8, 8, 6), load=95)
+        held = linear([return_week_miss, miss], limit=2, state=running)
+        self.assertEqual({load for load, _ in loads_and_reps(held)}, {95})
+        self.assertEqual(held.state, {"misses": 1, "through": "2026-10-12"})
+        lowered_but_trained_heavy = prescribed(date(2026, 10, 12), (8, 8, 6), load=95, logged=100)
+        reset = linear([lowered_but_trained_heavy, miss], limit=2, state=running)
+        self.assertEqual({load for load, _ in loads_and_reps(reset)}, {90})
+        self.assertEqual(reset.state, {"misses": 2, "through": "2026-10-12"})
 
     def test_a_kept_reset_without_the_through_exposure_starts_a_new_count(self):
         missed_at_reset = prescribed(date(2026, 10, 12), (8, 8, 6), load=94.5)
@@ -189,6 +203,15 @@ class LadderOverrideStateTest(unittest.TestCase):
             with self.assertRaises(ValidationError) as caught:
                 propose._override_state(program_doc, plugin, "session-a/pull_up", {"rung": 0, "through": None}, line)
         self.assertIn("fails its STATE schema", str(caught.exception))
+
+    def test_override_params_that_fail_the_params_schema_are_refused(self):
+        plugin = scheme("assistance_ladder")
+        program_doc = {"sessions": [{"id": "session-a", "exercises": [
+            {"exercise_id": "pull_up", "scheme": {"name": "assistance_ladder", "params": {"rungs": "none"}}}]}]}
+        line = {"override": {"reason": "synthetic"}, "sets": [{"type": "normal", "reps": 8, "rpe": 8, "load": 25}]}
+        with self.assertRaises(ValidationError) as caught:
+            propose._override_state(program_doc, plugin, "session-a/pull_up", {"rung": 0, "through": None}, line)
+        self.assertIn("fail its PARAMS schema", str(caught.exception))
 
     def test_only_the_ladder_defines_an_override_state(self):
         for name in ("linear", "double_progression", "wave_531", "hold"):

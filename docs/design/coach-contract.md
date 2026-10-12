@@ -2756,12 +2756,14 @@ and `plugins test` runs them. Loaded with
   proposes the reset and is kept, so the reset is proposed again (in a
   later run, or for the slot's later session in the same run) until an
   exposure after `through` is judged. The first such exposure starts a
-  new count when its prescribed top load is below the top load logged at
-  `through` (a reset, or a lower override, was trained); otherwise the
-  count runs on, so a reset trained at the old load, or a running count
-  that a lowered limit reaches, still resets. When either load is
-  unknown, a count at the limit starts a new count and a lower one runs
-  on. Before new training, a changed `misses_before_reset` re-reads the
+  new count when its logged top load is below the top load logged at
+  `through`: the athlete trained a lighter load, whatever lowered it (a
+  reset, a lower override, a return week, prescription-validity decay or
+  a load cap). Otherwise the count runs on, so a reset ignored for the
+  old load, or a running count that a lowered limit reaches, still
+  resets. The comparison is numeric, as the reset multiplies the load.
+  When either load is unknown, a count at the limit starts a new count
+  and a lower one runs on. Before new training, a changed `misses_before_reset` re-reads the
   stored count: a kept reset under a raised limit proposes a hold.
   A stored count of 0 whose `through` is a missed newest exposure,
   written by older versions after a reset, counts as a kept reset.

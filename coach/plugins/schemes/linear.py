@@ -52,8 +52,7 @@ def propose(ctx):
     misses = ctx.state.get("misses", 0)
     limit = ctx.params["misses_before_reset"]
     judged = base.usable_oldest_first(ctx.exposures, date.fromisoformat(through) if through else None)
-    trained_lower = _trained_lower(ctx.exposures, judged[0], through) if judged else None
-    if trained_lower or (trained_lower is None and judged and misses >= limit):
+    if judged and _count_restarts(ctx.exposures, judged[0], through, misses >= limit):
         misses = 0
     elif not judged and not misses and through == source.date.isoformat() and base.missed(source) is True:
         # Older versions cleared the count once a reset was proposed, leaving this state over the missed exposure.
@@ -106,15 +105,14 @@ def propose(ctx):
     )
 
 
-def _trained_lower(exposures, first, through):
-    """Whether `first` was prescribed a lower load than the `through` exposure logged, as a reset prescribes; None
-    when either load is unknown."""
-    prescribed = base.top_load(first.prescribed)
+def _count_restarts(exposures, first, through, at_limit):
+    """Whether `first`, the first exposure judged after `through`, starts a new count: it logged a lower top load than
+    the `through` exposure, as training a reset does. When either load is unknown, a count at the limit restarts."""
     before = next((e.top_load for e in exposures
                    if e.usable and e.week_kind != "deload" and e.date.isoformat() == through), None)
-    if prescribed is None or before is None:
-        return None
-    return prescribed < before
+    if first.top_load is None or before is None:
+        return at_limit
+    return first.top_load < before
 
 
 def _incomplete_hold(ctx, sets, source, misses, state):
