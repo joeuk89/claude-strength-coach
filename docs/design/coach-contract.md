@@ -3331,7 +3331,8 @@ propose week  ──►  .coach/proposals/<id>.json (+ .proposed.json)  ──�
 6. Write the draft and an untouched `.proposed.json` copy.
 
 Output: `data.overlay` is the complete C10 overlay (approval null,
-flags filled, every line's `provenance` filled), and `data.lines` is a
+flags filled, every line's `provenance` filled), `data.flags` its flags
+with their refs (below), and `data.lines` is a
 compact list `{session_id, date, exercise_id, text, change, rationale,
 flags}` with `text` from `units.format_load` for the coach's brief and
 `flags` the codes of the line's open flags (a first-load flag only on its
@@ -3347,9 +3348,25 @@ id follows C10. `data.lines_digest` (R-21b) is the C7 canonical hash of
   the proposal it replaces, and records a C25 decision when standing. For a `per_hand_x2` line,
   its reason must pass C13 load-statement validation before any proposal
   or decision artifact changes; ambiguous load prose exits 1.
-- `propose resolve --proposal ID --flag INDEX --resolution TEXT` resolves
-  one flag on the draft. It refuses (exit 3) a `load_mode_unconfirmed`
-  flag, which only a confirmed load mode clears.
+- **Flag references.** `propose week`, `show` and `rebuild` return
+  `data.flags`, the draft's flags each with a `ref`; `override` and
+  `restore` return theirs the same way. A ref is `<code>:<6 hex>`,
+  `coach.flags.ref`: a digest of the flag's code, severity, session,
+  exercise and message, never its list position, and never its
+  resolution. A flag keeps its ref through saves, reordering and
+  revalidation while its condition stands; a changed or new condition
+  gets another. Stored flags carry no `ref`. A proposed line's flags name
+  its session and date in the message (`session-a on 2026-10-14: ...`),
+  so a session planned on two dates raises two conditions.
+- `propose resolve --proposal ID --flag REF --resolution TEXT` resolves
+  the flag that ref names on the draft, and any identical copy of it. A
+  number is refused (exit 2), since list positions change when the
+  flags are checked again. A ref no current flag carries exits 1,
+  listing the open flags' refs, and leaves the draft unchanged; so does a
+  ref two different conditions share. It refuses (exit 3) a
+  `load_mode_unconfirmed` flag, which only a confirmed load mode clears.
+  A resolution follows its condition: revalidation keeps it on an
+  identical flag and never moves it to another.
 - **First-load warnings** (`coach.first_loads`). A `no_data` line flag's
   message names its session date, `<exercise> on YYYY-MM-DD: …`, which
   ties it to that occurrence of its slot; a message naming no date the
@@ -3377,7 +3394,8 @@ id follows C10. `data.lines_digest` (R-21b) is the C7 canonical hash of
 - `propose finalize --proposal ID [--dry-run]` re-runs step 5, judging
   the interference rules on the draft's sessions as they now are. It exits
   1 if any line differs from `.proposed.json` without `override.reason`,
-  and exits 3 if a `block` flag is unresolved, if the draft is stale
+  and exits 3 if a `block` flag is unresolved (a detail per flag, led by
+  its ref), if the draft is stale
   (below) or if its sessions no longer hold the program's exercises (as
   `overlay approve`, C10). It also exits 3 when a slot's stored scheme
   state differs from the state `propose week` started from (the run

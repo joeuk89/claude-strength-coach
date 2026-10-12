@@ -72,7 +72,8 @@ def override(args, ctx):
     "propose resolve",
     help="Resolve one flag of a proposal with the reason it stands",
     args=(_PROPOSAL,
-          arg("--flag", required=True, type=int, metavar="INDEX", help="the flag's index in the draft's flags (0 first)"),
+          arg("--flag", required=True, metavar="REF", help="the flag's ref (code:digest) from propose week, show or "
+                                                           "override"),
           arg("--resolution", required=True, metavar="TEXT", help="how the flag is settled")),
     writes=True,
 )

@@ -435,7 +435,8 @@ class AssistedReturnTest(AssistedLayoffCase):
         self.set_scheme("session-b", "pull_up", "double_progression")
         doc = self.propose("--dry-run")["overlay"]
         [message] = [f["message"] for f in doc["flags"] if f["code"] == "return_week" and f["exercise_id"] == "pull_up"]
-        self.assertEqual(message, "28 days off: return band 22-42 (assistance held, set change -1)")
+        self.assertEqual(message, "session-b on 2026-10-15: 28 days off: return band 22-42 (assistance held, set "
+                                  "change -1)")
 
     def test_a_double_progression_line_in_the_22_42_band_keeps_its_assistance(self):
         self.set_scheme("session-b", "pull_up", "double_progression")
@@ -747,17 +748,18 @@ class OverrideTest(ProposeCase):
 
     def test_an_override_that_makes_a_block_shows_it_in_the_draft_to_resolve(self):
         data = self.override("--sets", "3x5@140 rpe7", "--reason", "synthetic test")
-        index = next(i for i, f in enumerate(data["flags"]) if f["code"] == "unearned_load")
+        ref = next(f["ref"] for f in data["flags"] if f["code"] == "unearned_load")
         envelope = self.coach("propose", "finalize", "--proposal", FIRST_ID, expect=3)
-        self.assertIn("unearned_load", json.dumps(envelope["error"]))
-        self.coach("propose", "resolve", "--proposal", FIRST_ID, "--flag", str(index), "--resolution",
+        self.assertIn(ref, json.dumps(envelope["error"]))
+        self.coach("propose", "resolve", "--proposal", FIRST_ID, "--flag", ref, "--resolution",
                    "synthetic: the athlete tested it last week")
         self.assertTrue(self.coach("propose", "finalize", "--proposal", FIRST_ID)["data"]["written"])
 
     def test_dry_runs_write_nothing(self):
         before = self.snapshot()
         self.override("--load", "95", "--reason", "knee", "--standing", "--dry-run")
-        self.coach("propose", "resolve", "--proposal", FIRST_ID, "--flag", "0", "--resolution", "x", "--dry-run")
+        ref = self.coach("propose", "show", FIRST_ID)["data"]["flags"][0]["ref"]
+        self.coach("propose", "resolve", "--proposal", FIRST_ID, "--flag", ref, "--resolution", "x", "--dry-run")
         self.coach("propose", "finalize", "--proposal", FIRST_ID, "--dry-run")
         self.assertEqual(self.snapshot(), before)
 
@@ -771,9 +773,9 @@ class FinalizeTest(ProposeCase):
         self.edit_json("data/exercises.json", lambda doc: doc["exercises"].setdefault("bb_back_squat", {}).update(
             load_mode=None))
         data = self.propose()
-        index = next(i for i, f in enumerate(data["overlay"]["flags"]) if f["code"] == "load_mode_unconfirmed")
-        envelope = self.coach("propose", "resolve", "--proposal", data["overlay"]["id"], "--flag", str(index),
-                              "--resolution", "the athlete knows it", expect=3)
+        index = next(i for i, f in enumerate(data["flags"]) if f["code"] == "load_mode_unconfirmed")
+        envelope = self.coach("propose", "resolve", "--proposal", data["overlay"]["id"], "--flag",
+                              data["flags"][index]["ref"], "--resolution", "the athlete knows it", expect=3)
         self.assertIn("python3 -m coach library set-mode bb_back_squat", envelope["error"]["message"])
         self.assertFalse(read_json(self.draft_path(data["overlay"]["id"]))["flags"][index]["resolved"])
 

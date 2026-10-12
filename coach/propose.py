@@ -1535,7 +1535,7 @@ def _build_week(root, config, today, now, span, kind, transform_name, plan_file=
                        for exercise in session["exercises"]]
             lines = [result.draft_line for _, result in results]
         for key, result in results:
-            all_flags += result.flags
+            all_flags += [_on_date(flag, session_id, day) for flag in result.flags]
             entry = ctx_extra["states"].get(key)
             ctx_extra["states"][key] = {"scheme": result.scheme, "data": result.state,
                                         "pending": entry.get("pending") if entry else None}
@@ -1577,6 +1577,11 @@ def _build_week(root, config, today, now, span, kind, transform_name, plan_file=
             "doc": doc, "meta": meta, "span": span, "kind": kind, "rotation": found.rotation, "dropped": dropped}
 
 
+def _on_date(flag, session_id, day):
+    """The flag with its message naming the session's date, so a session planned twice raises two conditions."""
+    return dict(flag, message=f"{session_id} on {day.isoformat()}: {flag['message']}")
+
+
 def _write_built(root, built):
     if built["settled"]:
         _write_state(root, built["settled_state"], built["run"].program)
@@ -1589,7 +1594,8 @@ def _week_result(root, config, built, dry_run):
     lines = lines_of(doc, config.athlete.units, config.hevy.enabled)
     return {
         "id": doc["id"], "kind": built["kind"], "span": built["span"].to_json(), "draft": _relative(root, draft_path),
-        "proposed": _relative(root, proposed_path), "overlay": doc, "lines": lines,
+        "proposed": _relative(root, proposed_path), "overlay": doc, "flags": flags.with_refs(doc["flags"]),
+        "lines": lines,
         "lines_digest": jsonio.canonical_hash(lines), "settled": built["settled"], "rotation": built["rotation"],
         "dropped": [_dropped_row(entry) for entry in built["dropped"]], "written": not dry_run,
     }
@@ -1790,7 +1796,7 @@ def override(root, config, proposal_id, session_id, exercise_id, new_sets, load,
     if not dry_run:
         _write_proposal(root, proposal_id, draft, None, None)
     return {"id": proposal_id, "session_id": session_id, "exercise_id": exercise_id, "lines": changed,
-            "decision": decision, "flags": draft["flags"], "written": not dry_run}
+            "decision": decision, "flags": flags.with_refs(draft["flags"]), "written": not dry_run}
 
 
 def _rep_out_capped(root, session, line, sets):
@@ -1809,20 +1815,40 @@ def _rep_out_capped(root, session, line, sets):
     return tuple(base.rpe_capped((s,), min(caps))[0] if s.rep_out else s for s in sets)
 
 
-def resolve(root, proposal_id, index, resolution, dry_run):
+def resolve(root, proposal_id, reference, resolution, dry_run):
+    """Resolve the flag `reference` names (its `ref`, C24) with the reason it stands.
+
+    A reference names a condition, not a list position: one that no current flag states is refused, never
+    moved onto another flag. Identical copies of the condition are resolved together.
+    """
     if not resolution or not resolution.strip():
         raise UsageError("--resolution must say how the flag is settled")
+    reference = (reference or "").strip()
+    if reference.isdigit():
+        raise UsageError(f"--flag takes a flag's ref, such as unearned_load:3f9a1c, from the flags propose week, "
+                         f"show or override list; list positions change when the flags are checked again, so "
+                         f"{reference} names no flag")
     draft, _, _ = load_proposal(root, proposal_id)
     found = draft.get("flags", [])
-    if not 0 <= index < len(found):
-        raise ValidationError(f"Proposal {proposal_id} has {len(found)} flag(s); --flag takes 0 to {len(found) - 1}")
-    if found[index]["code"] == validity.UNCONFIRMED:
-        raise RefusedError(f"Flag {index} clears only once the library holds a confirmed load mode, not with a "
-                           f"resolution: {found[index]['message']}")
-    found[index] = dict(found[index], resolved=True, resolution=resolution.strip())
+    matches = [index for index, flag in enumerate(found) if flags.ref(flag) == reference]
+    if not matches:
+        raise ValidationError(
+            f"Proposal {proposal_id} has no flag {reference}: the condition it named is gone or has changed. Run "
+            f"python3 -m coach propose show {proposal_id} and resolve the current flag by its ref",
+            details=[{"path": None, "message": f"{flags.ref(f)}: {f['message']}"} for f in found if not f["resolved"]])
+    if len({validity.flag_key(found[index]) for index in matches}) > 1:
+        raise ValidationError(f"Flag {reference} names more than one condition in proposal {proposal_id}; settle "
+                              "them through propose override or edit the draft",
+                              details=[{"path": None, "message": found[index]["message"]} for index in matches])
+    flag = found[matches[0]]
+    if flag["code"] == validity.UNCONFIRMED:
+        raise RefusedError(f"Flag {reference} clears only once the library holds a confirmed load mode, not with a "
+                           f"resolution: {flag['message']}")
+    for index in matches:
+        found[index] = dict(found[index], resolved=True, resolution=resolution.strip())
     if not dry_run:
         _write_proposal(root, proposal_id, draft, None, None)
-    return {"id": proposal_id, "flag": found[index], "written": not dry_run}
+    return {"id": proposal_id, "flag": flags.with_refs([found[matches[0]]])[0], "written": not dry_run}
 
 
 def restore(root, config, proposal_id, session_id, reason, now, today, dry_run):
@@ -1860,7 +1886,8 @@ def restore(root, config, proposal_id, session_id, reason, now, today, dry_run):
     if not dry_run:
         _write_proposal(root, proposal_id, draft, proposed, meta)
     return {"id": proposal_id, "session_id": session_id, "restored": [_dropped_row(e) for e in entries],
-            "flags": draft["flags"], "lines": lines_of(doc, config.athlete.units, config.hevy.enabled),
+            "flags": flags.with_refs(draft["flags"]),
+            "lines": lines_of(doc, config.athlete.units, config.hevy.enabled),
             "written": not dry_run}
 
 
@@ -2039,9 +2066,10 @@ def show(root, config, proposal_id, now):
     doc = overlay.build(draft, config, root=root, now=now)
     doc["flags"] = first_loads.settle(doc["flags"], doc["sessions"], config.hevy.enabled)
     lines = lines_of(doc, config.athlete.units, config.hevy.enabled)
-    return {"id": proposal_id, "kind": meta["kind"], "span": meta["span"], "overlay": doc, "lines": lines,
-            "lines_digest": jsonio.canonical_hash(lines), "unexplained": unexplained_changes(draft, proposed),
-            "unresolved_blocks": overlay.unresolved_blocks(doc),
+    return {"id": proposal_id, "kind": meta["kind"], "span": meta["span"], "overlay": doc,
+            "flags": flags.with_refs(doc["flags"]), "lines": lines, "lines_digest": jsonio.canonical_hash(lines),
+            "unexplained": unexplained_changes(draft, proposed),
+            "unresolved_blocks": flags.with_refs(overlay.unresolved_blocks(doc)),
             "dropped": [_dropped_row(e) for e in meta.get("dropped", [])]}
 
 
@@ -2125,8 +2153,8 @@ def finalize(root, config, proposal_id, now, dry_run, today=None):
         raise RefusedError(
             f"Proposal {proposal_id} has {len(blocks)} unresolved block flag(s); settle each as its message "
             "says, or, where a reason can accept it, resolve it with propose resolve",
-            details=[{"path": None, "message": f"{f['code']} ({f['session_id']} / {f['exercise_id']}): {f['message']}"}
-                     for f in blocks])
+            details=[{"path": None, "message": f"{flags.ref(f)} ({f['session_id']} / {f['exercise_id']}): "
+                                               f"{f['message']}"} for f in blocks])
     path = overlay.path_for(root, doc["id"])
     if path.exists() and (overlay.read_json(path) or {}).get("approval"):
         raise RefusedError(f"Overlay {doc['id']} is already approved, so finalize does not replace it; run "

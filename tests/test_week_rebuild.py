@@ -223,10 +223,10 @@ class KeptOverrideTest(RebuildCase):
     def test_a_deload_overrides_sets_are_kept_only_by_a_transform_run_and_cut_once(self):
         deload = self.run_coach("propose", "week", "--kind", "deload", "--week", "2026-W43")
         self.override(deload["id"], "session-b", "db_single_arm_row", "--load", "25", reason="lighter row")
-        flags = self.run_coach("propose", "show", deload["id"])["overlay"]["flags"]
-        for index, found in enumerate(flags):
+        flags = self.run_coach("propose", "show", deload["id"])["flags"]
+        for found in flags:
             if found["severity"] == "block" and not found["resolved"]:
-                self.run_coach("propose", "resolve", "--proposal", deload["id"], "--flag", str(index),
+                self.run_coach("propose", "resolve", "--proposal", deload["id"], "--flag", found["ref"],
                                "--resolution", "synthetic: accepted for the test")
         self.run_coach("propose", "finalize", "--proposal", deload["id"])
         self.run_coach("overlay", "approve", deload["id"])
@@ -279,9 +279,9 @@ class RebuildCarryTest(RebuildCase):
     def test_a_resolved_block_flag_survives_a_rebuild(self):
         self.run_coach("propose", "week", "--week", "2026-W43")
         data = self.override(WEEKLY, "session-a", "bb_back_squat", "--load", "130", reason="test a heavy single week")
-        [index] = [i for i, f in enumerate(data["flags"]) if f["severity"] == "block"]
-        self.assertEqual(data["flags"][index]["code"], "unearned_load")
-        self.run_coach("propose", "resolve", "--proposal", WEEKLY, "--flag", str(index), "--resolution",
+        [block] = [f for f in data["flags"] if f["severity"] == "block"]
+        self.assertEqual(block["code"], "unearned_load")
+        self.run_coach("propose", "resolve", "--proposal", WEEKLY, "--flag", block["ref"], "--resolution",
                        "synthetic: accepted for the test")
         self.add_push_ups()
         rebuilt = self.run_coach("propose", "rebuild", "--proposal", WEEKLY)
@@ -412,9 +412,9 @@ class DraftLifecycleTest(RebuildCase):
 
     def test_discard_removes_an_unapproved_overlay_and_its_pending_state(self):
         data = self.run_coach("propose", "week", "--week", "2026-W44", now="2026-10-25T19:00:00Z")
-        for index, flag in enumerate(data["overlay"]["flags"]):
+        for flag in data["flags"]:
             if flag["severity"] == "block":
-                self.run_coach("propose", "resolve", "--proposal", data["id"], "--flag", str(index), "--resolution",
+                self.run_coach("propose", "resolve", "--proposal", data["id"], "--flag", flag["ref"], "--resolution",
                                "synthetic: accepted for the test", now="2026-10-25T19:00:00Z")
         self.run_coach("propose", "finalize", "--proposal", data["id"], now="2026-10-25T19:00:00Z")
         discarded = self.run_coach("propose", "discard", "--proposal", data["id"], now="2026-10-25T19:00:00Z")
