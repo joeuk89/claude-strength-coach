@@ -189,6 +189,47 @@ class RebuildTest(FirstLoadCase):
                                         if f["exercise_id"] == "bb_back_squat"])
 
 
+class LayoffTest(unittest.TestCase):
+    """The squat added to session-b with no start load, after a layoff from its logged session-a exposures."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name) / "instance"
+        shutil.copytree(INSTANCES / "nohevy", self.root)
+        for found in (self.root / "data" / "overlays").glob("*.json"):
+            found.unlink()
+        program = self.root / "data" / "program.json"
+        doc = json.loads(program.read_text(encoding="utf-8"))
+        squat = dict(doc["sessions"][0]["exercises"][0], start_load=None)
+        doc["sessions"][1]["exercises"].insert(0, squat)
+        program.write_text(json.dumps(doc, indent=2), encoding="utf-8")
+
+    def run_coach(self, *argv, expect=0):
+        code, envelope, stderr = run_cli(["--root", str(self.root), *argv], env={"COACH_NOW": "2026-11-01T19:00:00Z"})
+        self.assertEqual(code, expect, (envelope, stderr))
+        return envelope["data"]
+
+    def test_a_first_load_past_a_return_band_is_not_held_to_a_derivation_it_never_had(self):
+        self.run_coach("history", "sync")
+        overlay = self.run_coach("propose", "week", "--week", "2026-W45")["overlay"]
+        [line] = [line for s in overlay["sessions"] if s["session_id"] == "session-b" for line in s["exercises"]
+                  if line["exercise_id"] == "bb_back_squat"]
+        self.assertEqual(line["provenance"]["derived_from"], None)
+        self.assertNotEqual(line["provenance"]["decay"], None)
+
+        codes = {}
+        for load in ("61", "60"):
+            found = self.run_coach("propose", "override", "--proposal", overlay["id"], "--session", "session-b",
+                                   "--exercise", "bb_back_squat", "--load", load, "--reason", "first load agreed")
+            codes[load] = {f["code"]: f["resolved"] for f in found["flags"]
+                           if f["session_id"] == "session-b" and f["exercise_id"] == "bb_back_squat"}
+        self.assertEqual(codes["61"].get("load_unrepresentable"), False)
+        self.assertEqual(codes["60"].get("no_data"), True)
+        self.assertNotIn("stale_prescription", codes["60"])
+        self.run_coach("propose", "finalize", "--proposal", overlay["id"])
+
+
 class MessageTest(unittest.TestCase):
     def test_an_undated_flag_stands_for_every_line_of_its_slot(self):
         line = {"exercise_id": "bb_back_squat", "load_mode": "total", "sets": [{"type": "normal", "load": None}]}

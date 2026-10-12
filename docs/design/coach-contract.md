@@ -2592,7 +2592,9 @@ coach.validity.estimate_minutes(root, session) -> int
 - A line with a `no_data` flag (C10) and a working set still without a
   load gets no R-24 flag but `load_mode_mismatch` and
   `load_mode_unconfirmed`. Once all its working sets have loads it is
-  checked like any other line.
+  checked like any other line, except that a first load with a null
+  `provenance.derived_from` skips the return-band decay check: the coach
+  set it, so no exposure measures it.
 - Illness (R-02, rn:detraining-return.4, a heuristic for mild illness
   above the neck): when an `ill` miss annotation or an `ill` status day
   (C50; `coach.statusdays.ill_in(root, span)`, added by R-43) falls in the
