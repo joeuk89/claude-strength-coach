@@ -1348,7 +1348,9 @@ In a table, a figure is also explicit when its column header says per
 hand (`Per hand (kg)`, `Load/hand (kg)`), when it sits in a Hevy-headed
 column, or, in a load column, when the same row has a number in a
 Hevy-headed column. Ranges, dates, sets × reps, RPE, durations,
-distances, equipment increments and bodyweight measurements are not
+distances, equipment increments and capacities (`100 kg capacity`, or
+`up to 30 kg` under an `Equipment:` or `Kit:` label) and bodyweight
+measurements (`bodyweight`, `goal weight`, `weighed`) are not
 prescription loads. An excluded measurement covers only its own figures;
 a later instruction in the same sentence is still checked. Measurement
 subjects include changes (`bodyweight fell 2 kg`) and numeric
@@ -1362,21 +1364,19 @@ The check reads a `per_hand_x2` overlay line's `target_note`, `change`,
 `check-ins/*.md` outside rendered regions. Overlay text and override
 authoring use the same load-figure parser. In free prose a figure
 belongs to an exercise named before it in its statement. Punctuation and
-conjunctions (`and`, `but`, `then`, `plus`, `while`, `whereas`, alone or
-combined, as in `, and then`) end a clause. A clause starts a new
-statement, so an unmatched exercise does not inherit the one before it
-(`DB bench 20/hand and leg curl 25 kg`). A clause on the same line that
-opens with a load instruction continues the statement before it, across
-commas, conjunctions and sentence ends: a weight (`, 22 kg if fresh`),
-a load verb with its weight (`, then move to 22.5 kg`, `, aim for 22 kg`),
-either after a time anchor (`, next week 22.5 kg`), or a bodyweight
-measurement. So does a clause that opens with prescription notation
-(sets × reps, `N sets`, `RPE 8`, `top set`, `Load:`, rest or tempo), a
-condition (`if`, `unless`, `when`, `once`) or a consequence (`so`,
-`which means`), when its load comes straight after the opener or the
-clause has no load: `, 3x10, 22 kg`, `. If fresh, 22 kg`. A clause
-that names something else before its load, such as a numbered exercise
-clause (`3 sets of leg curl at 25 kg`), starts a new statement.
+conjunctions (`and`, `but`, `or`, `then`, `plus`, `while`, `whereas`,
+alone or combined, as in `, and then`) end a clause. A clause starts a
+new statement only when, before its first load, it names an exercise or
+a movement word that ends two or more library movement names (`curl`,
+`press`, `row`, `squat` and the like). So an unmatched exercise does not
+inherit the one before it (`DB bench 20/hand and leg curl 25 kg`,
+`. If leg curl 25 kg moves fast`, `3 sets of leg curl at 25 kg`). Any
+other clause on the same line continues the statement before it, across
+commas, conjunctions and sentence ends, and its figures keep that
+statement's exercise: `, 3x12 @ 14 kg`, `, keeping 20 kg`, `, about 20 kg`,
+`. If fresh, 22 kg`, `. Go heavier: 16 kg`. A clause that opens with a
+load instruction (`, raise to 22 kg`, `, next week 22.5 kg`) always
+continues.
 Library names, aliases, Hevy titles and ids identify exercises, and so
 does an entry's name without its parenthetical equipment (`Lateral Raise
 (Cable)` gives `lateral raise`). Hyphens and spaces match each other,
@@ -1387,8 +1387,9 @@ An entry that lists the phrase as its own name, alias, Hevy title or id
 owns it; a phrase only derived for variants with different load modes
 is ambiguous and is not checked. A dumbbell word followed by movement
 words the library uses names a `per_hand_x2` exercise when no entry
-matches (`DB incline press 22 kg`); one the library knows resolves
-through it (`DB row` is a single implement). A dumbbell word with no
+matches (`DB incline press 22 kg`) or every entry it matches uses other
+equipment (`DB split squat`, `dumbbell deadlift`); a dumbbell entry the
+library knows resolves through it (`DB row` is a single implement). A dumbbell word with no
 movement after it (`dumbbells up to 30 kg`) names no exercise.
 Equipment modifiers attached to the exercise (`cable lateral raise`,
 `lateral raise on the cable machine`) select the matching variant; a

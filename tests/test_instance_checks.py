@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 
 from coach import load_statements, overlay
+from coach.library import Library
 from coach.checks import instance
 from tests.support import INSTANCES, REPO_ROOT, VALID, run_cli, run_module
 
@@ -580,6 +581,48 @@ class BareHevyValuesTest(unittest.TestCase):
                 with self.subTest(text=text):
                     self.assertEqual(self.flagged(tmp, text), expected)
 
+    def test_a_clause_naming_no_new_movement_keeps_the_load_with_its_exercise(self):
+        bench, arnold = "db_bench_press", "db_arnold_press"
+        with TempCopy() as tmp:
+            for text, figure, exercise in (("Arnold press, 3x12 @ 14 kg", "14 kg", arnold),
+                                           ("DB bench, about 20 kg", "20 kg", bench),
+                                           ("DB bench 3x10, keeping 20 kg", "20 kg", bench),
+                                           ("DB bench, starting at 20 kg", "20 kg", bench),
+                                           ("Arnold press, last set 14 kg", "14 kg", arnold),
+                                           ("DB bench 3x10 while keeping 20 kg", "20 kg", bench),
+                                           ("DB bench, holding 20 kg", "20 kg", bench),
+                                           ("DB bench, staying at 20 kg", "20 kg", bench),
+                                           ("DB bench, using 20 kg", "20 kg", bench),
+                                           ("DB bench, adding 2 kg next week", "2 kg", bench),
+                                           ("DB bench, dropping to 18 kg", "18 kg", bench),
+                                           ("DB bench, then deload to 18 kg", "18 kg", bench),
+                                           ("DB bench, ~20 kg", "20 kg", bench),
+                                           ("DB bench, around 22 kg", "22 kg", bench),
+                                           ("DB bench, load 20 kg", "20 kg", bench),
+                                           ("Arnold press, sets of 12 at 14 kg", "14 kg", arnold),
+                                           ("Arnold press, AMRAP at 14 kg", "14 kg", arnold),
+                                           ("Arnold press, warm-up 8 kg", "8 kg", arnold),
+                                           ("Arnold press, 2 warm-up sets then 14 kg", "14 kg", arnold),
+                                           ("Arnold press 3x12. Go heavier: 16 kg.", "16 kg", arnold),
+                                           ("DB bench 20/hand, push to 22 kg", "22 kg", bench),
+                                           ("DB bench 20/hand, raise to 22 kg", "22 kg", bench),
+                                           ("DB bench 3 or 4 sets at 20 kg", "20 kg", bench)):
+                with self.subTest(text=text):
+                    self.assertEqual(self.flagged(tmp, text), [(repr(figure), exercise)])
+
+    def test_a_clause_naming_another_movement_does_not_inherit_the_exercise(self):
+        with TempCopy() as tmp:
+            for text in ("DB bench 20/hand. If leg curl 25 kg moves fast, go heavier.",
+                         "DB bench 20/hand, once leg curl 25 kg feels easy add a set",
+                         "DB bench 20/hand or leg curl 25 kg",
+                         "DB bench 20/hand, then sissy squats at 10 kg",
+                         "DB bench 20/hand, dumbbells up to 30 kg",
+                         "Equipment: dumbbell bench up to 30 kg.",
+                         "DB bench 20/hand. Weighed 74 kg this morning.",
+                         "Dumbbell squat stand in the garage, 100 kg capacity."):
+                with self.subTest(text=text):
+                    self.assertEqual(self.flagged(tmp, text), [])
+
     def test_dumbbell_wording_names_the_dumbbell_exercise(self):
         with TempCopy() as tmp:
             for text, exercise in (("dumbbell romanian deadlifts 30 kg", "db_romanian_deadlift"),
@@ -593,7 +636,9 @@ class BareHevyValuesTest(unittest.TestCase):
                                    ("DB step-ups 15 kg", "db_step_up"),
                                    ("DB press 20 kg", "DB press"),
                                    ("DB incline press 22 kg", "DB incline press"),
-                                   ("DB split squats 16 kg", "DB split squats")):
+                                   ("DB split squats 16 kg", "DB split squats"),
+                                   ("DB chest press 20 kg", "DB chest press"),
+                                   ("dumbbell deadlift 30 kg", "dumbbell deadlift")):
                 with self.subTest(text=text):
                     [(listed, found)] = self.flagged(tmp, text)
                     self.assertEqual(found, exercise)
@@ -601,7 +646,7 @@ class BareHevyValuesTest(unittest.TestCase):
     def test_dumbbell_wording_keeps_other_load_modes_and_equipment_prose(self):
         with TempCopy() as tmp:
             for text in ("DB row 20 kg", "DB single arm row 20 kg", "dumbbell goblet squat 24 kg",
-                         "dumbbell deadlift 30 kg", "dumbbells over 30 kg are too heavy",
+                         "dumbbells over 30 kg are too heavy",
                          "dumbbell rack: 2-20 kg in 2 kg steps", "DB set to 30 kg."):
                 with self.subTest(text=text):
                     self.assertEqual(self.flagged(tmp, text), [])
@@ -774,10 +819,15 @@ class LoadFigureTest(unittest.TestCase):
                 ["DB bench 20/hand, then move to 22.5 kg", " Leg curl 25 kg"],
             "DB bench 20/hand, and leg curl 25 kg": ["DB bench 20/hand", " leg curl 25 kg"],
             "Arnold press, bodyweight 73 kg, move to 15 kg": ["Arnold press, bodyweight 73 kg, move to 15 kg"],
+            "DB bench 3x10, keeping 20 kg": ["DB bench 3x10, keeping 20 kg"],
+            "DB bench 20/hand or leg curl 25 kg": ["DB bench 20/hand ", " leg curl 25 kg"],
+            "DB bench 20/hand. If leg curl 25 kg moves fast, go heavier.":
+                ["DB bench 20/hand", " If leg curl 25 kg moves fast, go heavier"],
         }
+        mentions = load_statements.Mentions(Library())
         for text, expected in cases.items():
             with self.subTest(text):
-                self.assertEqual([s for s in load_statements.statements(text) if s.strip()], expected)
+                self.assertEqual([s for s in mentions.statements(text) if s.strip()], expected)
 
     def test_load_column_cells(self):
         self.assertEqual(self.bare("45", load_column=True), ["45"])

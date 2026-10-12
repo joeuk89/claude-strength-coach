@@ -67,22 +67,25 @@ def _chains(text, figures):
 
 
 _EQUIPMENT_NOUN = r"(?:dumbbells?|dbs?|plates?|cables?|kettlebells?|barbells?)"
+_CAPACITY = r"\s+(?:(?:go\s+)?up\s+(?:to|in)|to|down\s+to)\s*$"
 _EQUIPMENT_CAPACITY_BEFORE = re.compile(
     rf"^\s*(?:(?:home only|equipment|kit):\s*)?(?:adjustable\s+)?{_EQUIPMENT_NOUN}"
-    rf"(?:\s*(?:,|and)\s*(?:adjustable\s+)?{_EQUIPMENT_NOUN})*"
-    r"\s+(?:(?:go\s+)?up\s+(?:to|in)|to|down\s+to)\s*$", re.IGNORECASE,
+    rf"(?:\s+(?:and\s+)?(?:adjustable\s+)?{_EQUIPMENT_NOUN})*{_CAPACITY}"
+    rf"|^\s*(?:equipment|kit):[^:]*?{_CAPACITY}", re.IGNORECASE,
 )
 _WEIGHT = r"\d+(?:\.\d+)?\s*(?:kgs?|lbs?|kilos?|pounds?)(?![A-Za-z])"
-_MEASUREMENT_SUBJECT_WORDS = r"(?:body\s*weight|body mass|goal\s+(?:weight|plan)|weight\s+goal)"
-_MEASUREMENT_SUBJECT = re.compile(rf"\b{_MEASUREMENT_SUBJECT_WORDS}\b", re.IGNORECASE)
-_CLAUSE_SEPARATOR = re.compile(
-    r"(,|[;!?\n]|\.(?!\d)|\b(?:(?:and|but)\s+then|and|but|then|plus|while|whereas)\b)", re.IGNORECASE,
+_MEASUREMENT_SUBJECT = re.compile(
+    r"\b(?:body\s*weight|body mass|goal\s+(?:weight|plan)|weight\s+goal|weigh(?:ed|s)?|weigh[\s-]?ins?)\b",
+    re.IGNORECASE,
 )
-_MEASUREMENT_CONTINUATION = re.compile(r"\s*(?:to|at|→|->|and\s+now|,?\s*now)\s*", re.IGNORECASE)
+_CLAUSE_SEPARATOR = re.compile(
+    r"(,|[;!?\n]|\.(?!\d)|\b(?:(?:and|but)\s+then|and|but|or|then|plus|while|whereas)\b)", re.IGNORECASE,
+)
+_MEASUREMENT_CONTINUATION = re.compile(r"\s*(?:to|at|or|→|->|and\s+now|,?\s*now)\s*", re.IGNORECASE)
 _MEASUREMENT_SUFFIX = re.compile(rf"{_WEIGHT}\s+(?:of\s+)?(?:body\s*weight|body mass)\b", re.IGNORECASE)
 _EQUIPMENT_LIMIT = re.compile(
-    rf"{_WEIGHT}\s+{_EQUIPMENT_NOUN}\s+(?:is|are)\s+(?:the\s+)?(?:heaviest|maximum|largest)\b",
-    re.IGNORECASE,
+    rf"{_WEIGHT}\s+{_EQUIPMENT_NOUN}\s+(?:is|are)\s+(?:the\s+)?(?:heaviest|maximum|largest)\b"
+    rf"|{_WEIGHT}\s+capacity\b", re.IGNORECASE,
 )
 _INCREMENT_BEFORE = re.compile(r"\b(?:step|increment)\s+(?:is|of|:)\s*$", re.IGNORECASE)
 _INCREMENT_AFTER = re.compile(r"\s*(?:cable\s+)?(?:steps?|increments?)\b", re.IGNORECASE)
@@ -109,7 +112,7 @@ def measurement_spans(text):
 
 
 def _unrelated_measurement(text, figure, measurements):
-    before = re.split(r"[;!?\n]|\.(?!\d)", text[:figure.start])[-1]
+    before = re.split(r"[,;!?\n]|\.(?!\d)", text[:figure.start])[-1]
     measured = any(start <= figure.start < end for start, end in measurements)
     return bool(measured or _EQUIPMENT_CAPACITY_BEFORE.search(before)
                 or _INCREMENT_BEFORE.search(before) or _INCREMENT_AFTER.match(text[figure.end:]))
@@ -144,72 +147,14 @@ def bare_message(rel, where, figures, exercise, text, hevy_enabled):
             f"{guidance}")
 
 
-_LOAD_LEAD = (
+_LOAD_LED = re.compile(
     r"\s*(?:(?:next|this|last|following)\s+(?:week|session|time|block|workout)|today|tomorrow)?[\s:]*"
     r"(?:(?:move|moving|go|going|work|increase|increasing|reduce|hold|stay|add|drop|raise|rising|lower|bump"
-    r"|build|building|climb|climbing|progress|progressing|aim|target|try|use|keep)\s+)?"
+    r"|build|building|climb|climbing|progress|progressing|aim|target|try|use|keep|push|pushing)\s+)?"
     r"(?:(?:up|down|back)\s+)?(?:(?:to|at|by|for|with)\s+)?"
-    r"\d+(?:\.\d+)?\s*(?:kgs?|lbs?|kilos?|pounds?|/\s*hand|per\s+hand|each|→|->|=>|⇒)(?![A-Za-z])"
+    r"\d+(?:\.\d+)?\s*(?:kgs?|lbs?|kilos?|pounds?|/\s*hand|per\s+hand|each|→|->|=>|⇒)(?![A-Za-z])",
+    re.IGNORECASE,
 )
-_LOAD_LED = re.compile(_LOAD_LEAD, re.IGNORECASE)
-_MEASUREMENT_LED = re.compile(rf"\s*(?:at\s+)?{_MEASUREMENT_SUBJECT_WORDS}\b", re.IGNORECASE)
-_RANGE = r"\d+(?:\.\d+)?(?:\s*[-–]\s*\d+(?:\.\d+)?)*"
-_SECONDS = r"(?:s|secs?|seconds?|mins?|minutes?)\b"
-_NOTATION_ITEM = (
-    rf"(?:\d+\s*[×xX*]\s*{_RANGE}(?:\s*reps?\b)?"
-    rf"|{_RANGE}\s*(?:sets?|reps?)\b(?:\s+of\s+{_RANGE}(?:\s*reps?\b)?)?"
-    rf"|(?:@\s*)?(?:rpe|rir)\s*[:@]?\s*{_RANGE}"
-    r"|(?:top|back[\s-]?off|working|heavy)\s+sets?\b|(?:load|weight)\s*:"
-    rf"|\d+\s*{_SECONDS}\s+rest\b|rest\s*:?\s*{_RANGE}\s*(?:{_SECONDS})?|tempo\s*:?\s*[\dxX]+(?:\s*[-–]\s*[\dxX]+)*)"
-)
-_NOTATION_LED = re.compile(rf"\s*{_NOTATION_ITEM}(?:[\s@]*{_NOTATION_ITEM})*", re.IGNORECASE)
-_CONSEQUENCE_LED = re.compile(r"\s*(?:so|which\s+means|meaning)\b", re.IGNORECASE)
-_CONDITION_LED = re.compile(r"\s*(?:if|unless|when|once)\b", re.IGNORECASE)
-_CONDITION_WORDS = re.compile(r"(?:\s+[A-Za-z]+){1,2}?(?=" + _LOAD_LEAD + ")", re.IGNORECASE)
-
-
-def _has_load(text):
-    return any(figure.unit for figure in _figures(text))
-
-
-def _continues(fragment):
-    """Whether a clause carries on the statement before it instead of naming a new subject."""
-    if _LOAD_LED.match(fragment) or _MEASUREMENT_LED.match(fragment):
-        return True
-    for opener in (_NOTATION_LED, _CONSEQUENCE_LED, _CONDITION_LED):
-        led = opener.match(fragment)
-        if not led:
-            continue
-        rest = fragment[led.end():]
-        if opener is _CONDITION_LED and _CONDITION_WORDS.match(rest):
-            return True
-        return bool(_LOAD_LED.match(rest)) or not _has_load(rest)
-    return False
-
-
-def statements(text):
-    """Split text into one statement per subject.
-
-    Punctuation and conjunctions start a new subject. A clause continues the
-    statement before it, so its figures keep that statement's exercise, when
-    it opens with a load instruction or a bodyweight measurement, or with
-    prescription notation, a condition or a consequence that is followed by
-    its load or by no load at all.
-    """
-    parts = _CLAUSE_SEPARATOR.split(text)
-    found = [parts[0]]
-    joint = ""
-    for separator, following in zip(parts[1::2], parts[2::2]):
-        joint += separator
-        if not following.strip():
-            joint += following
-            continue
-        if _continues(following):
-            found[-1] += joint + following
-        else:
-            found.append(following)
-        joint = ""
-    return found
 
 
 PER_HAND_X2 = "per_hand_x2"
@@ -264,6 +209,43 @@ class Mentions:
         dumbbell_movement = rf"{self._SPELLINGS['dumbbell']}(?:[\s-]+{word}){{1,3}}"
         self._pattern = re.compile(rf"(?<![A-Za-z0-9_])(?:(?:{alternatives})(?:e?s)?(?![A-Za-z0-9_])"
                                    rf"|{dumbbell_movement})", re.IGNORECASE)
+        families = {}
+        for entry in entries:
+            if entry["load_mode_default"] not in ("distance", "duration"):
+                families.setdefault(movement[entry["id"]].split()[-1], set()).add(movement[entry["id"]])
+        heads = sorted(head for head, names in families.items() if len(names) > 1 and head.isalpha() and len(head) > 2)
+        self._movement_head = re.compile(rf"(?<![A-Za-z0-9_])(?:{'|'.join(heads)})(?:e?s)?(?![A-Za-z0-9_])",
+                                         re.IGNORECASE)
+
+    def _names_subject(self, clause):
+        loads = [figure for figure in _figures(clause) if figure.unit or figure.two_number]
+        before = clause[:loads[0].start] if loads else clause
+        return bool(self._pattern.search(before) or self._movement_head.search(before))
+
+    def statements(self, text):
+        """Split text into one statement per subject.
+
+        Punctuation and conjunctions end a clause. A clause that opens with a
+        load instruction continues the statement before it, so its figures
+        keep that statement's exercise. Otherwise a clause starts a new
+        statement only when, before its first load, it names an exercise or
+        a word that ends several library movement names (`leg curl`,
+        `3 sets of seal row`); any other clause continues.
+        """
+        parts = _CLAUSE_SEPARATOR.split(text)
+        found = [parts[0]]
+        joint = ""
+        for separator, following in zip(parts[1::2], parts[2::2]):
+            joint += separator
+            if not following.strip():
+                joint += following
+                continue
+            if _LOAD_LED.match(following) or not self._names_subject(following):
+                found[-1] += joint + following
+            else:
+                found.append(following)
+            joint = ""
+        return found
 
     @classmethod
     def _key(cls, phrase):
@@ -279,10 +261,13 @@ class Mentions:
                 return list(self._candidates[stem].values())
         return None
 
-    def _equipment(self, text, match, end, measurements, ambiguous):
+    def _named_equipment(self, match):
         words = re.findall(r"[a-z]+", match.group(0).lower())
         named = {self._EQUIPMENT.get(word, word) for word in words}
-        named &= {"dumbbell", "barbell", "kettlebell", "cable", "machine", "band", "bodyweight"}
+        return named & {"dumbbell", "barbell", "kettlebell", "cable", "machine", "band", "bodyweight"}
+
+    def _equipment(self, text, match, end, measurements, ambiguous):
+        named = self._named_equipment(match)
         if named:
             return named
         before = self._BEFORE_EQUIPMENT.search(text[:match.start()])
@@ -298,8 +283,9 @@ class Mentions:
     def find(self, text):
         """[(start, end, exercise, mode)] in order; mode is None when the mention is ambiguous.
 
-        A dumbbell word before a movement the library does not name is a
-        `per_hand_x2` mention named by its own words.
+        A dumbbell word before a movement the library does not name, or
+        names only for other equipment, is a `per_hand_x2` mention named by
+        its own words.
         """
         found = []
         measurements = measurement_spans(text)
@@ -308,7 +294,8 @@ class Mentions:
             end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
             key = self._key(match.group(0))
             candidates = self._lookup(key) or self._lookup(key.partition(" ")[2])
-            if candidates is None:
+            if candidates is None or ("dumbbell" in self._named_equipment(match)
+                                      and all(entry["equipment"] != "dumbbell" for entry, _ in candidates)):
                 found.append((match.start(), match.end(), match.group(0), PER_HAND_X2))
                 continue
             owners = [entry for entry, owned in candidates if owned] or [entry for entry, _ in candidates]

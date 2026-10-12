@@ -25,7 +25,7 @@ from coach.config import equipment_for
 from coach.errors import ConfigError, ValidationError
 from coach.hevy.cache import HevyCache
 from coach.library import Library
-from coach.load_statements import PER_HAND_X2, Mentions, bare_figures, bare_message, statements
+from coach.load_statements import PER_HAND_X2, Mentions, bare_figures, bare_message
 
 OWNER = "R-16"
 PATHS_KEY = "x-coach-paths"
@@ -427,7 +427,7 @@ def _prose_results(rel, text, mentions, hevy_enabled):
                 continue
             table = _Table()
         if not is_row:
-            for statement in statements(line):
+            for statement in mentions.statements(line):
                 positioned = [(figure, figure.start) for figure in bare_figures(statement)]
                 results += _bare_results(rel, number, statement, positioned, mentions.find(statement), None,
                                          hevy_enabled)

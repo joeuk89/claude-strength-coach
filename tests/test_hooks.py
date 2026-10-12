@@ -242,7 +242,9 @@ class PostToolUseTest(unittest.TestCase):
                               ("DB bench 20/hand, and move to 25 kg.", True),
                               ("DB bench 3x10 at 20/hand, next week 22.5 kg.", True),
                               ("DB bench 20/hand, 3 sets of leg curl at 25 kg.", False),
-                              ("DB bench 20/hand, and leg curl 25 kg.", False)):
+                              ("DB bench 20/hand, and leg curl 25 kg.", False),
+                              ("DB bench 20/hand. If leg curl 25 kg moves fast, go heavier.", False),
+                              ("DB bench 20/hand, once leg curl 25 kg feels easy add a set", False)):
             with self.subTest(text=text):
                 root = copy_of(self, VALID)
                 profile = root / "profile.md"
@@ -259,7 +261,8 @@ class PostToolUseTest(unittest.TestCase):
         for text in ("Incline DB press, 3 × 10, 22 kg", "Arnold press, 3x12, 14 kg, 90 s rest",
                      "DB bench: 4 sets of 8-10 reps, RPE 8, 22 kg", "DB bench, top set 24 kg",
                      "Arnold press 3x12. Load: 14 kg.", "DB curls 12 kg", "DB RDL 30 kg", "DB press 20 kg",
-                     "DB bench 20/hand. If fresh, 22 kg."):
+                     "DB bench 20/hand. If fresh, 22 kg.", "Arnold press, 3x12 @ 14 kg", "DB bench, about 20 kg",
+                     "DB bench 3x10, keeping 20 kg", "DB bench, starting at 20 kg", "Arnold press, last set 14 kg"):
             with self.subTest(text=text):
                 root = copy_of(self, VALID)
                 profile = root / "profile.md"
