@@ -195,8 +195,8 @@ class CapacityEvidenceTest(NoHevyCase):
         self.assertFalse(any(row["delta"] is not None and row["delta"] < 0 for row in card["card"]["e1rm"]))
         self.assertIn("deload (light week), kept in the log", card["text"])
         progress = pages.render_progress(self.root, datetime(2026, 10, 19, 19, tzinfo=timezone.utc))
-        self.assertIn("31.5", progress)
-        self.assertNotIn("25.9", progress)
+        self.assertIn("| 32/hand |", progress)
+        self.assertNotIn("26/hand", progress)
         self.assertIn("deload (light week), kept in the log", progress)
         path = self.root / "data/program.json"
         doc = read_json(path)

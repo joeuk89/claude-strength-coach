@@ -211,6 +211,26 @@ def _text(value):
     return "0" if text in ("", "-0") else text
 
 
+def whole(value):
+    """A human display of an estimate in whole athlete units, half rounded up: `32.92` → `33`."""
+    found = format(Decimal(str(value)).quantize(Decimal(1), rounding=ROUND_HALF_UP), "f")
+    return "0" if found == "-0" else found
+
+
+def signed_whole(value):
+    """A change in whole athlete units: `+1`, `-1`, `±0`, or `—` when there is nothing to compare."""
+    if value is None:
+        return "—"
+    found = whole(value)
+    return "±0" if found == "0" else found if found.startswith("-") else f"+{found}"
+
+
+def one_decimal(value):
+    """At most one decimal, half rounded up, trailing zero stripped: `0.83` → `0.8`."""
+    found = format(Decimal(str(value)).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP), "f").rstrip("0").rstrip(".")
+    return "0" if found in ("", "-0") else found
+
+
 def format_load(load, show_hevy=True):
     """The text a renderer prints for a load. Never prints a unit.
 

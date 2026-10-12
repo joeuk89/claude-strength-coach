@@ -21,5 +21,5 @@ Heavier top sets; stop 1–2 reps short of failure.
 - No missed-day rules yet: tell the coach, and the rest of the week is reprogrammed.
 
 ## Wins
-- New best e1RM: Back Squat 126.67 kg (Mon 12 Oct)
+- New best e1RM: Back Squat 127 kg (Mon 12 Oct)
 - New best e1RM: Bench Press 35 kg/hand (Mon 12 Oct)

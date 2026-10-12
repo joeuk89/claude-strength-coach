@@ -25,6 +25,7 @@ BODYWEIGHT_MODES = ("bodyweight", "assisted")
 TOTAL_SYSTEM = "total_system"
 LOAD_BASIS = "load"
 TOTAL_SYSTEM_LABEL = "total system mass"
+E1RM_MEANING = "an estimated one-rep max worked out from logged working sets"
 PRIMARY_WEIGHT = 1.0
 SECONDARY_WEIGHT = 0.5
 EQUIPMENT_INCREMENT = {
@@ -119,6 +120,18 @@ def _formula_load(exposure, logged, bodyweight):
 def basis_label(point):
     """The words a human display puts after an e1RM so its basis is clear: empty for an external-load e1RM."""
     return f" {TOTAL_SYSTEM_LABEL}" if point.get("basis") == TOTAL_SYSTEM else ""
+
+
+def e1rm_text(point, per_hand, unit=None):
+    """`33 kg/hand`: an e1RM as a human display shows it, in whole athlete units, then its basis label.
+    `unit` None leaves the unit to a table header: `33/hand`."""
+    unit_text = f" {unit}" if unit else ""
+    return f"{units.whole(point['e1rm'])}{unit_text}{'/hand' if per_hand else ''}{basis_label(point)}"
+
+
+def e1rm_meaning(unit):
+    """The sentence a human display of e1RMs carries once, nearby."""
+    return f"e1RM is {E1RM_MEANING}, to the nearest {unit}."
 
 
 def _unavailable(exposure, reason):

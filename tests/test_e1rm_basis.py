@@ -232,15 +232,15 @@ class TotalSystemTest(NoHevyCase):
         self.nutrition_readings(reading("2026-10-08", 80))
         progress = self.coach("pages", "show", "progress")["data"]["text"]
         row = next(line for line in progress.splitlines() if line.startswith("| Pull Up"))
-        self.assertIn(f"106.67 {TOTAL_SYSTEM_TEXT}", row)
+        self.assertIn(f"107 {TOTAL_SYSTEM_TEXT}", row)
         dashboard = self.coach("pages", "show", "dashboard")["data"]["text"]
-        self.assertIn(f"Pull Up 106.67 kg {TOTAL_SYSTEM_TEXT}", dashboard)
+        self.assertIn(f"Pull Up 107 kg {TOTAL_SYSTEM_TEXT}", dashboard)
         shutil.copy(CHECKIN_RECORD, self.root / "check-ins" / CHECKIN_RECORD.name)
         prepared = self.coach("checkin", "prepare")["data"]
         row = next(r for r in prepared["card"]["e1rm"] if r["exercise_id"] == "pull_up")
         self.assertEqual(row["basis"], "total_system")
-        self.assertIn(f"Pull Up 106.67 {TOTAL_SYSTEM_TEXT}", prepared["text"])
-        self.assertNotIn(f"Back Squat (Barbell) 121.88 {TOTAL_SYSTEM_TEXT}", prepared["text"])
+        self.assertIn(f"Pull Up 107 kg {TOTAL_SYSTEM_TEXT}", prepared["text"])
+        self.assertNotIn(f"Back Squat (Barbell) 122 kg {TOTAL_SYSTEM_TEXT}", prepared["text"])
 
 
 class PriorityKpiTest(NoHevyCase):

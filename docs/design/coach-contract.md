@@ -2141,7 +2141,12 @@ rounded half up to 2 decimals; `load` is the number the formula used
 source}` (`hevy` or `nutrition`), else null. Every human display of a
 total-system e1RM follows the number with `stats.basis_label(point)`,
 " total system mass" (check-in card and record, `progress.md`, the
-dashboard, the program page's priority KPI).
+dashboard, the program page's priority KPI). Those displays print an
+e1RM through `stats.e1rm_text(point, per_hand, unit)` and a change
+through `units.signed_whole`, both rounded half up to whole athlete
+units (`33 kg/hand`, `+1`, `±0`), and say once, nearby, what an e1RM is
+(`stats.E1RM_MEANING`, or the sentence `stats.e1rm_meaning(unit)`). The
+data keeps its 2 decimals.
 
 `data.unavailable[exercise_id]` explains an exercise whose newest exposure
 in the window can give no e1RM, for one of two reasons, each the same code
@@ -4380,7 +4385,7 @@ coach.checkin.due(root, today) -> Due
 # Due(last: Record | None, days_since: int | None, due_date: date | None,
 #     overdue_days: int, mode: "first" | "weekly" | "deep" | "catch_up", tier_reasons: list[str])
 coach.checkin.prepare(root, today, until=None, tier=None, now=None, *, deep_review_reasons=()) -> dict   # the card
-coach.checkin.card_text(card) -> str                                         # the Sunday message
+coach.checkin.card_text(card, unit) -> str                                   # the Sunday message
 coach.checkin.misses(root, since, until, now=None) -> dict
 coach.checkin.misses_since(root, until) -> date                              # the deep card's misses start
 coach.checkin.render_week_review(root, record_date) -> str                   # C11
@@ -4431,7 +4436,7 @@ and `render_card` would capture R-33b's `card` regions.
   no record, block or card-part reason displays "asked for".
 
 **Card document** (`checkin prepare` → `data.card`; `data.text` is the
-markdown from `coach.checkin.card_text(card)`). It reads history with
+markdown from `coach.checkin.card_text(card, unit)`). It reads history with
 `include_unsynced=True` (C17). The last record is the newest review dated
 before the window end, so re-running `prepare` after writing today's
 record gives the same card. With no review, the window starts at the
@@ -4480,7 +4485,12 @@ earliest overlay, else at the first-review anchor, else on the end day:
   annotation. Durations and caps from C18/C19.
 - `exercises`: one row per prescribed exercise of a trained session.
   `prescribed` and `logged` text use `units.format_load`; status and
-  `rpe_delta` from C18.
+  `rpe_delta` from C18. `logged` groups consecutive sets of equal load and
+  RPE; when there is more than one group, each names its sets and groups
+  are separated by `; ` (`set 1: 9 @ 25/hand @ RPE 9.5; sets 2–3: 7, 6 @
+  25/hand @ RPE 8.5`). Text shows `rpe_delta` in words, to one decimal,
+  through `checkin.rpe_gap_text` (`RPE 0.8 below target`), and nothing
+  when it rounds to 0.
 - `notes`: the athlete's own words from each workout dated in the window,
   oldest first: the workout's `description` (`exercise_id` and `name`
   null), then each exercise's `notes`, whitespace collapsed. An exercise
@@ -4492,7 +4502,12 @@ earliest overlay, else at the first-review anchor, else on the end day:
   or writes a niggle, constraint or diagnosis from it.
 - `e1rm`: exercises with a C18 point in the window; `delta` = C18 `delta`
   (latest minus previous rounded point, counting only points up to the
-  window end); `basis` = the latest point's C18 `basis`. Compounds first (`coach.patterns.COMPOUND_PATTERNS` once
+  window end); `basis` = the latest point's C18 `basis`.
+  `card_text(card, unit)` (`unit` is `[athlete] units`) prints them as
+  one line naming what an e1RM is, each value in C18's whole-unit display
+  with the change since the previous estimate (`first estimate` with
+  none); the record region prints a table with a header unit after the
+  `stats.e1rm_meaning` sentence. Compounds first (`coach.patterns.COMPOUND_PATTERNS` once
   R-23a exists; library order before), at most eight rows (a heuristic).
 - `e1rm_notes`: one line per exercise, at most eight, for the newest
   exposure in the window that `coach.stats.capacity_note` explains: an
@@ -5014,8 +5029,9 @@ are the program's exercises in session order, then any others by name.
 just before it commits, so the two match, while a time read from git
 would make every publish stale its own dashboard.
 
-**Progress** (`progress.md`): a table of every lift with a C18 series
-(best e1RM and date, latest, change over 28 days: the latest point minus
+**Progress** (`progress.md`): the `stats.e1rm_meaning` sentence, then a
+table of every lift with a C18 series in its whole-unit display (best
+e1RM and date, latest, change over 28 days: the latest point minus
 the newest point dated at least 28 days before `as_of`); part sections
 (ladder state, priority lifts); core-complete streak (current, longest,
 and the last 12 weeks as ✔/✗, – for a week with no planned core
@@ -6436,7 +6452,7 @@ external_session_rpe = 6
 ```json
 {"week": "2026-W41", "span": {"start": "2026-10-05", "end": "2026-10-11"}, "tier": "review",
  "distance_unit": "km", "activity_source": true,
- "lifting": {"workouts": 2, "hard_sets": 26, "minutes": 115},
+ "lifting": {"workouts": 2, "working_sets": 28, "hard_sets": 26, "minutes": 115},
  "external": {"done": 0},
  "run": {"count": 2, "distance": 18.5, "minutes": 110, "quality": 1},
  "conditioning": {"count": 1, "minutes": 20},
@@ -6448,7 +6464,8 @@ external_session_rpe = 6
 ```
 
   `hard_sets` is the week's total of C18 hard sets (not a per-muscle sum)
-  over exercises the library resolved, as C18 counts them. `minutes` for
+  over exercises the library resolved, as C18 counts them;
+  `working_sets` counts every working set of those exercises, hard or not. `minutes` for
   lifting come from C18 durations. Lifting and coach-led bouts have
   `quality: false` and `quality_basis: null`; workouts of a conditioning
   session (C17) are not lifting, they arrive as Activities. `srpe.rpe`
@@ -6633,7 +6650,12 @@ the window holds neither: lifting never implies running.
 
 **Render.** `cardio render --week W [--into FILE]` prints the weekly
 numbers, the reconcile table (when the tier has one) and the flags, as
-markdown. With `--into` it replaces the region between
+markdown. The lifting line counts workouts and sets in the singular or
+plural, gives hard sets out of working sets and says why a set is not
+hard (logged at RPE `stats.EASY_RPE` or below). The session-RPE line
+shows the whole-number total in arbitrary units, names its inputs
+(minutes × session RPE, summed over the week) and says it is
+information only, with no target or limit. With `--into` it replaces the region between
 `<!-- coach:begin cardio <week label> -->` and
 `<!-- coach:end cardio <week label> -->` (C11), appending the region when
 absent. No freshness check: the block is a snapshot.

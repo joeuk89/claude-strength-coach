@@ -3,11 +3,13 @@
 
 ## Lifts
 
+e1RM is an estimated one-rep max worked out from logged working sets, to the nearest kg.
+
 | Lift | Best e1RM (kg) | Date | Latest | 28-day change |
 |---|---|---|---|---|
-| Back Squat (Barbell) | 126.67 | 12 Oct 2026 | 126.67 | — |
+| Back Squat (Barbell) | 127 | 12 Oct 2026 | 127 | — |
 | Bench Press (Dumbbell) | 35/hand | 12 Oct 2026 | 35/hand | — |
-| Single Arm Row (Dumbbell) | 42 | 1 Oct 2026 | 41.5 | — |
+| Single Arm Row (Dumbbell) | 42 | 1 Oct 2026 | 42 | — |
 
 ## Core-complete weeks
 

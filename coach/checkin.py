@@ -81,12 +81,6 @@ def _text(value):
     return "0" if found in ("", "-0") else found
 
 
-def _signed(value):
-    if value is None:
-        return "—"
-    return "±0" if value == 0 else f"{'+' if value > 0 else ''}{_text(value)}"
-
-
 @dataclass(frozen=True)
 class Record:
     date: date
@@ -298,7 +292,8 @@ def prescribed_text(line):
 
 
 def logged_text(workout, exercise_id):
-    """`10, 10, 10 @ 22.5/hand (Hevy: 45) @ RPE 8`: the working sets logged for one exercise, or None."""
+    """`10, 10, 10 @ 22.5/hand (Hevy: 45) @ RPE 8`: the working sets logged for one exercise, or None.
+    Sets that differ in load or RPE form groups named by set number: `set 1: 9 @ 25 @ RPE 9.5; sets 2–3: …`."""
     sets = [s for e in workout["exercises"] if e["exercise_id"] == exercise_id
             for s in e["sets"] if s["type"] in history.WORKING_SET_TYPES]
     groups = []
@@ -310,14 +305,26 @@ def logged_text(workout, exercise_id):
         else:
             groups.append([key, [set_]])
     parts = []
+    first = 1
     for (load, rpe), members in groups:
         part = ", ".join(_reps(s) for s in members)
         if load:
             part += f" @ {load}"
         if rpe is not None:
             part += f" @ RPE {_text(rpe)}"
+        if len(groups) > 1:
+            last = first + len(members) - 1
+            part = (f"set {first}: " if last == first else f"sets {first}–{last}: ") + part
+            first = last + 1
         parts.append(part)
-    return " + ".join(parts) or None
+    return "; ".join(parts) or None
+
+
+def rpe_gap_text(delta):
+    """`RPE 0.8 below target`: a mean logged-minus-target RPE in words, or None when it rounds to nothing."""
+    if delta is None or units.one_decimal(abs(delta)) == "0":
+        return None
+    return f"RPE {units.one_decimal(abs(delta))} {'below' if delta < 0 else 'above'} target"
 
 
 def _cell(value):
@@ -852,16 +859,22 @@ def _builtin_fields(inst, card):
     }
 
 
-def _e1rm_value(row):
-    value = _text(row["e1rm"])
-    value = f"{value}/hand" if row["load_mode"] == "per_hand_x2" else value
-    return value + stats.basis_label(row)
+def _e1rm_value(row, unit=None):
+    return stats.e1rm_text(row, row["load_mode"] == "per_hand_x2", unit)
+
+
+def _e1rm_line(card, unit):
+    shown = []
+    for row in card["e1rm"]:
+        change = "first estimate" if row["delta"] is None else units.signed_whole(row["delta"])
+        shown.append(f"{row['name']} {_e1rm_value(row, unit)} ({change})")
+    return f"e1RM, {stats.E1RM_MEANING} (change since the previous estimate): " + " · ".join(shown)
 
 
 def _result_text(row):
     if row["status"] == "hit":
-        drift = f" (RPE {_signed(row['rpe_delta'])})" if row["rpe_delta"] else ""
-        return f"{row['name']} hit{drift}"
+        gap = rpe_gap_text(row["rpe_delta"])
+        return f"{row['name']} hit" + (f" ({gap})" if gap else "")
     if row["status"] in ("under", "over"):
         return f"{row['name']} {row['status']}: {row['logged']} against {row['prescribed']}"
     return f"{row['name']} {row['status']}"
@@ -895,8 +908,8 @@ def _e1rm_notes(card):
     return ["", "e1RM notes:"] + [f"- {note}" for note in notes] if notes else []
 
 
-def card_text(card):
-    """The Sunday message: the week as the log shows it, then the numbered fields."""
+def card_text(card, unit):
+    """The Sunday message: the week as the log shows it, then the numbered fields. `unit` is `[athlete] units`."""
     if card["mode"] == CATCH_UP:
         return "\n".join(checkin_catchup.text_lines(card, _first_line(card))) + "\n"
     lines = [_first_line(card)]
@@ -918,8 +931,7 @@ def card_text(card):
     if card["notes"]:
         lines += ["", "Notes logged:"] + [f"- {_note_line(note)}" for note in card["notes"]]
     if card["e1rm"]:
-        lines += ["", "e1RM: " + " · ".join(f"{r['name']} {_e1rm_value(r)} ({_signed(r['delta'])})"
-                                             for r in card["e1rm"])]
+        lines += ["", _e1rm_line(card, unit)]
     lines += _e1rm_notes(card)
     if card["flags"]:
         lines += ["", "Flags:"] + [f"- `{f['code']}`: {f['message']}" for f in card["flags"]]
@@ -943,6 +955,10 @@ def _review_card(root, day, tier):
     return _build(root, day, tier=card_tier, live=False, parts=False)
 
 
+def _review_region(root, day, tier, region_id):
+    return _region(_review_card(root, day, tier), region_id, config_module.load(root).athlete.units)
+
+
 def _missed_line(card):
     missed = [r for r in card["sessions"]["rows"] if r["status"] == "missed"]
     return ", ".join(f"{render.day_label(r['date'])} {r['title']} ({r['tag']})" for r in missed) or "none"
@@ -958,7 +974,7 @@ def _status_text(row):
     return "trained"
 
 
-def _region(card, record_date):
+def _region(card, record_date, unit):
     if card["mode"] == CATCH_UP:
         lines = [render.begin_marker(REGION_KIND, record_date)] + checkin_catchup.region_lines(card)
         return "\n".join(lines + [render.end_marker(REGION_KIND, record_date)])
@@ -990,16 +1006,18 @@ def _region(card, record_date):
         lines += ["", _row(["Day", "Exercise", "Prescribed", "Logged", "Result"]), "| --- | --- | --- | --- | --- |"]
         for row in card["exercises"]:
             result = row["status"]
-            if row["rpe_delta"]:
-                result += f", RPE {_signed(row['rpe_delta'])}"
+            gap = rpe_gap_text(row["rpe_delta"])
+            if gap:
+                result += f", {gap}"
             lines.append(_row([render.day_label(row["date"]), row["exercise_id"], row["prescribed"], row["logged"],
                                result]))
     if card["notes"]:
         lines += ["", "**Notes logged:**", ""] + [f"- {_note_line(note)}" for note in card["notes"]]
     if card["e1rm"]:
-        lines += ["", _row(["Lift", "e1RM", "Change", "Date"]), "| --- | --- | --- | --- |"]
+        lines += ["", stats.e1rm_meaning(unit) + " Change is since the previous estimate.", "",
+                  _row(["Lift", f"e1RM ({unit})", "Change", "Date"]), "| --- | --- | --- | --- |"]
         for row in card["e1rm"]:
-            lines.append(_row([row["exercise_id"], _e1rm_value(row), _signed(row["delta"]),
+            lines.append(_row([row["exercise_id"], _e1rm_value(row), units.signed_whole(row["delta"]),
                                render.short_date(row["date"])]))
     lines += _e1rm_notes(card)
     if card["flags"]:
@@ -1039,7 +1057,7 @@ def render_week_review(root, record_date):
                 return text[start:end]
         raise ValueError(f"{archive.path.as_posix()} holds no {REGION_KIND} {day.isoformat()} region")
     tier = record.tier if record else "weekly"
-    return _region(_review_card(root, day, tier), day.isoformat())
+    return _review_region(root, day, tier, day.isoformat())
 
 
 def _details(overlay_region):
@@ -1095,7 +1113,7 @@ def skeleton(root, record_date, tier=None, overlay_id=None, refresh=False, dry_r
         newest = bool(found_reviews and found_reviews[-1].date == day)
         for region_id, start, end in reversed(render.find_regions(text, REGION_KIND)):
             if region_id == day.isoformat() and newest:
-                text = text[:start] + _region(_review_card(root, day, tier), region_id) + text[end:]
+                text = text[:start] + _review_region(root, day, tier, region_id) + text[end:]
                 rendered.append(f"{REGION_KIND} {region_id}")
         for region_id, start, end in reversed(render.find_regions(text, render.REGION_KIND)):
             text = text[:start] + render.render_overlay(root, region_id) + text[end:]
@@ -1115,7 +1133,7 @@ def skeleton(root, record_date, tier=None, overlay_id=None, refresh=False, dry_r
         if tier is None:
             mode = _build(root, day, now=now, live=False)["mode"]
             tier = TIER_OF_MODE.get(mode, mode)
-        review = _region(_review_card(root, day, tier), day.isoformat())
+        review = _review_region(root, day, tier, day.isoformat())
         text = skeleton_text(day, tier, review, overlay_region if overlay_id is not None else None)
         rendered.append(f"{REGION_KIND} {day.isoformat()}")
         if overlay_id is not None:
