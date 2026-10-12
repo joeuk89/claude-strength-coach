@@ -402,6 +402,27 @@ def reconcile(root, week_value, today):
     return {"week": _label(span), "span": span.to_json(), "tier": tier, "items": items, "summary": summary}
 
 
+def runs_on_file(root, config, span, today):
+    """The span's runs from the activity files whatever `[activity] enabled` says, or None when the files record
+    and plan no run in the span: `{distance_unit, run: {count, distance, quality}, missed}`, `missed` being the
+    planned runs before `today` that no recorded run matched (C49)."""
+    settings = _settings(config)
+    store = ActivityStore(root, config)
+    runs = store.activities(span, kinds=("run",))
+    planned = store.planned(span, kinds=("run",))
+    if not runs and not planned:
+        return None
+    items = match(planned, runs, settings["reconcile_move_days"], today, associations.load(root)["associations"],
+                  settings["quality_rpe_min"])
+    plan_for = {i["activity_id"]: i["_planned"] for i in items if i["_planned"] and i["_activity"]}
+    unit = settings["distance_unit"]
+    quality = sum(1 for run in runs if quality_of(run, plan_for.get(run["id"]), settings["quality_rpe_min"])[0])
+    return {"distance_unit": unit,
+            "run": {"count": len(runs), "distance": _distance(sum(r["distance_meters"] or 0 for r in runs), unit),
+                    "quality": quality},
+            "missed": [_public(i) for i in items if i["status"] == "missed"]}
+
+
 def sleep_judgement(store, settings, end):
     """(short nights, nights with data, debt: True | False | None) over the 7 nights ending on `end`."""
     nights = dates.Span(end - timedelta(days=NIGHTS - 1), end)

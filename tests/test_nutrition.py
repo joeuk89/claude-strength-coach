@@ -326,8 +326,15 @@ class QuestionsTest(unittest.TestCase):
         self.assertNotIn("expenditure", no_app[0])
 
     def test_no_anchors_drops_the_anchors_ask(self):
-        status = dict(nutrition.status(VALID, date(2026, 10, 11)), anchors=[])
+        status = dict(nutrition.status(VALID, date(2026, 10, 11)), anchors=[], plan="nutrition/plans/2026-10-05.md")
         self.assertEqual(nutrition.questions(status)[1], "Anything in the plan that didn't work?")
+
+    def test_the_plan_ask_needs_a_meal_plan_in_force(self):
+        status = dict(nutrition.status(VALID, date(2026, 10, 11)), template=False, plan=None)
+        self.assertEqual(nutrition.questions(status)[1:], ["anchors most days (y/n)?"])
+        self.assertEqual(len(nutrition.questions(dict(status, anchors=[]))), 1)
+        planned = nutrition.questions(dict(status, plan="nutrition/plans/2026-10-05.md"))
+        self.assertEqual(planned[1], "anchors most days (y/n)? Anything in the plan that didn't work?")
 
     def test_disabled_status_has_nothing(self):
         self.assertEqual(nutrition.questions({"enabled": False}), [])

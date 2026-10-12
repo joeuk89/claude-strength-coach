@@ -4223,10 +4223,11 @@ dates unique:
 - `questions` are plain strings in order: the readings question (the
   app's numbers in R-01's order, or, without an app, "this week's
   morning weigh-ins · average daily protein, if you track it"), the
-  habits question ("anchors most days (y/n)? Anything in the plan that
-  didn't work?", or only "Anything in the plan that didn't work?" when
-  `anchors` is empty), and the food-exceptions question only when
-  `template` is true. `brief_line` reads `Food: protein floor <g> g,
+  habits question, and the food-exceptions question only when
+  `template` is true. The habits question joins "anchors most days
+  (y/n)?" when `anchors` is non-empty and "Anything in the plan that
+  didn't work?" when `plan` is set; with neither it is left out.
+  `brief_line` reads `Food: protein floor <g> g,
   last week <g> g · anchors: <names or none> · override: <none | what,
   until D | what, from D | expired D>`; with no reading it says "no
   reading yet", with no protein figure "last week not tracked". With a
@@ -4390,7 +4391,7 @@ earliest overlay, else at the first-review anchor, else on the end day:
 
 ```json
 {
-  "schema_version": 3,
+  "schema_version": 5,
   "date": "2026-10-11",
   "window": {"start": "2026-10-05", "end": "2026-10-11"},
   "mode": "weekly", "tier_reasons": [], "deep_deferred": false,
@@ -4406,6 +4407,9 @@ earliest overlay, else at the first-review anchor, else on the end day:
   "exercises": [{"date": "2026-10-05", "session_id": "session-a", "exercise_id": "bb_back_squat",
                  "name": "Back Squat (Barbell)", "prescribed": "3×5 @ 97.5 @ RPE 7.5",
                  "logged": "5, 5, 5 @ 97.5 @ RPE 7.5", "status": "hit", "rpe_delta": 0}],
+  "notes": [{"date": "2026-10-05", "workout_id": "…", "session_id": "session-a", "title": "Session A",
+             "exercise_id": "db_bench_press", "name": "Bench Press (Dumbbell)",
+             "text": "right shoulder pinchy at the bottom, 3/10"}],
   "e1rm": [{"exercise_id": "bb_back_squat", "name": "Back Squat (Barbell)", "load_mode": "total",
             "date": "2026-10-05", "e1rm": 121.88, "delta": 1.55, "method": "epley_rir", "basis": "load"}],
   "e1rm_notes": ["Bench Press (Dumbbell) (2026-10-06): deload (light week), kept in the log and left out of e1RM changes"],
@@ -4429,6 +4433,15 @@ earliest overlay, else at the first-review anchor, else on the end day:
 - `exercises`: one row per prescribed exercise of a trained session.
   `prescribed` and `logged` text use `units.format_load`; status and
   `rpe_delta` from C18.
+- `notes`: the athlete's own words from each workout dated in the window,
+  oldest first: the workout's `description` (`exercise_id` and `name`
+  null), then each exercise's `notes`, whitespace collapsed. An exercise
+  note equal to its workout's, or to an earlier note on the same
+  exercise, is left out. `card_text` lists them once under "Notes
+  logged:" and the record region under "**Notes logged:**", each as
+  `<day> <title>[, <exercise name>]: "<text>"`; a note-free window adds
+  neither. A note is the athlete's report: nothing here classifies it
+  or writes a niggle, constraint or diagnosis from it.
 - `e1rm`: exercises with a C18 point in the window; `delta` = C18 `delta`
   (latest minus previous rounded point, counting only points up to the
   window end); `basis` = the latest point's C18 `basis`. Compounds first (`coach.patterns.COMPOUND_PATTERNS` once
@@ -4483,10 +4496,11 @@ with no ask). Builtin fields:
 |---|---|
 | `sessions` | trained and missed rows; asks for one tag per missed core session (`time / sleep / ill / family / skipped / other`) and for anything trained but not logged (recorded as `trained_unlogged`, C17) |
 | `coach_led` | each external date; asks what it covered; states `state.rotation` and asks to confirm (R-21b: the position from `schedule plan`) |
-| `runs` | asks count and total distance; states Hevy-logged runs |
+| `runs` | none: only a part with a source for runs adds it |
 | `sleep` | R-01 wording |
 | `niggles` | asks for anything new |
-| `nutrition`, `meal_plan` | R-01 wording (R-06's two additions included) |
+| `nutrition` | one morning scale weight, labelled `Bodyweight` |
+| `meal_plan` | none: only a part with a meal plan adds it |
 | `next_week` | R-01 wording; states `state.rotation` for confirmation when there is no `coach_led` field |
 
 **Card parts** (`coach/checkin_parts/<topic>.py`), the way later items
@@ -4510,12 +4524,16 @@ def contribute(ctx: CardContext) -> Contribution | None
 - Parts are pure reads and run in a fixed order (module name).
 - R-21a ships one part itself, `nutrition`: when `coach.nutrition` exists
   and `nutrition status` says enabled, it replaces `nutrition` with
-  `data.questions` (pre-fills included), labelled `Food`, and omits
-  `meal_plan`. When the module is absent or reports `{"enabled": false}`,
-  it returns None and R-01's builtin fields stay. A soft dependency on R-33a: nothing is computed
-  from nutrition data here.
+  `data.questions` (pre-fills included), labelled `Food`, prefilled
+  `Meal plan: <path>.` when `data.plan` is set, and omits `meal_plan`.
+  When the module is absent or reports `{"enabled": false}`, it returns
+  None and the builtin scale-weight field stays. A soft dependency on
+  R-33a: nothing is computed from nutrition data here.
 - Expected parts from later items: R-27 (`niggles` field from `niggles
-  list`; due follow-ups as facts; `niggle_escalate`), R-30a and R-31
+  list` and the card's `notes`: `Open: <area> (<status>), ….` and `You
+  logged notes on <day> <title>, … (above).`, asking whether anything in
+  those notes is a niggle to track; due follow-ups as facts;
+  `niggle_escalate`), R-30a and R-31
   (`tier_reasons`), R-43 (part `cardio`: `runs`, `sleep` stated from
   activity sources, and the week-flag providers' flags; C49).
 
@@ -4550,7 +4568,7 @@ as it was):
 ```
 
 - The week-review region is the card's data part, rendered as of the
-  record date (no questions). It reads committed history only (no
+  record date (no questions), the window's `notes` included. It reads committed history only (no
   `include_unsynced`), leaves out the Hevy routine list and card parts,
   and takes its tier from the record's title, so a fresh render needs
   nothing gitignored. The skeleton warns when the window holds workouts
@@ -6552,7 +6570,11 @@ reason}`). With `[activity] enabled = false` only `status_active` can
 fire. R-43's card part `cardio` (C36) owns the `runs` and `sleep`
 fields: the window's runs from `week`, plans `reconcile` found missed,
 the last seven nights when `sleep_min_nights` have data (else the
-builtin ask), and every provider's flags over the window.
+builtin ask), and every provider's flags over the window. With
+`[activity] enabled = false` it states runs only from `cardio.runs_on_file`
+(the activity files' runs and planned runs in the window, whatever the
+switch says; a bad file line counts as none) and leaves `runs` out when
+the window holds neither: lifting never implies running.
 
 **Render.** `cardio render --week W [--into FILE]` prints the weekly
 numbers, the reconcile table (when the tier has one) and the flags, as

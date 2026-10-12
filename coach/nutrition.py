@@ -339,11 +339,15 @@ def brief_line(status):
 
 
 def questions(status):
-    """The Sunday message's food questions; the third only with a standing weekly template."""
+    """The Sunday message's food questions: readings, then habits (anchors on file, a meal plan in force), then
+    next week's exceptions with a standing weekly template."""
     if not status.get("enabled"):
         return []
-    habits = f"{QUESTION_ANCHORS} {QUESTION_PLAN}" if status["anchors"] else QUESTION_PLAN
-    found = [QUESTION_READINGS_APP if status["app"] != "none" else QUESTION_READINGS_NO_APP, habits]
+    found = [QUESTION_READINGS_APP if status["app"] != "none" else QUESTION_READINGS_NO_APP]
+    habits = " ".join(ask for ask, applies in ((QUESTION_ANCHORS, status["anchors"]),
+                                               (QUESTION_PLAN, status.get("plan"))) if applies)
+    if habits:
+        found.append(habits)
     if status.get("template"):
         found.append(QUESTION_NEXT_WEEK)
     return found

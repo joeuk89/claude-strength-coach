@@ -21,8 +21,7 @@ from tests.support.skills import skill_text, step_text
 
 CHECKIN = INSTANCES / "checkin"
 TAGS = "time / sleep / ill / family / skipped / other"
-R01_NUTRITION = "No MacroFactor: this week's morning weigh-ins, and roughly how eating went"
-R01_MEAL_PLAN = "What stuck, what got swapped?"
+SCALE_WEIGHT = "One morning scale weight."
 
 
 class CheckinCase(HistoryCase):
@@ -116,7 +115,7 @@ class DueCommandTest(CheckinCase):
 class CardSessionsTest(CheckinCase):
     def test_window_mode_and_sessions(self):
         card = self.card()
-        self.assertEqual(card["schema_version"], 3)
+        self.assertEqual(card["schema_version"], 5)
         self.assertEqual(card["window"], {"start": "2026-10-05", "end": "2026-10-11"})
         self.assertEqual((card["mode"], card["days_since_last"], card["unsynced"]), ("weekly", 7, 0))
         sessions = card["sessions"]
@@ -329,13 +328,13 @@ class NutritionPartTest(CheckinCase):
         coach.commands.discover()
         coach.checks.discover()
 
-    def test_without_the_module_r01_fields_stay(self):
+    def test_without_the_module_one_scale_weight_is_asked(self):
         with mock.patch.dict(sys.modules, {"coach.nutrition": None}):
             card = self.card()
-        self.assertIn(R01_NUTRITION, self.field(card, "nutrition")["ask"])
-        self.assertEqual(self.field(card, "nutrition")["n"], 6)
-        self.assertEqual((self.field(card, "meal_plan")["n"], self.field(card, "meal_plan")["ask"]),
-                         (7, R01_MEAL_PLAN))
+        weight = self.field(card, "nutrition")
+        self.assertEqual((weight["n"], weight["label"], weight["ask"]), (6, "Bodyweight", SCALE_WEIGHT))
+        self.assertIsNone(self.field(card, "meal_plan"))
+        self.assertEqual(self.field(card, "next_week")["n"], 7)
 
     def test_enabled_status_replaces_field_6_and_drops_7(self):
         questions = ["readings?", "anchors most days (y/n)? Anything in the plan that didn't work?",
@@ -351,11 +350,11 @@ class NutritionPartTest(CheckinCase):
         self.assertEqual(self.field(card, "next_week")["n"], 7)
         self.assertNotIn("nudge_lines", card)
 
-    def test_disabled_status_brings_r01_back(self):
+    def test_disabled_status_asks_one_scale_weight(self):
         with mock.patch.dict(sys.modules, {"coach.nutrition": stub_nutrition({"enabled": False})}):
             card = self.card()
-        self.assertIn(R01_NUTRITION, self.field(card, "nutrition")["ask"])
-        self.assertEqual(self.field(card, "meal_plan")["n"], 7)
+        self.assertEqual(self.field(card, "nutrition")["ask"], SCALE_WEIGHT)
+        self.assertIsNone(self.field(card, "meal_plan"))
 
     def test_the_real_module_with_the_fixture_config(self):
         card = self.card()
@@ -410,17 +409,24 @@ class CardPartsTest(CheckinCase):
         self.assertIn(second, message)
 
     def test_none_for_a_field_removes_it_and_renumbers(self):
-        self.part("no_plan", """
+        self.part("no_sleep", """
             from coach.checkin_parts import Contribution
-            FIELDS = ("meal_plan",)
+            FIELDS = ("sleep",)
             def contribute(ctx):
-                return Contribution(fields={"meal_plan": None})
+                return Contribution(fields={"sleep": None})
         """)
         with self.paths(builtin=False):
             card = self.card()
+        self.assertIsNone(self.field(card, "sleep"))
+        self.assertEqual([f["id"] for f in card["fields"]],
+                         ["sessions", "coach_led", "niggles", "nutrition", "next_week", "hevy_edits"])
+        self.assertEqual([f["n"] for f in card["fields"]], [1, 2, 3, 4, 5, 6])
+
+    def test_runs_and_meal_plan_have_no_builtin(self):
+        with self.paths(builtin=False):
+            card = self.card()
+        self.assertIsNone(self.field(card, "runs"))
         self.assertIsNone(self.field(card, "meal_plan"))
-        self.assertEqual([f["n"] for f in card["fields"]], list(range(1, len(card["fields"]) + 1)))
-        self.assertEqual(self.field(card, "next_week")["n"], 7)
 
     def test_a_contribution_of_none_keeps_the_builtin(self):
         self.part("quiet", "FIELDS = ('sleep',)\ndef contribute(ctx):\n    return None\n")
