@@ -584,7 +584,7 @@ merges them; with no instance file the catalogue stands alone.
   entry has `requires: []` and `ability: null`). `requires` lists the
   apparatus an exercise needs beyond its equipment; `ability:
   "demonstrated"` marks an exercise an athlete must have shown they can
-  do before a swap picks it (C45). The catalogue is schema v3 and
+  do before a swap picks it (C45). The catalogue is schema v4 and
   carries no migration (C7). Enums, agreed in triage:
   - `pattern`: `squat`, `hinge`, `lunge`, `horizontal_push`,
     `vertical_push`, `horizontal_pull`, `vertical_pull`, `elbow_flexion`,
@@ -608,6 +608,11 @@ merges them; with no instance file the catalogue stands alone.
   and `distance`. `Library.increment(id, unit)` returns null when the
   entry has none; the caller then uses the equipment increment from
   `equipment_for` (C54).
+- Optional `e1rm: "unsupported"` marks a lift whose external load is too
+  small a share of the mass moved for any e1RM: the dumbbell split squat,
+  lunge, walking lunge and step-up. No body-mass fraction is estimated
+  for them. `coach.library.e1rm_supported(id)` reads it (catalogue only;
+  custom entries are supported). Catalogue `schema_version` 4 adds it.
 - Instance file, keyed by library id:
 
   ```json
@@ -1675,7 +1680,15 @@ names the exercise, the session and the reps to failure, and suggests
 `e1rm` KPI has no working set in any of its slots within the cap, using
 the start of a rep range plus the prescribed reps in reserve. It suggests
 a `top_load` or `top_reps` KPI, or a working set within the cap; it does
-not block adoption.
+not block adoption. `priority_e1rm_unsupported`, for a priority lift
+with an `e1rm` KPI whose exercise gets no e1RM (C5): it names the lift
+and suggests a `top_load` or `top_reps` KPI, and replaces
+`priority_no_e1rm` for that lift. `e1rm_scheme_unsupported`, for a slot
+whose exercise gets no e1RM (C5) on a scheme that loads from one:
+`fixed_reps_rpe`, `rpe_anchored`, or `wave_531` without a
+`training_max` param. Its load holds for good, so the warning names the
+exercise, the session and the scheme, and suggests `double_progression`;
+it replaces `fixed_reps_no_e1rm` for that slot.
 
 **A corrected load mode** (`program reconcile-mode ID --basis
 old|confirmed [--input FILE] [--dry-run]`). A line whose `load_mode`
@@ -2010,19 +2023,40 @@ coach.stats.implied_rpe(e1rm, load, reps) -> float       # R-24
   `n = 30 × (e1rm/load − 1)` (negative: beyond failure) when `load > e1rm`.
   So a single at the e1RM implies RPE 10.
 - Only `total`, `per_hand_x2`, `single_implement` lifts get a series.
-  Bodyweight and assisted lifts get one only when a body-measurement
-  weight exists within 14 days (`bodyweight + added`, `bodyweight − assist`).
+  Bodyweight and assisted lifts get one only when a bodyweight reading
+  exists within 14 days (`bodyweight + added`, `bodyweight − assist`): a
+  total-system estimate. A lift the catalogue marks `e1rm: "unsupported"`
+  (C5) gets no series in any load mode.
+- Bodyweight readings are Hevy body measurements and C35 nutrition
+  readings (`trend_weight`, else `scale_weight`, converted from
+  `weight_unit` to `[athlete] units`), read whether or not Hevy or
+  nutrition is enabled. The nearest reading within 14 days of the
+  exposure date counts; a tie goes to the earlier date, then to Hevy.
+  Under `as_of` (C38) no reading dated after its local date counts.
 - Excluded: warm-ups, discounted sets, `unknown_convention` spans, open
   `convention_slip` candidates, conditioning-session workouts (C17).
 
 `stats e1rm [--exercise ID] [--since D]` →
-`data.series[exercise_id] = [{date, e1rm, method, workout_id, set_index, load, reps, rpe}]`
+`data.series[exercise_id] = [{date, e1rm, method, workout_id, set_index, load, reps, rpe, basis, bodyweight}]`
 (best set per exposure, oldest first), plus `data.best[exercise_id]`
 `{e1rm, date}` over the window and `data.delta[exercise_id]` (latest
 minus previous point, null with one point). `e1rm` and `load` are
 rounded half up to 2 decimals; `load` is the number the formula used
-(bodyweight plus added load for `bodyweight`). Body-measurement weights
-come from the Hevy cache.
+(bodyweight plus added load for `bodyweight`). `basis` is `load` or
+`total_system`; a total-system point's `bodyweight` is `{value, date,
+source}` (`hevy` or `nutrition`), else null. Every human display of a
+total-system e1RM follows the number with `stats.basis_label(point)`,
+" total system mass" (check-in card and record, `progress.md`, the
+dashboard, the program page's priority KPI).
+
+`data.unavailable[exercise_id]` explains an exercise whose newest exposure
+in the window can give no e1RM, for one of two reasons, each the same code
+as its observation reason: `unsupported_exercise` (C5) or
+`no_bodyweight_reading` (no reading within 14 days). It holds `reason`,
+`message`, `date`, `workout_id` and the exposure's observed `sets`
+(`set_index`, `load` as the coaching number, `reps`, `rpe`). A later
+exposure that passes both tests removes the entry; an excluded or
+suspect exposure, or one in a load mode with no e1RM, leaves it alone.
 
 `data.observations[exercise_id]` retains every resolved working exposure,
 including unsupported estimates and recovery work. Each row carries
@@ -2032,7 +2066,8 @@ set supports an estimate), `comparable` (eligible normal work), `reason`,
 `set_index`, formula `load`, `reps`, `rpe`, `reps_to_failure`, nullable
 `e1rm`, `eligible`, `reason` and `method`. Exclusion reasons include
 `over_rep_cap`, `excluded`, `suspect_convention`, `unsupported_load_mode`,
-`no_bodyweight_reading` (a `bodyweight` or `assisted` set with load and
+`unsupported_exercise` (C5; also the exposure's reason, ahead of
+`recovery_context`), `no_bodyweight_reading` (a `bodyweight` or `assisted` set with load and
 reps but no reading within the window), `missing_load_or_reps`, and
 exposure-level `recovery_context`.
 
@@ -2384,7 +2419,8 @@ coach.validity.estimate_minutes(root, session) -> int
   implied RPE is `rpe_infeasible` (rn:autoregulation.6). Only working
   sets of `total`, `per_hand_x2` and `single_implement` lines are judged
   this way; a rep range is judged at its start. With no e1RM point (and for
-  `bodyweight` lines, whose added load has no e1RM), a top working load
+  `bodyweight` lines, whose added load has no e1RM, and for lifts with no
+  e1RM at all, C5, whose message says body mass dominates), a top working load
   more than two increments (`Library.increment`, else the equipment
   increment) above the newest exposure neither excluded nor `suspect`
   is `unearned_load`. `assisted`
@@ -2489,7 +2525,7 @@ double a load.
 class SchemeContext:
     today: date; session_date: date; unit: str; week_kind: str   # weekly | midweek | deload
     exercise: ExerciseInfo        # id, pattern, muscles, equipment, load_mode, increment, is_compound,
-                                  # load_direction (+1; −1 for assisted)
+                                  # load_direction (+1; −1 for assisted), e1rm_supported (C5)
     slot: SlotInfo                # session_id, set groups, rest_seconds, cues, constraints, start_load
     params: dict                  # validated, defaults filled
     state: dict                   # validated; INITIAL when absent or after a scheme change
@@ -2681,7 +2717,8 @@ and `plugins test` runs them. Loaded with
   (null: the RPE of a second working set group, else `top_rpe` − 1),
   `backoff_pct` (null).
   The e1RM comes from the newest valid exposure's heaviest working set
-  when it logged reps and an RPE (C18 `e1rm`), else `ctx.e1rm`. The top
+  when it logged reps and an RPE (C18 `e1rm`), else `ctx.e1rm`; a lift
+  with `ctx.exercise.e1rm_supported` false (C5) has none. The top
   set is `load_for(e1rm, top_reps, top_rpe)` floored to the increment.
   Each back-off is `load_for(e1rm, backoff_reps, backoff_rpe)` floored
   to the increment and never above the top-set load; a set `backoff_pct`
@@ -2694,8 +2731,8 @@ and `plugins test` runs them. Loaded with
   `backoff_rpe` param, or an RPE on any program working set after the
   first), they carry the same `backoff_rpe` as with an e1RM; otherwise
   they carry none. With no e1RM the rationale calls the loads
-  provisional; with no load to hold it leaves the first loads to the
-  coach.
+  provisional, except on an unsupported lift, where it names body mass
+  instead; with no load to hold it leaves the first loads to the coach.
   `round_down` is set when the e1RM sets the loads. State is empty.
   `LOAD_MODES` is `E1RM_MODES`.
 - `wave_531` params: `training_max` (null: `training_max_pct`, 0.9, of
@@ -4061,7 +4098,8 @@ dates unique:
     17, 18 and 6 (fat-free mass) for target and stretch; 8 and 7 for
     the floor. The floor is a minimum commitment, the target a coaching
     aim, and the stretch an optional higher aim, not a universal benefit cap.
-- Readers: R-25 reads C4 `phase` and may read C35 weights for
+- Readers: R-20's C18 e1RM reads C35 weights as bodyweight readings;
+  R-25 reads C4 `phase` and may read C35 weights for
   `progress.md`'s bodyweight trend; R-40a reads `[nutrition] enabled` and
   writes the table at setup.
 
@@ -4140,7 +4178,7 @@ record gives the same card:
                  "name": "Back Squat (Barbell)", "prescribed": "3×5 @ 97.5 @ RPE 7.5",
                  "logged": "5, 5, 5 @ 97.5 @ RPE 7.5", "status": "hit", "rpe_delta": 0}],
   "e1rm": [{"exercise_id": "bb_back_squat", "name": "Back Squat (Barbell)", "load_mode": "total",
-            "date": "2026-10-05", "e1rm": 121.88, "delta": 1.55, "method": "epley_rir"}],
+            "date": "2026-10-05", "e1rm": 121.88, "delta": 1.55, "method": "epley_rir", "basis": "load"}],
   "e1rm_notes": ["Bench Press (Dumbbell) (2026-10-06): deload (light week), kept in the log and left out of e1RM changes"],
   "hevy": [{"routine_id": "…0002", "title": "Session B", "session_id": "session-b",
             "overlay_id": "2026-10-05-weekly", "state": "edited_in_app",
@@ -4164,7 +4202,7 @@ record gives the same card:
   `rpe_delta` from C18.
 - `e1rm`: exercises with a C18 point in the window; `delta` = C18 `delta`
   (latest minus previous rounded point, counting only points up to the
-  window end). Compounds first (`coach.patterns.COMPOUND_PATTERNS` once
+  window end); `basis` = the latest point's C18 `basis`. Compounds first (`coach.patterns.COMPOUND_PATTERNS` once
   R-23a exists; library order before), at most eight rows (a heuristic).
 - `e1rm_notes`: one line per exercise, at most eight, for the newest
   exposure in the window that `coach.stats.capacity_note` explains: an
@@ -5010,9 +5048,12 @@ null`:
   e1RM point in the window (`e1rm`), the heaviest working load or most
   reps at the newest valid exposure (`top_load`, `top_reps`), or the
   slot's `assistance_ladder` state `{value, name, date, session_id}`
-  (`rung`, with no trend). `trend` is `{from, to, delta}` over the first
+  (`rung`, with no trend). An `e1rm` `now` also carries the C18 `basis`.
+  `trend` is `{from, to, delta}` over the first
   and last point in the window, null with fewer than two. `met` is null
   without a target; for an `assisted` lift's `top_load`, lower is met.
+  `unavailable` is the C18 `unavailable` entry for an `e1rm` KPI
+  (`{reason, message, date}`), else null, so a KPI with no value says why.
 - `weeks` rows, one per week from the week holding `since` to the week
   holding today: `planned` (core sessions holding the lift as their own
   line, not a fold and not a moved session), `trained` (workouts with a
@@ -5759,11 +5800,12 @@ R-14b's `routines create`; adopt itself never calls Hevy.
 | `upper-lower-4` | 4 fixed | `double_progression` | `double_progression` | beginner to intermediate |
 | `push-pull-legs` | 3–6 rolling | `double_progression` | `double_progression` | intermediate |
 | `wave-3wk` ("3-week wave (5/3/1-style)") | 4 fixed | `wave_531` | `double_progression` | intermediate, barbell |
-| `rpe-full-body-3` | 3 fixed | `rpe_anchored` | `fixed_reps_rpe`; `double_progression` for 12- and 15-rep lines | intermediate to advanced |
+| `rpe-full-body-3` | 3 fixed | `rpe_anchored` | `fixed_reps_rpe`; `double_progression` for 12- and 15-rep lines and the split squat | intermediate to advanced |
 
 - No starter raises a `program validate` warning. `rpe-full-body-3`'s
   12- and 15-rep accessories are too high-rep for an e1RM, so they use
-  `double_progression` at 10–12 and 12–15 reps, RPE 8.
+  `double_progression` at 10–12 and 12–15 reps, RPE 8; its split squat
+  gets no e1RM (C5), so it uses `double_progression` at 8–12 reps.
 - Each starter declares its main lifts in `priority`, its weekly dose in
   `dose_targets` and a `minimum_week` (C40); `structure balance --variant
   minimum` must pass on it.

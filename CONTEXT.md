@@ -286,6 +286,16 @@ other modes are `total` (bar or stack), `bodyweight` (added load),
 carry no load. A property of the slot, not of the exercise's name.
 _Avoid_: load type, dumbbell weight (ambiguous between per-hand and Hevy value)
 
+**Total-system e1RM**:
+The e1RM of a `bodyweight` or `assisted` lift: bodyweight plus the added
+load, or minus the assistance, so it estimates the mass the athlete
+moves, not the load they set. It needs a bodyweight reading (a Hevy body
+measurement or a nutrition reading) within 14 days of the workout, and
+every display labels it "total system mass". Dumbbell split squats,
+lunges and step-ups, whose dumbbells are a small share of the mass moved,
+get no e1RM at all.
+_Avoid_: bodyweight e1RM (ambiguous between the total and the added load)
+
 **Exercise library**:
 Every exercise the coach can prescribe, each with a stable id: the
 builtin catalogue that ships with the framework, merged with the

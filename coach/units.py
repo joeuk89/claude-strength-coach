@@ -110,6 +110,12 @@ def mass_kg(value, unit):
     return json_number(round(value * _factor(unit), 3))
 
 
+def mass_from_kg(kg, unit):
+    """A body mass in kg or lb from kilograms."""
+    _number(kg, "mass")
+    return json_number(round(kg / _factor(unit), _ATHLETE_PLACES))
+
+
 _HEIGHT_METRES_PER = {"cm": 0.01, "in": 0.0254}
 HEIGHT_UNITS = tuple(_HEIGHT_METRES_PER)
 

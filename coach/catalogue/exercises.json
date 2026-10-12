@@ -1,5 +1,5 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "exercises": [
     {
       "id": "bb_back_squat",
@@ -330,7 +330,8 @@
       ],
       "requires": [
         "box"
-      ]
+      ],
+      "e1rm": "unsupported"
     },
     {
       "id": "db_lunge",
@@ -363,7 +364,8 @@
         "db_walking_lunge",
         "db_bulgarian_split_squat",
         "split_squat"
-      ]
+      ],
+      "e1rm": "unsupported"
     },
     {
       "id": "db_walking_lunge",
@@ -394,7 +396,8 @@
       "substitutes": [
         "db_lunge",
         "db_bulgarian_split_squat"
-      ]
+      ],
+      "e1rm": "unsupported"
     },
     {
       "id": "db_step_up",
@@ -430,7 +433,8 @@
       ],
       "requires": [
         "box"
-      ]
+      ],
+      "e1rm": "unsupported"
     },
     {
       "id": "split_squat",

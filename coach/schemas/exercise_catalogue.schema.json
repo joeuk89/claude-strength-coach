@@ -8,7 +8,7 @@
   "additionalProperties": false,
   "properties": {
     "schema_version": {
-      "const": 3
+      "const": 4
     },
     "exercises": {
       "type": "array",
@@ -230,6 +230,11 @@
         "ability": {
           "enum": [
             "demonstrated"
+          ]
+        },
+        "e1rm": {
+          "enum": [
+            "unsupported"
           ]
         }
       }

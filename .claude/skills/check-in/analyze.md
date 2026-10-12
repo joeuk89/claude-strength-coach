@@ -40,6 +40,10 @@ athlete hit the prescribed load × reps @ RPE?
   priority lift's KPI now, its trend, and its exposures per week
   against plan. Name each `priority_exposures_missed` flag (a planned
   exposure missed with no floor dose in its place) in the Coach's read.
+  A KPI with `unavailable` quotes its message as the reason its newest
+  exposure gave no e1RM; with no `now`, judge that lift by its logged
+  reps and load. A `now` with
+  `basis` `total_system` counts body mass: say "total system mass" with its number.
   For priority protocols the program holds only in prose: did they
   happen as written? Watch for this athlete's known drift patterns
   (Coach's notes).
@@ -49,7 +53,9 @@ athlete hit the prescribed load × reps @ RPE?
   `python3 -m coach stats e1rm --since <last deep check-in>` (each
   lift's series, best and latest change): trend, not gospel. Light-week,
   return-week, reduced and over-cap exposures stay out of the series; read
-  them in `observations`, and the card's `e1rm_notes` says why. Flag stalls
+  them in `observations`, and the card's `e1rm_notes` says why. A
+  `total_system` point counts body mass: say "total system mass" with
+  its number. `unavailable` lists lifts with no estimate and why. Flag stalls
   (same load+reps 3+ sessions) and progression-scheme violations.
 - Missed sessions since the last deep check-in: `python3 -m coach
   checkin misses` counts them by tag and by session (the deep card's

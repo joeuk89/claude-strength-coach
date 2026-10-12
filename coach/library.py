@@ -80,6 +80,16 @@ def catalogue():
     return copy.deepcopy(list(_catalogue_entries()))
 
 
+@functools.lru_cache(maxsize=1)
+def _no_e1rm_ids():
+    return frozenset(entry["id"] for entry in _catalogue_entries() if entry.get("e1rm") == "unsupported")
+
+
+def e1rm_supported(exercise_id):
+    """False for a catalogue lift whose external load is too small a share of the mass moved for an e1RM (C5)."""
+    return exercise_id not in _no_e1rm_ids()
+
+
 def jsonpath(*parts):
     path = "$"
     for part in parts:

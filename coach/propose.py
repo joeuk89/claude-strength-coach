@@ -23,7 +23,7 @@ from coach import state as state_module
 from coach import stats, units, validity
 from coach.checks.instance import cap_for
 from coach.errors import ConfigError, RefusedError, UsageError, ValidationError
-from coach.library import Library
+from coach.library import Library, e1rm_supported
 from coach.plugins import base
 
 KINDS = ("weekly", "midweek", "deload")
@@ -605,7 +605,7 @@ def _exercise_info(run, session, exercise):
         id=exercise_id, name=entry.get("name", exercise_id), pattern=entry.get("pattern"),
         muscles=entry.get("muscles", {}), equipment=entry.get("equipment"), load_mode=mode,
         increment=run.increment(exercise_id, session["location"]), is_compound=patterns.is_compound(entry),
-        load_direction=-1 if mode == "assisted" else 1,
+        load_direction=-1 if mode == "assisted" else 1, e1rm_supported=e1rm_supported(exercise_id),
     )
 
 

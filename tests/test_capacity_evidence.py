@@ -204,7 +204,7 @@ class CapacityEvidenceTest(NoHevyCase):
                             "floor": {"sets": 2, "rpe": None}}]
         write_json(path, doc)
         lift = self.coach("structure", "priority")["data"]["lifts"][0]
-        self.assertEqual(lift["kpi"]["now"], {"value": 31.5, "date": "2026-10-05"})
+        self.assertEqual(lift["kpi"]["now"], {"value": 31.5, "date": "2026-10-05", "basis": "load"})
         self.assertIsNone(lift["kpi"]["trend"])
 
     def test_lower_reps_with_a_heavier_override_is_not_recovery(self):
@@ -438,6 +438,7 @@ class CapacityEvidenceTest(NoHevyCase):
                 self.assertNotIn("e1RM notes", text)
                 self.assertNotIn("unsupported", progress)
         write_json(path, original)
+        (self.root / "data/nutrition/readings.json").unlink()
         draft = self.prefill(session="session-b", day="2026-10-13")
         for exercise in draft["exercises"]:
             for logged in exercise["sets"]:

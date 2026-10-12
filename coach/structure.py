@@ -862,14 +862,16 @@ def _top_reps(exposure):
 
 
 def _kpi_series(inst, lift, since, until):
-    """[(date, value)] oldest first, and the KPI's value now as {value, date, ...} or None."""
+    """[(date, value)] oldest first, the KPI's value now as {value, date, ...} or None, and why an e1RM is missing."""
     exercise_id, kind = lift["exercise_id"], lift["kpi"]["kind"]
     if kind == "e1rm":
         found = stats.e1rm_series(inst.root, exercise_id, since=since, now=inst.now)
         points = [p for p in found["series"].get(exercise_id, []) if p["date"] <= until.isoformat()]
         best = max(points, key=lambda p: (p["e1rm"], p["date"])) if points else None
-        return [(p["date"], p["e1rm"]) for p in points], ({"value": best["e1rm"], "date": best["date"]}
-                                                          if best else None)
+        gone = found["unavailable"].get(exercise_id)
+        why = {"reason": gone["reason"], "message": gone["message"], "date": gone["date"]} if gone else None
+        return [(p["date"], p["e1rm"]) for p in points], ({"value": best["e1rm"], "date": best["date"],
+                                                           "basis": best["basis"]} if best else None), why
     if kind in ("top_load", "top_reps"):
         measure = _top_load if kind == "top_load" else _top_reps
         exposures = sorted((e for e in history.all_exposures(inst.root, now=inst.now)
@@ -877,8 +879,8 @@ def _kpi_series(inst, lift, since, until):
                             and not e["excluded"] and not e["suspect"]),
                            key=lambda e: (e["date"], e["workout_id"]))
         series = [(e["date"], _round(v)) for e in exposures if (v := measure(e)) is not None]
-        return series, ({"value": series[-1][1], "date": series[-1][0]} if series else None)
-    return [], _rung_now(inst, exercise_id)
+        return series, ({"value": series[-1][1], "date": series[-1][0]} if series else None), None
+    return [], _rung_now(inst, exercise_id), None
 
 
 def _rung_now(inst, exercise_id):
@@ -899,7 +901,7 @@ def _rung_now(inst, exercise_id):
 
 def _kpi(inst, lift, since, until):
     kpi = lift["kpi"]
-    series, now_value = _kpi_series(inst, lift, since, until)
+    series, now_value, unavailable = _kpi_series(inst, lift, since, until)
     trend = None
     if len(series) > 1:
         trend = {"from": {"date": series[0][0], "value": series[0][1]},
@@ -912,7 +914,7 @@ def _kpi(inst, lift, since, until):
         lower_is_better = kpi["kind"] == "top_load" and "assisted" in modes
         met = now_value["value"] <= kpi["target"] if lower_is_better else now_value["value"] >= kpi["target"]
     return {"kind": kpi["kind"], "target": kpi["target"], "by": kpi["by"], "now": now_value, "trend": trend,
-            "met": met}
+            "met": met, "unavailable": unavailable}
 
 
 def _weeks_between(inst, since, until):

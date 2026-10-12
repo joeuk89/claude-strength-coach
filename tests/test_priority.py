@@ -45,8 +45,9 @@ class KpiTest(PriorityCase):
         self.set_priority(priority_entry(kpi={"kind": "e1rm", "target": 130, "by": "2027-01-31"}))
         lift = self.lift()
         best = self.data("stats", "e1rm", "--exercise", SQUAT)["best"][SQUAT]
-        self.assertEqual(lift["kpi"]["now"], {"value": best["e1rm"], "date": best["date"]})
-        self.assertEqual(lift["kpi"]["now"], {"value": 121.88, "date": "2026-10-05"})
+        self.assertEqual(lift["kpi"]["now"], {"value": best["e1rm"], "date": best["date"], "basis": "load"})
+        self.assertEqual(lift["kpi"]["now"]["value"], 121.88)
+        self.assertIsNone(lift["kpi"]["unavailable"])
         self.assertEqual(lift["kpi"]["trend"]["delta"], 1.55)
         self.assertEqual((lift["kpi"]["target"], lift["kpi"]["by"], lift["kpi"]["met"]), (130, "2027-01-31", False))
         self.assertEqual(lift["sessions"], ["session-a"])

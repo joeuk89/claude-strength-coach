@@ -135,6 +135,10 @@ class ExerciseInfo:
     increment: float
     is_compound: bool
     load_direction: int = 1
+    e1rm_supported: bool = True
+
+
+NO_E1RM_REASON = "body mass dominates this movement, so it gets no e1RM"
 
 
 @dataclass(frozen=True)
