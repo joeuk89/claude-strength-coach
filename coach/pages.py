@@ -175,15 +175,15 @@ def _change_text(line, show_hevy=True):
 
 
 def _change_reason(line, intent=None):
-    """What the athlete reads after a change. An override's reason is the coach's audit record, so it stays off the
-    page. A recovery week's lines say what the week is for: a light transform keeps the scheme's note, which then
-    describes an ordinary week."""
+    """What the athlete reads after a change. A recovery week's line names the week and an overridden line credits the
+    coach, both ahead of the scheme's note, which stays on the line and would credit the change to the scheme. An
+    override's reason is the coach's audit record, so it stays off the page."""
     if intent:
         return f"{intent} week"
-    if line.get("target_note"):
-        return line["target_note"]
     if line.get("override"):
         return "agreed with your coach"
+    if line.get("target_note"):
+        return line["target_note"]
     provenance = line.get("provenance") or {}
     if provenance.get("decay"):
         return f"eased back after {provenance['decay']['days_off']} days off"

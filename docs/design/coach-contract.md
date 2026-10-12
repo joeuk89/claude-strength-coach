@@ -5697,9 +5697,10 @@ these headings:
   <change>: <reason>`. Reason, in athlete words: in a light, deload or
   return week (`coach.overlay.recovery_intent`), `light week`, `deload
   week` or `return week`, even over a `target_note` the week's transform
-  kept from the scheme; else `target_note`; else `agreed with your coach`
-  for an override, whose `reason` is the coach's audit record and never
-  reaches the page; else `eased back after <n> days off` for a decayed
+  kept from the scheme; else `agreed with your coach` for an override,
+  even over the `target_note` it kept from the scheme, its `reason` being
+  the coach's audit record that never reaches the page; else
+  `target_note`; else `eased back after <n> days off` for a decayed
   line; else `provenance.rationale` (C21). A `per_hand_x2`
   change that ends on the bare per-hand load (`22.5 → 25/hand`) gets the
   Hevy value appended (`22.5 → 25/hand (Hevy: 50)`).
