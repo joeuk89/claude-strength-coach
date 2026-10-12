@@ -409,8 +409,8 @@ def adherence_of(root, planned, window, include_unsynced=False, today=None, now=
     sessions, used_notes, miss_pairs = [], set(), []
     for position, (doc, session) in enumerate(planned):
         day = dates.parse_date(session["date"])
-        in_span = (lambda a, d=doc: d["span"]["start"] <= a["date"] <= d["span"]["end"]
-                   and a["session_id"] == session["session_id"])
+        in_span = (lambda a, d=doc, s=session: a["session_id"] == s["session_id"]
+                   and (d["span"]["start"] <= a["date"] <= d["span"]["end"] or a["date"] == s.get("moved_from")))
         row = {"session_id": session["session_id"], "date": session["date"], "title": session["title"],
                "overlay_id": doc["id"], "status": None, "workout_id": None, "workout_date": None, "moved": False,
                "unlogged": False, "tag": None, "exercises": []}

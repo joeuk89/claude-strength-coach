@@ -2138,7 +2138,8 @@ progression: return-week logs remain the next week's baseline.
   matched once, nearest date first; `moved: true` when the date differs;
   or a `trained_unlogged` annotation, with `unlogged: true`), `missed`
   (with `tag` from a `miss` annotation for that session inside the
-  overlay span, each matched once, nearest date first; else `untagged`),
+  overlay span or on a moved session's original date, each matched
+  once, nearest date first; else `untagged`),
   `upcoming`.
   Workouts matching no planned session are listed as `extra`.
 - Exercise `status` for a trained session, comparing working sets in order:
@@ -5200,7 +5201,8 @@ coach.structure.ordinary_weeks(root, until, n=4, reach=12) -> list[str]
   only (KPIs, e1RM, validity), never misses. A session an overlay moved
   (`moved_from`, C37) is one planned session, on its new date, when the
   overlay holding the moved copy is in force there; its original date
-  plans nothing, and a `miss` annotation on it is not counted. A session
+  plans nothing. A `miss` annotation on that date is not counted on its
+  own: it tags the moved copy when that is missed too. A session
   for the same id that moves nothing is a separate planned session.
   `coach.overlay.planned` applies the overlay rules for both
   `structure` and `stats adherence --span` (so the check-in card), and

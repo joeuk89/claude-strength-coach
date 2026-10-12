@@ -299,6 +299,14 @@ class UnrecordedAdoptionTest(PlannedSessionCase):
         data = self.coach("structure", "adherence", now="2026-11-01T19:00:00Z")
         self.assertEqual([w["label"] for w in data["weeks"]], ["2026-W42", "2026-W44"])
 
+    def test_a_block_init_never_moves_the_adoption_forward(self):
+        self.drop_overlays()
+        self.block_started("2026-10-12")
+        self.coach("block", "init", "--hard-weeks", "1", "--started", "2026-10-19", "--through", "2026-10-19",
+                   now="2026-10-25T19:00:00Z")
+        self.assertEqual(read_json(self.root / "data/state.json")["program_adopted"], "2026-10-12")
+        self.assertEqual(self.week("2026-10-12", now="2026-10-25T19:00:00Z")["planned"], 2)
+
     def test_the_first_overlay_dates_it_without_a_block_start(self):
         self.block_started(None)
         data = self.coach("structure", "priority", now="2026-10-18T19:00:00Z")
@@ -379,6 +387,18 @@ class MovedSessionTest(PlannedSessionCase):
         moved = self.coach("stats", "adherence", "--overlay", self.moved_id, now="2026-10-18T19:00:00Z")
         self.assertEqual([(s["session_id"], s["status"]) for s in moved["sessions"]
                           if s["session_id"] == "session-a"], [("session-a", "missed")])
+
+    def test_an_untrained_moved_session_keeps_the_tag_its_miss_recorded(self):
+        now = "2026-10-18T19:00:00Z"
+        report = self.week("2026-10-12", now=now)
+        self.assertEqual([(s["date"], s["status"], s["tag"]) for s in report["sessions"]
+                          if s["session_id"] == "session-a"], [("2026-10-17", "missed", "family")])
+        span = self.coach("stats", "adherence", "--span", "2026-10-12..2026-10-18", now=now)
+        self.assertEqual([(s["date"], s["tag"]) for s in span["sessions"] if s["status"] == "missed"],
+                         [("2026-10-17", "family")])
+        missed = self.coach("checkin", "misses", "--since", "2026-10-12", "--until", "2026-10-18", now=now)
+        self.assertEqual((missed["by_tag"]["family"], missed["by_tag"]["untagged"], missed["sessions_missed"]),
+                         (1, 0, 1))
 
     def test_a_pending_move_leaves_no_miss_on_the_original_day(self):
         report = self.week("2026-10-12", now="2026-10-16T19:00:00Z")
