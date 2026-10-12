@@ -89,6 +89,41 @@ def flags(root, config, span, mode, bouts, today, overlay=None):
     return found
 
 
+def codes(root):
+    """Every flag code an interference rule may emit: `collision` and each instance rule's own codes."""
+    registry = plugins.load(root)
+    found = {FRAMEWORK_CODE}
+    for plugin in registry.plugins:
+        if plugin.kind == KIND and plugin.valid and plugin.source != "framework":
+            found.update(plugin.module.FLAGS)
+    return found
+
+
+def refresh(root, config, doc, today):
+    """The overlay's flags with its interference flags judged again from its sessions as they are now (C51).
+
+    Every earlier interference flag is replaced, so a moved session drops a collision it no longer has and a
+    recheck never adds a second copy; an identical flag keeps its resolution.
+    """
+    span = Span(dates.parse_date(doc["span"]["start"]), dates.parse_date(doc["span"]["end"]))
+    found = flags(root, config, span, "proposal", cardio.bouts(root, span, "proposal", overlay=doc, today=today),
+                  today, overlay=doc)
+    owned = codes(root)
+    earlier = {_key(f): f for f in doc["flags"] if f["code"] in owned}
+    merged = [f for f in doc["flags"] if f["code"] not in owned]
+    for flag in found:
+        before = earlier.get(_key(flag))
+        if before is not None:
+            flag = dict(flag, resolved=before["resolved"], resolution=before["resolution"])
+        if all(_key(flag) != _key(other) for other in merged):
+            merged.append(flag)
+    return merged
+
+
+def _key(flag):
+    return flag["code"], flag["severity"], flag.get("session_id"), flag.get("exercise_id"), flag["message"]
+
+
 def _order(bout):
     return bout.date, bout.start.isoformat() if bout.start else "", bout.kind, bout.ref
 

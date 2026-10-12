@@ -2,7 +2,7 @@ import os
 import tempfile
 from pathlib import Path
 
-from coach import dates, jsonio, overlay, render, validity
+from coach import dates, interference, jsonio, overlay, render, validity
 from coach.commands import arg, command
 from coach.errors import RefusedError, UsageError, ValidationError
 from coach.validate import Error
@@ -62,6 +62,7 @@ def _write_text(path, text):
 def build(args, ctx):
     draft = overlay.read_json(args.input)
     doc = overlay.build(draft, ctx.config, root=ctx.root, now=ctx.now())
+    doc["flags"] = interference.refresh(ctx.root, ctx.config, doc, ctx.today())
     path = overlay.path_for(ctx.root, doc["id"])
     if path.exists():
         existing = overlay.read_json(path)

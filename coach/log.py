@@ -12,12 +12,14 @@ import json
 from datetime import timezone
 from pathlib import Path
 
-from coach import dates, history, jsonio, overlay, paths, program, render, units
+from coach import dates, history, jsonio, overlay, paths, program, render, timing, units
 from coach.activity.records import append_lines
 from coach.errors import CoachError, RefusedError, ValidationError
 from coach.validate import Error, validate
 
 SCHEMAS = {"workout": "manual_workout_line", "void": "manual_void_line"}
+WORKOUT_VERSION = 2
+ADDED_IN = {2: ("start_time",)}
 NO_LOAD_MODES = ("band", "duration", "distance")
 NO_REPS_MODES = ("duration", "distance")
 ADHOC = "adhoc"
@@ -56,6 +58,13 @@ def schema_errors(line):
     kind = line.get("kind") if isinstance(line, dict) else None
     if kind not in SCHEMAS:
         return [Error("$.kind", f"expected one of {', '.join(SCHEMAS)}, found {kind!r}")]
+    version = line.get("schema_version")
+    if kind == "workout" and isinstance(version, int) and not isinstance(version, bool):
+        if version > WORKOUT_VERSION:
+            return [Error("$.schema_version", f"version {version} is newer than this coach reads "
+                                              f"({WORKOUT_VERSION}); run /framework-sync")]
+        if 1 <= version < WORKOUT_VERSION:
+            return validate(line, jsonio.line_schema(SCHEMAS[kind], version, ADDED_IN))
     return validate(line, jsonio.load_schema(SCHEMAS[kind]))
 
 
@@ -232,8 +241,9 @@ def prefill(root, config, session_id, day, library):
             exercises.append({"exercise_id": line["exercise_id"], "load_mode": line["load_mode"],
                               "unit": config.athlete.units, "notes": "", "sets": [_draft_set(s) for s in working]})
             asks += _asks(_name(library, line["exercise_id"]), line, working)
-    draft = {"schema_version": 1, "kind": "workout", "date": day, "session_id": session_id,
-             "overlay_id": doc["id"], "duration_minutes": None, "notes": "", "exercises": exercises}
+    draft = {"schema_version": WORKOUT_VERSION, "kind": "workout", "date": day, "start_time": None,
+             "session_id": session_id, "overlay_id": doc["id"], "duration_minutes": None, "notes": "",
+             "exercises": exercises}
     return draft, asks
 
 
@@ -431,10 +441,19 @@ def add(root, config, library, draft, today, now, again=False, dry_run=False):
         raise ValidationError(f"log add assigns {' and '.join(given)}; leave {'them' if len(given) > 1 else 'it'} "
                               "out of the input")
     found = lines(root)
-    line = {"schema_version": 1, "kind": "workout", "id": None, "logged_at": _timestamp(now)}
+    line = {"schema_version": WORKOUT_VERSION, "kind": "workout", "id": None, "logged_at": _timestamp(now),
+            "start_time": None}
     line.update(draft)
+    line["schema_version"] = WORKOUT_VERSION
     if isinstance(line.get("date"), str) and (line.get("session_id") is None or isinstance(line["session_id"], str)):
         line["id"] = next_id(found, line["date"], line["session_id"])
+    if isinstance(line["start_time"], str) and isinstance(line.get("date"), str):
+        zone = dates.zone(config.athlete.timezone) if config.athlete.timezone else None
+        try:
+            line["start_time"] = timing.utc_text(timing.parse_start(line["start_time"], line["date"], zone))
+        except ValueError as exc:
+            raise ValidationError(f"The workout is not valid: $.start_time: {exc}",
+                                  details=[{"path": "$.start_time", "message": str(exc)}]) from None
     errors = schema_errors(line)
     if errors:
         raise ValidationError(f"The workout is not valid: {errors[0].path}: {errors[0].message}",

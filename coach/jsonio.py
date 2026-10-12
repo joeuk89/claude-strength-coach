@@ -1,5 +1,6 @@
 """Reading and writing the package's JSON documents (contract C7)."""
 
+import copy
 import hashlib
 import json
 import os
@@ -19,6 +20,25 @@ def load_schema(name):
 
 def current_version(schema):
     return schema["properties"]["schema_version"]["const"]
+
+
+def line_schema(name, version, added_in):
+    """The schema a JSONL line written at `version` validates against (C29: each line keeps its version).
+
+    `added_in` maps each later version to the top-level properties it added; an older line may not carry them.
+    """
+    schema = load_schema(name)
+    if version == current_version(schema):
+        return schema
+    older = copy.deepcopy(schema)
+    older["properties"]["schema_version"] = {"const": version}
+    for later, names in added_in.items():
+        if later > version:
+            for key in names:
+                older["properties"].pop(key, None)
+                if key in older.get("required", []):
+                    older["required"].remove(key)
+    return older
 
 
 def read_doc(path, schema_name):

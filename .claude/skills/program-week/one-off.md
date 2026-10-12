@@ -59,6 +59,8 @@ Write `.coach/drafts/overlay-<span start>.json` in the athlete's units
   for ("travel week: keep the main lifts at two hard sets each").
 - A reshuffled session keeps its program `session_id` and title, with
   its new `date`.
+- A session's `start` (`HH:MM` local time, or a timestamp) and
+  `duration_minutes`, when the athlete gives them (context.md).
 - Each temporary session gets a new `session_id` (`travel-a`),
   `"temporary": true`, the title its Hevy routine will carry ("Travel A
   — Full body") and, on a constrained week, its `location`.
@@ -69,6 +71,8 @@ Write `.coach/drafts/overlay-<span start>.json` in the athlete's units
   per-hand modes, the added load for bodyweight, else the total.
 
 Then run `python3 -m coach overlay build --input <draft>`, which writes
-`data/overlays/<id>.json` and gives the id, and go to build.md. A draft
+`data/overlays/<id>.json` and gives the id, and go to build.md. Build
+judges the program's interference rules on the span's sessions as a
+proposed week does: settle each `collision` as compute.md says. A draft
 that names an unapproved overlay's id rebuilds it, which is how a tweak
 to the brief lands.

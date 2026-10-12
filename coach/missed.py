@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from coach import checkin, dates, flags, history, jsonio, overlay, pages, paths, program, render, stats, structure
-from coach import units, validity
+from coach import interference, units, validity
 from coach import config as config_module
 from coach.errors import RefusedError, UsageError, ValidationError
 from coach.library import Library
@@ -278,7 +278,7 @@ def _shift(doc, missed, day, rule, config, today):
         if status != FREE:
             reasons.append(reason)
             continue
-        moved = dict(copy.deepcopy(missed), date=candidate.isoformat(), moved_from=missed["date"])
+        moved = dict(copy.deepcopy(missed), date=candidate.isoformat(), moved_from=missed["date"], start=None)
         later = copy.deepcopy(_later_sessions(doc, day)) + [moved]
         later.sort(key=lambda s: s["date"])
         label = "Moved by choice" if action.get("on") else f"Rule {rule['id']}"
@@ -360,6 +360,7 @@ def _build(root, doc, session_id, day, rules, now, config, library):
         raise Unmatched("no session is left in the overlay's span")
     built = overlay.build(_draft(doc, sessions, extra), config, root=root, now=now)
     built["flags"] = validity.merge_flags(built, validity.check_overlay(root, built))
+    built["flags"] = interference.refresh(root, config, built, today)
     return built
 
 

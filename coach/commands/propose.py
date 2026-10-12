@@ -81,6 +81,31 @@ def resolve(args, ctx):
 
 
 @command(
+    "propose time",
+    help="Set when one session of a proposal starts and how long it lasts, or clear it, and judge the interference "
+         "rules again; finalize afterwards",
+    args=(_PROPOSAL,
+          arg("--session", required=True, metavar="S", help="program session id"),
+          arg("--date", metavar="D", help="the session's date, when the proposal holds it twice"),
+          arg("--start", metavar="TIME", help="HH:MM on the session's date in [athlete] timezone, or an ISO 8601 "
+                                              "timestamp (with an offset, or local time)"),
+          arg("--duration-min", type=int, metavar="MIN", help="how long the session lasts, in whole minutes"),
+          arg("--clear", action="store_true", help="remove the session's start and duration")),
+    writes=True,
+)
+def session_time(args, ctx):
+    if args.clear == (args.start is not None):
+        raise UsageError("give --start TIME or --clear")
+    if args.clear and args.duration_min is not None:
+        raise UsageError("--duration-min goes with --start")
+    if args.duration_min is not None and args.duration_min < 1:
+        raise UsageError("--duration-min must be at least 1")
+    day = _date(args.date, "--date").isoformat() if args.date else None
+    return propose.set_time(ctx.root, ctx.config, args.proposal, args.session, day, args.start, args.duration_min,
+                            ctx.today(), ctx.now(), args.dry_run)
+
+
+@command(
     "propose restore",
     help="Put back a conditioning session the drop rule removed from a proposal, resolving its flag with the reason",
     args=(_PROPOSAL,

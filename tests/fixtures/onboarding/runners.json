@@ -1,0 +1,16 @@
+{
+  "about": "Synthetic setup answers about runs: one athlete follows an outside running plan, one only counts runs.",
+  "now": "2026-10-11T18:00:00Z",
+  "outside_plan": {
+    "athlete": "I run three times a week from my running app's half-marathon plan. This week Tuesday is intervals at 07:00 for 45 minutes.",
+    "config": {"athlete": {"timezone": "Europe/London"}, "activity": {"enabled": true}, "cardio": {"tier": "review"}},
+    "coming_week": [
+      ["planned", "add", "--date", "2026-10-13", "--kind", "run", "--title", "Intervals", "--quality",
+       "--start", "07:00", "--duration-min", "45"]
+    ]
+  },
+  "count_only": {
+    "athlete": "I jog now and then when I feel like it; there is no plan.",
+    "config": {"activity": {"enabled": true}, "cardio": {"tier": "count"}}
+  }
+}

@@ -69,7 +69,7 @@ def next_manual_id(store, kind, day, record_kind):
 def build_manual(ctx, kind, item):
     """The full line for a manual record, validated."""
     record = manual.normalise(dict(item, file=kind), ctx)[0]
-    line = records.upsert_line(record, records.utc_text(ctx.now()))
+    line = records.upsert_line(record, records.utc_text(ctx.now()), kind)
     errors = records.line_errors(line, kind)
     if errors:
         raise ValidationError(f"the {kind} record is not valid: {errors[0].path}: {errors[0].message}",

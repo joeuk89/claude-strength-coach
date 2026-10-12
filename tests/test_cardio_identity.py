@@ -10,7 +10,7 @@ from tests.test_cardio import CardioCase, NOW
 
 def plan(record_id, day, meters, quality=False, title="Run", seconds=None):
     return {"id": record_id, "source": "manual", "date": day, "kind": "run", "title": title,
-            "quality": quality, "target": {"distance_meters": meters, "duration_seconds": seconds}}
+            "quality": quality, "start": None, "target": {"distance_meters": meters, "duration_seconds": seconds}}
 
 
 def activity(record_id, day, meters, seconds=1800, name=None, rpe=None):
@@ -21,9 +21,9 @@ def activity(record_id, day, meters, seconds=1800, name=None, rpe=None):
 
 class IdentityTest(CardioCase):
     def set_records(self, plans, activities):
-        for kind, items in (("planned", plans), ("activities", activities)):
-            path = self.root / "data" / "activity" / (kind + ".jsonl")
-            path.write_text("".join(json.dumps(records.upsert_line(item, NOW)) + "\n" for item in items))
+        for name, kind, items in (("planned", "planned", plans), ("activities", "activity", activities)):
+            path = self.root / "data" / "activity" / (name + ".jsonl")
+            path.write_text("".join(json.dumps(records.upsert_line(item, NOW, kind)) + "\n" for item in items))
 
     def swapped(self):
         plans = [plan("manual:quality", "2026-10-06", 10000, True),
@@ -96,7 +96,7 @@ class IdentityTest(CardioCase):
         self.data("cardio", "associate", "manual:short", "--planned-id", "manual:quality")
         changed = dict(acts[0], rpe=1, distance_meters=12000)
         path = self.root / paths.ACTIVITIES
-        line = records.upsert_line(changed, NOW)
+        line = records.upsert_line(changed, NOW, "activity")
         records.append_lines(path, [line, line])
         item = next(i for i in self.reconcile() if i["planned_id"] == "manual:quality")
         self.assertEqual((item["activity_id"], item["delta"]["distance_meters"], item["quality"]),

@@ -276,7 +276,8 @@ def _srpe(rpe, minutes, method):
 
 def _planned_bout(plan):
     target = plan.get("target") or {}
-    return Bout(dates.parse_date(plan["date"]), None, None, plan["kind"], "planned", plan["id"], None,
+    start = dates.parse_timestamp(plan["start"]) if plan.get("start") else None
+    return Bout(dates.parse_date(plan["date"]), start, None, plan["kind"], "planned", plan["id"], None,
                 _minutes(target.get("duration_seconds")), target.get("distance_meters"), bool(plan["quality"]),
                 "planned")
 
@@ -318,9 +319,11 @@ def _proposal_bouts(week_data, overlay):
     kinds = {s["id"]: s["kind"] for s in program_doc["sessions"]} if program_doc else {}
     for session in (overlay or {}).get("sessions", []):
         kind = "conditioning" if kinds.get(session["session_id"]) == "conditioning" else LIFTING
-        found.append(Bout(dates.parse_date(session["date"]), None, None, kind, "planned",
-                          f"{overlay['id']}/{session['session_id']}", session["session_id"], None, None,
-                          kind == "conditioning", "kind" if kind == "conditioning" else None))
+        start = dates.parse_timestamp(session["start"]) if session.get("start") else None
+        found.append(Bout(dates.parse_date(session["date"]), start, None, kind, "planned",
+                          f"{overlay['id']}/{session['session_id']}", session["session_id"],
+                          session.get("duration_minutes"), None, kind == "conditioning",
+                          "kind" if kind == "conditioning" else None))
     minutes = week_data.settings["external_session_minutes"]
     for external in program_doc["external_sessions"] if program_doc else []:
         for day in week_data.span.days():

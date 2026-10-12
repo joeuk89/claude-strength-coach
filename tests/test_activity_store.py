@@ -24,7 +24,7 @@ def activity(record_id, kind, start, minutes=30, **fields):
               "duration_seconds": minutes * 60, "distance_meters": None, "elevation_gain_meters": None,
               "avg_hr": None, "max_hr": None, "active_kcal": None, "rpe": None, "device": None, "notes": None}
     record.update(fields)
-    return records.upsert_line(record, NOW)
+    return records.upsert_line(record, NOW, "activity")
 
 
 def wellness(record_id, start, end=None, asleep=None, **fields):
@@ -35,7 +35,7 @@ def wellness(record_id, start, end=None, asleep=None, **fields):
               "resting_hr_bpm": None, "hrv_ms": None, "steps": None, "body_mass_kg": None,
               "body_fat_pct": None, "device": None}
     record.update(fields)
-    return records.upsert_line(record, NOW)
+    return records.upsert_line(record, NOW, "wellness")
 
 
 class StoreCase(unittest.TestCase):

@@ -18,7 +18,8 @@ from typing import NamedTuple
 
 from coach import constraints as constraints_module
 from coach import dates, decisions, flags, followups, history, jsonio, niggles, overlay, paths, patterns, plugins
-from coach import capacity, cardio, conditioning, external, first_loads, program, research, statusdays, weekflags
+from coach import capacity, cardio, conditioning, external, first_loads, interference, program, research, statusdays
+from coach import timing, weekflags
 from coach import state as state_module
 from coach import stats, units, validity
 from coach.checks.instance import cap_for
@@ -29,6 +30,7 @@ from coach.loads import AvailableLoads, available_loads
 from coach.plugins import base
 
 KINDS = ("weekly", "midweek", "deload")
+TIMING_KEYS = ("start", "duration_minutes")
 DECAY_AFTER_DAYS = validity.RETURN_BANDS[0].upper
 STALL_EXPOSURES = 3
 _SET_SPEC = re.compile(r"^\s*(\d+)\s*[x×]\s*(\d+)(?:\s*-\s*(\d+))?\s*(\+)?\s*(s)?\s*(?:@\s*(\d+(?:\.\d+)?))?\s*"
@@ -1624,6 +1626,43 @@ def restore(root, config, proposal_id, session_id, reason, now, today, dry_run):
             "written": not dry_run}
 
 
+def set_time(root, config, proposal_id, session_id, day, start, minutes, today, now, dry_run):
+    """Set or clear one session's planned start and duration in a draft, judging interference again (C24, C51).
+
+    `start` is local text in `[athlete] timezone`, text with an offset, or None to clear the start and duration.
+    Only the session's timing changes, never a line, so finalize needs no override reason for it.
+    """
+    draft, _, _ = load_proposal(root, proposal_id)
+    found = [s for s in draft["sessions"] if s["session_id"] == session_id and (day is None or s["date"] == day)]
+    if not found:
+        listed = ", ".join(f"{s['session_id']} {s['date']}" for s in draft["sessions"])
+        raise ValidationError(f"Proposal {proposal_id} has no session {session_id}"
+                              f"{' on ' + day if day else ''}; its sessions are {listed}")
+    if len(found) > 1:
+        raise UsageError(f"{session_id} is in proposal {proposal_id} on {', '.join(s['date'] for s in found)}; "
+                         "give --date")
+    session = found[0]
+    zone = dates.zone(config.athlete.timezone) if config.athlete.timezone else None
+    if start is None:
+        session.update(start=None, duration_minutes=None)
+    else:
+        try:
+            session["start"] = timing.utc_text(timing.parse_start(start, session["date"], zone))
+        except ValueError as exc:
+            raise ValidationError(f"--start: {exc}") from None
+        session["duration_minutes"] = minutes
+    doc = overlay.build(draft, config, root=root, now=now)
+    doc["flags"] = _checked_flags(root, config, doc)
+    doc["flags"] = interference.refresh(root, config, doc, today)
+    draft["flags"] = doc["flags"]
+    if not dry_run:
+        _write_proposal(root, proposal_id, draft, None, None)
+    collisions = [f for f in doc["flags"] if f["code"] in interference.codes(root)]
+    return {"id": proposal_id, "session_id": session_id, "date": session["date"], "start": session["start"],
+            "duration_minutes": session["duration_minutes"], "interference": collisions,
+            "finalized": overlay.path_for(root, proposal_id).exists(), "written": not dry_run}
+
+
 def rebuild(root, config, proposal_id, today, now, dry_run):
     """Propose a draft's span again under the same id from the program as it is now, keeping the draft's
     explained edits and flag resolutions (C24).
@@ -1651,8 +1690,10 @@ def rebuild(root, config, proposal_id, today, now, dry_run):
     new_draft = copy.deepcopy(built["draft"])
     kept, lost = _carry_edits(root, proposal_id, draft, proposed, new_draft, config.athlete.units,
                               config.hevy.enabled)
+    _carry_timing(draft, new_draft)
     doc = overlay.build(new_draft, config, root=root, now=now)
     doc["flags"] = _checked_flags(root, config, doc)
+    doc["flags"] = interference.refresh(root, config, doc, today)
     resolved = {_flag_identity(f): f for f in draft.get("flags", [])
                 if f.get("resolved") and not first_loads.is_automatic(f)}
     carried_resolutions = 0
@@ -1674,6 +1715,17 @@ def rebuild(root, config, proposal_id, today, now, dry_run):
                      if e.get("restored") and (e["session_id"], e["date"]) in dropped_again]
     return dict(result, kept=kept, lost=lost, resolutions_kept=carried_resolutions, restores_lost=restores_lost,
                 overlay_removed=_relative(root, path) if finalized else None)
+
+
+def _carry_timing(draft, new_draft):
+    """Each session's planned start and duration onto the same session and date in the rebuilt draft."""
+    timing_of = {(s["session_id"], s["date"]): s for s in draft.get("sessions", [])}
+    for session in new_draft["sessions"]:
+        earlier = timing_of.get((session["session_id"], session["date"]))
+        if earlier is not None:
+            for key in TIMING_KEYS:
+                if earlier.get(key) is not None:
+                    session[key] = earlier[key]
 
 
 def _flag_identity(flag):
@@ -1829,6 +1881,7 @@ def finalize(root, config, proposal_id, now, dry_run, today=None):
                               details=unexplained)
     doc = overlay.build(draft, config, root=root, now=now)
     doc["flags"] = _checked_flags(root, config, doc)
+    doc["flags"] = interference.refresh(root, config, doc, today or now.date())
     blocks = overlay.unresolved_blocks(doc)
     if blocks:
         raise RefusedError(

@@ -101,6 +101,7 @@
       "Bash(python3 -m coach propose override:*)",
       "Bash(python3 -m coach propose resolve:*)",
       "Bash(python3 -m coach propose restore:*)",
+      "Bash(python3 -m coach propose time:*)",
       "Bash(python3 -m coach propose finalize:*)",
       "Bash(python3 -m coach propose rebuild:*)",
       "Bash(python3 -m coach propose discard:*)",

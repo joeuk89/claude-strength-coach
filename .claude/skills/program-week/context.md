@@ -63,6 +63,25 @@ principles", matching band and all. An `ill` miss tag or illness in the
 gap adds that rule's illness conditions; standalone, ask whether
 illness caused the gap.
 
+## Planned runs and session times
+
+At `[cardio] tier` `review` or `program` (`python3 -m coach config show`),
+settle the span's runs before computing. Run `python3 -m coach planned list
+--from <span start> --to <span end>`, show it, and ask what changed and what
+is still to come, with each run's start time and length. Record a new run
+with `python3 -m coach planned add --date <D> --kind run --title "<title>"
+[--quality] --start HH:MM --duration-min <N>`; a changed one with `python3 -m
+coach planned void <id> --reason "<what changed>"`, then `planned add`. A run
+already planned is refused, not added twice. At `count`, ask nothing: no
+plan is read or written, and the coach never writes a running plan.
+
+When a quality run sits within a day of a lifting session, ask when that
+session starts and how long it runs, and record both as compute.md's
+`collision` entry says, or as the draft's session `start` and
+`duration_minutes` (one-off.md). Without both times a `collision` says
+the gap is unknown: ask for them rather than treat it as a confirmed
+breach.
+
 ## Goal events
 
 `python3 -m coach events list` shows each active goal event with its

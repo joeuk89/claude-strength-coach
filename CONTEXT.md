@@ -599,7 +599,9 @@ A program rule on spacing lifting and quality activities: lift first with
 at least 6 hours before a same-day quality activity, and no quality
 activity in the 24 hours before a heavy lower session. A broken rule
 raises a `collision` flag; the coach and athlete decide what moves.
-Easy activities never trigger one.
+Easy activities never trigger one. Gaps are elapsed hours between known
+start and end times; without them the flag says the gap is unknown and
+asks for the times, never claiming a measured breach from dates alone.
 _Avoid_: conflict, spacing rule
 
 **Heavy lower session**:
