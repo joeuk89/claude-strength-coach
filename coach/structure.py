@@ -156,10 +156,11 @@ class _Instance:
     library: Library = None
     overlays: list = None
     decisions: dict = None
+    as_of: object = None
     _workouts: list = field(default=None, repr=False)
 
     @classmethod
-    def load(cls, root, today=None, now=None, program_doc=None, require_program=True):
+    def load(cls, root, today=None, now=None, program_doc=None, require_program=True, as_of=None):
         root = Path(root)
         config = config_module.load(root)
         today = _as_date(today) or stats._today(config, now)
@@ -167,7 +168,7 @@ class _Instance:
             program_doc = program.load(root)
         return cls(root=root, today=today, now=now, config=config, program=program_doc,
                    state=history.load_optional(state, root), library=Library.load(root),
-                   overlays=overlay.list(root), decisions=decisions.load(root))
+                   overlays=overlay.list(root), decisions=decisions.load(root), as_of=as_of)
 
     @property
     def week_starts(self):
@@ -178,7 +179,7 @@ class _Instance:
 
     def workouts(self):
         if self._workouts is None:
-            self._workouts = history.workouts(self.root, now=self.now)
+            self._workouts = history.workouts(self.root, now=self.now, as_of=self.as_of)
         return self._workouts
 
     @cached_property
@@ -279,6 +280,7 @@ def coach_led(root, span, *, today=None, now=None, as_of=None):
 
 
 def _external_pairs(inst, span, as_of=None):
+    as_of = as_of or inst.as_of
     notes = [a for a in history.external_occurrences(inst.root, as_of) if span.contains(dates.parse_date(a["date"]))]
     off = statusdays.break_days(inst.root, span)
     rows = []
@@ -318,8 +320,8 @@ def _external_pairs(inst, span, as_of=None):
 def _activity_dates(inst, until):
     """Dates any training happened, up to `until`: workouts, trained-unlogged sessions, coach-led sessions done."""
     found = {w["date"] for w in inst.workouts()}
-    found |= {a["date"] for a in history.annotations(inst.root, "trained_unlogged")}
-    found |= {a["date"] for a in history.external_occurrences(inst.root)
+    found |= {a["date"] for a in history.annotations(inst.root, "trained_unlogged", inst.as_of)}
+    found |= {a["date"] for a in history.external_occurrences(inst.root, inst.as_of)
               if history.external_status(a) == history.DONE}
     return sorted(dates.parse_date(d) for d in found if d <= until.isoformat())
 
@@ -479,7 +481,7 @@ def _week_reports(inst, spans):
     for span in spans:
         pairs += _planned_pairs(inst, span)
     window = dates.Span(min(s.start for s in spans), max(s.end for s in spans))
-    matched = stats.adherence_of(inst.root, pairs, window, today=inst.today, now=inst.now)
+    matched = stats.adherence_of(inst.root, pairs, window, today=inst.today, now=inst.now, as_of=inst.as_of)
     sessions_by_key = {(s["date"], s["session_id"]): s for _, s in pairs}
     workouts = {w["workout_id"]: w for w in inst.workouts()}
     reports = {}
@@ -695,9 +697,12 @@ def _delivered_undershoot(weeks):
             for muscle, labels in sorted(short.items()) if len(labels) >= UNDERSHOOT_WEEKS]
 
 
-def adherence(root, until=None, *, today=None, now=None):
-    """Sessions trained over planned across the trailing four ordinary weeks, with the adherence flags (C41)."""
-    inst = _Instance.load(root, today, now)
+def adherence(root, until=None, *, today=None, now=None, as_of=None):
+    """Sessions trained over planned across the trailing four ordinary weeks, with the adherence flags (C41).
+
+    With `as_of`, only workouts started and annotations created by then count (C38).
+    """
+    inst = _Instance.load(root, today, now, as_of=as_of)
     return _adherence(inst, _as_date(until) or inst.today)[0]
 
 

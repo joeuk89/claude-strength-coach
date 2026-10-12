@@ -5744,18 +5744,39 @@ these headings:
 
 **Dashboard** (`README.md`): first, a status block of at most six lines
 (the brief's header line; the block status line from
-`coach.block.status_line` (C43); last check-in date, tier and link; open flag
-count (unresolved `warn` and `block` flags on the week's overlays, less
-the niggle flags Watch retires); the
+`coach.block.status_line` (C43); last check-in date, tier and link; the
+consistency line (below); the
 page's as-of time as "Updated <day> <HH:MM> (<zone>)", then part lines up
-to six), then the Sessions table, then a progress summary of at most
-five lines (three e1RM bests, the first naming `stats.E1RM_LABEL`;
-streak, latest bodyweight with the same basis and sources as
-`progress.md`), then links
+to six), then the Sessions table, then `## Watch` with the brief's Watch
+items (the same `watch()`, so resolved flags such as a retired `no_data`
+never show; "Nothing flagged." when empty), then a progress summary of at
+most five lines (three e1RM bests, the first naming `stats.E1RM_LABEL`;
+the core-complete streak labelled as the stricter count, "Core-complete
+streak (weeks with every core session trained): 2 weeks (longest 3
+weeks)", or "none yet" before any finished week counts; latest bodyweight
+with the same basis and sources as `progress.md`), then links
 (`this-week.md`, `progress.md`, latest record, `routine/program.md`,
 `check-ins/`, and the template's README on GitHub for "how this works").
 The Sessions table header is within the first 12 lines. The three bests
 are the program's exercises in session order, then any others by name.
+No flag count shows: the overlays keep every flag and its resolution for
+the coach.
+
+**Consistency** leads the dashboard: C41 `structure.adherence` read as
+of, with `until` the day before the brief's week, so it covers completed
+weeks only and the brief's week stays in the Sessions table. It reads
+"Consistency: 16 of 20 planned sessions trained in the last 4 completed
+ordinary weeks (14 Sep – 11 Oct)"; with fewer than four ordinary weeks,
+"… in 2 completed ordinary weeks (28 Sep – 11 Oct); a full count takes
+4"; with planned sessions none, "no planned session in …"; with no
+ordinary week, "no completed ordinary week yet, so there is nothing to
+count". It shows no percentage. The weeks adherence left out follow:
+"; left out: week of 21 Sep (illness)" for up to three, each with its
+kind in words (`planned break`, `light week`, `minimum week`, `one-off
+week`, `layoff`, `illness`), else their count by kind ("5 weeks (2
+illness, 3 layoff)"). The page only selects what leads: adherence,
+its thresholds and the streak keep their own definitions.
+
 "Last publish time" is the as-of time: `pages publish` renders the page
 just before it commits, so the two match, while a time read from git
 would make every publish stale its own dashboard.
@@ -5770,9 +5791,12 @@ proposal starts from and its unit (`Back Squat (Barbell), Session A:
 current training max 195 kg (program start 180 kg).`), read through
 `propose.training_maxes`: the stored state, a pending one once its
 overlay is approved, else the program's starting value; part sections
-(ladder state, priority lifts); core-complete streak (current, longest,
-and the last 12 weeks as ✔/✗, – for a week with no planned core
-session); bodyweight (part, else the C35 selected bodyweight series dated
+(ladder state, priority lifts); `## Consistency`: the dashboard's count
+as a sentence, then a table of every week adherence counted (`yes`) or
+left out (`left out: <kind>`), oldest first, with sessions trained of
+planned (– when none was planned); core-complete streak, first labelled
+the stricter count, then current, longest, and the last 12 weeks as
+✔/✗, – for a week with no planned core session; bodyweight (part, else the C35 selected bodyweight series dated
 by `as_of`, as weekly means of the last 12 weeks, then "Basis: <trend
 weight | scale weight> (<sources>); weekly means.", a fallback adding
 ", standing in for <other basis>, which covers under 14 days"; with no
@@ -5852,7 +5876,8 @@ instance; a caller that already holds that read passes it as `view`,
 which must be of the same `root` and `now`.
 
 **As-of reads** (C17, C18). `coach.history.workouts`, `annotations` and
-`all_exposures`, and `coach.stats.e1rm_series` and `adherence`, take
+`all_exposures`, `coach.stats.e1rm_series` and `adherence`, and
+`coach.structure.adherence`, take
 `as_of` (an aware datetime, default None = no bound): workouts started at
 or before it (a workout with no start time: dated on or before its local
 date), annotations created at or before it, and body weights dated on or
@@ -6217,7 +6242,7 @@ null`:
 
 ```python
 coach.structure.week(root, week_start) -> WeekReport     # week_start from coach.dates.week_span
-coach.structure.adherence(root, until=None) -> AdherenceReport
+coach.structure.adherence(root, until=None, *, as_of=None) -> AdherenceReport
 coach.structure.balance(root, program=None) -> BalanceReport
 coach.structure.planned_dose(root, sessions) -> dict[muscle, float]
 coach.structure.ordinary_weeks(root, until, n=4, reach=12) -> list[str]
@@ -6382,7 +6407,9 @@ static balance alone. The command only reads: it never adopts FILE.
 
 - Signatures: `week(root, week_start, *, today=None, now=None)` takes a
   date or a `Span` (the week holding it); `adherence`, `balance` and
-  `ordinary_weeks` take the same keyword `today` and `now`.
+  `ordinary_weeks` take the same keyword `today` and `now`; `adherence`
+  also takes `as_of`, which bounds its workouts and annotations as C38
+  describes, for the dashboard.
   `coach.structure.session_dose(library, session)` is the planned dose of
   one session in either shape (a program session's set groups count
   `count` sets each; an overlay lists each set), and `planned_dose` sums

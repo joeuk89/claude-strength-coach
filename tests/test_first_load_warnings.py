@@ -90,7 +90,8 @@ class RetireTest(FirstLoadCase):
         brief = self.run_coach("pages", "show", "brief")["text"]
         self.assertNotIn(LEFT_FOR_THE_COACH, brief)
         dashboard = self.run_coach("pages", "show", "dashboard")["text"]
-        self.assertIn("Open flags: none", dashboard)
+        self.assertIn("## Watch", dashboard.splitlines())
+        self.assertNotIn(LEFT_FOR_THE_COACH, dashboard)
 
     def test_a_retired_line_is_checked_like_any_other(self):
         self.propose()
