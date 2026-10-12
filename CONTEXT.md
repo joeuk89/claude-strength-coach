@@ -84,8 +84,9 @@ the load behind it.
 **Incomplete exposure**:
 An exposure that logged fewer working sets than its prescription asked
 for, with no logged set short of its reps. The sets may have been
-skipped for time, so the lift holds and no miss is counted; a set that
-was attempted and fell short is a miss.
+skipped for time, so no miss is counted and the lift holds, unless the
+misses already counted call for a reset; a set that was attempted and
+fell short is a miss.
 _Avoid_: partial session, skipped set (as a miss)
 
 **Validity window**:

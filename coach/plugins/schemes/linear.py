@@ -81,13 +81,18 @@ def propose(ctx):
             review = (base.flag(ctx, "linear_below_start",
                                 f"Linear reset to {base.load_words(ctx, new_load)} is below the program's "
                                 f"starting load {base.load_words(ctx, ctx.slot.start_load)}; review progression"),)
-        return base.Proposal(
-            sets=base.with_load(sets, new_load),
-            rationale=(f"Linear: prescribed reps missed {misses} exposures running, so the load resets to "
-                       f"{base.number(factor * 100)} % of {base.load_words(ctx, load)}"),
-            derived_from=source, state=state, round_down=True, flags=review,
-        )
-    if base.incomplete(source) and not base.missed(source):
+        resets = f"the load resets to {base.number(factor * 100)} % of {base.load_words(ctx, load)}"
+        rationale = f"Linear: prescribed reps missed {misses} exposures running, so {resets}"
+        if _incomplete(source):
+            logged = _sets_logged(source)
+            rationale = (f"Linear: {logged} and none fell short, so no miss is counted, but the {misses} misses "
+                         f"already counted mean {resets}")
+            review += (base.flag(ctx, "incomplete_exposure", (
+                f"{ctx.exercise.name}: {logged}, so no miss is counted, but the {misses} misses already counted "
+                "still reset the load (a coaching heuristic)")),)
+        return base.Proposal(sets=base.with_load(sets, new_load), rationale=rationale, derived_from=source,
+                             state=state, round_down=True, flags=review)
+    if _incomplete(source):
         return _incomplete_hold(ctx, sets, source, misses, state)
     if misses:
         return base.Proposal(
@@ -115,18 +120,25 @@ def _count_restarts(exposures, first, through, at_limit):
     return first.top_load < before
 
 
+def _incomplete(exposure):
+    return base.incomplete(exposure) and not base.missed(exposure)
+
+
+def _sets_logged(exposure):
+    logged, wanted = len(base.working(exposure.sets)), len(base.working(exposure.prescribed))
+    return f"{logged} of {wanted} prescribed working sets logged on {exposure.date.isoformat()}"
+
+
 def _incomplete_hold(ctx, sets, source, misses, state):
     load, limit = source.top_load, ctx.params["misses_before_reset"]
-    logged, wanted = len(base.working(source.sets)), len(base.working(source.prescribed))
-    when = source.date.isoformat()
+    logged = _sets_logged(source)
     standing = f"; miss {misses} of {limit} stands" if misses else ""
     flag = base.flag(ctx, "incomplete_exposure", (
-        f"{ctx.exercise.name}: {logged} of {wanted} prescribed working sets logged on {when}, so the load holds and "
-        "no miss is counted (a coaching heuristic); confirm whether the missing sets were skipped or failed"))
+        f"{ctx.exercise.name}: {logged}, so the load holds and no miss is counted (a coaching heuristic); confirm "
+        "whether the missing sets were skipped or failed"))
     return base.Proposal(
         sets=base.with_load(sets, load),
-        rationale=(f"Linear: {logged} of {wanted} prescribed working sets logged on {when} and none fell short, so "
-                   f"{base.load_words(ctx, load)} holds{standing}"),
+        rationale=f"Linear: {logged} and none fell short, so {base.load_words(ctx, load)} holds{standing}",
         derived_from=source, state=state, flags=(flag,),
     )
 

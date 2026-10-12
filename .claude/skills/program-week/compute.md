@@ -92,11 +92,12 @@ and the rotation position, and settle its flags:
   session stayed: agree whether to ease or move it, then resolve the
   flag (step 4).
 - `incomplete_exposure` (fewer sets logged than prescribed, none short):
-  the load holds and no miss counts. Ask whether the missing sets were
-  skipped or failed. A failed set is a miss: when it reaches the line's
-  `misses_before_reset`, override the line to the reset load (step 3);
-  below it the load holds and nothing records the miss, so name it at the
-  next check-in.
+  no miss counts. If the misses already counted reach the line's
+  `misses_before_reset`, the line resets anyway and needs no question.
+  Otherwise the load holds: ask whether the missing sets were skipped or
+  failed. A failed set is a miss: when it reaches `misses_before_reset`,
+  override the line to the reset load (step 3); below it the load holds
+  and nothing records the miss, so name it at the next check-in.
 - `no_data` (set the first load with the athlete), `stalled`,
   `constraint_applied`, `override_standing`, `scheme_reset`,
   `rotation_unconfirmed` (state the position for confirmation, as

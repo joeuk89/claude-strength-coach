@@ -152,6 +152,30 @@ class LinearResetStateTest(unittest.TestCase):
         self.assertEqual({load for load, _ in loads_and_reps(climbed)}, {107.5})
         self.assertEqual(climbed.state, {"misses": 0, "through": "2026-10-12"})
 
+    def test_an_incomplete_exposure_under_a_kept_reset_still_resets_and_raises_the_flag(self):
+        kept_reset = {"misses": 2, "through": "2026-10-05"}
+        miss = prescribed(date(2026, 10, 5), (5, 5, 5), load=105)
+        ignored_and_short = prescribed(date(2026, 10, 12), (8, 8), load=94.5, logged=105)
+        first = linear([ignored_and_short, miss], limit=2, state=kept_reset)
+        again = linear([ignored_and_short, miss], limit=2, state=first.state)
+        for proposal in (first, again):
+            self.assertEqual({load for load, _ in loads_and_reps(proposal)}, {94.5})
+            self.assertEqual(proposal.state, {"misses": 2, "through": "2026-10-12"})
+            self.assertIn("2 of 3 prescribed working sets logged on 2026-10-12", proposal.rationale)
+            self.assertIn("no miss is counted", proposal.rationale)
+            self.assertIn("2 misses already counted", proposal.rationale)
+            self.assertNotIn("missed 2 exposures running", proposal.rationale)
+            [flag] = [f for f in proposal.flags if f["code"] == "incomplete_exposure"]
+            self.assertIn("still reset the load", flag["message"])
+
+    def test_misses_then_an_incomplete_exposure_judged_together_still_reset_with_the_flag(self):
+        misses = [prescribed(date(2026, 10, day), (8, 8, 6)) for day in (8, 5)]
+        short = prescribed(date(2026, 10, 12), (8, 8))
+        proposal = linear([short, *misses], limit=2)
+        self.assertEqual({load for load, _ in loads_and_reps(proposal)}, {90})
+        self.assertEqual(proposal.state["misses"], 2)
+        self.assertIn("incomplete_exposure", [f["code"] for f in proposal.flags])
+
     def test_any_lower_load_trained_after_a_running_count_starts_a_new_count(self):
         running = {"misses": 1, "through": "2026-10-05"}
         miss = prescribed(date(2026, 10, 5), (8, 8, 6))
@@ -169,6 +193,16 @@ class LinearResetStateTest(unittest.TestCase):
         held = linear([missed_at_reset], limit=2, state={"misses": 2, "through": "2026-10-05"})
         self.assertEqual({load for load, _ in loads_and_reps(held)}, {94.5})
         self.assertEqual(held.state, {"misses": 1, "through": "2026-10-12"})
+
+    def test_a_running_count_with_an_unknown_load_runs_on(self):
+        running = {"misses": 1, "through": "2026-10-05"}
+        miss = prescribed(date(2026, 10, 12), (8, 8, 6))
+        without_through = linear([miss], limit=2, state=running)
+        self.assertEqual({load for load, _ in loads_and_reps(without_through)}, {90})
+        self.assertEqual(without_through.state, {"misses": 2, "through": "2026-10-12"})
+        unloaded = replace(miss, sets=tuple(replace(s, load=None) for s in miss.sets))
+        no_load = linear([unloaded, prescribed(date(2026, 10, 5), (8, 8, 6))], limit=2, state=running)
+        self.assertEqual(no_load.state, {"misses": 2, "through": "2026-10-12"})
 
     def test_misses_judged_together_with_no_reset_between_them_still_reset(self):
         misses = [prescribed(date(2026, 10, day), (8, 8, 6)) for day in (12, 8, 5)]
@@ -385,7 +419,8 @@ class ComputeGuidanceTest(unittest.TestCase):
     def test_program_week_settles_incomplete_exposures_ladder_overrides_and_refused_finalizes(self):
         compute = flat(step_text("program-week", "compute.md"))
         for phrase in ("`incomplete_exposure`", "skipped or failed", "`misses_before_reset`",
-                       "moves the ladder to that rung", "A refused finalize writes nothing"):
+                       "resets anyway and needs no question", "moves the ladder to that rung",
+                       "A refused finalize writes nothing"):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, compute)
 

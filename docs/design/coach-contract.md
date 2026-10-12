@@ -2354,7 +2354,7 @@ Reserved codes:
 | `no_data` | warn | R-23a | | No usable exposure and no start load; load left empty for the coach. |
 | `stalled` | warn | R-23a | | No metric or matched-work effort gain over three comparable slot exposures; a coaching heuristic, not a diagnosis. Suppressed when the final proposal advances load. |
 | `prescription_unknown` | warn | R-23a | | Historical prescription unknown; no prescribed hit or miss inferred. Prescription validation still runs. |
-| `incomplete_exposure` | warn | R-23a | | Fewer working sets logged than prescribed and none fell short: linear holds the load and counts no miss (a coaching heuristic); confirm whether the sets were skipped or failed. |
+| `incomplete_exposure` | warn | R-23a | | Fewer working sets logged than prescribed and none fell short: linear counts no miss and holds the load, or still resets it when the misses already counted reach the limit (a coaching heuristic); below the limit, confirm whether the sets were skipped or failed. |
 | `linear_below_start` | info | R-23a | | Linear reset fell below the starting load; review progression without automatic adjustment. |
 | `rpe_drift` | warn | R-23a | | Compound or recovery-capped exercise: logged RPE at least 1 over target on two or more working sets of the last exposure. |
 | `range_effort_mismatch` | warn | R-23a | | Double progression held a load whose derived-from exposure had a working set below its set group's rep range or 2 or more RPE over target; review a lighter load or a different rep range. |
@@ -2763,13 +2763,16 @@ and `plugins test` runs them. Loaded with
   old load, or a running count that a lowered limit reaches, still
   resets. The comparison is numeric, as the reset multiplies the load.
   When either load is unknown, a count at the limit starts a new count
-  and a lower one runs on. Before new training, a changed `misses_before_reset` re-reads the
-  stored count: a kept reset under a raised limit proposes a hold.
+  and a lower one runs on. Before new training, a changed
+  `misses_before_reset` re-reads the stored count: a kept reset under a
+  raised limit proposes a hold.
   A stored count of 0 whose `through` is a missed newest exposure,
   written by older versions after a reset, counts as a kept reset.
-  An incomplete exposure with no short set holds the load, leaves the
-  count alone and raises `incomplete_exposure`, a coaching heuristic;
-  an attempted short set is a miss.
+  An incomplete exposure with no short set leaves the count alone and
+  raises `incomplete_exposure`, a coaching heuristic; an attempted short
+  set is a miss. Below the limit the load holds. A count already at the
+  limit still resets the load, and the rationale names the misses
+  already counted, not a miss on the incomplete exposure.
 - `last_prescription` is `{overlay_id, session_id, date, exercise_id,
   load_mode, sets, override}` with `sets` as `base.SetSpec`s.
 - A scheme may define `LOAD_MODES`, a tuple of the load modes it can
