@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "niggles": [
     {
       "id": "n-0001",
@@ -16,7 +16,7 @@
           "run"
         ]
       },
-      "constraints": [],
+      "standing": [],
       "constrain_while": [
         "aggravated",
         "watching"
@@ -25,7 +25,8 @@
         {
           "date": "2026-10-11",
           "status": "watching",
-          "note": "sore after long runs"
+          "note": "sore after long runs",
+          "flare_constraints": null
         }
       ]
     }

@@ -39,7 +39,12 @@ register("return_after_illness", owner=OWNER, severities=("block",),
 register("ill_day_excluded", owner=OWNER, severities=("info",),
          summary="An ill status day covers the session's date, so the proposal leaves the session out.")
 register("constraint_applied", owner=OWNER, severities=("info",),
-         summary="A cap, a slot constraint or a niggle constraint changed the proposal.")
+         summary="A cap, a slot constraint, a niggle constraint or an RPE ceiling the e1RM model turns into a load "
+                 "limit changed the proposal.")
+register("rpe_ceiling_unchecked", owner=OWNER, severities=("warn",),
+         summary="A line's RPE ceiling (a recovery cap, the illness cap, a return band or a light week) cannot be "
+                 "checked against an e1RM the model accepts, or the kit makes no load under it: the load holds at the "
+                 "derived-from load or the kit's lightest, and the coach reviews it with the athlete.")
 register("override_standing", owner=OWNER, severities=("info",),
          summary="A standing override was applied again instead of the scheme's proposal.")
 register("override_kept", owner=OWNER, severities=("info",),

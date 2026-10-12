@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "niggles": [
     {
       "id": "n-0001",
@@ -10,11 +10,12 @@
       "status": "watching",
       "notes": null,
       "applies_to": {"patterns": ["squatt"], "exercises": ["no_such_exercise"], "activity_kinds": []},
-      "constraints": [{"kind": "rpe_cap", "value": 7, "reason": "synthetic left knee"}],
+      "standing": [{"from": "2026-09-14", "constraints": [{"kind": "rpe_cap", "value": 7, "reason": "synthetic left knee"}],
+                    "confirm": null}],
       "constrain_while": ["aggravated", "watching"],
       "history": [
-        {"date": "2026-09-14", "status": "watching", "note": null},
-        {"date": "2026-10-11", "status": "watching", "note": null}
+        {"date": "2026-09-14", "status": "watching", "note": null, "flare_constraints": null},
+        {"date": "2026-10-11", "status": "watching", "note": null, "flare_constraints": null}
       ]
     }
   ]

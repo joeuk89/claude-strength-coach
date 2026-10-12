@@ -1,11 +1,14 @@
 """Niggles: aches worth watching, the movements they affect and the load limits they set (contract C26, C27).
 
 `data/niggles.json` replaces the profile's niggle log. Rows are never
-deleted, because a recurrence is the signal. While a row's status is one
-of its `constrain_while` statuses, or always for a `chronic` row, its
-constraints apply to every program line whose exercise it names or whose
-movement pattern it covers. Nothing here diagnoses: escalation only
-recommends a qualified professional.
+deleted, because a recurrence is the signal. A row's limits are dated, so
+a past date reads the limits in force then. Its standing limits apply
+while its status is one of its `constrain_while` statuses, or always for
+a `chronic` row. A flare's limits are temporary: they hold for the run of
+history entries with the status they were set under, and the standing
+limits are what remains when it ends. Both apply to every program line
+whose exercise the row names or whose movement pattern it covers. Nothing
+here diagnoses: escalation only recommends a qualified professional.
 """
 
 import re
@@ -101,11 +104,21 @@ def problems(doc, library):
             if kind not in records.KINDS:
                 errors.append(Error(f"{path}.applies_to.activity_kinds[{number}]",
                                     f"{kind} is not an activity kind; valid: {', '.join(records.KINDS)}"))
-        for number, constraint in enumerate(row["constraints"]):
-            errors += _constraint_problems(constraint, f"{path}.constraints[{number}]")
+        standing = row["standing"]
+        for number, version in enumerate(standing):
+            for index_c, constraint in enumerate(version["constraints"]):
+                errors += _constraint_problems(constraint, f"{path}.standing[{number}].constraints[{index_c}]")
+            if number and version["from"] <= standing[number - 1]["from"]:
+                errors.append(Error(f"{path}.standing[{number}].from", "standing versions are in date order, one "
+                                                                       "per date"))
         history = row["history"]
-        for number in range(1, len(history)):
-            if history[number]["date"] < history[number - 1]["date"]:
+        for number, entry in enumerate(history):
+            for index_c, constraint in enumerate(entry["flare_constraints"] or []):
+                errors += _constraint_problems(constraint, f"{path}.history[{number}].flare_constraints[{index_c}]")
+            if entry["status"] == "resolved" and entry["flare_constraints"]:
+                errors.append(Error(f"{path}.history[{number}].flare_constraints", "a resolved entry sets no flare "
+                                                                                   "limits"))
+            if number and entry["date"] < history[number - 1]["date"]:
                 errors.append(Error(f"{path}.history[{number}].date", "history is in date order"))
         if history[-1]["status"] != row["status"]:
             errors.append(Error(f"{path}.status", f"status {row['status']} does not match the newest history "
@@ -191,27 +204,56 @@ def _note(text):
     return text.strip() if text and text.strip() else None
 
 
+def _check_flare(niggle_id, status, flare):
+    if flare and status == "resolved":
+        raise ValidationError(f"Niggle {niggle_id} is resolved, so it takes no flare limits; give them with the "
+                              "status the flare has, e.g. --status aggravated")
+
+
 def add(doc, area, on, status="watching", patterns=(), exercises=(), activity_kinds=(), constraints=(),
-        constrain_while=DEFAULT_CONSTRAIN_WHILE, note=None, notes=None):
-    """(doc with a new row, the row). The caller has checked patterns, exercise ids and kinds."""
+        constrain_while=DEFAULT_CONSTRAIN_WHILE, note=None, notes=None, flare=None):
+    """(doc with a new row, the row). `constraints` are its standing limits and `flare` a flare's limits, from `on`.
+
+    The caller has checked patterns, exercise ids and kinds.
+    """
     day = on.isoformat()
-    row = {"id": next_id(doc), "area": area.strip(), "first_noted": day, "last_noted": day, "mentions": 1,
+    niggle_id = next_id(doc)
+    _check_flare(niggle_id, status, flare)
+    row = {"id": niggle_id, "area": area.strip(), "first_noted": day, "last_noted": day, "mentions": 1,
            "status": status, "notes": _note(notes),
            "applies_to": {"patterns": list(patterns), "exercises": list(exercises),
                           "activity_kinds": list(activity_kinds)},
-           "constraints": list(constraints), "constrain_while": list(constrain_while),
-           "history": [{"date": day, "status": status, "note": _note(note)}]}
+           "standing": [{"from": day, "constraints": list(constraints), "confirm": None}] if constraints else [],
+           "constrain_while": list(constrain_while),
+           "history": [{"date": day, "status": status, "note": _note(note),
+                        "flare_constraints": list(flare) if flare is not None else None}]}
     return dict(doc, niggles=doc["niggles"] + [row]), row
 
 
-def update(doc, niggle_id, on, status=None, note=None, mention=False, **fields):
+def _standing_from(row, day, constraints):
+    """The row's standing versions with `constraints` in force from `day`; a second change that day replaces it."""
+    versions = list(row["standing"])
+    if versions and day < versions[-1]["from"]:
+        raise ValidationError(f"Niggle {row['id']} has standing limits set after {day}")
+    version = {"from": day, "constraints": list(constraints), "confirm": None}
+    if versions and versions[-1]["from"] == day:
+        versions[-1] = version
+    elif constraints or versions:
+        versions.append(version)
+    return versions
+
+
+def update(doc, niggle_id, on, status=None, note=None, mention=False, flare=None, **fields):
     """(doc, row) after a check-in report and any field changes.
 
-    A status, a note or a mention adds a history entry dated `on`; a second
-    report the same day replaces that day's entry, so history holds one
-    entry per check-in. A mention counts once per day. `fields` replaces
-    `area`, `notes`, `patterns`, `exercises`, `activity_kinds`,
-    `constraints` or `constrain_while` when given (not None).
+    A status, a note, a mention or flare limits add a history entry dated
+    `on`; a second report the same day replaces that day's entry, so
+    history holds one entry per check-in. A mention counts once per day.
+    `flare` (a list, [] to end them) sets the flare limits from `on`; a
+    same-day entry keeps its flare limits only while its status holds.
+    `constraints` sets the standing limits from `on`. `fields` replaces
+    `area`, `notes`, `patterns`, `exercises`, `activity_kinds` or
+    `constrain_while` when given (not None).
     """
     row = dict(_find(doc, niggle_id))
     day = on.isoformat()
@@ -220,25 +262,30 @@ def update(doc, niggle_id, on, status=None, note=None, mention=False, **fields):
         if fields.get(key) is not None:
             applies[key] = list(fields[key])
     row["applies_to"] = applies
-    for key in ("constraints", "constrain_while"):
-        if fields.get(key) is not None:
-            row[key] = list(fields[key])
+    if fields.get("constrain_while") is not None:
+        row["constrain_while"] = list(fields["constrain_while"])
+    if fields.get("constraints") is not None:
+        row["standing"] = _standing_from(row, day, fields["constraints"])
     if fields.get("area") is not None:
         row["area"] = fields["area"].strip()
     if fields.get("notes") is not None:
         row["notes"] = _note(fields["notes"])
-    if status is not None or note is not None or mention:
+    if status is not None or note is not None or mention or flare is not None:
         if day < row["history"][-1]["date"]:
             raise ValidationError(f"Niggle {niggle_id} has a history entry after {day}")
+        _check_flare(niggle_id, status or row["status"], flare)
         if mention and row["last_noted"] != day:
             row["mentions"] += 1
         if mention:
             row["last_noted"] = max(row["last_noted"], day)
         row["status"] = status or row["status"]
         history = list(row["history"])
-        entry = {"date": day, "status": row["status"], "note": _note(note)}
+        entry = {"date": day, "status": row["status"], "note": _note(note),
+                 "flare_constraints": list(flare) if flare is not None else None}
         if history[-1]["date"] == day:
             entry["note"] = entry["note"] or history[-1]["note"]
+            if flare is None and history[-1]["status"] == entry["status"]:
+                entry["flare_constraints"] = history[-1]["flare_constraints"]
             history[-1] = entry
         else:
             history.append(entry)
@@ -257,10 +304,50 @@ def status_on(row, on_date):
     return found[-1]["status"] if found else None
 
 
+def _day_text(on_date):
+    return on_date.isoformat() if hasattr(on_date, "isoformat") else on_date
+
+
 def constraints_active(row, on_date):
-    """True when the row's constraints are in force on the date: always while chronic, else per constrain_while."""
+    """True when the row's status puts its standing limits in force on the date: always while chronic, else per
+    constrain_while."""
     status = status_on(row, on_date)
     return status == "chronic" or (status is not None and status in row["constrain_while"])
+
+
+def standing_on(row, on_date):
+    """The row's standing version in force on a date ({from, constraints, confirm}), or None."""
+    day = _day_text(on_date)
+    found = [version for version in row["standing"] if version["from"] <= day]
+    return found[-1] if found else None
+
+
+def flare_on(row, on_date):
+    """(flare limits, the date they were set) on a date: the newest set within the run of history entries sharing
+    the status in force that day; ([], None) when there are none."""
+    day = _day_text(on_date)
+    found = [entry for entry in row["history"] if entry["date"] <= day]
+    if not found or found[-1]["status"] == "resolved":
+        return [], None
+    status = found[-1]["status"]
+    for entry in reversed(found):
+        if entry["status"] != status:
+            break
+        if entry["flare_constraints"] is not None:
+            return list(entry["flare_constraints"]), entry["date"]
+    return [], None
+
+
+def constraints_on(row, on_date):
+    """Every limit the row puts in force on a date, each {kind, value, reason, source, scope, since}: its standing
+    limits while its status applies them, and its flare's limits."""
+    found = []
+    version = standing_on(row, on_date)
+    if version is not None and constraints_active(row, on_date):
+        found += [dict(c, source=row["id"], scope="standing", since=version["from"]) for c in version["constraints"]]
+    flare, since = flare_on(row, on_date)
+    found += [dict(c, source=row["id"], scope="flare", since=since) for c in flare]
+    return found
 
 
 def matches(row, entry):
@@ -270,10 +357,18 @@ def matches(row, entry):
 
 
 def active_constraints(doc, entry, on_date):
-    """The niggle constraints in force for one library entry on a date, each {kind, value, reason, source}."""
-    return [dict(constraint, source=row["id"]) for row in doc["niggles"]
-            if row["constraints"] and constraints_active(row, on_date) and matches(row, entry)
-            for constraint in row["constraints"]]
+    """The niggle limits in force for one library entry on a date, each {kind, value, reason, source, scope, since}.
+
+    Every source is kept; the proposal pipeline applies the strictest.
+    """
+    return [constraint for row in doc["niggles"] if matches(row, entry) for constraint in constraints_on(row, on_date)]
+
+
+def unconfirmed(row, on_date):
+    """The standing version's question for the coach when a migration could not tell standing limits from a
+    flare's, else None."""
+    version = standing_on(row, on_date)
+    return version["confirm"] if version else None
 
 
 def escalation(row):
@@ -382,13 +477,14 @@ def _imported(cells, number, errors):
     notes = None if cells["notes"].lower() in _EMPTY_CELLS else cells["notes"]
     return {"area": area, "first_noted": parsed["first noted"], "last_noted": parsed["last noted"],
             "mentions": mentions, "status": status, "notes": notes,
-            "history": [{"date": parsed["last noted"], "status": status, "note": IMPORT_NOTE}]}
+            "history": [{"date": parsed["last noted"], "status": status, "note": IMPORT_NOTE,
+                         "flare_constraints": None}]}
 
 
 def import_profile(doc, text, today, chronic=()):
     """(doc with the imported rows, rows, numbered section lines) from profile.md's text.
 
-    Each niggle log row becomes a row with no constraints. Each section line
+    Each niggle log row becomes a row with no limits. Each section line
     whose number is in `chronic` becomes a `chronic` row with nothing in
     `applies_to`, for the coach to fill; the other lines are not imported.
     """
@@ -412,13 +508,14 @@ def import_profile(doc, text, today, chronic=()):
     for index in sorted(set(chronic)):
         found.append({"area": lines[index - 1], "first_noted": day, "last_noted": day, "mentions": 1,
                       "status": "chronic", "notes": None,
-                      "history": [{"date": day, "status": "chronic", "note": f"{IMPORT_NOTE} Injuries / limitations"}]})
+                      "history": [{"date": day, "status": "chronic", "note": f"{IMPORT_NOTE} Injuries / limitations",
+                                   "flare_constraints": None}]})
     rows = []
     for row in found:
         row = dict({"id": next_id(doc)}, **row, applies_to={"patterns": [], "exercises": [], "activity_kinds": []},
-                   constraints=[], constrain_while=list(DEFAULT_CONSTRAIN_WHILE))
+                   standing=[], constrain_while=list(DEFAULT_CONSTRAIN_WHILE))
         row = {key: row[key] for key in ("id", "area", "first_noted", "last_noted", "mentions", "status", "notes",
-                                         "applies_to", "constraints", "constrain_while", "history")}
+                                         "applies_to", "standing", "constrain_while", "history")}
         doc = dict(doc, niggles=doc["niggles"] + [row])
         rows.append(row)
     return doc, rows, numbered
