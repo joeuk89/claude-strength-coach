@@ -10,16 +10,17 @@ from coach.library import Library, template_resolution
 
 def template_requirements(root, doc):
     lib = Library.load(root)
-    cache = HevyCache(root)
-    templates = cache.exercise_templates()
-    pull_first = "" if cache.read("exercise_templates") is not None else "python3 -m coach hevy pull; then "
+    cached = HevyCache(root).read_if_valid("exercise_templates")
+    templates = cached["data"] if cached else []
+    pull_first = "" if cached else "python3 -m coach hevy pull; then "
+    owners = lib.template_owners()
     found = []
     for session in doc["sessions"]:
         for line in session["exercises"]:
             if line.get("hevy_template_id"):
                 continue
             entry = lib.get(line["exercise_id"])
-            resolution = template_resolution(entry, templates, lib.template_owners())
+            resolution = template_resolution(entry, templates, owners)
             found.append({"session_id": session["session_id"], "exercise_id": line["exercise_id"],
                           **resolution, "repair": f"{pull_first}python3 -m coach library set-template "
                           f"{line['exercise_id']} ID; then rebuild the proposal/overlay so it carries "
@@ -32,7 +33,7 @@ def hevy_requirements(root, doc, enabled=True):
 
     if not enabled:
         return {"enabled": False, "ready": True, "templates": [], "sessions": []}
-    sessions = [{"session_id": s["session_id"], "title": s["title"], "action": "create_or_reuse"}
+    sessions = [{"session_id": s["session_id"], "title": s["title"]}
                 for s, rid in zip(doc["sessions"], session_routines(root, doc)) if not rid]
     templates = template_requirements(root, doc)
     return {"enabled": True, "ready": not templates, "templates": templates, "sessions": sessions}

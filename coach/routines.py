@@ -805,8 +805,9 @@ def _require_program_sessions(root, doc, sessions):
 
 
 def _spare_temporary(root, doc, today, hevy, ids):
-    """Temporary routines free to reuse, in state.json order: none that carries a coming session elsewhere."""
-    busy = set(ids) | _carrying(root, doc, today)
+    """Temporary routines free to reuse, in state.json order: none a program session maps, and none that
+    carries a coming session elsewhere."""
+    busy = set(ids) | set(hevy["routines"]) | _carrying(root, doc, today)
     return [entry["routine_id"] for entry in hevy["temporary_routines"] if entry["routine_id"] not in busy]
 
 
@@ -839,7 +840,6 @@ def _record(hevy, doc, session, routine_id):
         hevy["temporary_routines"] = [e for e in hevy["temporary_routines"] if e["routine_id"] != routine_id]
         hevy["routines"][routine_id] = {"session_id": session["session_id"]}
         return
-    hevy["routines"].pop(routine_id, None)
     carrier = {"routine_id": routine_id, "overlay_id": doc["id"], "session_id": session["session_id"]}
     for position, entry in enumerate(hevy["temporary_routines"]):
         if entry["routine_id"] == routine_id:

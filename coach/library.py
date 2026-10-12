@@ -110,7 +110,8 @@ class Library:
         from coach.hevy.cache import HevyCache
 
         lib = cls(jsonio.read_doc(path, "exercise_library") if path.exists() else None, path)
-        lib.resolve_templates(HevyCache(root).exercise_templates())
+        cached = HevyCache(root).read_if_valid("exercise_templates")
+        lib.resolve_templates(cached["data"] if cached else [])
         return lib
 
     def resolve_templates(self, templates):
@@ -481,8 +482,9 @@ def seed(lib, routines, templates):
     """
     by_id = {item.get("id"): item for item in templates or []}
     doc = copy.deepcopy(lib.instance)
+    owners = lib.template_owners()
     for entry in lib.entries():
-        resolution = template_resolution(entry, templates or [], lib.template_owners())
+        resolution = template_resolution(entry, templates or [], owners)
         if resolution["status"] in ("mapped", "matched") and not doc["exercises"].get(entry["id"], {}).get("hevy_template_id"):
             doc["exercises"].setdefault(entry["id"], {})["hevy_template_id"] = resolution["template_id"]
     proposals, guessed = [], []
@@ -503,13 +505,8 @@ def seed(lib, routines, templates):
             guessed.append(f"{new_id}: pattern and muscles were guessed from Hevy's template for {title!r}; "
                            f"check them with python3 -m coach library show {new_id}")
         else:
-            entry = current.get(proposal["matched_id"])
-            resolution = template_resolution(entry, templates or [], current.template_owners())
-            if proposal["matched_by"] != "template_id" and resolution["status"] == "ambiguous":
-                proposal.update(action="unresolved", candidates=resolution["candidates"])
-                proposals.append(proposal)
-                continue
-            proposal["action"] = _record(exercises, entry, template_id, proposal)
+            # The athlete's own routine names this template, so it settles a title shared by several.
+            proposal["action"] = _record(exercises, current.get(proposal["matched_id"]), template_id, proposal)
         proposals.append(proposal)
     Library(doc, lib.path)
     return proposals, doc, guessed

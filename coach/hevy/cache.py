@@ -55,6 +55,13 @@ class HevyCache:
         path = self.path(f"{name}.json")
         return jsonio.read_doc(path, FILE_SCHEMA) if path.is_file() else None
 
+    def read_if_valid(self, name):
+        """Like read, but None for an unreadable file too, for callers that work without the cache."""
+        try:
+            return self.read(name)
+        except (ValidationError, OSError):
+            return None
+
     def _data(self, name):
         doc = self.read(name)
         return doc["data"] if doc else []

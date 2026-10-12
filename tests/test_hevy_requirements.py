@@ -5,16 +5,19 @@ import json
 import unittest
 from unittest import mock
 
-from coach import external, jsonio, library, program_drafts, state
+from coach import external, jsonio, library, program_drafts, routines, state
 from coach.hevy.cache import HevyCache
 from coach.library import Library
+from tests.support import VALID
 from tests.test_library import CliMixin, Instance, read_library, write_library
 from tests.test_library_seed import template
-from tests.test_program_drafts import AdoptCase, SYNTHETIC, init_repo, snapshot
+from tests.test_program_drafts import (NOW, SYNTHETIC, AdoptCase, ImportCase, exercise, hevy_exercise, hevy_set,
+                                       init_repo, routine, snapshot)
 from tests.test_routines import ENV, R1, R2, WEEKLY, read_overlay, write_overlay
 from tests.test_routines_create import (CREATE, ONE_OFF, T1, T2, CreateCase, GateMixin, OneOffCase, read_state,
                                         write_state)
 from tests.test_starters import Case as StarterCase
+from tests.test_starters import cli as starter_cli
 
 
 class TemplateCacheTest(CliMixin, unittest.TestCase):
@@ -37,6 +40,8 @@ class TemplateCacheTest(CliMixin, unittest.TestCase):
             entry = Library.load(root).get("machine_pec_deck")
             self.assertIsNone(entry["hevy_template_id"])
             self.assertEqual(library.template_resolution(entry, items)["status"], "ambiguous")
+            self.run_ok(root, "library", "seed")
+            self.assertIsNone(read_library(root)["exercises"].get("machine_pec_deck", {}).get("hevy_template_id"))
             self.run_ok(root, "library", "set-template", "machine_pec_deck", "P2")
             self.cache(root, list(reversed(items)))
             self.run_ok(root, "library", "seed")
@@ -83,12 +88,49 @@ class TemplateCacheTest(CliMixin, unittest.TestCase):
             self.assertIn("already belongs to db_curl", envelope["error"]["message"])
             self.assertEqual(snapshot(root), before)
 
+    def test_an_unreadable_template_cache_does_not_stop_local_commands_with_hevy_off(self):
+        with Instance(VALID) as root:
+            config = root / "config.toml"
+            config.write_text(config.read_text().replace("[hevy]\nenabled = true", "[hevy]\nenabled = false"))
+            path = HevyCache(root).path("exercise_templates.json")
+            path.parent.mkdir(parents=True, exist_ok=True)
+            newer = json.dumps({"schema_version": 99, "fetched_at": "2026-10-11T18:00:00Z", "source": "hevy",
+                                "data": []})
+            for name, text in (("newer schema", newer), ("corrupt", "{not json")):
+                path.write_text(text, encoding="utf-8")
+                with self.subTest(name):
+                    self.run_ok(root, "library", "show", "db_bench_press")
+                    self.run_ok(root, "library", "list")
+                    self.run_ok(root, "program", "validate")
+                    self.run_ok(root, "program", "render", "--dry-run")
+
     def test_multiple_verified_ids_without_primary_require_choice_even_with_one_cached(self):
         entry = Library({"schema_version": 1, "exercises": {
             "db_bench_press": {"hevy_template_ids": ["B1", "B2"]}}}).get("db_bench_press")
         result = library.template_resolution(entry, [template("Bench Press (Dumbbell)", tid="B1")])
         self.assertEqual(result["status"], "ambiguous")
         self.assertIsNone(result["template_id"])
+
+
+class SeedSameTitleTest(ImportCase):
+    def test_the_routine_template_settles_two_same_title_templates_through_seed_confirm_and_import(self):
+        root = self.instance()
+        HevyCache(root).write_collection("exercise_templates", [
+            template("Butterfly (Pec Deck)", equipment="machine", tid=tid) for tid in ("P1", "P2")], NOW)
+        self.cached([routine("Push", [hevy_exercise("P1", "Butterfly (Pec Deck)", [hevy_set(40, reps=12)])])], root)
+        code, envelope, stderr = self.cli(root, "library", "seed")
+        self.assertEqual(code, 0, (envelope, stderr))
+        pec = next(p for p in envelope["data"]["proposals"] if p["hevy_template_id"] == "P1")
+        self.assertEqual((pec["matched_id"], pec["action"]), ("machine_pec_deck", "created"))
+        own = read_library(root)["exercises"]["machine_pec_deck"]
+        self.assertEqual((own["hevy_template_id"], own["load_mode_proposed"]), ("P1", "total"))
+        code, envelope, stderr = self.cli(root, "library", "confirm", "machine_pec_deck")
+        self.assertEqual(code, 0, (envelope, stderr))
+        code, envelope, stderr = self.cli(root, "program", "import-hevy", "--dry-run")
+        self.assertEqual(code, 0, (envelope, stderr))
+        session = envelope["data"]["draft"]["program"]["sessions"][0]["id"]
+        pec = exercise(envelope["data"]["draft"], session, "machine_pec_deck")
+        self.assertEqual((pec["load_mode"], pec["start_load"]), ("total", 40))
 
 
 class RequirementsTest(CreateCase):
@@ -245,6 +287,29 @@ class StarterRequirementsTest(StarterCase):
         self.assertTrue(all("hevy pull" in f["message"] for f in unresolved))
         self.assertIn("hevy_routine_unmapped", {f["code"] for f in doc["flags"]})
 
+    def test_a_missing_template_cache_names_hevy_pull_in_the_overlay_consistency_check(self):
+        root, _ = self.adopted("full-body-3")
+        doc = self.ok(root, "propose", "week", "--week", "2026-W42")["overlay"]
+        self.ok(root, "propose", "finalize", "--proposal", doc["id"])
+        HevyCache(root).path("exercise_templates.json").unlink()
+        code, envelope, stderr = starter_cli(root, "check", "--only", "overlay_library_consistency")
+        failing = [r for r in envelope["data"]["results"] if r["status"] == "fail"]
+        self.assertTrue(failing, (envelope, stderr))
+        self.assertTrue(all("hevy pull" in r["message"] for r in failing))
+
+    def test_an_unreadable_template_cache_asks_for_a_pull_instead_of_failing_the_proposal(self):
+        root, _ = self.adopted("full-body-3")
+        HevyCache(root).path("exercise_templates.json").write_text("{not json", encoding="utf-8")
+        own = read_library(root)["exercises"]
+        for entry in own.values():
+            entry.pop("hevy_template_id", None)
+            entry.pop("hevy_template_ids", None)
+        write_library(root, own)
+        doc = self.ok(root, "propose", "week", "--week", "2026-W42", "--dry-run")["overlay"]
+        unresolved = [f for f in doc["flags"] if f["code"] == "hevy_template_unresolved"]
+        self.assertTrue(unresolved)
+        self.assertTrue(all("hevy pull" in f["message"] for f in unresolved))
+
 
 class TemporaryPlanTest(OneOffCase):
     def test_a_changed_spare_cannot_replace_the_reviewed_action(self):
@@ -357,6 +422,15 @@ class PlanGateTest(GateMixin, RedesignCase):
         self.assertEqual(self.decide(f"{retire} --expect-plan {preview['plan_hash']}")["permissionDecision"], "ask")
         self.assertEqual(self.fake.writes, [])
 
+    def test_an_orphan_retire_on_an_unapproved_overlay_is_denied_even_with_the_hash(self):
+        self.redesign()
+        self.edit_overlay(lambda doc: None, approve=False)
+        retire = f"python3 -m coach routines retire --overlay {WEEKLY} --routine {R1}"
+        preview = self.cli("routines", "retire", "--overlay", WEEKLY, "--routine", R1, "--dry-run")["data"]
+        decision = self.decide(f"{retire} --expect-plan {preview['plan_hash']}")
+        self.assertEqual(decision["permissionDecision"], "deny")
+        self.assertIn("not approved", decision["permissionDecisionReason"])
+
     def test_a_retire_with_nothing_to_retire_needs_no_hash_in_the_cli_or_the_gate(self):
         ended = dict(ENV, COACH_NOW="2026-10-19T08:00:00Z")
         envelope = self.cli("routines", "retire", "--overlay", WEEKLY, env=ended)
@@ -365,3 +439,161 @@ class PlanGateTest(GateMixin, RedesignCase):
         decision = self.decide(f"python3 -m coach routines retire --overlay {WEEKLY}", env=ended)
         self.assertEqual(decision["permissionDecision"], "ask")
         self.assertEqual(self.fake.writes, [])
+
+
+class RefusalMixin:
+    def assert_refused(self, *argv, env=None):
+        before, writes = snapshot(self.root), list(self.fake.writes)
+        envelope = self.cli(*argv, expect=3, env=env)
+        self.assertEqual(self.fake.writes, writes)
+        self.assertEqual(snapshot(self.root), before)
+        return envelope
+
+
+class GuardTest(RefusalMixin, RedesignCase):
+    """Each write guard refuses (exit 3) with no Hevy write and no file change."""
+
+    def test_a_chosen_routine_edited_in_the_app_after_the_preview_is_not_overwritten(self):
+        self.redesign()
+        args = ("routines", "create", "--overlay", WEEKLY, "--reuse", f"session-a={R1}")
+        preview = self.cli(*args, "--dry-run")["data"]
+        chosen = next(r for r in self.fake.collection("routines") if r["id"] == R1)
+        chosen.update(title="Edited in the app", updated_at="2026-10-11T19:00:00Z")
+        envelope = self.assert_refused(*args, "--expect-plan", preview["plan_hash"])
+        self.assertIn("changed in Hevy", envelope["error"]["message"])
+
+    def test_create_refuses_an_approved_overlay_whose_templates_are_unresolved(self):
+        self.forget_session_b(approve=False)
+        self.edit_overlay(lambda doc: [e.update(hevy_template_id=None) for s in doc["sessions"]
+                                       for e in s["exercises"]])
+        for extra in (("--dry-run",), ("--expect-plan", "sha256:any")):
+            with self.subTest(extra=extra):
+                envelope = self.assert_refused("routines", "create", "--overlay", WEEKLY, *extra)
+                self.assertIn("unresolved", envelope["error"]["message"])
+
+    def test_retiring_a_named_orphan_needs_an_approved_overlay(self):
+        self.redesign()
+        self.edit_overlay(lambda doc: None, approve=False)
+        args = ("routines", "retire", "--overlay", WEEKLY, "--routine", R1)
+        preview = self.cli(*args, "--dry-run")["data"]
+        envelope = self.assert_refused(*args, "--expect-plan", preview["plan_hash"])
+        self.assertIn("not approved", envelope["error"]["message"])
+
+    def test_retire_leaves_alone_a_routine_this_overlay_still_maps(self):
+        self.redesign()
+        self.edit_overlay(lambda doc: doc["sessions"][0].update(hevy_routine_id=R1))
+        self.assertIn(R1, {r["routine_id"] for r in external.orphan_routines(self.root)})
+        args = ("routines", "retire", "--overlay", WEEKLY, "--routine", R1)
+        preview = self.cli(*args, "--dry-run")["data"]
+        self.assertEqual([r["status"] for r in preview["routines"]], ["in_use"])
+        self.assertNotIn("plan_hash", preview)
+        self.assertEqual(self.cli(*args)["data"]["writes"], 0)
+        self.assertEqual(self.fake.writes, [])
+
+
+class OneOffGuardTest(RefusalMixin, OneOffCase):
+    def test_the_plan_hash_binds_the_folder_decision_on_its_own(self):
+        doc = read_overlay(self.root, ONE_OFF)
+        self.assertNotEqual(routines._plan_hash(doc, "create", [], create_folder=True),
+                            routines._plan_hash(doc, "create", [], create_folder=False))
+
+    def test_the_plan_hash_binds_the_one_off_folder(self):
+        args = ("routines", "create", "--overlay", ONE_OFF)
+        preview = self.cli(*args, "--dry-run")["data"]
+        self.assertEqual(preview["folder"]["status"], "would_create")
+        doc = read_state(self.root)
+        doc["hevy"]["folders"]["one_off"] = 7
+        write_state(self.root, doc)
+        self.assert_refused(*args, "--expect-plan", preview["plan_hash"])
+
+    def test_retire_refuses_an_ended_temporary_routine_missing_from_the_cache(self):
+        self.create(overlay_id=ONE_OFF)
+        cache = HevyCache(self.root)
+        cache.write_collection("routines", [r for r in cache.routines() if r["id"] != T1],
+                               cache.read("routines")["fetched_at"])
+        ended = dict(ENV, COACH_NOW="2026-10-19T08:00:00Z")
+        envelope = self.assert_refused("routines", "retire", "--overlay", ONE_OFF, "--dry-run", env=ended)
+        self.assertIn("not cached", envelope["error"]["message"])
+
+
+class ReuseMappingTest(CreateCase):
+    def add_routine(self, routine_id, title):
+        routine = copy.deepcopy(self.fake.collection("routines")[0])
+        routine.update(id=routine_id, title=title, folder_id=None)
+        self.fake.collection("routines").append(routine)
+        HevyCache(self.root).upsert_routine(routine)
+
+    def test_a_reused_routine_takes_the_session_title(self):
+        self.forget_session_b()
+        doc = read_state(self.root)
+        jsonio.write_doc(self.root / "data/archive/programs/2026-10-10/state.json",
+                         dict(doc, hevy=dict(doc["hevy"], routines={"old-b": {"session_id": "old-b"}})), False)
+        self.add_routine("old-b", "Old Lower")
+        args = ("--reuse", "session-b=old-b")
+        preview = self.create(*args, "--dry-run")["data"]
+        self.create(*args, "--expect-plan", preview["plan_hash"])
+        self.assertEqual([b["routine"]["title"] for b in self.fake.put_bodies], ["Session B"])
+        self.assertEqual(read_state(self.root)["hevy"]["routines"]["old-b"], {"session_id": "session-b"})
+
+    def test_a_program_session_that_reuses_a_spare_takes_it_out_of_the_temporary_list(self):
+        self.forget_session_b()
+        self.add_routine(T1, "(unused)")
+        doc = read_state(self.root)
+        doc["hevy"]["temporary_routines"] = [{"routine_id": T1, "overlay_id": None, "session_id": None}]
+        write_state(self.root, doc)
+        args = ("--reuse", f"session-b={T1}")
+        preview = self.create(*args, "--dry-run")["data"]
+        self.create(*args, "--expect-plan", preview["plan_hash"])
+        hevy = read_state(self.root)["hevy"]
+        self.assertEqual(hevy["routines"][T1], {"session_id": "session-b"})
+        self.assertEqual(hevy["temporary_routines"], [])
+
+
+class SpareSelectionTest(OneOffCase):
+    def test_a_spare_a_program_session_maps_is_never_taken_for_a_temporary_session(self):
+        doc = read_state(self.root)
+        doc["hevy"]["routines"][T1] = {"session_id": "session-a"}
+        write_state(self.root, doc)
+        preview = self.create("--dry-run", overlay_id=ONE_OFF)["data"]
+        self.assertEqual([r["routine_id"] for r in preview["routines"]], [T2, None, None])
+        self.create("--expect-plan", preview["plan_hash"], overlay_id=ONE_OFF)
+        self.assertEqual(read_state(self.root)["hevy"]["routines"][T1], {"session_id": "session-a"})
+        self.assertNotIn(f"/v1/routines/{T1}", self.put_paths)
+
+
+class HevyOffOrphanTest(RedesignCase):
+    def test_preflight_reports_no_orphans_with_hevy_off(self):
+        self.redesign()
+        self.assertTrue(external.orphan_routines(self.root))
+        config = self.root / "config.toml"
+        config.write_text(config.read_text().replace("[hevy]\nenabled = true", "[hevy]\nenabled = false"))
+        self.assertEqual(self.cli("routines", "preflight", "--overlay", WEEKLY)["data"]["orphan_routines"], [])
+
+
+class HevyOffAdoptionTest(AdoptCase):
+    def test_adoption_reports_no_orphans_with_hevy_off(self):
+        root = self.instance()
+        self.pull(root, SYNTHETIC)
+        config = root / "config.toml"
+        config.write_text(config.read_text().replace("[hevy]\nenabled = true", "[hevy]\nenabled = false"))
+        draft = json.loads(json.dumps(self.draft()).replace("session-a", "upper").replace("session-b", "lower"))
+        draft["hevy_routines"] = {}
+        report = program_drafts.adopt(root, draft, replace=True, dry_run=True, today="2026-10-11")
+        self.assertEqual(report["orphan_routines"], [])
+
+
+class ProposalTemplateTest(StarterCase):
+    def test_two_verified_ids_without_a_primary_leave_the_line_unmapped_and_block(self):
+        root, _ = self.adopted("full-body-3")
+        doc = self.ok(root, "propose", "week", "--week", "2026-W42", "--dry-run")["overlay"]
+        first = doc["sessions"][0]["exercises"][0]["exercise_id"]
+        own = read_library(root)["exercises"]
+        own.setdefault(first, {}).update(hevy_template_id=None, hevy_template_ids=["TWO-1", "TWO-2"])
+        write_library(root, own)
+        doc = self.ok(root, "propose", "week", "--week", "2026-W42", "--dry-run")["overlay"]
+        lines = [e for s in doc["sessions"] for e in s["exercises"] if e["exercise_id"] == first]
+        self.assertTrue(lines)
+        self.assertTrue(all(e["hevy_template_id"] is None for e in lines))
+        blocked = [f for f in doc["flags"] if f["code"] == "hevy_template_unresolved" and f["exercise_id"] == first]
+        self.assertEqual(len(blocked), len(lines))
+        self.assertTrue(all("ambiguous" in f["message"] for f in blocked))

@@ -130,7 +130,9 @@ class _CoachWrite:
             return ASK, _WRITE_UNAVAILABLE.format(f"the dry run failed: {exc.message.rstrip('.')}")
         except Exception as exc:
             return ASK, _WRITE_UNAVAILABLE.format(f"the dry run failed: {type(exc).__name__}: {exc}")
-        if self.cmd.name == "routines create" and not report.get("approved"):
+        needs_approval = self.cmd.name == "routines create" or (
+            self.cmd.name == "routines retire" and getattr(self.args, "routine", None))
+        if needs_approval and not report.get("approved"):
             return DENY, "Approval gate: overlay is not approved; review the write brief first."
         if report.get("plan_hash") and getattr(self.args, "expect_plan", None) != report["plan_hash"]:
             return DENY, "Approval gate: review --dry-run and pass the approved --expect-plan hash."

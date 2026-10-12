@@ -48,7 +48,7 @@ coach/                       # framework: synced to instances
   external.py                # Hevy mapping requirements, managed orphan routines        (R-14)
   gate.py                    # PreToolUse hook logic                                     (R-15)
   program.py, state.py, migrate.py, migrations/<doc>/{__init__,NNNN_<slug>}.py           (R-17a)
-  program_drafts.py          # import_hevy and adopt; reads stats and routines, which import program.py (R-41a)
+  program_drafts.py          # import_hevy and adopt; reads stats and routines, which import program.py, and external (R-41a)
   history.py                 # resolve workouts, annotations, exposures                  (R-20)
   history_sources/<name>.py  # one module per history input: hevy (R-20), manual (R-40c)
   stats.py                   # e1RM, adherence, dose, durations, audit                   (R-20)
@@ -674,8 +674,9 @@ unresolved; multiple known IDs without a primary also need a choice.
 confirming load modes. `library set-template ID TEMPLATE_ID [--dry-run]`
 chooses a primary ID locally, requiring that ID in the cached collection
 and rejecting an ID owned by another exercise before mutation. The choice
-survives later pulls and seeding. Custom local entries remain valid with
-no external ID. For each distinct routine `exercise_template_id`, in
+survives later pulls and seeding. A routine exercise's own template id
+settles a title that several cached templates share: seed records it on
+the matched entry. Custom local entries remain valid with no external ID. For each distinct routine `exercise_template_id`, in
 routine order, it finds a library entry by template id, then Hevy title,
 then alias or name (both by match key), and proposes a load mode from the
 first row that applies:
@@ -1208,9 +1209,9 @@ Cues: <cues>
     creates; a malformed, unknown-session, unrelated, busy or duplicate
     choice refuses (exit 3) before any request. Named routines are
     reserved first. Each other `temporary` session then reuses the first
-    `hevy.temporary_routines` entry, in state order, that carries no
-    session of this overlay and no session dated today or later of
-    another overlay in force that day. A reused routine takes the session
+    `hevy.temporary_routines` entry, in state order, that no program
+    session maps, that carries no session of this overlay and no session
+    dated today or later of another overlay in force that day. A reused routine takes the session
     title and keeps its folder (`intended_body` with the routine). A spare
     the cache lacks (preview) or GET answers 404 (execution) is skipped,
     listed in `stale`, and dropped from `temporary_routines` (not under
@@ -1225,8 +1226,9 @@ Cues: <cues>
   - **Recording.** Each id goes into state.json only after its POST or PUT
     succeeds (the folder in `folders.one_off`, a program routine in
     `hevy.routines`, a temporary one as its `temporary_routines` entry with
-    this overlay and session), never into the overlay, so the approval
-    hash holds. A failed request leaves the mapping alone. Each routine is
+    this overlay and session; a program session that takes a spare also
+    removes its `temporary_routines` entry), never into the overlay, so
+    the approval hash holds. A failed request leaves the mapping alone. Each routine is
     then read back, cached and verified as push does; a read-back that
     differs exits 1 with the report, keeping the ids already recorded and
     writing no later routine. A second run finds every session and writes
@@ -1259,7 +1261,8 @@ Cues: <cues>
   list and by-id endpoints agree), each intended body, and any new
   folder. Execution requires `--expect-plan HASH` from the preview named
   in the approved write brief, and the R-15 gate denies the command
-  without it. A changed choice or a routine changed in Hevy refuses
+  without it, as it denies a create or a `--routine` retire on an
+  unapproved overlay. A changed choice or a routine changed in Hevy refuses
   (exit 3) before any write. The hash approves nothing by itself: the
   named brief, the overlay approval and the gate still apply. With
   nothing to write there is no `plan_hash`, and the command needs none
@@ -5600,8 +5603,8 @@ writes `data/program.json` directly.
    names, empty when Hevy is off), `data.scheme_state` (`kept` and
    `dropped` slot keys), `archived`, `written`, `removed`, `staged`;
    under `--dry-run`, `would_archive`, `would_write` and `would_remove`.
-   `orphan_routines` lists old managed routine IDs/titles no new mapping
-   retains, with leave/reuse/retire choices; the archive preserves their
+   `orphan_routines` lists the orphan routines (id and title) no new
+   mapping retains, with leave/reuse/retire choices; the archive preserves their
    provenance for later create/retire previews. Hevy off returns none.
 
 Adopt reports an avoided exercise (C54) the way it reports an
