@@ -7,6 +7,7 @@ The allowlist decides eligibility only: each record is named as a file,
 never staged as a directory or pattern.
 """
 
+import os
 import subprocess
 from pathlib import Path, PurePosixPath
 
@@ -19,7 +20,7 @@ STRUCTURAL = paths.PROGRAM.as_posix()
 STATUS_SCOPE = (paths.DATA_DIR.as_posix(), paths.ROUTINE_DIR.as_posix())
 ELIGIBLE_TEXT = ", ".join((*ELIGIBLE_FILES, *(f"{d}/" for d in ELIGIBLE_DIRS), f"{STRUCTURAL} (--structural)"))
 STEP_WRITES = {
-    "light_week": (paths.DECISIONS, paths.STATE, paths.ROUTINE_PROGRAM_PAGE),
+    "light_week": (paths.BLOCKS, paths.DECISIONS, paths.STATE, paths.ROUTINE_PROGRAM_PAGE),
     "one_off": (paths.STATE,),
     "create_routines": (paths.STATE,),
     "missed": (paths.ANNOTATIONS,),
@@ -52,10 +53,12 @@ def git(root, *argv, env=None):
 def changes(root, env=None):
     """{path: "added" | "modified" | "deleted"} for every uncommitted change under data/ and routine/.
 
-    A rename counts as its two halves, so the deleted source is never committed unnamed.
+    A rename counts as its two halves, so the deleted source is never committed unnamed. Optional locks are
+    off, so reading the status never refreshes the index.
     """
+    read_only = dict(os.environ if env is None else env, GIT_OPTIONAL_LOCKS="0")
     out = git(root, "status", "--porcelain=v1", "-z", "--no-renames", "--untracked-files=all", "--",
-              *STATUS_SCOPE, env=env).stdout
+              *STATUS_SCOPE, env=read_only).stdout
     found = {}
     for entry in out.split("\0"):
         if len(entry) < 4:

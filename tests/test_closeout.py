@@ -1,6 +1,7 @@
 """The training-record commit plan in weekly close-out: `pages plan` and `pages publish --include` (C38)."""
 
 import json
+import os
 import shutil
 import unittest
 
@@ -105,7 +106,7 @@ class PlanTest(CloseOutCase):
 
     def test_names_the_records_each_approved_write_step_will_write(self):
         cases = {
-            ("--light-week",): ["data/decisions.json", "data/state.json", "routine/program.md"],
+            ("--light-week",): ["data/blocks.json", "data/decisions.json", "data/state.json", "routine/program.md"],
             ("--one-off",): ["data/state.json"],
             ("--create-routines",): ["data/state.json"],
             ("--missed",): ["data/history/annotations.json"],
@@ -126,6 +127,14 @@ class PlanTest(CloseOutCase):
         self.train_the_week()
         rows = {row["path"]: row["change"] for row in self.plan("--missed")["records"]}
         self.assertEqual(rows, dict(RECORDS, **{"data/history/annotations.json": "planned"}))
+
+    def test_a_stale_index_stat_is_not_refreshed_by_the_plan(self):
+        state = self.root / "data" / "state.json"
+        later = state.stat().st_mtime + 3600
+        os.utime(state, (later, later))
+        index = (self.root / ".git" / "index").read_bytes()
+        self.assertEqual(self.plan()["records"], [])
+        self.assertEqual((self.root / ".git" / "index").read_bytes(), index)
 
     def test_a_session_page_needs_a_structural_change(self):
         message = self.coach("pages", "plan", "--session", "session-a", expect=2)["error"]["message"]
@@ -288,9 +297,23 @@ class ApprovedPassTest(CloseOutCase):
         self.assertEqual(dry["records"]["local"], [])
         data = self.publish(*self.include(planned))["data"]
         self.assertTrue(data["pushed"])
-        self.assertEqual([row["path"] for row in data["records"]["included"]], planned)
+        self.assertEqual([row["path"] for row in data["records"]["included"]],
+                         [path for path in planned if path != "data/blocks.json"])
+        self.assertEqual(data["records"]["unchanged"], ["data/blocks.json"])
         self.assertFalse(self.status() & set(planned))
         self.assertLessEqual(set(planned), self.remote_files())
+
+    def test_a_light_week_before_the_first_ledger_commits_the_ledger_it_creates(self):
+        self.disable_hevy()
+        self.commit_everything()
+        self.assertFalse((self.root / "data" / "blocks.json").exists())
+        planned = self.plan("--light-week")["include"]
+        self.approve()
+        self.coach("block", "decide", "--outcome", "adopted", "--type", "light", "--reason", "poor sleep all week")
+        data = self.publish(*self.include(planned))["data"]
+        self.assertEqual(data["records"]["local"], [])
+        self.assertIn({"path": "data/blocks.json", "change": "added"}, data["records"]["included"])
+        self.assertIn("data/blocks.json", self.remote_files())
 
 
 @unittest.skipIf(shutil.which("git") is None, "needs git")

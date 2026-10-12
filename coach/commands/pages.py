@@ -67,7 +67,8 @@ def publish(args, ctx):
           arg("--session", action="append", default=[], metavar="ID",
               help="with --structural: a session it edits, adds or removes (its routine/ page); repeat for each"),
           arg("--light-week", action="store_true",
-              help="block decide records a light week: data/decisions.json, data/state.json, routine/program.md"),
+              help="block decide records a light week: data/blocks.json, data/decisions.json, data/state.json, "
+                   "routine/program.md"),
           arg("--one-off", action="store_true",
               help="a one-off week is set, or an ended one cleared: data/state.json"),
           arg("--create-routines", action="store_true", help="routines create records new ids: data/state.json"),

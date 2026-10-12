@@ -68,7 +68,7 @@ coach/                       # framework: synced to instances
   checkin_parts/<topic>.py   # one module per item that adds card fields                 (each item)
   missed.py                  # missed-day rule matching and application                  (R-22)
   pages.py                   # brief, dashboard, progress renderers, publish             (R-25)
-  closeout.py                # training-record commit plan for publish (C38)              (R-25)
+  closeout.py                # training-record commit plan for publish (C38)             (R-25)
   page_parts/__init__.py     # page part discovery                                       (R-25)
   page_parts/<topic>.py      # one module per item that adds page items                  (each item)
   status/__init__.py         # status provider registry + auto-discovery                 (R-26b)
@@ -4726,8 +4726,9 @@ file, with literal pathspecs, so a pattern or directory never stages
 anything unreviewed. An `--include` that is absolute, contains `..`,
 names a directory or an ineligible file (config, profile, `.env`, other
 data), or names `data/program.json` without `--structural`, exits 3
-before anything is written. `pages plan` is read-only. `records` lists
-each eligible path with an uncommitted change (`added`, `modified` or
+before anything is written. `pages plan` is read-only: it reads `git
+status` with optional locks off, so even the index's stat cache is left
+alone. `records` lists each eligible path with an uncommitted change (`added`, `modified` or
 `deleted`, untracked files included) from `git status`, plus each path
 the approved write steps will write, flagged by the caller, as
 `planned` when it has not changed yet:
@@ -4736,7 +4737,7 @@ the approved write steps will write, flagged by the caller, as
 |---|---|---|
 | `--structural` | the program edit and `program render` | `data/program.json`, `routine/program.md` |
 | `--session ID` (with `--structural`) | a session the change edits, adds or removes | `routine/<ID>.md` |
-| `--light-week` | `block decide --outcome adopted` | `data/decisions.json`, `data/state.json`, `routine/program.md` |
+| `--light-week` | `block decide --outcome adopted` | `data/blocks.json`, `data/decisions.json`, `data/state.json`, `routine/program.md` |
 | `--one-off` | setting or clearing `one_off` | `data/state.json` |
 | `--create-routines` | `routines create` | `data/state.json` |
 | `--missed` | `missed apply` | `data/history/annotations.json` |

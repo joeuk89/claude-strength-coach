@@ -18,8 +18,7 @@ from functools import cached_property
 from pathlib import Path
 
 from coach import block as block_module
-from coach import checkin, dates, history, overlay, page_parts, paths, program, render, sheets, state, stats, units
-from coach import closeout
+from coach import checkin, closeout, dates, history, overlay, page_parts, paths, program, render, sheets, state, stats, units
 from coach import config as config_module
 from coach import flags as flags_module
 from coach.config_tables import coaching
