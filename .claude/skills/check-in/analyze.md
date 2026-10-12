@@ -76,10 +76,8 @@ athlete hit the prescribed load × reps @ RPE?
   were derived from the bad data.
 - Exercise drift vs. the plan: structural drift means `/hevy-sync` is
   due; offer it (Hevy users only).
-- Intensity honesty: the RPE drift check on each exposure in the window,
-  same scope and threshold. Sustained drift means drift in consecutive
-  exposures of the same lift. Isolation drift stays one summary line,
-  not a decision.
+- Intensity honesty: the RPE drift check on each exposure in the window;
+  sustained drift is drift in consecutive exposures of one lift.
 - Session durations vs. the time limits in `profile.md`, junk volume.
 - Weekly balance: does the program's balance picture still match what's
   actually being trained?
@@ -112,10 +110,12 @@ the four fatigue triggers (compound RPE drift two sessions running and
 an `aggravated` niggle come from the data), and proposes, watches or
 skips a light week. It writes `data/blocks.json` and `block` in
 `data/state.json`, re-renders `routine/program.md`, and prints the
-`status_line`, `deep_review` and the block flags (`light_week_due`,
-`light_week_skipped`, `fatigue_watch`, `deep_review_due`). Run it again
-for the same week after a correction, or after act.md changes a
-niggle's status: a second close of the same week replaces its entry.
+`status_line`, `deep_review`, the block flags and each week's `reviews`.
+The hard-week gate counts fatigue, not a met prescription: quote each
+`summary`, and take `reps_missed`, `effort_above_target` and
+`effort_below_target` into the load review. Run it again for the same week
+after a correction, or after act.md changes a niggle's status: a second
+close replaces its entry.
 
 **Both tiers — adherence.** Adherence = sessions trained ÷ sessions
 planned over the **trailing four ordinary weeks**:
@@ -123,10 +123,10 @@ planned over the **trailing four ordinary weeks**:
 - Judge each week against the overlay in force that week. Coach-led
   sessions count, as the replies confirmed them; optional sessions are
   left out; a shortened session counts as trained.
-- An **ordinary week** is any week except a deload or other light week, a one-off
-  week (illness, travel, limited kit), a minimum week, a planned break week
-  (`status-days add --no-training`), or a week inside a layoff of 11+ days. Skip
-  those and reach further back, at most 12 weeks. Fewer than four: no trigger yet.
+- An **ordinary week** is any week except a light, constrained one-off
+  (temporary sessions), minimum, planned break, layoff (11+ days) or illness
+  week (training missed while ill); a reshuffle stays ordinary. Each `skipped`
+  week names its `reason`. Reach back at most 12 weeks; under four: no trigger.
 
 `python3 -m coach structure adherence` works this out and raises the
 flags below; `python3 -m coach structure decide` records the athlete's

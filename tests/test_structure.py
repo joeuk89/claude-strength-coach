@@ -68,11 +68,14 @@ class StructureCase(unittest.TestCase):
         doc = read_json(self.root / "data/history/annotations.json")
         return next(a["id"] for a in doc["annotations"] if all(a.get(k) == v for k, v in match.items()))
 
-    def make_kind(self, week_start, kind):
-        """Turn the weekly overlay starting `week_start` into one of `kind`."""
+    def make_kind(self, week_start, kind, temporary=False):
+        """Turn the weekly overlay starting `week_start` into one of `kind`; `temporary` marks its sessions as a
+        constrained one-off's."""
         old = self.root / "data" / "overlays" / f"{week_start}-weekly.json"
         doc = read_json(old)
         doc["kind"] = kind
+        for session in doc["sessions"]:
+            session["temporary"] = temporary
         doc["id"] = f"{week_start}-{kind.replace('_', '-')}"
         old.unlink()
         write_json(self.root / "data" / "overlays" / f"{doc['id']}.json", doc)
@@ -173,23 +176,37 @@ class AdherenceTest(StructureCase):
         self.make_kind("2026-09-28", "deload")
         data = self.adherence()
         self.assertEqual([w["label"] for w in data["weeks"]], ["2026-W37", "2026-W38", "2026-W39", "2026-W41"])
-        self.assertEqual(data["skipped"], [{"week": "2026-09-28", "label": "2026-W40", "kind": "light"}])
+        self.assertEqual(data["skipped"], [{"week": "2026-09-28", "label": "2026-W40", "kind": "light",
+                                            "reason": "deload overlay 2026-09-28-deload", "planned": 3,
+                                            "trained": 2}])
         self.assertEqual((data["trained"], data["planned"]), (8, 12))
 
-    def test_a_one_off_week_and_an_adopted_light_week_are_skipped(self):
-        self.make_kind("2026-09-28", "one_off")
+    def test_a_constrained_one_off_week_and_an_adopted_light_week_are_skipped(self):
+        self.make_kind("2026-09-28", "one_off", temporary=True)
         self.write_decisions({"kind": "light_week", "made_at": "2026-09-13T18:00:00Z", "outcome": "adopted",
                               "reason": "ceiling", "details": {"type": "light", "week": "2026-09-21",
                                                               "reason": "ceiling", "triggers": [], "hard_weeks": 6}})
         data = self.adherence()
         self.assertEqual([w["label"] for w in data["weeks"]], ["2026-W36", "2026-W37", "2026-W38", "2026-W41"])
         self.assertEqual({s["label"]: s["kind"] for s in data["skipped"]}, {"2026-W39": "light", "2026-W40": "one_off"})
+        reasons = {s["label"]: s["reason"] for s in data["skipped"]}
+        self.assertEqual(reasons["2026-W39"], "light week adopted in d-0001")
+        self.assertEqual(reasons["2026-W40"], "constrained one-off week: temporary sessions session-a, session-b")
+
+    def test_a_one_off_that_only_reshuffles_program_sessions_stays_ordinary(self):
+        self.make_kind("2026-09-28", "one_off")
+        data = self.adherence()
+        self.assertEqual([w["label"] for w in data["weeks"]], ["2026-W38", "2026-W39", "2026-W40", "2026-W41"])
+        self.assertEqual(data["skipped"], [])
+        self.assertEqual(self.data("structure", "week", "--week", "2026-W40")["kind"], "ordinary")
 
     def test_a_minimum_week_is_skipped(self):
         self.write_minimum_plan("2026-09-28")
         data = self.adherence()
         self.assertEqual([w["label"] for w in data["weeks"]], ["2026-W37", "2026-W38", "2026-W39", "2026-W41"])
-        self.assertEqual(data["skipped"], [{"week": "2026-09-28", "label": "2026-W40", "kind": "minimum"}])
+        self.assertEqual(data["skipped"], [{"week": "2026-09-28", "label": "2026-W40", "kind": "minimum",
+                                            "reason": "minimum week plan .coach/plans/2026-09-28-minimum.json",
+                                            "planned": 3, "trained": 2}])
         self.assertEqual(structure.ordinary_weeks(self.root, date(2026, 10, 11), today=date(2026, 10, 11)),
                          ["2026-09-07", "2026-09-14", "2026-09-21", "2026-10-05"])
 

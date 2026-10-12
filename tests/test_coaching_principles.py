@@ -128,7 +128,7 @@ class HeuristicLabelsTest(unittest.TestCase):
         labels = bullet.split("These rules are coaching heuristics, not research cut-offs.", 1)[1]
         for rule, refs in (
             ("the 75 % and 50 % lines", ("rn:deloads.2",)),
-            ("the trained-as-prescribed rule", ("rn:deloads.11",)),
+            ("the hard-week session gate", ("rn:deloads.11",)),
             ("the ceiling counted in completed hard weeks", ("rn:deloads.3",)),
             ("the four fatigue triggers with the two-trigger rule", ("rn:autoregulation.4", "rn:deloads.5")),
             ("the three-week skip rule", ("rn:deloads.4",)),

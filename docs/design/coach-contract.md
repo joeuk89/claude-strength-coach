@@ -2430,6 +2430,9 @@ Reserved codes:
 | `light_week_skipped` | info | R-31 | | Two triggers fired below three hard weeks; light week skipped with the count. |
 | `fatigue_watch` | info | R-31 | | One fatigue trigger fired; names it. |
 | `deep_review_due` | info | R-31 | | The next check-in is deep; lists the reasons. |
+| `effort_below_target` | info | R-31 | | A logged line's mean RPE is more than 1.5 under its targets; review the loads. |
+| `effort_above_target` | info | R-31 | | A logged line's mean RPE is more than 1.5 over its targets; review the loads and recovery. |
+| `reps_missed` | info | R-31 | | A logged working set fell short of its prescribed reps; names each line and its logged reps. |
 | `cap_breach` | warn | R-43 | | A weekly run, single-run or weekly-quality cap is exceeded, logged or planned. |
 | `run_volume_spike` | warn, info | R-43 | | A run is more than `spike_ratio` × the longest run in the lookback (warn logged, info planned). |
 | `quality_stack` | warn | R-43 | | Two quality activities on the same or consecutive days. |
@@ -5647,9 +5650,13 @@ coach.structure.ordinary_weeks(root, until, n=4, reach=12) -> list[str]
   sessions count).
 - **Ordinary week**: not a planned break week, not a light week (overlay
   kind `deload`, or an adopted `light_week` decision covering it), not a
-  `minimum` or `one_off` week, not inside a layoff gap of 11+ days. The window reaches
-  back at most 12 weeks; with fewer than four ordinary weeks it reports
-  `insufficient_weeks` and raises no adherence flag.
+  `minimum` or constrained `one_off` week, not inside a layoff gap of 11+
+  days, and not an `illness` week. The window reaches back at most 12
+  weeks; with fewer than four ordinary weeks it reports
+  `insufficient_weeks` and raises no adherence flag. Leaving illness weeks
+  out and keeping reshuffles in are application decisions the maintainer
+  approved, not research findings: schedule adherence asks whether the
+  athlete trains the plan, and illness says nothing about the plan.
 
 **`structure week --week 2026-W41`** →
 
@@ -5667,8 +5674,19 @@ coach.structure.ordinary_weeks(root, until, n=4, reach=12) -> list[str]
 ```
 
 - `kind`: `ordinary`, `break`, `light`, `minimum`, `one_off`, `layoff`,
-  the first that applies in the order `break`, `light`, `minimum` (a
-  minimum plan file for the week, C40), `one_off`, `layoff`. A **break
+  `illness`, the first that applies in the order `break`, `light`,
+  `minimum` (a minimum plan file for the week, C40), `one_off`, `layoff`,
+  `illness`; `kind_reason` says why in words (null for `ordinary`), and
+  names the overlay, decision, plan file, temporary sessions or missed
+  sessions behind it. A `one_off` overlay makes the week `one_off` only
+  when a session it plans in the week is `temporary` (constrained mode,
+  `program-week` one-off.md); one that only re-dates program sessions is a
+  reshuffle, so the week keeps ordinary accounting and its misses count.
+  An **illness week** lost planned training to illness: a core session
+  `missed` with tag `ill`, or a core session `missed` or a coach-led
+  session `not_done` on a day a live `ill` status day (C50) covers. An
+  `ill` row over days that plan nothing, an ill week trained in full, and
+  a `travel` row without `no_training` leave the week ordinary. A **break
   week** has a day a planned break covers (C50) and every core and
   coach-led session it plans on such a day, whatever overlay is or is not
   in force, so the same break classes the same with or without one. A
@@ -5781,8 +5799,9 @@ static balance alone. The command only reads: it never adopts FILE.
 - A light week by decision: an adopted `light_week` decision, not
   withdrawn, whose `details.week` falls in the week.
 - `structure adherence` returns `until`, `weeks` (`{week, label,
-  planned, trained}` oldest first), `skipped` (`{week, label, kind}` for
-  the non-ordinary weeks passed over), `planned`, `trained`, `pct`
+  planned, trained}` oldest first), `skipped` (`{week, label, kind,
+  reason, planned, trained}` for the non-ordinary weeks passed over, so an
+  illness week keeps the sessions it trained), `planned`, `trained`, `pct`
   (rounded half up), `insufficient_weeks`, `flags` and `decision`. The
   70 % and 80 % lines compare the unrounded ratio. Its delivered
   `volume_undershoot` counts `delivered` plus `bonus` against the target.
@@ -5927,15 +5946,29 @@ Checks: `block_state` (fail: `state.block` disagrees with the ledger),
 
 Rules (R-02's prose, scripted; the prose stays the human copy):
 
-- **Trained as prescribed**: a trained session counts toward a hard week
-  when at least two thirds of its prescribed working sets were logged and
-  its mean logged RPE (over sets with both values) is no more than 1.5
-  below target; sets without a logged RPE count as on target. A coach-led
-  session counts when its `external` annotation says done. Session counts
-  come from `coach.structure.week` (C41).
+- **Hard-week session gate** (rn:deloads.11; the ledger's
+  `as_prescribed` counts the sessions that pass it): a trained session
+  passes when at least two thirds of its prescribed working sets were
+  logged and its mean logged RPE (over sets with both values) is no more
+  than 1.5 below target; sets without a logged RPE count as on target. A
+  coach-led session passes when its `external` annotation says done.
+  Session counts come from `coach.structure.week` (C41). The gate counts
+  training stress for fatigue; it is not proof the prescription was met,
+  so a session with failed reps or a grind past its target still passes.
+- **Against the prescription**, reported beside the gate and never
+  changing it: per logged core session, each line whose mean RPE
+  difference (over sets with both values) is more than 1.5 under target
+  (`effort_below_target`: review the loads) or over it
+  (`effort_above_target`: review the loads and recovery), the 1.5
+  tolerance of the gate read both ways, and each line with a working set
+  under its target reps, the bottom of a range (`reps_missed`). A set with
+  a target and no logged RPE is counted as `rpe_missing`, never as
+  measured effort.
 - **Hard week**: not light, return, one-off, minimum or break; at least
-  75 % of planned core and coach-led sessions trained as prescribed.
-  Under 50 % trained ends the block (rn:deloads.2).
+  75 % of planned core and coach-led sessions passed the gate.
+  Under 50 % trained ends the block (rn:deloads.2). An `illness` week
+  (C41) is classed by these rules too: adherence leaves it out, the block
+  keeps its training.
 - **Paused weeks**: a one-off, minimum or planned break week neither
   counts nor resets (rn:deloads.13). This is bookkeeping, separate from
   the ordinary under-50 % reset, and it never shortens the days off the
@@ -5959,7 +5992,8 @@ Rules (R-02's prose, scripted; the prose stays the human copy):
   starts at zero. A week whose overlay carries a `22-42` decay classes as
   `return`.
 - The next check-in is deep (`deep_review.due`) when six weeks have passed
-  since the last deep close (rn:deloads.12), a light week is being proposed, R-30a's
+  since the last deep close (rn:deloads.12), a light week is newly proposed (not an
+  unchanged repeat of a declined one), R-30a's
   structural flags are raised (coach mode only: in run mode, C44, no
   `adherence_trigger` decision is ever recorded to clear them), a
   catch-up check-in deferred a due deep review, or on the first close;
@@ -5979,7 +6013,8 @@ Block <n> · <count> of <ceiling> hard weeks · triggers <k> of 4 (<names>) · l
 
 Flags (registered in `coach/flags/block.py`; rows in C20):
 `light_week_due`, `light_week_skipped`, `fatigue_watch`,
-`deep_review_due`.
+`deep_review_due`, and from `block close` only, `effort_below_target`,
+`effort_above_target` and `reps_missed`.
 
 **Built with R-31** (details C42 and C43 leave open):
 
@@ -5988,7 +6023,11 @@ Flags (registered in `coach/flags/block.py`; rows in C20):
   today, now)`, `classify(root, week_start, *, today, now)`;
   `status_line_for(block_state, ceiling, ledger=None, decisions=None)` is
   the pure form `status_line(root)` and `program adopt` call.
-  `coach.block.trained_as_prescribed(lines, workout)` is the C43 rule;
+  `coach.block.trained_as_prescribed(lines, workout)` is the gate and
+  `coach.block.compare(lines, workout)` the full comparison
+  (`prescribed_sets`, `logged_sets`, `rpe_sets`, `rpe_missing`,
+  `mean_rpe_delta`, `effort_below`, `effort_above`, `reps_missed`,
+  `signals`, `hard_gate`);
   `coach.block.outcome_for(class, count, fired, ceiling, ill)` the light
   week rules.
 - **Which weeks a close covers**: every week after the newest closed one
@@ -6004,7 +6043,8 @@ Flags (registered in `coach/flags/block.py`; rows in C20):
   ended it; the next block starts the day after, at zero. Every reset
   week ends a block, even one with no hard week.
 - **Classes**, in order: `break`, `light`, `minimum` and `one_off` from
-  `coach.structure.week` `kind` (`break`, `minimum` and `one_off` neither
+  `coach.structure.week` `kind` (a reshuffle is not `one_off`, and an
+  `illness` week takes the classes below; `break`, `minimum` and `one_off` neither
   count nor reset; a break week is judged on planned-break coverage alone,
   never on whether an overlay was written for it, and a one-off in force
   only on break days leaves a partly covered week to the classes below);
@@ -6012,12 +6052,13 @@ Flags (registered in `coach/flags/block.py`; rows in C20):
   `0-10` and the last lifting workout before the first such session is more
   than 10 days back (R-02: a return week follows a layoff of 11+ days, so
   one stale lift rotated back in never ends a block); `low` when trained is
-  under half of planned; `hard` when trained as prescribed is at least three
-  quarters of planned; else `partial` (also with nothing planned). A partial
-  break's covered sessions leave `planned` (C41 `on_break`), so the sessions
-  left are classed as usual. Trained as prescribed counts coach-led sessions
-  `done` and core sessions logged against the overlay line (or the program
-  session when no overlay covered the day), comparing
+  under half of planned; `hard` when the sessions that passed the hard-week
+  session gate are at least three quarters of planned; else `partial` (also
+  with nothing planned). A partial break's covered sessions leave `planned`
+  (C41 `on_break`), so the sessions left are classed as usual. The
+  hard-week session gate passes coach-led sessions `done` and core
+  sessions logged against the overlay line (or the program session when
+  no overlay covered the day), comparing
   `min(logged, prescribed)` working sets per line; a `trained_unlogged`
   session has no logged sets, so it is not.
 - **Triggers**: readiness and sleep only for the week `--week` names
@@ -6049,10 +6090,34 @@ Flags (registered in `coach/flags/block.py`; rows in C20):
   `catch_up_deferred` when `coach.checkin.deferred_reason` finds a
   catch-up that put a due deep review off; `light_week_proposed`; and
   `restructure_required` (the adherence
-  trigger from `coach.structure.adherence`). R-02's prose names the
+  trigger from `coach.structure.adherence`). `light_week_proposed` is left
+  out for an unchanged repeat (`coach.block.repeated_decline`): the newest
+  light-week decision not withdrawn declined an earlier proposal in this
+  block (its `details.week` on or after `block.started`) of the same type
+  and reason, and the proposal ran on without a break: every week closed in
+  this block from `details.week` through `block.last_closed_week` has
+  outcome `due` and fired no two triggers outside `details.triggers`.
+  `deep_review.repeat_of` names that decision (null otherwise) and
+  `light_week_due` says the repeat alone does not make the check-in deep.
+  A watch never makes a check-in deep. A first proposal, a proposal after
+  an adoption or in a new block, a changed type or reason, a new pair of
+  triggers, or a proposal that lapsed for a week and came back is deep as
+  before, and the other reasons apply unchanged. R-02's prose names the
   adherence trigger, not every structural flag, so `volume_undershoot`
   and `add_session_type_blocked` do not make a check-in deep. `--deep`
   marks the closed week `deep` and sets `last_deep_review` to today.
+- `block close` also returns `reviews`, one per closed week and not
+  stored in the ledger: `{week, label, class, kind, kind_reason, planned,
+  trained, hard_gate, sessions, summary}`. `sessions` holds the
+  `coach.block.compare` result of each logged core lifting session plus
+  its `session_id`, `date` and `workout_id`; `summary` states how many
+  sessions passed the gate, that the gate counts training stress rather
+  than completed prescriptions, how many sessions missed reps or logged
+  effort over or under target, how many targeted sets had no RPE logged,
+  and, for an `illness` week, that adherence leaves it out. Its flags add
+  one `effort_below_target`, `effort_above_target` or `reps_missed` per
+  session and signal, naming each line. A repeated close of the same week
+  returns the same reviews and flags.
 - `block decide`: `declined` needs a proposed (or declined) week and
   `--reason`; at the ceiling its `revisit_on` is the end of the proposed
   week. `adopted` takes the proposal's type and week by default; another

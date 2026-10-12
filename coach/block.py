@@ -3,7 +3,7 @@
 R-02's rules scripted; `CLAUDE.md` "Fatigue management & deloads" is the
 prose copy (rn:deloads.1). The 75 % and 50 % lines (rn:deloads.2), the
 hard-week ceiling (rn:deloads.3), the three-week skip rule (rn:deloads.4),
-the two-of-four trigger rule (rn:deloads.5), the trained-as-prescribed rule
+the two-of-four trigger rule (rn:deloads.5), the hard-week session gate
 (rn:deloads.11) and the `light` and `return` transform numbers are coaching
 heuristics, not research cut-offs. A planned no-training break week neither
 counts nor resets (rn:deloads.13): bookkeeping, not a research finding.
@@ -193,39 +193,83 @@ def _planned_lines(inst, row):
             for line in session["exercises"]]
 
 
-def trained_as_prescribed(prescribed_lines, workout):
-    """True when at least two thirds of the prescribed working sets were logged and the mean RPE is at most 1.5 under.
+def _target_reps(set_):
+    if set_.get("reps") is not None:
+        return set_["reps"], str(set_["reps"])
+    found = set_.get("rep_range")
+    if found:
+        return found["start"], f"{found['start']}–{found['end']}"
+    return None, None
 
-    The mean runs over sets with both a target and a logged RPE; with none,
-    the session counts as on target.
+
+def compare(prescribed_lines, workout):
+    """A logged session against its prescription: the sets, the effort and the reps.
+
+    `rpe_sets` pairs a target with a logged RPE; `rpe_missing` has a target and no logged RPE, so its effort was not
+    measured. `effort_below` and `effort_above` name each line whose mean RPE difference is past `RPE_SHORTFALL`
+    under or over its targets; `reps_missed` each line with a working set under its target reps (the bottom of a
+    range). `signals` lists which of the three are non-empty, and `hard_gate` is the rn:deloads.11 gate.
     """
-    prescribed = logged = 0
-    deltas = []
+    prescribed = logged = missing = 0
+    deltas, short, below, above = [], [], [], []
     for line in prescribed_lines:
         wanted = [s for s in line["sets"] if overlay.is_working(s)]
         got = [s for e in workout["exercises"] if e["exercise_id"] == line["exercise_id"]
                for s in e["sets"] if s["type"] in history.WORKING_SET_TYPES]
         prescribed += len(wanted)
         logged += min(len(got), len(wanted))
-        deltas += [g["rpe"] - w["rpe"] for w, g in zip(wanted, got)
-                   if w.get("rpe") is not None and g.get("rpe") is not None]
-    if not prescribed:
-        return True
-    if LOGGED_SHARE[1] * logged < LOGGED_SHARE[0] * prescribed:
-        return False
-    return not deltas or sum(deltas) / len(deltas) >= -RPE_SHORTFALL
+        pairs = list(zip(wanted, got))
+        line_deltas = [g["rpe"] - w["rpe"] for w, g in pairs if w.get("rpe") is not None and g.get("rpe") is not None]
+        missing += sum(1 for w, g in pairs if w.get("rpe") is not None and g.get("rpe") is None)
+        deltas += line_deltas
+        if line_deltas:
+            line_mean = sum(line_deltas) / len(line_deltas)
+            effort = {"exercise_id": line["exercise_id"], "mean_rpe_delta": round(line_mean, 2),
+                      "sets": len(line_deltas)}
+            if line_mean < -RPE_SHORTFALL:
+                below.append(effort)
+            elif line_mean > RPE_SHORTFALL:
+                above.append(effort)
+        targets = [_target_reps(w) for w, _ in pairs]
+        if any(t is not None and g.get("reps") is not None and g["reps"] < t
+               for (t, _), (_, g) in zip(targets, pairs)):
+            texts = list(dict.fromkeys(text for _, text in targets if text))
+            short.append({"exercise_id": line["exercise_id"], "target": "/".join(texts),
+                          "logged": [g.get("reps") for _, g in pairs]})
+    mean = sum(deltas) / len(deltas) if deltas else None
+    signals = [code for code, found in (("effort_below_target", below), ("effort_above_target", above),
+                                        ("reps_missed", short)) if found]
+    gate = (not prescribed or (LOGGED_SHARE[1] * logged >= LOGGED_SHARE[0] * prescribed
+                               and (mean is None or mean >= -RPE_SHORTFALL)))
+    return {"prescribed_sets": prescribed, "logged_sets": logged, "rpe_sets": len(deltas), "rpe_missing": missing,
+            "mean_rpe_delta": round(mean, 2) if mean is not None else None, "effort_below": below,
+            "effort_above": above, "reps_missed": short, "signals": signals, "hard_gate": gate}
 
 
-def _row_as_prescribed(inst, row):
+def trained_as_prescribed(prescribed_lines, workout):
+    """The hard-week session gate (rn:deloads.11): at least two thirds of the prescribed working sets logged and a
+    mean RPE no more than 1.5 under target, sets without a logged RPE counting as on target.
+
+    The gate counts training stress for the fatigue ledger; it is not proof the prescription was met, so a session
+    with missed reps or a grind past its target still passes. `compare` reports those.
+    """
+    return compare(prescribed_lines, workout)["hard_gate"]
+
+
+def _review_row(inst, row):
+    """(counts toward a hard week, the compare() review or None) for one planned session row."""
     if "external_id" in row:
-        return row["status"] == "done"
+        return row["status"] == "done", None
     if row["tier"] != "core" or row["status"] != "trained" or row.get("unlogged"):
-        return False
+        return False, None
     session = next((s for s in inst.program["sessions"] if s["id"] == row["session_id"]), None)
     if session is not None and session["kind"] == "conditioning":
-        return True
+        return True, None
     workout = inst.workout(row["workout_id"])
-    return workout is not None and trained_as_prescribed(_planned_lines(inst, row), workout)
+    if workout is None:
+        return False, None
+    found = compare(_planned_lines(inst, row), workout)
+    return found["hard_gate"], found
 
 
 def _is_return(inst, span):
@@ -249,7 +293,14 @@ def _is_return(inst, span):
 def _facts(inst, span):
     report = structure.week(inst.root, span, today=inst.today, now=inst.now)
     planned, trained = report["planned"], report["trained"]
-    as_prescribed = sum(1 for row in report["sessions"] if _row_as_prescribed(inst, row))
+    sessions = []
+    as_prescribed = 0
+    for row in report["sessions"]:
+        counts, found = _review_row(inst, row)
+        as_prescribed += counts
+        if found is not None:
+            sessions.append(dict(found, session_id=row["session_id"], date=row["date"],
+                                 workout_id=row["workout_id"]))
     ill = any(row.get("status") == "missed" and row.get("tag") == "ill" for row in report["sessions"])
     if report["kind"] in ("light",) + PAUSED:
         found = report["kind"]
@@ -262,7 +313,8 @@ def _facts(inst, span):
     else:
         found = "partial"
     return {"class": found, "planned": planned, "trained": trained, "as_prescribed": as_prescribed,
-            "on_break": sum(1 for row in report["on_break"] if row.get("tier", "core") == "core"), "ill": ill}
+            "on_break": sum(1 for row in report["on_break"] if row.get("tier", "core") == "core"), "ill": ill,
+            "kind": report["kind"], "kind_reason": report["kind_reason"], "sessions": sessions}
 
 
 def classify(root, week_start, *, today=None, now=None):
@@ -427,14 +479,50 @@ def _restructure_required(inst):
     return any(f["code"] == "restructure_required" for f in report["flags"])
 
 
+def repeated_decline(block_state, ledger, decisions_doc):
+    """The declined `light_week` decision a proposal repeats unchanged, or None.
+
+    Unchanged: the newest standing light-week decision declined an earlier proposal in this block, of the same
+    type for the same reason, and every week closed since that proposal was due again without a break, firing no
+    pair of triggers that decision had not seen. A repeat alone does not make a check-in deep; a new, changed or
+    returning proposal does.
+    """
+    light = block_state["light_week"]
+    if light["status"] != "proposed" or decisions_doc is None or ledger is None:
+        return None
+    standing = [d for d in decisions_doc["decisions"] if d["kind"] == "light_week" and d["status"] != "withdrawn"]
+    newest = max(standing, key=lambda d: (d["made_at"], d["id"]), default=None)
+    if newest is None or newest["outcome"] != "declined":
+        return None
+    details = newest["details"]
+    if not ((block_state["started"] or "") <= details["week"] < (light["week"] or "")):
+        return None
+    if (details["type"], details["reason"]) != (light["type"], light["reason"]):
+        return None
+    last = block_state["last_closed_week"] or ""
+    since = [w for w in ledger["blocks"][-1]["weeks"] if details["week"] <= w["week"] <= last]
+    if not since or since[0]["week"] != details["week"]:
+        return None
+    seen = set(details["triggers"])
+    for week in since:
+        fired = set(week["triggers"])
+        if week["outcome"] != "due" or (len(fired) >= TRIGGERS_FOR_LIGHT and not fired <= seen):
+            return None
+    return newest
+
+
 def deep_review(inst, block_state):
     """Whether the check-in that closes the newest week is deep, and why (C43)."""
     reasons, last = _deep_tier(inst, block_state)
+    repeat = None
     if block_state["light_week"]["status"] == "proposed":
-        reasons.append("light_week_proposed")
+        repeat = repeated_decline(block_state, inst.ledger, inst.decisions)
+        if repeat is None:
+            reasons.append("light_week_proposed")
     if _restructure_required(inst):
         reasons.append("restructure_required")
-    return {"due": bool(reasons), "reasons": reasons, "last_deep_review": last.isoformat() if last else None}
+    return {"due": bool(reasons), "reasons": reasons, "last_deep_review": last.isoformat() if last else None,
+            "repeat_of": repeat["id"] if repeat else None}
 
 
 DEEP_REASON_WORDS = {"first_close": "no deep check-in on record", "six_weeks": "six weeks since the last deep check-in",
@@ -445,7 +533,7 @@ DEEP_REASON_WORDS = {"first_close": "no deep check-in on record", "six_weeks": "
 RECORD_DEEP_REASONS = ("first_close", "six_weeks", "catch_up_deferred")
 
 
-def _flags(block_state, entry, deep, words=None):
+def _flags(block_state, entry, deep, words=None, decisions_doc=None):
     light = block_state["light_week"]
     found = []
     if light["status"] == "proposed":
@@ -455,8 +543,12 @@ def _flags(block_state, entry, deep, words=None):
                   "illness": "an illness week under 50 % trained",
                   "coach": "the coach's call"}.get(light["reason"], "carried over")
         when = f" for {_week_text(light['week'])}" if light["week"] else ""
+        repeat = _decision(decisions_doc, deep.get("repeat_of"))
+        again = (f"; proposed again after {repeat['id']} declined it ({repeat['reason']}), which alone does not make "
+                 "the check-in deep") if repeat else ""
         found.append(flags.make("light_week_due", message=(
-            f"Light week{when}: {light['type'] or 'deload'}, because {reason}; record the answer with block decide")))
+            f"Light week{when}: {light['type'] or 'deload'}, because {reason}{again}; record the answer with "
+            "block decide")))
     elif light["status"] == "skipped" and entry:
         names = ", ".join(TRIGGER_NAMES[t] for t in entry["triggers"])
         found.append(flags.make("light_week_skipped", message=(
@@ -470,6 +562,64 @@ def _flags(block_state, entry, deep, words=None):
         found.append(flags.make("deep_review_due", message=(
             "Run this check-in deep: " + "; ".join(DEEP_REASON_WORDS[r] for r in deep["reasons"]))))
     return found
+
+
+def _number(value):
+    return f"{round(abs(value), 1):g}"
+
+
+def _session_flags(inst, review):
+    """The prescription flags for one closed week's logged sessions: effort and reps against the prescription."""
+    def name(exercise_id):
+        return (inst.library.get(exercise_id) or {}).get("name", exercise_id)
+
+    def efforts(lines):
+        return "; ".join(f"{name(line['exercise_id'])} by {_number(line['mean_rpe_delta'])} across {line['sets']} sets"
+                         for line in lines)
+
+    found = []
+    for session in review["sessions"]:
+        where, session_id = f"{session['date']} {session['session_id']}", session["session_id"]
+        if session["effort_below"]:
+            found.append(flags.make("effort_below_target", session_id=session_id, message=(
+                f"{where}: logged RPE averaged under target ({efforts(session['effort_below'])}); the loads "
+                "look light, so review them with the athlete")))
+        if session["effort_above"]:
+            found.append(flags.make("effort_above_target", session_id=session_id, message=(
+                f"{where}: logged RPE averaged over target ({efforts(session['effort_above'])}); review the "
+                "loads and recovery with the athlete")))
+        if session["reps_missed"]:
+            lines = "; ".join(
+                f"{name(line['exercise_id'])} {'/'.join(str(r) if r is not None else '-' for r in line['logged'])} "
+                f"against {line['target']}" for line in session["reps_missed"])
+            found.append(flags.make("reps_missed", session_id=session_id, message=(
+                f"{where}: reps under the prescription ({lines}); the prescription was not met, whether or not the "
+                "session counted toward the hard-week count")))
+    return found
+
+
+def _review(span, facts):
+    """One closed week's sessions against their prescriptions, and a summary that keeps the hard-week gate apart
+    from completing the prescription."""
+    sessions = facts["sessions"]
+    parts = [f"{span.label()}: class {facts['class']}; {facts['as_prescribed']} of {facts['planned']} planned "
+             "sessions passed the hard-week gate (rn:deloads.11), which counts training stress for the block, not "
+             "completed prescriptions."]
+    counts = [(sum(1 for s in sessions if code in s["signals"]), words) for code, words in (
+        ("reps_missed", "missed reps"), ("effort_above_target", "logged effort over target"),
+        ("effort_below_target", "logged effort under target"))]
+    named = [f"{n} session{'s' if n != 1 else ''} {words}" for n, words in counts if n]
+    if named:
+        parts.append("Against the prescription: " + ", ".join(named) + ".")
+    missing = sum(s["rpe_missing"] for s in sessions)
+    if missing:
+        parts.append(f"No RPE logged on {missing} set{'s' if missing != 1 else ''} with a target: the gate counts "
+                     "them on target, but their effort was not measured.")
+    if facts["kind"] == "illness":
+        parts.append(f"Adherence leaves this week out ({facts['kind_reason']}).")
+    return {"week": span.start.isoformat(), "label": span.label(), "class": facts["class"], "kind": facts["kind"],
+            "kind_reason": facts["kind_reason"], "planned": facts["planned"], "trained": facts["trained"],
+            "hard_gate": facts["as_prescribed"], "sessions": sessions, "summary": " ".join(parts)}
 
 
 def _seed_from_state(block_state):
@@ -590,7 +740,7 @@ def close(root, week_start, readiness=None, sleep=None, deep=False, dry_run=Fals
                               f"({ledger['blocks'][-1]['started']})")
     ceiling = ceiling_of(inst.program)
     closed_at = _timestamp(inst.moment())
-    entries, ended, span, words = [], [], first, {}
+    entries, ended, span, words, reviews = [], [], first, {}, []
     outcome = week_type = reason = None
     while span.start <= target.start:
         is_target = span.start == target.start
@@ -606,6 +756,7 @@ def close(root, week_start, readiness=None, sleep=None, deep=False, dry_run=Fals
                  "closed_at": closed_at}
         block["weeks"].append(entry)
         entries.append(entry)
+        reviews.append(_review(span, facts))
         if facts["class"] in ENDS_BLOCK:
             block["ended"], block["end_reason"] = span.end.isoformat(), facts["class"]
             ended.append(block["id"])
@@ -617,11 +768,15 @@ def close(root, week_start, readiness=None, sleep=None, deep=False, dry_run=Fals
     light_week = _light_week_after(previous["light_week"], outcome, week_type, reason, target, replaced)
     block_state = _block_state(ledger, light_week, target.start.isoformat(), last_deep)
     inst.state = _with_block(inst, block_state)
+    inst.ledger = ledger
     deep_report = deep_review(inst, block_state)
     rendered = _save(inst, ledger, block_state, dry_run)
+    raised = _flags(block_state, entries[-1], deep_report, words, inst.decisions)
+    for review in reviews:
+        raised += _session_flags(inst, review)
     return {"weeks": entries, "replaced": replaced, "ended": ended, "block": block_state,
             "status_line": status_line_for(block_state, ceiling, ledger, inst.decisions),
-            "deep_review": deep_report, "flags": _flags(block_state, entries[-1], deep_report, words),
+            "deep_review": deep_report, "reviews": reviews, "flags": raised,
             "rendered": rendered, "written": not dry_run}
 
 
@@ -637,7 +792,7 @@ def status(root, *, today=None, now=None):
     current = ledger["blocks"][-1] if ledger else None
     return {"block": block_state, "ceiling": ceiling_of(inst.program),
             "status_line": status_line_for(block_state, ceiling_of(inst.program), ledger, inst.decisions),
-            "deep_review": deep_report, "flags": _flags(block_state, entry, deep_report),
+            "deep_review": deep_report, "flags": _flags(block_state, entry, deep_report, decisions_doc=inst.decisions),
             "ledger": {"blocks": len(ledger["blocks"]), "current": current["id"],
                        "weeks_in_current": len(current["weeks"])} if ledger else None,
             "last_week": entry}
