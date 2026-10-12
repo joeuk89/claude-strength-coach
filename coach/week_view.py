@@ -17,13 +17,15 @@ from coach.activity.store import ActivityStore
 COACH_LED, ACTIVITY = "coach_led", "activity"
 LOGGED = "logged"
 NIGGLE_STATUSES = ("aggravated", "watching", "easing")
+CLOSED_STATUSES = (None, "resolved")
 NIGGLE_FLAGS = ("niggle_link", "niggle_escalate")
 SLEEP_FLAGS = ("sleep_debt",)
 SLEEP_KEY = "sleep"
 LIGHT_WEEK_KEY = "light_week"
-# Lower sorts first: overlay `block` flags are 20 and `warn` flags 30 (C38).
+# Lower sorts first: overlay `block` flags are 20 and `warn` flags 30 (C38). A sleep watch from the last closed
+# week sorts after them, so this week's own `sleep_debt` reading shows in its place.
 PRIORITY = {"aggravated": 22, "light_week_proposed": 24, "watching": 26, "easing": 26, "fatigue_watch": 27,
-            "light_week_declined": 28, "light_week_skipped": 35}
+            "light_week_declined": 28, "sleep_watch": 31, "light_week_skipped": 35, "chronic": 45}
 TRIGGER_WORDS = {"readiness": "poor readiness", "rpe_drift": "RPE drift on a compound lift",
                  "niggle": "an aggravated niggle", "sleep": "poor sleep"}
 PROPOSED_BECAUSE = {"ceiling": "{hard_weeks} completed hard weeks reach the ceiling",
@@ -114,24 +116,32 @@ def flag_keys(flag):
 
 
 def open_niggle_ids(root, today):
+    """The niggles noted by `today` and not resolved on it, chronic ones included."""
     if not niggles.exists(root):
         return set()
-    return {row["id"] for row in niggles.load(root)["niggles"] if niggles.status_on(row, today) in NIGGLE_STATUSES}
+    return {row["id"] for row in niggles.load(root)["niggles"]
+            if niggles.status_on(row, today) not in CLOSED_STATUSES}
 
 
 def is_current(flag, open_ids):
-    """False for a stored niggle flag whose niggle is no longer open: resolving it retires the warning."""
+    """False for a stored niggle flag whose niggle is resolved, or not yet noted, on the page's date."""
     keys = flag_keys(flag)
     return not (flag["code"] in NIGGLE_FLAGS and keys and keys[0][len("niggle:"):] not in open_ids)
 
 
 def niggle_watch(root, today):
-    """(key, text, priority) for each niggle open on `today`: aggravated, watching or easing."""
+    """(key, text, priority) for each niggle aggravated, watching or easing on `today`, and each chronic one whose
+    limits are in force on it."""
     if not niggles.exists(root):
         return []
     found = []
     for row in niggles.load(root)["niggles"]:
         status = niggles.status_on(row, today)
+        if status == "chronic":
+            if niggles.constraints_on(row, today):
+                found.append((niggle_key(row["id"]), f"{row['area'].capitalize()} niggle (chronic): its limits "
+                                                     "apply to this week's loads.", PRIORITY["chronic"]))
+            continue
         if status not in NIGGLE_STATUSES:
             continue
         since = _status_since(row, today)
@@ -180,9 +190,10 @@ def block_watch(root):
     if light["status"] == "watch" and triggers:
         words = _trigger_words(triggers[0], facts["signals"])
         week = f" in the week of {render.short_date(facts['week'])}" if facts["week"] else ""
-        found.append((SLEEP_KEY if triggers[0] == "sleep" else "fatigue_watch",
+        sleep = triggers[0] == "sleep"
+        found.append((SLEEP_KEY if sleep else "fatigue_watch",
                       f"Fatigue watch: {words}{week}. Tell the coach how you recover this week.",
-                      PRIORITY["fatigue_watch"]))
+                      PRIORITY["sleep_watch" if sleep else "fatigue_watch"]))
     elif light["status"] == "proposed":
         when = f" for the week of {render.short_date(light['week'])}" if light["week"] else ""
         because = PROPOSED_BECAUSE.get(light["reason"], "").format(hard_weeks=facts["hard_weeks"])

@@ -5706,8 +5706,9 @@ these headings:
   (priority 20) and unresolved `warn` flags (30) on the overlays behind
   the week's sessions, and part items (default 50). R-40a routes the
   flags through `coach.flags.for_mode` (C44). A stored `niggle_link` or
-  `niggle_escalate` flag whose niggle is no longer open on the brief's
-  date is retired, the overlay keeping it. An item repeating a shown one
+  `niggle_escalate` flag whose niggle is resolved, or not yet noted, on
+  the brief's date is retired, the overlay keeping it; a chronic niggle
+  stays open. An item repeating a shown one
   word for word, or sharing one of its keys (`niggle:<id>`, `sleep`,
   `light_week`: a `niggle_*` flag carries its niggle's key, `sleep_debt`
   carries `sleep`), is left out, so an overlay flag and the live item it
@@ -5804,10 +5805,10 @@ Two parts replacing the same slot, a part naming an unknown slot, and a
 part filling a slot it does not declare in `SLOTS` are errors (exit 1,
 naming the modules). Parts run in module-name order and read only.
 
-R-25 ships one part itself, `nutrition`: when `coach.nutrition` exists and
-`nutrition status` says enabled, it adds `data.brief_line` to
-`brief.lines` (once) and the phase to `brief.header.phase`; absent or
-disabled, it adds nothing. A soft dependency on R-33a, computing nothing.
+R-25 ships two parts itself. The `nutrition` part: when
+`coach.nutrition` exists and `nutrition status` says enabled, it adds
+`data.brief_line` to `brief.lines` (once) and the phase to
+`brief.header.phase`; absent or disabled, it adds nothing. A soft dependency on R-33a, computing nothing.
 
 The `recovery` part adds current recovery context to `brief.watch`,
 each item keyed so an equivalent overlay flag shows once:
@@ -5815,12 +5816,15 @@ each item keyed so an equivalent overlay flag shows once:
 - each niggle aggravated, watching or easing on the brief's date (C27),
   key `niggle:<id>`, priority 22 aggravated or escalating, else 26: its
   area, status and since when, and what it applies to; an escalating one
-  says to have it assessed by a qualified professional. A resolved one
-  drops out; its rows stay.
+  says to have it assessed by a qualified professional. A chronic one
+  shows (45) while its limits are in force on the brief's date, saying
+  they apply to this week's loads. A resolved one drops out; its rows
+  stay.
 - the block's state now (`coach.block.watch_facts`, C43): a fatigue
   watch whose trigger fired in the state's last closed week (27; key
-  `sleep` for a sleep trigger), a proposed light week with its week,
-  type and reason (24), a declined one with its decision's reason and,
+  `sleep` and 31 for a sleep trigger, so this week's `sleep_debt` flag
+  shows in its place), a proposed light week with its week, type and
+  reason (24), a declined one with its decision's reason and,
   at the ceiling, that it is proposed again (28), or a skipped one with
   its triggers (35); key `light_week`. A later close that changes the
   state replaces it; the ledger keeps every week.

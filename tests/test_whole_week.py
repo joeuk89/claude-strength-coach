@@ -169,6 +169,47 @@ class WatchTest(WeekCase):
         self.assertEqual(sum("knee" in line for line in watch), 1)
         self.assertEqual(sum("sleep" in line for line in watch), 1)
         self.assertIn("Left knee niggle (watching since 11 Oct)", watch[0])
+        self.assertIn("- 4 of the 7 nights to 2026-10-11 were under 7 h asleep.", watch)
+
+    def test_a_chronic_niggle_keeps_its_current_flag_on_watch(self):
+        self.coach("niggles", "update", "n-0001", "--status", "chronic", "--date", "2026-10-12", now=MONDAY)
+        flag = dict(niggle_link(), message=niggle_link()["message"].replace("watching", "chronic"))
+        self.edit(f"data/overlays/{WEEKLY}.json", lambda doc: doc["flags"].append(flag))
+        self.assertEqual(section(self.brief(MONDAY), "Watch"), [f"- {flag['message']}"])
+
+    def test_a_chronic_niggle_whose_limits_apply_shows_once_beside_its_flag(self):
+        self.coach("niggles", "update", "n-0001", "--status", "chronic", "--pattern", "squat", "--constraint",
+                   "rpe_cap=7", "--date", "2026-10-12", now=MONDAY)
+        self.assertEqual(section(self.brief(MONDAY), "Watch"),
+                         ["- Left knee niggle (chronic): its limits apply to this week's loads."])
+        self.coach("niggles", "update", "n-0001", "--clear-constraints", "--date", "2026-10-12", now=MONDAY)
+        self.assertEqual(section(self.brief(MONDAY), "Watch"), ["- Nothing flagged."])
+
+    def test_a_niggle_with_limits_in_force_says_they_apply_to_this_weeks_loads(self):
+        self.coach("niggles", "update", "n-0001", "--pattern", "squat", "--flare-constraint", "rpe_cap=7",
+                   "--note", "sore on squats", "--date", "2026-10-12", now=MONDAY)
+        self.assertEqual(section(self.brief(MONDAY), "Watch"), [
+            "- Left knee niggle (watching since 11 Oct): tell the coach how it responds to runs and squat. Its limits "
+            "apply to this week's loads."])
+
+    def test_an_escalating_niggle_says_to_have_it_assessed(self):
+        self.coach("niggles", "update", "n-0001", "--status", "aggravated", "--date", "2026-10-12", now=MONDAY)
+        self.assertEqual(section(self.brief(MONDAY), "Watch")[0],
+                         "- Left knee niggle (aggravated since 12 Oct): worse: watching to aggravated. Have it assessed "
+                         "by a qualified professional (a doctor or physiotherapist); the program works around it "
+                         "meanwhile.")
+
+    def test_a_proposed_light_week_names_its_week_type_and_reason(self):
+        self.edit("data/state.json", lambda doc: doc["block"].update(hard_weeks_completed=6))
+        self.set_light_week(status="proposed", type="light", reason="ceiling", week="2026-10-19")
+        self.assertIn("- Light week proposed for the week of 19 Oct: a light week, because 6 completed hard weeks "
+                      "reach the ceiling. Decide it with the coach at the check-in.", section(self.brief(), "Watch"))
+
+    def test_a_skipped_light_week_names_its_triggers_and_the_hard_week_count(self):
+        self.close_week("2026-10-05", ["sleep", "readiness"], sleep="poor")
+        self.set_light_week(status="skipped")
+        self.assertIn("- Two fatigue triggers (poor sleep and poor readiness) with 2 completed hard weeks, too few "
+                      "for a light week: watch how you recover this week.", section(self.brief(), "Watch"))
 
     def read(self, relative):
         return (self.root / relative).read_bytes()
