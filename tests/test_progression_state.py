@@ -317,7 +317,7 @@ class LinearResetPipelineTest(ProposeCase):
         self.assertNotIn("unearned_load", codes(doc, "bb_back_squat"))
 
 
-class LadderOverridePipelineTest(ProposeCase):
+class LadderPipelineCase(ProposeCase):
     """The pull-up as an assisted ladder at its first rung, 30 kg of assistance, every logged exposure consumed."""
 
     def setUp(self):
@@ -343,19 +343,25 @@ class LadderOverridePipelineTest(ProposeCase):
         return next(line for session in doc["sessions"] for line in session["exercises"]
                     if line["exercise_id"] == "pull_up")
 
-    def log_pull_ups(self, day, load, rpe):
-        """A session-b workout on `day` trained against the approved overlay, holding only the pull-up."""
+    def log_pull_ups(self, day, load, rpe, overlay_id=FIRST_ID):
+        """A session-b workout on `day` trained against an approved overlay, holding only the pull-up."""
         def edit(doc):
             source = next(w for w in doc["workouts"] if any(e["exercise_id"] == "pull_up" for e in w["exercises"]))
             logged = copy.deepcopy(source)
             logged.update(workout_id="10000000-0000-4000-8000-000000000099", date=day, routine_id=R_B,
-                          session_id="session-b", overlay_id=FIRST_ID, start_time=f"{day}T18:00:00Z",
+                          session_id="session-b", overlay_id=overlay_id, start_time=f"{day}T18:00:00Z",
                           end_time=f"{day}T19:00:00Z",
                           exercises=[e for e in logged["exercises"] if e["exercise_id"] == "pull_up"])
             self.assist(logged["exercises"][0], load, rpe)
             doc["workouts"].append(logged)
         self.edit_json("data/history/2026-10.json", edit)
 
+    def next_week(self):
+        return self.pull_up(self.propose("--dry-run", env={"COACH_NOW": "2026-10-18T18:00:00Z"},
+                                         week="2026-W43")["overlay"])
+
+
+class LadderOverridePipelineTest(LadderPipelineCase):
     def approve_override_to_the_second_rung(self):
         line = self.pull_up(self.propose()["overlay"])
         self.assertEqual({coaching(s["load"]) for s in working(line)}, {30})
@@ -366,10 +372,6 @@ class LadderOverridePipelineTest(ProposeCase):
         state = read_json(self.root / "data" / "state.json")["scheme_state"]["session-b/pull_up"]
         self.assertEqual(state["pending"], {"overlay_id": FIRST_ID, "data": {"rung": 1, "through": "2026-10-08"}})
         self.coach("overlay", "approve", FIRST_ID)
-
-    def next_week(self):
-        return self.pull_up(self.propose("--dry-run", env={"COACH_NOW": "2026-10-18T18:00:00Z"},
-                                         week="2026-W43")["overlay"])
 
     def test_the_matching_log_at_the_approved_rung_is_its_baseline(self):
         self.approve_override_to_the_second_rung()
@@ -390,7 +392,41 @@ class LadderOverridePipelineTest(ProposeCase):
         self.assertEqual({coaching(s["load"]) for s in working(line)}, {25})
 
 
-class BodyweightLadderOverridePipelineTest(ProposeCase):
+class LadderDeloadPipelineTest(LadderPipelineCase):
+    """The pull-up ladder with its 30 kg hit of 2026-10-08 not yet judged, so the week earns the 25 kg rung."""
+
+    DELOAD_ID = "2026-10-12-deload"
+
+    def setUp(self):
+        super().setUp()
+        self.edit_json("data/state.json", lambda doc: doc["scheme_state"]["session-b/pull_up"]["data"].update(
+            through="2026-10-01"))
+
+    def test_an_ordinary_week_climbs_to_the_earned_rung(self):
+        line = self.pull_up(self.propose("--dry-run")["overlay"])
+        self.assertEqual({coaching(s["load"]) for s in working(line)}, {25})
+        self.assertEqual(line["target_note"], "Rung 2 of 3: 25 kg assist")
+
+    def test_a_deload_names_the_assistance_it_delivers_and_leaves_the_climb_for_later(self):
+        data = self.propose("--kind", "deload")
+        self.assertEqual(data["id"], self.DELOAD_ID)
+        line = self.pull_up(data["overlay"])
+        self.assertEqual({coaching(s["load"]) for s in working(line)}, {30})
+        self.assertEqual(line["target_note"], "Rung 1 of 3: 30 kg assist; rung 2 waits for an ordinary week")
+        self.assertNotIn("25", line["target_note"])
+
+        finalized = self.coach("propose", "finalize", "--proposal", self.DELOAD_ID)["data"]
+        self.assertNotIn("session-b/pull_up", finalized["pending"])
+        state = read_json(self.root / "data" / "state.json")["scheme_state"]["session-b/pull_up"]
+        self.assertEqual((state["data"], state["pending"]), ({"rung": 0, "through": "2026-10-01"}, None))
+        self.coach("overlay", "approve", self.DELOAD_ID)
+        self.log_pull_ups("2026-10-15", 30, 6, overlay_id=self.DELOAD_ID)
+        line = self.next_week()
+        self.assertEqual({coaching(s["load"]) for s in working(line)}, {25})
+        self.assertEqual(line["target_note"], "Rung 2 of 3: 25 kg assist")
+
+
+class BodyweightLadderCase(ProposeCase):
     """The pull-up as a bodyweight ladder stored at its top rung, +10 kg, every logged exposure consumed."""
 
     def setUp(self):
@@ -416,6 +452,8 @@ class BodyweightLadderOverridePipelineTest(ProposeCase):
         return next(line for session in doc["sessions"] for line in session["exercises"]
                     if line["exercise_id"] == "pull_up")
 
+
+class BodyweightLadderOverridePipelineTest(BodyweightLadderCase):
     def test_an_approved_override_back_to_bodyweight_holds_the_ladder_on_its_first_rung(self):
         line = self.pull_up(self.propose()["overlay"])
         self.assertEqual({coaching(s["load"]) for s in working(line)}, {10})
@@ -428,6 +466,25 @@ class BodyweightLadderOverridePipelineTest(ProposeCase):
         again = self.pull_up(self.propose("--dry-run")["overlay"])
         self.assertEqual({coaching(s["load"]) for s in working(again)}, {0})
         self.assertEqual(again["target_note"], "Rung 1 of 3: Bodyweight")
+
+
+class VariationLadderPipelineTest(BodyweightLadderCase):
+    """Two bodyweight variations under a weighted top rung, held on the second variation."""
+
+    def setUp(self):
+        super().setUp()
+        self.edit_program(lambda doc: self.slot(doc, "session-b", "pull_up").update(start_load=0, scheme={
+            "name": "assistance_ladder",
+            "params": {"rungs": [{"name": "Negative"}, {"name": "Band-free pull-up"}, {"name": "+10 kg", "load": 10}]},
+        }))
+        self.edit_json("data/state.json", lambda doc: doc["scheme_state"]["session-b/pull_up"]["data"].update(rung=1))
+
+    def test_every_week_names_the_variation_to_train(self):
+        for extra in ((), ("--kind", "deload")):
+            with self.subTest(extra=extra):
+                line = self.pull_up(self.propose("--dry-run", *extra)["overlay"])
+                self.assertEqual({coaching(s["load"]) for s in working(line)}, {0})
+                self.assertEqual(line["target_note"], "Rung 2 of 3: Band-free pull-up")
 
 
 class FinalizeAtomicTest(ProposeCase):
@@ -492,7 +549,7 @@ class ComputeGuidanceTest(unittest.TestCase):
         compute = flat(step_text("program-week", "compute.md"))
         for phrase in ("`incomplete_exposure`", "skipped or failed", "`misses_before_reset`",
                        "resets anyway and needs no question", "moves the ladder to that rung",
-                       "A refused finalize writes nothing"):
+                       "A refused finalize writes nothing", "a deload or light week still cuts it"):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, compute)
 

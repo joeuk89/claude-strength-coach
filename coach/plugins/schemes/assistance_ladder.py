@@ -118,16 +118,50 @@ def propose(ctx):
                          derived_from=source, state=state, target_note=_note(ctx, rung))
 
 
+def _rungs_at(params, load, load_mode):
+    """Every rung whose load is `load`; bodyweight variations share load 0."""
+    return [i for i, rung in enumerate(params["rungs"])
+            if (rung_load := _rung_load(load_mode, rung)) is not None and abs(rung_load - load) < 1e-9]
+
+
+def _rung_of(params, sets, load_mode):
+    """The one rung whose load every working set carries, or None."""
+    loads = {s.load for s in base.working(sets)}
+    if len(loads) != 1 or None in loads:
+        return None
+    found = _rungs_at(params, next(iter(loads)), load_mode)
+    return found[0] if len(found) == 1 else None
+
+
 def override_state(params, state, sets, load_mode):
     """The state after an approved override: on the rung whose load every overridden working set carries, so the
     coach's switch to that rung stands; an override off the rungs leaves the state as proposed."""
+    rung = _rung_of(params, sets, load_mode)
+    return dict(state) if rung is None else dict(state, rung=rung)
+
+
+def final_note(ctx, proposal, sets):
+    """The note for the rung the line delivers once a deload's held assistance, a constraint or a standing override
+    has moved its load off the proposed rung. Rungs sharing that load resolve to the proposed rung, else the nearest
+    below it. A deload names the climb it leaves for an ordinary week, unless a standing override holds the line."""
     loads = {s.load for s in base.working(sets)}
+    if loads <= {None}:
+        return proposal.target_note
     if len(loads) != 1 or None in loads:
-        return dict(state)
+        return None
     [load] = loads
-    rung_loads = [_rung_load(load_mode, rung) for rung in params["rungs"]]
-    found = [i for i, rung_load in enumerate(rung_loads) if rung_load is not None and abs(rung_load - load) < 1e-9]
-    return dict(state, rung=found[0]) if len(found) == 1 else dict(state)
+    proposed = proposal.state["rung"]
+    found = _rungs_at(ctx.params, load, ctx.exercise.load_mode)
+    if not found:
+        words = (f"{base.number(load)} {ctx.unit} of assistance" if ctx.exercise.load_direction < 0
+                 else base.load_words(ctx, load))
+        return f"Between rungs this week: {words}"
+    below = [i for i in found if i <= proposed]
+    rung = below[-1] if below else found[0]
+    standing = ctx.last_override is not None and ctx.last_override.get("standing")
+    if ctx.week_kind == "deload" and rung < proposed and not standing:
+        return f"{_note(ctx, rung)}; rung {proposed + 1} waits for an ordinary week"
+    return _note(ctx, rung)
 
 
 def decay(ctx, proposal, days_off):

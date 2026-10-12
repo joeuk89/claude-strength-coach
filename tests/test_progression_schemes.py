@@ -360,6 +360,53 @@ class AssistanceLadderTest(unittest.TestCase):
         self.assertEqual(loads_and_reps(proposal), [(0, 12)] * 3)
         self.assertIn("incline push-up", proposal.target_note)
 
+    def final_note(self, loads, week_kind="weekly", params=None):
+        ctx = replace(self.ladder({"rung": 0, "through": "2026-09-28"}), week_kind=week_kind,
+                      params=dict(self.PARAMS, **(params or {})))
+        proposal = base.Proposal(sets=(), rationale="x", derived_from=None, state={"rung": 1, "through": None},
+                                 flags=(), target_note="Rung 2 of 3: medium band")
+        sets = tuple(base.SetSpec(reps=8, rpe=6, load=load) for load in loads)
+        return scheme("assistance_ladder").module.final_note(ctx, proposal, sets)
+
+    def test_the_final_note_names_the_rung_the_sets_deliver(self):
+        self.assertEqual(self.final_note((30, 30)), "Rung 2 of 3: medium band")
+        self.assertEqual(self.final_note((20, 20)), "Rung 3 of 3: light band")
+        self.assertEqual(self.final_note((40, 40), "deload"),
+                         "Rung 1 of 3: heavy band; rung 2 waits for an ordinary week")
+
+    def test_a_final_note_off_the_rungs_names_the_load_or_nothing(self):
+        self.assertEqual(self.final_note((35, 35)), "Between rungs this week: 35 kg of assistance")
+        self.assertIsNone(self.final_note((40, 30)))
+        self.assertEqual(self.final_note((None, None), params={"rungs": [{"name": "a", "load": None}] * 3}),
+                         "Rung 2 of 3: medium band")
+
+    def variation_note(self, proposed, load, week_kind="weekly", last_override=None):
+        params = {"rungs": [{"name": "negative"}, {"name": "pull-up"}, {"name": "weighted", "load": 10}]}
+        bodyweight = replace(PULL_UP, load_mode="bodyweight", load_direction=1)
+        ctx = replace(context("assistance_ladder", params, exercise=bodyweight, sets=self.SETS, start_load=0,
+                              week_kind=week_kind), last_override=last_override)
+        proposal = base.Proposal(sets=(), rationale="x", derived_from=None, state={"rung": proposed, "through": None},
+                                 flags=(), target_note=f"Rung {proposed + 1} of 3: proposed")
+        sets = (base.SetSpec(reps=8, rpe=6, load=load),) * 3
+        return scheme("assistance_ladder").module.final_note(ctx, proposal, sets)
+
+    def test_a_variation_rung_sharing_its_load_keeps_its_name(self):
+        for week_kind in ("weekly", "deload"):
+            with self.subTest(week_kind=week_kind):
+                self.assertEqual(self.variation_note(1, 0, week_kind), "Rung 2 of 3: pull-up")
+                self.assertEqual(self.variation_note(0, 0, week_kind), "Rung 1 of 3: negative")
+
+    def test_a_load_moved_onto_shared_rungs_names_the_nearest_one_below(self):
+        self.assertEqual(self.variation_note(2, 0), "Rung 2 of 3: pull-up")
+        self.assertEqual(self.variation_note(2, 0, "deload"),
+                         "Rung 2 of 3: pull-up; rung 3 waits for an ordinary week")
+
+    def test_a_deload_under_a_standing_override_promises_no_climb(self):
+        standing = {"standing": True, "id": "d1", "until": "2026-11-15"}
+        self.assertEqual(self.variation_note(2, 0, "deload", standing), "Rung 2 of 3: pull-up")
+        self.assertEqual(self.variation_note(2, 0, "deload", dict(standing, standing=False)),
+                         "Rung 2 of 3: pull-up; rung 3 waits for an ordinary week")
+
 
 class Wave531Test(unittest.TestCase):
     def wave(self, state, params=None, e1rm=None, exercise=SQUAT, days_off=0, exposures=(), session_date=SESSION_DATE,

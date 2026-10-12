@@ -2,5 +2,5 @@
 
 KIND = "scheme"
 REQUIRED = ("propose", "decay")
-OPTIONAL = ("deload", "override_state")
+OPTIONAL = ("deload", "override_state", "final_note")
 STATEFUL = True
