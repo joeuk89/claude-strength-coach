@@ -3203,7 +3203,9 @@ constrained mode) stay coach-built through `overlay build`.
   since a scheme's own `deload` rebuilds the scheme's sets. The
   rationale names the kept sets, each adjustment, any load the kit
   changes and the scheme's own proposal, and the line raises
-  `override_standing`. A one-week override
+  `override_standing`. A cut of the kept sets is measured from the
+  lower of their top load and the derived-from load, and its rationale
+  and `load_cut_held` follow C23 for the kept sets. A one-week override
   (not standing) is only information to the scheme.
 - Standing overrides need an `until` date, default four weeks after
   `made_at`, at most eight. Renewing one is another `propose override

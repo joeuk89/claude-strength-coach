@@ -39,12 +39,13 @@ class StandingOverrideTransformTest(StandingOverrideCase):
         self.assertEqual(len(sets), 1)
         self.assertEqual({s["reps"] for s in sets}, {15})
         self.assertEqual({s["rpe"] for s in sets}, {6})
-        for s in sets:
-            self.assertLessEqual(coaching(s["load"]), 60 * 0.9 + 1e-9)
-            self.assertGreater(coaching(s["load"]), 60 * 0.9 - 2.5 - 1e-9)
+        self.assertEqual({coaching(s["load"]) for s in sets}, {55})
         rationale = squat["provenance"]["rationale"]
         self.assertIn("kept as 2×15 @ 60 RPE 9, adjusted for the", rationale)
         self.assertIn("deload: 1×15", rationale)
+        self.assertIn("a 10 % cut from 60 targets 54; the kit makes 55, an actual 8.3 % cut", rationale)
+        self.assertNotIn("the kit makes 55, not 54", rationale)
+        self.assertNotIn("load_cut_held", codes(doc, "bb_back_squat"))
         return squat
 
     def test_the_standard_deload_cuts_the_kept_sets_once(self):
@@ -108,6 +109,18 @@ class StandingOverrideKitTest(StandingOverrideCase):
         self.assertNotEqual(load, 61)
         self.assertIn(f"the kit makes {load:g}, not 61", squat["provenance"]["rationale"])
 
+
+    def test_a_deload_cut_the_kit_cannot_make_holds_the_kept_load_and_says_so(self):
+        self.coach("propose", "override", "--proposal", FIRST_ID, "--session", "session-a", "--exercise",
+                   "bb_back_squat", "--sets", "2x15@20 rpe9", "--reason", "synthetic: knee settles at 15 reps",
+                   "--standing")
+        doc = self.propose("--kind", "deload", "--dry-run")["overlay"]
+        squat = find_line(doc, "bb_back_squat")
+        self.assertEqual([(coaching(s["load"]), s["rpe"]) for s in working(squat)], [(20, 6)])
+        self.assertIn("a 10 % cut from 20 targets 18; the nearest load the kit makes no heavier than 20 is 20 itself",
+                      squat["provenance"]["rationale"])
+        held = [f for f in doc["flags"] if f["code"] == "load_cut_held" and f["exercise_id"] == "bb_back_squat"]
+        self.assertEqual([f["severity"] for f in held], ["info"])
 
 class StandingOverrideExpiryTest(StandingOverrideCase):
     def test_an_override_ending_sunday_is_not_kept_for_monday_whenever_the_week_is_proposed(self):
