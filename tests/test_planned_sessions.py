@@ -1,4 +1,4 @@
-"""Planned obligations: only from the program's adoption on, and a moved session counted once (contract C40, C41)."""
+"""Planned sessions: the schedule rule only from the program's adoption on, and a moved session planned once (C40, C41)."""
 
 import json
 import shutil
@@ -27,7 +27,7 @@ def codes(found):
     return [f["code"] for f in found]
 
 
-class ObligationCase(unittest.TestCase):
+class PlannedSessionCase(unittest.TestCase):
     """nohevy/: Session A on Mondays, B on Thursdays, Session A logged on 28 Sep and 5 Oct, adopted 11 Oct."""
 
     adopted = "2026-10-11"
@@ -46,6 +46,16 @@ class ObligationCase(unittest.TestCase):
         doc = read_json(path)
         change(doc)
         write_json(path, doc)
+
+    def remake(self, overlay_id, created_at):
+        """Rewrite an overlay as made at `created_at`, approved again."""
+        path = self.root / "data" / "overlays" / f"{overlay_id}.json"
+        doc = dict(read_json(path), created_at=created_at, approval=None)
+        write_json(path, overlay.approve(doc, dates.parse_timestamp(created_at)))
+
+    def drop_overlays(self):
+        for path in (self.root / "data" / "overlays").glob("*.json"):
+            path.unlink()
 
     def coach(self, *argv, now, expect=0):
         code, envelope, stderr = run_cli(["--root", str(self.root), *argv], env={"COACH_NOW": now})
@@ -89,7 +99,7 @@ class ObligationCase(unittest.TestCase):
         return [(w["label"], w["planned"], w["missed"], w["unreplaced"]) for w in lift["weeks"]]
 
 
-class AdoptionTest(ObligationCase):
+class AdoptionTest(PlannedSessionCase):
     def setUp(self):
         super().setUp()
         self.train("session-a", "2026-10-12")
@@ -121,12 +131,6 @@ class AdoptionTest(ObligationCase):
         report = self.week("2026-10-05", now="2026-10-18T19:00:00Z")
         self.assertEqual((report["sessions"], report["planned"], report["trained"]), ([], 0, 0))
 
-    def test_an_unrecorded_adoption_counts_from_the_first_overlay(self):
-        self.edit("data/state.json", lambda doc: doc.update(program_adopted=None))
-        data = self.coach("structure", "priority", now="2026-10-18T19:00:00Z")
-        self.assertEqual(self.lift_weeks(data, SQUAT), [("2026-W42", 1, 0, 0)])
-        self.assertEqual(data["flags"], [])
-
     def test_a_new_block_keeps_the_adoption_and_the_weeks_before_it(self):
         self.coach("block", "decide", "--outcome", "adopted", "--type", "light", "--week", "2026-10-19",
                    "--reason", "travel", now="2026-10-18T19:00:00Z")
@@ -142,8 +146,14 @@ class AdoptionTest(ObligationCase):
         self.assertEqual([w["label"] for w in data["skipped"]], ["2026-W43"])
 
 
-class MidweekAdoptionTest(ObligationCase):
+class MidweekAdoptionTest(PlannedSessionCase):
+    """A first program adopted on Wed 14 Oct, its opening week's overlay written that day."""
+
     adopted = "2026-10-14"
+
+    def setUp(self):
+        super().setUp()
+        self.remake(WEEKLY, f"{self.adopted}T09:00:00Z")
 
     def test_the_adoption_week_plans_only_the_days_from_adoption(self):
         self.train("session-b", "2026-10-15")
@@ -153,9 +163,19 @@ class MidweekAdoptionTest(ObligationCase):
         data = self.coach("structure", "priority", now="2026-10-18T19:00:00Z")
         self.assertEqual(self.lift_weeks(data, SQUAT), [("2026-W42", 0, 0, 0)])
         self.assertEqual(data["flags"], [])
+        card = self.coach("checkin", "prepare", "--until", "2026-10-18", now="2026-10-18T19:00:00Z")["card"]
+        self.assertEqual((card["sessions"]["planned_core"], card["sessions"]["trained_core"]), (1, 1))
+
+    def test_the_schedule_rule_plans_only_the_days_from_adoption(self):
+        self.train("session-b", "2026-10-15")
+        self.drop_overlays()
+        report = self.week("2026-10-12", now="2026-10-18T19:00:00Z")
+        self.assertEqual(self.rows(report), [("2026-10-15", "session-b", "trained")])
+        self.assertEqual((report["planned"], report["trained"]), (1, 1))
 
     def test_an_adoption_week_with_no_session_left_is_not_judged(self):
         self.edit("data/state.json", lambda doc: doc.update(program_adopted="2026-10-16"))
+        self.remake(WEEKLY, "2026-10-16T09:00:00Z")
         self.plan_week("2026-10-19")
         self.train("session-a", "2026-10-19")
         self.train("session-b", "2026-10-22")
@@ -164,8 +184,100 @@ class MidweekAdoptionTest(ObligationCase):
         priority = self.coach("structure", "priority", now="2026-10-25T19:00:00Z")
         self.assertEqual([row[0] for row in self.lift_weeks(priority, SQUAT)], ["2026-W43"])
 
+    def test_coach_led_sessions_start_at_adoption(self):
+        self.edit("data/program.json", lambda doc: doc.update(external_sessions=[
+            {"id": "pt-mon", "title": "PT", "weekday": "mon", "estimated_sets": {}}]))
+        self.plan_week("2026-10-19")
+        adoption_week = self.week("2026-10-12", now="2026-10-25T19:00:00Z")
+        next_week = self.week("2026-10-19", now="2026-10-25T19:00:00Z")
+        self.assertEqual([s.get("external_id") for s in adoption_week["sessions"]], [None])
+        self.assertEqual([(s["date"], s["external_id"]) for s in next_week["sessions"] if s.get("external_id")],
+                         [("2026-10-19", "pt-mon")])
 
-class MovedSessionTest(ObligationCase):
+
+class SundayWeekAdoptionTest(PlannedSessionCase):
+    """The midweek adoption with weeks starting on Sunday."""
+
+    adopted = "2026-10-14"
+
+    def setUp(self):
+        super().setUp()
+        self.remake(WEEKLY, f"{self.adopted}T09:00:00Z")
+        path = self.root / "config.toml"
+        path.write_text(path.read_text(encoding="utf-8").replace('week_starts = "monday"', 'week_starts = "sunday"'),
+                        encoding="utf-8")
+
+    def test_the_adoption_week_plans_only_the_days_from_adoption(self):
+        self.train("session-b", "2026-10-15")
+        report = self.week("2026-10-11", now="2026-10-18T19:00:00Z")
+        self.assertEqual((report["week"], report["span"]["end"]), ("2026-10-11", "2026-10-17"))
+        self.assertEqual(self.rows(report), [("2026-10-15", "session-b", "trained")])
+        self.assertEqual((report["planned"], report["trained"]), (1, 1))
+        data = self.coach("structure", "adherence", now="2026-10-18T19:00:00Z")
+        self.assertEqual([(w["week"], w["planned"], w["trained"]) for w in data["weeks"]], [("2026-10-11", 1, 1)])
+
+
+class ReplacedProgramTest(PlannedSessionCase):
+    """The program was replaced on Mon 19 Oct, after W42 was trained under the old program's overlay."""
+
+    def setUp(self):
+        super().setUp()
+        self.train("session-a", "2026-10-12")
+        self.train("session-b", "2026-10-15")
+        self.edit("data/state.json", lambda doc: doc.update(program_adopted="2026-10-19"))
+        self.plan_week("2026-10-19")
+        self.train("session-a", "2026-10-19")
+        self.train("session-b", "2026-10-22")
+
+    def test_the_old_programs_overlay_weeks_still_count(self):
+        data = self.coach("structure", "adherence", now="2026-10-25T19:00:00Z")
+        self.assertEqual([(w["label"], w["planned"], w["trained"]) for w in data["weeks"]],
+                         [("2026-W42", 2, 2), ("2026-W43", 2, 2)])
+        report = self.week("2026-10-12", now="2026-10-25T19:00:00Z")
+        self.assertEqual((report["planned"], report["trained"]), (2, 2))
+
+    def test_the_new_schedule_rule_never_reaches_back_before_the_replace(self):
+        self.drop_overlays()
+        report = self.week("2026-10-12", now="2026-10-25T19:00:00Z")
+        self.assertEqual((report["sessions"], report["planned"]), ([], 0))
+
+
+class UnrecordedAdoptionTest(PlannedSessionCase):
+    """A state migrated from v4: `program_adopted` is null."""
+
+    adopted = None
+
+    def setUp(self):
+        super().setUp()
+        self.train("session-a", "2026-10-12")
+        self.train("session-b", "2026-10-15")
+
+    def block_started(self, day):
+        self.edit("data/state.json", lambda doc: doc["block"].update(started=day))
+
+    def test_the_block_start_dates_it_when_no_overlay_exists(self):
+        self.drop_overlays()
+        self.block_started("2026-10-12")
+        self.assertEqual((self.week("2026-10-12", now="2026-10-18T19:00:00Z")["planned"],
+                          self.week("2026-10-05", now="2026-10-18T19:00:00Z")["planned"]), (2, 0))
+        closed = self.coach("block", "close", "--week", "2026-W42", "--dry-run", now="2026-10-18T19:00:00Z")
+        self.assertEqual(closed["weeks"][-1]["class"], "hard")
+
+    def test_the_first_overlay_dates_it_without_a_block_start(self):
+        self.block_started(None)
+        data = self.coach("structure", "priority", now="2026-10-18T19:00:00Z")
+        self.assertEqual(self.lift_weeks(data, SQUAT), [("2026-W42", 1, 0, 0)])
+        self.assertEqual(data["flags"], [])
+
+    def test_the_newest_program_archive_dates_a_replaced_program(self):
+        self.drop_overlays()
+        for name in ("2026-09-01", "2026-10-14"):
+            (self.root / "data" / "archive" / "programs" / name).mkdir(parents=True)
+        report = self.week("2026-10-12", now="2026-10-18T19:00:00Z")
+        self.assertEqual(self.rows(report), [("2026-10-15", "session-b", "trained")])
+
+
+class MovedSessionTest(PlannedSessionCase):
     """Session A missed on Mon 12 Oct and shifted to Sat 17 Oct by the program's rule."""
 
     approve = False
@@ -197,6 +309,18 @@ class MovedSessionTest(ObligationCase):
         closed = self.coach("block", "close", "--week", "2026-W42", "--dry-run", now="2026-10-18T19:00:00Z")
         week = closed["weeks"][-1]
         self.assertEqual((week["class"], week["planned"], week["trained"], week["as_prescribed"]), ("hard", 2, 2, 2))
+
+    def test_the_check_in_card_counts_a_trained_move_once(self):
+        self.train("session-a", "2026-10-17")
+        span = self.coach("stats", "adherence", "--span", "2026-10-12..2026-10-18", now="2026-10-18T19:00:00Z")
+        self.assertEqual([(s["date"], s["session_id"], s["status"]) for s in span["sessions"]],
+                         [("2026-10-15", "session-b", "trained"), ("2026-10-17", "session-a", "trained")])
+        card = self.coach("checkin", "prepare", "--until", "2026-10-18", now="2026-10-18T19:00:00Z")["card"]
+        self.assertEqual((card["sessions"]["planned_core"], card["sessions"]["trained_core"]), (2, 2))
+        self.assertNotIn("2026-10-12", [row["date"] for row in card["sessions"]["rows"]])
+        missed = self.coach("checkin", "misses", "--since", "2026-10-12", "--until", "2026-10-18",
+                            now="2026-10-18T19:00:00Z")
+        self.assertEqual(missed["sessions_missed"], 0)
 
     def test_priority_and_overlay_adherence_agree_on_a_trained_move(self):
         self.train("session-a", "2026-10-17")
@@ -231,8 +355,8 @@ class ApprovedMovedSessionTest(MovedSessionTest):
     approve = True
 
 
-class ExtraSessionTest(ObligationCase):
-    def test_an_extra_session_that_moves_nothing_is_a_second_obligation(self):
+class ExtraSessionTest(PlannedSessionCase):
+    def test_an_extra_session_that_moves_nothing_is_a_second_planned_session(self):
         def add_saturday_a(doc):
             monday = next(s for s in doc["sessions"] if s["session_id"] == "session-a")
             doc["sessions"].append(dict(json.loads(json.dumps(monday)), date="2026-10-17"))

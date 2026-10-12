@@ -553,15 +553,18 @@ def misses(root, since, until, now=None, include_unsynced=True):
     program_doc = history.load_optional(program, root)
     optional = {s["id"] for s in (program_doc["sessions"] if program_doc else []) if s["tier"] == "optional"}
     adherence = stats.adherence(root, span=(since, until), include_unsynced=include_unsynced, today=until, now=now)
-    spans = {doc["id"]: doc["span"] for doc in overlay.list(root)}
+    docs = overlay.list(root)
+    spans = {doc["id"]: doc["span"] for doc in docs}
     planned = [(row["session_id"], spans[row["overlay_id"]]) for row in adherence["sessions"]]
+    moved = overlay.moved_away(docs)
     for row in adherence["sessions"]:
         if row["status"] == "missed" and row["session_id"] not in optional:
             count(row["tag"], row["session_id"])
     for note in history.annotations(root, "miss"):
         if not since.isoformat() <= note["date"] <= until.isoformat() or note["session_id"] in optional:
             continue
-        if any(sid == note["session_id"] and span["start"] <= note["date"] <= span["end"] for sid, span in planned):
+        if (note["date"], note["session_id"]) in moved or any(
+                sid == note["session_id"] and span["start"] <= note["date"] <= span["end"] for sid, span in planned):
             continue
         count(note.get("tag"), note["session_id"])
     return {"since": since.isoformat(), "until": until.isoformat(), "by_tag": by_tag,

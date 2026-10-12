@@ -352,12 +352,8 @@ def _planned(root, overlays, overlay_id, span):
             if found and found[0]["id"] == doc["id"]:
                 planned.append((doc, session))
         return planned, dates.Span(dates.parse_date(doc["span"]["start"]), dates.parse_date(doc["span"]["end"]))
-    planned = []
-    for day in span.days():
-        found = overlay.pick_in_force(overlays, day)
-        if found:
-            planned += [(found[0], s) for s in overlay.sessions_on(found[0], day)]
-    return planned, span
+    adopted = state.adopted(root, history.load_optional(state, root), overlays)
+    return overlay.planned(overlays, span.days(), adopted, config_module.load(root).athlete.timezone), span
 
 
 def _nearest(items, day, key):

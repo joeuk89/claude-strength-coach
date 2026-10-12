@@ -100,10 +100,6 @@ class StateShowTest(EnvelopeMixin, unittest.TestCase):
         self.assertIn("session-c", " ".join(d["message"] for d in envelope["error"]["details"]))
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class ProgramAdoptedMigrationTest(unittest.TestCase):
     def test_v4_state_gains_an_unknown_adoption_and_a_note(self):
         doc = valid_state()
@@ -122,3 +118,7 @@ class ProgramAdoptedMigrationTest(unittest.TestCase):
         doc = valid_state()
         doc["program_adopted"] = "2026-02-30"
         self.assertIn("$.program_adopted", problem_paths(doc))
+
+
+if __name__ == "__main__":
+    unittest.main()

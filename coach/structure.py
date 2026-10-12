@@ -36,6 +36,7 @@ REACH_WEEKS = 12
 UNDERSHOOT_WEEKS = 3
 OVERRIDE_DAYS = 28
 LAYOFF_AFTER_DAYS = validity.RETURN_BANDS[0].upper
+_UNSET = object()
 FLOOR_PREFIX = "priority:"
 PRIORITY_DAYS = 28
 MINIMUM_MAX_SESSIONS = 2
@@ -153,7 +154,7 @@ class _Instance:
     overlays: list = None
     decisions: dict = None
     _workouts: list = field(default=None, repr=False)
-    _moved_away: set = field(default=None, repr=False)
+    _adopted: object = field(default=_UNSET, repr=False)
 
     @classmethod
     def load(cls, root, today=None, now=None, program_doc=None, require_program=True):
@@ -180,31 +181,13 @@ class _Instance:
 
     @property
     def adopted(self):
-        """The first day the program plans sessions: its recorded adoption, else the first overlay's start, else None.
+        """The first day the current program plans sessions from its schedule rule and coach-led sessions."""
+        if self._adopted is _UNSET:
+            self._adopted = state.adopted(self.root, self.state, self.overlays)
+        return self._adopted
 
-        Workouts before it stay training evidence; the program never planned anything they could miss.
-        """
-        recorded = (self.state or {}).get("program_adopted")
-        if recorded:
-            return dates.parse_date(recorded)
-        starts = [dates.parse_date(doc["span"]["start"]) for doc in self.overlays]
-        return min(starts) if starts else None
-
-    def obliges(self, day):
+    def schedules_on(self, day):
         return self.adopted is not None and day >= self.adopted
-
-    def moved_away(self):
-        """(original date, session id) of each session an overlay in force on the new date moved elsewhere."""
-        if self._moved_away is None:
-            self._moved_away = set()
-            for doc in self.overlays:
-                for session in doc["sessions"]:
-                    if not session.get("moved_from"):
-                        continue
-                    found = overlay.pick_in_force(self.overlays, session["date"])
-                    if found and found[0]["id"] == doc["id"]:
-                        self._moved_away.add((session["moved_from"], session["session_id"]))
-        return self._moved_away
 
     def made_on(self, decision):
         zone = self.config.athlete.timezone
@@ -263,24 +246,16 @@ def _program_session(session, day):
 def _planned_pairs(inst, span):
     """(overlay, session) planned in a span: the overlay in force each day, else the schedule rule on the program.
 
-    Days before the program's adoption plan nothing, and a moved session is planned on its new date only.
+    The schedule rule plans nothing before the program's adoption (contract C41).
     """
-    pairs, uncovered = [], set()
-    for day in span.days():
-        if not inst.obliges(day):
-            continue
-        found = overlay.pick_in_force(inst.overlays, day)
-        if found:
-            pairs += [(found[0], s) for s in overlay.sessions_on(found[0], day)]
-        else:
-            uncovered.add(day)
+    zone = inst.config.athlete.timezone
+    pairs = overlay.planned(inst.overlays, span.days(), inst.adopted, zone)
+    uncovered = {day for day in span.days() if inst.schedules_on(day) and not overlay.pick_in_force(inst.overlays, day)}
     if uncovered:
         stand_in = {"id": None, "kind": None, "span": span.to_json(), "sessions": []}
         for day, session_id in _schedule(inst, inst.program, span):
             if day in uncovered:
                 pairs.append((stand_in, _program_session(inst.program_session(session_id), day)))
-    moved = inst.moved_away()
-    pairs = [pair for pair in pairs if (pair[1]["date"], pair[1]["session_id"]) not in moved]
     return sorted(pairs, key=lambda pair: (pair[1]["date"], pair[1]["session_id"]))
 
 
@@ -294,7 +269,7 @@ def _external_rows(inst, span):
             days = [d for d in span.days() if base.WEEKDAYS[d.weekday()] == external["weekday"]]
         else:
             days = sorted({dates.parse_date(a["date"]) for a in own})
-        days = [d for d in days if inst.obliges(d)]
+        days = [d for d in days if inst.schedules_on(d)]
         used = set()
         for day in days:
             candidates = [(abs((dates.parse_date(a["date"]) - day).days), -index, index)
@@ -361,20 +336,21 @@ def _kind(inst, span, activity, until):
 
 
 def _program_week(inst, span):
-    """True for a week wholly after the program's adoption, or for the adoption week when it still plans a session."""
-    if inst.adopted is None or span.end < inst.adopted:
-        return False
-    return span.start >= inst.adopted or bool(_planned_pairs(inst, span) or _external_rows(inst, span))
+    """True for a week wholly on or after the program's adoption, or for any earlier week that plans a session."""
+    if inst.adopted is not None and span.start >= inst.adopted:
+        return True
+    return bool(_planned_pairs(inst, span) or _external_rows(inst, span))
 
 
 def _closed_weeks(inst, until, reach):
-    """Up to `reach` program weeks ending on or before `until`, newest first."""
+    """The program weeks among the `reach` weeks ending on or before `until`, newest first."""
     span = inst.week(until)
     if span.end > until:
         span = inst.week(span.start - timedelta(days=1))
     found = []
-    while len(found) < reach and _program_week(inst, span):
-        found.append(span)
+    for _ in range(reach):
+        if _program_week(inst, span):
+            found.append(span)
         span = inst.week(span.start - timedelta(days=1))
     return found
 

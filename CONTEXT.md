@@ -132,9 +132,10 @@ _Avoid_: regular week, counted week
 
 **Planned session**:
 A session the program expected on a date, which adherence counts as
-trained or missed. Sessions are planned only from the day the program
-was adopted, so older workouts never count as misses, and a moved
-session is planned once, on its new date. A new block changes neither.
+trained or missed. The schedule rule plans sessions only from the day
+the program was adopted, so older workouts never count as misses; an
+earlier program's overlays keep their own weeks. A moved session is
+planned once, on its new date. A new block changes neither.
 _Avoid_: obligation, scheduled session
 
 **Block**:

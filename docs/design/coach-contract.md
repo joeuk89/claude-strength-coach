@@ -1621,12 +1621,16 @@ version bump (below).
 
 ```json
 {
-  "schema_version": 3,
+  "schema_version": 5,
+  "program_adopted": "2026-09-01",
   "rotation": {"position": "week-a", "confirmed": true, "confirmed_at": "2026-10-11", "week": "2026-10-12"},
   "block": {
+    "id": "b-0001",
     "started": "2026-09-01",
     "hard_weeks_completed": 3,
-    "deload": {"status": "not_due", "since": null}
+    "last_closed_week": "2026-10-05",
+    "last_deep_review": null,
+    "light_week": {"status": "not_due", "type": null, "reason": null, "week": null, "decision_id": null}
   },
   "one_off": null,
   "scheme_state": {"session-a/bb_back_squat": {"scheme": "double_progression", "data": {}, "pending": null}},
@@ -1642,13 +1646,16 @@ version bump (below).
 ```
 
 - `program_adopted` (v5) is the date `program adopt` made the current
-  program the program, null when unknown. Planned sessions start on it
-  (C41). The migration from v4 sets it null; `program adopt` sets it,
-  including on `--replace`, while the block carries over.
+  program the program, null when unknown. The schedule rule plans
+  sessions from it (C41). The migration from v4 sets it null;
+  `program adopt` sets it, including on `--replace`, while the block
+  carries over. `coach.state.adopted` reads a null as the newest
+  `data/archive/programs/<date>/` (a replace archives the old program
+  that day), else the earliest of `block.started` and the first
+  overlay's start, else unknown.
 - `rotation.position` is null when the schedule has no rotation
   (`fixed_weekdays`); `confirmed_at` is a date or null.
-- `deload.status`: `not_due`, `due`, `in_progress`, `done`, `skipped`.
-  R-31 replaces `block` with the C42 shape.
+- `block` has the C42 shape (R-31, v4).
 - `one_off`: null or `{"overlay_id": id, "span": span}`.
 - `scheme_state` keys are `<session_id>/<exercise_id>` and name a slot the
   program has, or `<session_id>/_session` for a `conditioning` session's
@@ -5100,7 +5107,7 @@ null`:
   upcoming) and `unreplaced`. Each week with `unreplaced` raises one
   `priority_exposures_missed`, naming the misses. The `kpi` reads every
   workout since `since`, including those before the program's adoption;
-  only the `weeks` rows stop at it.
+  only the `weeks` rows are limited to program weeks.
 - **Program v8.** Optional `minimum_week.external_sessions` lists retained
   coach-led ids, default `[]`; migration `0007_minimum_external_sessions`
   adds the empty list to configured minimums and preserves null minimums.
@@ -5180,19 +5187,26 @@ coach.structure.ordinary_weeks(root, until, n=4, reach=12) -> list[str]
   (`coach.stats.set_weights`, C18). Planned dose for a date comes from the
   overlay in force; with no overlay, from `schedule plan` on the program.
   Working sets only.
-- **Planned sessions** start on the program's adoption date (C16
-  `program_adopted`; when it is null, the earliest overlay's start): a
-  day before it plans no session, coach-led ones included, so workouts
-  before it are training evidence only (KPIs, e1RM, validity) and never
-  misses. A session an overlay moved (`moved_from`, C37) is one planned
-  session, on its new date, when the overlay holding the moved copy is in
-  force there; its original date plans nothing. A session for the same
-  id that moves nothing is a separate planned session.
+- **Planned sessions** come from the overlay in force each day, else
+  from the schedule rule on the program. The schedule rule and coach-led
+  sessions plan only from the program's adoption date (C16
+  `program_adopted`, read by `coach.state.adopted`). An overlay plans a
+  day before that date only when it was made before it, so it belongs
+  to an earlier program: a replaced program's weeks keep counting, and
+  an opening week's overlay made at adoption plans nothing on the days
+  before it. Workouts on days that plan nothing are training evidence
+  only (KPIs, e1RM, validity), never misses. A session an overlay moved
+  (`moved_from`, C37) is one planned session, on its new date, when the
+  overlay holding the moved copy is in force there; its original date
+  plans nothing, and a `miss` annotation on it is not counted. A session
+  for the same id that moves nothing is a separate planned session.
+  `coach.overlay.planned` applies the overlay rules for both
+  `structure` and `stats adherence --span` (so the check-in card).
 - A **program week** is a week wholly on or after the adoption date, or
-  the week holding it when the days from adoption still plan a session.
-  Adherence, `ordinary_weeks` and the priority rows scan program weeks
-  only. Block starts (C42) move nothing here: a new block keeps every
-  earlier program week.
+  an earlier week that still plans a session. Adherence,
+  `ordinary_weeks` and the priority rows scan the program weeks among
+  the weeks they reach. Block starts (C42) move nothing here: a new
+  block keeps every earlier program week.
 - Coach-led sessions: planned from `program.external_sessions` placed by
   the schedule's weekday; delivered when an `external` annotation for that
   date says `done: true`, using `estimated_sets` as fractional sets. No

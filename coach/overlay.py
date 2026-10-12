@@ -118,6 +118,41 @@ def sessions_on(doc, day):
     return [s for s in doc["sessions"] if s["date"] == day]
 
 
+def created_on(doc, zone=None):
+    return dates.parse_timestamp(doc["created_at"]).astimezone(dates.zone(zone) if zone else None).date()
+
+
+def moved_away(docs):
+    """(original date, session id) of each session moved by an overlay that is in force on its new date."""
+    found = set()
+    for doc in docs:
+        for session in doc["sessions"]:
+            if session.get("moved_from"):
+                picked = pick_in_force(docs, session["date"])
+                if picked and picked[0]["id"] == doc["id"]:
+                    found.add((session["moved_from"], session["session_id"]))
+    return found
+
+
+def planned(docs, days, adopted=None, zone=None):
+    """(overlay, session) the overlay in force plans on each day (contract C41).
+
+    A moved session is planned on its new date only. A day before `adopted` plans only from an overlay made
+    before it, one written for an earlier program.
+    """
+    moved = moved_away(docs)
+    found = []
+    for day in days:
+        picked = pick_in_force(docs, day)
+        if not picked:
+            continue
+        doc = picked[0]
+        if adopted is not None and _as_date(day) < adopted and created_on(doc, zone) >= adopted:
+            continue
+        found += [(doc, s) for s in sessions_on(doc, day) if (s["date"], s["session_id"]) not in moved]
+    return found
+
+
 def approval_hash(doc):
     """The C7 canonical hash of the overlay with `approval` removed."""
     return jsonio.canonical_hash({key: value for key, value in doc.items() if key != "approval"})

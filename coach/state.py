@@ -12,6 +12,7 @@ from coach.validate import validate as validate_schema
 SCHEMA = "state"
 _SLOT_KEY = re.compile(r"^([a-z0-9-]+)/([a-z0-9_]+)$")
 SESSION_SLOT = "_session"
+_ARCHIVE_NAME = re.compile(r"^\d{4}-\d{2}-\d{2}(-\d+)?$")
 
 
 def path_for(root):
@@ -38,6 +39,27 @@ def load(root):
     if not path.is_file():
         raise ValidationError(f"No state yet: {paths.STATE} does not exist in {root}")
     return jsonio.read_doc(path, SCHEMA)
+
+
+def adopted(root, doc, overlays):
+    """The day the current program was adopted, or None when nothing records it (contract C41).
+
+    A null `program_adopted` predates the field. Then the newest program archive dates it, because a replace
+    archives the old program that day; else the earliest of the block's start and the first overlay's start.
+    """
+    recorded = (doc or {}).get("program_adopted")
+    if recorded:
+        return dates.parse_date(recorded)
+    archive = Path(root) / paths.PROGRAM_ARCHIVE_DIR
+    archived = sorted(entry.name[:10] for entry in archive.iterdir()
+                      if entry.is_dir() and _ARCHIVE_NAME.match(entry.name)) if archive.is_dir() else []
+    if archived:
+        return dates.parse_date(archived[-1])
+    starts = [found["span"]["start"] for found in overlays]
+    started = ((doc or {}).get("block") or {}).get("started")
+    if started:
+        starts.append(started)
+    return dates.parse_date(min(starts)) if starts else None
 
 
 def problems(doc, program_doc=None):
