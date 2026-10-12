@@ -72,9 +72,10 @@ Before searching, derive the brief from `profile.md`:
 - **Phase & targets** (Nutrition & goals): a cut wants high-satiety,
   protein-dense, lower-kcal meals; a bulk wants easy extra calories;
   maintenance wants balance. Respect the protein floor.
-- **Food & eating**: hard-filter dislikes and allergies — never present
-  a candidate that violates them; match cooking appetite (don't offer
-  hour-long cooks to an assemble-only athlete) and slot budgets.
+- **Food & eating** (`reference/record-formats.md`): use **Likes**;
+  hard-filter **Dislikes** and **Allergies/intolerances** — never present
+  a candidate that violates them. Match **Cooking appetite** and slot
+  budgets (assemble-only means no hour-long cooks).
 - **Training week**: portable/quick options for pre/post-session slots.
 
 ## Quality checks before drafting a card

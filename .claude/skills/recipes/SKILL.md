@@ -31,26 +31,25 @@ fails, run `python3 -m coach recipes render` before reading the index.
 
 ## 2. First run — the food interview
 
-If `profile.md` has no Food & eating section or `nutrition/menu/`
-doesn't exist, interview first — one question at a time, and **skip
-anything already on file; only ask what's missing**: likes, dislikes,
-allergies/intolerances; staples always in the house; cooking appetite
-(assemble-only ↔ batch-cook ↔ cook most days); how they shop (weekly
-online order, weekly in person, ad hoc top-ups); standing coverage
-(meal kit, canteen, family dinners, regular meals out); and plan style
-(loose ↔ strict — see `/meal-plan`). **If Food & eating is already
-complete, don't open an interview at all — confirm it's current and go
-straight to seeding.**
+For first-bank setup or a requested food-profile refresh, follow
+`reference/record-formats.md` → "profile.md: Food & eating". Reuse facts
+from existing prose, config and this conversation. Ask **all missing
+fields together in one message**, using that section's labels; a partial
+reply gets only the necessary follow-up. For a complete section, confirm
+it is current and go straight to seeding, even if the bank is absent.
+A specific recipe request needs only facts relevant to that request.
 
-Write/refresh the Food & eating section with the athlete's confirmation.
+Show the proposed Food & eating section and any slot-note TOML
+(`[nutrition.bank.slot_notes]`) together; write them only after the
+athlete confirms. Once `[nutrition.template]` exists, its planning
+fields live in config: a change to them is a `/meal-plan` template edit.
 
 Then **seed the bank**: draft cards for what the athlete already eats
 and likes (macros estimated per the card format), slot by slot, snacks
-included; offer a sourcing sweep (below) to fill thin slots.
-Record the slot notes that came out of the interview (coverage,
-per-slot priorities) in `config.toml` under
-`[nutrition.bank.slot_notes]`, then run `python3 -m coach recipes
-render`, which writes `index.md` with them.
+included; offer a sourcing sweep (below) to fill thin slots. Present cards
+for approval as below before writing. After approved config edits run
+`python3 -m coach config validate`; after card or slot-note writes run
+`python3 -m coach recipes render`, which writes the index with its notes.
 
 ## 3. Adding and shaping recipes — five modes
 

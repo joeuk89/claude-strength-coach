@@ -498,9 +498,16 @@ covers the rest of the profile):
 | reference basis and mass; floor, target, stretch; floor date and step | why that basis (the body-fat reading and its source) |
 | anchors: name, slot, days, macros or card | how the anchors were chosen; what the athlete likes |
 | the active override: dates, what, reason, exit condition, renewal count | — |
-| staples, office days, standing coverage, plan style (R-33c) | food likes, dislikes, allergies, cooking appetite, shopping style |
+| staples, office days, standing coverage, plan style (R-33c) | food likes, dislikes, allergies/intolerances, cooking appetite, shopping pattern |
 | — | sleep-gate status and reasoning (until an activity source, C29) |
 | — | the MacroFactor setup summary and revision notes |
+
+Before the first `/meal-plan` setup, the athlete's answers for the R-33c
+row sit in `profile.md` → Food & eating as prose that no script reads.
+The approval that writes `[nutrition.template]` replaces them with a
+pointer line, so those facts are never in both places; later changes are
+template edits. `reference/record-formats.md` → "profile.md: Food &
+eating" defines the fields, the grouped interview and the mapping.
 
 ## C5. Load modes and the load object
 
