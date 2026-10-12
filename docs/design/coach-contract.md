@@ -344,6 +344,7 @@ timezone = ""             # IANA name; empty = system local time
 experience = "intermediate"   # current level, explicitly confirmed during setup
 # birth_year = 1980           # optional positive whole year, not in the future
 # desired_sessions = 4        # optional weekly session target, 1..7; not availability
+demonstrated_exercises = []   # catalogue ids with "ability": "demonstrated" the athlete has shown (C45)
 available_days = []       # weekday ids "mon".."sun"; empty = not stated
 session_minutes = 60      # default time cap per session; 0 = no cap; [sessions.cap_minutes] overrides (C19)
 
@@ -353,6 +354,7 @@ cache_max_age_hours = 24  # coach check warns past this
 
 [equipment]               # the main place the athlete trains; all in athlete units
 available = []            # R-11 equipment enum values; empty = every piece assumed
+apparatus = []            # R-11 apparatus enum values; empty with available empty = every piece assumed
 dumbbells = []            # per-hand dumbbell weights available; empty = not checked
 dumbbell_increment = 2.0  # per hand
 dumbbell_max = 40.0       # per hand; a cap
@@ -365,7 +367,7 @@ cable_increment = 2.5
 [equipment.locations.home]  # optional; any number of named places (name ^[a-z0-9-]+$)
 available = ["dumbbell", "band", "bodyweight"]
 dumbbells = [5, 10, 15, 20] # any [equipment] key may appear; it overrides the main table at this place
-dumbbell_max = 20.0
+dumbbell_max = 20.0         # a place that sets available and no apparatus has none (equipment_for, C54)
 
 [caps]                    # optional: library exercise id = max load, athlete units
                           # (per hand for per-hand modes, total otherwise)
@@ -572,7 +574,13 @@ merges them; with no instance file the catalogue stands alone.
 - Catalogue entry: `id`, `name`, `aliases[]`, `hevy_titles[]`,
   `hevy_template_ids[]`, `muscles {primary[], secondary[]}`, `pattern`,
   `equipment`, `load_mode_default`, `increment {kg, lb} | null`,
-  `substitutes[]`. Enums, agreed in triage:
+  `substitutes[]`, and optionally `requires[]` and `ability`, which
+  only the catalogue carries (an instance entry cannot set them; a custom
+  entry has `requires: []` and `ability: null`). `requires` lists the
+  apparatus an exercise needs beyond its equipment; `ability:
+  "demonstrated"` marks an exercise an athlete must have shown they can
+  do before a swap picks it (C45). The catalogue is schema v3 and
+  carries no migration (C7). Enums, agreed in triage:
   - `pattern`: `squat`, `hinge`, `lunge`, `horizontal_push`,
     `vertical_push`, `horizontal_pull`, `vertical_pull`, `elbow_flexion`,
     `elbow_extension`, `shoulder_raise`, `knee_flexion`,
@@ -587,6 +595,9 @@ merges them; with no instance file the catalogue stands alone.
   - `equipment`: `barbell`, `ez_bar`, `trap_bar`, `dumbbell`,
     `kettlebell`, `machine`, `smith_machine`, `cable`, `plate`, `band`,
     `suspension`, `bodyweight`, `cardio_machine`, `other`.
+  - Apparatus (`library.APPARATUS`): `flat_bench`, `incline_bench`,
+    `pull_up_bar`, `dip_station`, `nordic_anchor`, `box` (a sturdy box,
+    step or chair). A listed bench also serves as a `box`.
 - `increment` is the entry's progression step in each unit: per hand for
   the per-hand modes, the total otherwise, null for `band`, `duration`
   and `distance`. `Library.increment(id, unit)` returns null when the
@@ -5288,7 +5299,7 @@ R-14b's `routines create`; adopt itself never calls Hevy.
 
 | id | Days | Main-lift scheme | Accessories | Level |
 |---|---|---|---|---|
-| `full-body-3` | 3 fixed | `linear` | `double_progression` | beginner |
+| `full-body-3` | 3 fixed | `linear` | `double_progression` | beginner; no required equipment, since every barbell lift has a dumbbell substitute |
 | `upper-lower-4` | 4 fixed | `double_progression` | `double_progression` | beginner to intermediate |
 | `push-pull-legs` | 3–6 rolling | `double_progression` | `double_progression` | intermediate |
 | `wave-3wk` ("3-week wave (5/3/1-style)") | 4 fixed | `wave_531` | `double_progression` | intermediate, barbell |
@@ -5302,15 +5313,17 @@ R-14b's `routines create`; adopt itself never calls Hevy.
   minimum` must pass on it.
 - Calibration lines (no data, no start load) carry `load: null` on a
   loaded mode with a `no_data` flag (C10).
-- `starters list [--days N] [--equipment E,...]` returns id, title,
-  summary, level, days, minutes and required equipment.
+- `starters list [--days N] [--equipment E,...] [--location NAME]`
+  returns id, title, summary, level, days, minutes, required equipment
+  and how the starter fits the kit.
 - `starters show ID` returns the starter and its rendered session pages.
-- `starters draft ID [--days mon,wed,fri] [--start-load EXERCISE=VALUE ...] [--out FILE] [--dry-run]`
+- `starters draft ID [--days mon,wed,fri] [--start-load EXERCISE=VALUE ...] [--location NAME] [--out FILE] [--dry-run]`
   remaps the schedule to the given days (default: `[athlete]
   available_days` when set, else the starter's defaults), applies any
   start loads (coaching numbers, athlete units), swaps exercises whose
-  equipment is not in `available` (from `equipment_for`, C54) or that are
-  avoided for the first library substitute that fits, and writes a draft
+  equipment is not in `available` (from `equipment_for`, C54), whose
+  apparatus or ability is unconfirmed, or that are avoided for the first
+  library substitute that fits, and writes a draft
   with `source: "starter:<id>"`. Exit 1 when the day count is outside
   `days` or `equipment_required` is not available.
 - `cites` holds template research claim refs (C28); empty until the notes
@@ -5336,13 +5349,18 @@ R-14b's `routines create`; adopt itself never calls Hevy.
   `maintenance`. Loaded lines start at null (a calibration line) except
   `bodyweight` lines, which start at 0 added load.
 - `starters list` returns `starters` (rows: `id`, `title`, `summary`,
-  `level`, `days`, `minutes`, `equipment_required`, `recommended`),
-  `days`, `equipment` (the filter used; empty means every piece),
-  `experience` and `recommended_id`. Rows sort by default day count,
-  then id. `recommended` is true when `level` holds `[athlete]
-  experience`; `recommended_id` is the first such row. `--days N` keeps
-  starters with `min <= N <= max`; `--equipment` keeps starters whose
-  `equipment_required` it covers (an unknown id is exit 2).
+  `level`, `days`, `minutes`, `equipment_required`, `swaps`,
+  `unmatched`, `recommended`), `days`, `equipment` (the filter used;
+  empty means every piece), `location`, `experience` and
+  `recommended_id`. Rows sort by default day count, then id. `swaps` and
+  `unmatched` count the `swapped_exercise` and `no_substitute` rows a
+  draft would report. `recommended` is true when `level` holds
+  `[athlete] experience` and `unmatched` is 0; `recommended_id` is the
+  first such row. `--days N` keeps starters with `min <= N <= max`;
+  `--equipment` replaces the place's `available` and keeps starters
+  whose `equipment_required` it covers (an unknown id is exit 2).
+  `--location` judges the kit at `[equipment.locations.NAME]` (unknown:
+  exit 5).
 - `starters show ID` returns `starter` and `pages` (`program
   render`'s pages for the starter's program with its default days).
 - `starters draft`:
@@ -5353,18 +5371,34 @@ R-14b's `routines create`; adopt itself never calls Hevy.
     on its first. The minimum week moves to the first chosen day and the
     one at index `(n + 1) div 2`. A day count outside `days` exits 1
     naming the allowed range and where the days came from.
-  - A line is swapped when its exercise is avoided (C54) or its
-    equipment is missing from a non-empty `available`, in every session,
-    standby ones included. The substitute is the first of the library
-    entry's `substitutes` that is not avoided, whose equipment is
-    available, that the session does not already hold, and whose load
-    mode the line's scheme accepts (`LOAD_MODES`). The line takes its
-    load mode (confirmed, else the catalogue default), `cues` null, and
-    a start load of 0 for `bodyweight`, else null. One `swapped_exercise`
-    row per line names the reason (the avoid reason, or the missing
-    equipment). With none that fits, the line stays and gets one
-    `no_substitute` row. A priority lift follows its first swap in an
-    active session.
+  - The kit is the place's (`--location`, else the main table) from
+    `equipment_for`; with `--location` every session's `location` is
+    that place. Unknown is not confirmed (`coach.fit`): an exercise does
+    not fit when its equipment is missing from a non-empty `available`,
+    when an apparatus it `requires` is not in `apparatus` (unless both
+    lists are empty: every piece assumed), or when its `ability` is
+    `demonstrated` and `[athlete] demonstrated_exercises` does not list
+    it, whatever the athlete's experience.
+  - A line is swapped when its exercise is avoided (C54) or does not
+    fit, in every session, standby ones included. The substitute is the
+    first of the library entry's `substitutes` that is not avoided, that
+    fits, that no niggle open on the draft's day (status not `resolved`)
+    covers unless it also covers the replaced exercise (C27 `matches`),
+    that the session does not already hold, and whose load mode the
+    line's scheme accepts (`LOAD_MODES`). The line takes its load mode
+    (confirmed, else the catalogue default), `cues` null, and a start
+    load of 0 for `bodyweight`, else null (a calibration line). One
+    `swapped_exercise` row per line names the reason and every
+    substitute passed over with its reason. With none that fits, the
+    line stays and gets one `no_substitute` row that names them too. A
+    priority lift follows its first swap in an active session.
+  - After a swap in an active session, `dose_targets` keeps each major
+    muscle's target and re-derives the rest as the starter files do:
+    each other primary muscle of an active exercise gets its planned
+    weekly fractional sets at the draft's schedule, capped at 6, and a
+    muscle no longer trained as a primary loses its target. A major
+    muscle a swap leaves short keeps 10, so `structure balance` shows
+    the gap.
   - `--start-load EXERCISE=VALUE` applies after the swaps to every line
     of that exercise. An exercise the draft lacks, a line that is not on
     a loaded mode, or a malformed pair exits 1.
@@ -5374,6 +5408,16 @@ R-14b's `routines create`; adopt itself never calls Hevy.
 - Catalogue: `bb_back_squat` gains `goblet_squat` and `bb_deadlift`
   gains `db_romanian_deadlift` as last substitutes, so a dumbbell kit
   can run upper/lower.
+- Catalogue regressions, so a bench-free dumbbell, band and bodyweight
+  kit can run `full-body-3`: `split_squat`, `bw_squat`, `sit_to_stand`
+  (`box`), `bw_step_up` (`box`), `incline_push_up` (`box`),
+  `knee_push_up` and `db_floor_press`. Last substitutes added:
+  `db_floor_press` for the flat presses; `db_bench_press`,
+  `db_floor_press` and `push_up` for `db_incline_bench_press`; `db_row`
+  for `lat_pulldown`; `db_romanian_deadlift` and
+  `db_single_leg_romanian_deadlift` for the leg curls;
+  `db_overhead_triceps_extension` for `cable_triceps_pushdown`; and the
+  bodyweight regressions for their loaded forms.
 
 ## C46. Training without Hevy: manual log and session sheets (R-40c; R-20, R-21a, R-25 read)
 
@@ -6132,6 +6176,8 @@ prose in `profile.md` is only what a human reads.
 | current experience, desired weekly sessions, available days, session length | `[athlete] experience`, `desired_sessions`, `available_days`, `session_minutes` (C4) | R-10 |
 | optional birth year | `[athlete] birth_year`; `config show` reports explicitly approximate age, or null when unknown | R-10 |
 | equipment at the main place and at other places | `[equipment]`, `[equipment.locations.<name>]` (C4) | R-10 |
+| benches, bars and supports at each place | `apparatus` in those tables (C4, C5) | R-41b |
+| skill exercises the athlete has shown they can do | `[athlete] demonstrated_exercises` (C4) | R-41b |
 | which place a session or a one-off week uses | session `location` in `program.json` (C16) and the overlay (C10) | R-17a, R-13 |
 | per-session time caps | `[sessions.cap_minutes]` (C19) | R-20 |
 | coach-led sessions | `program.external_sessions` (C16) | R-17a |
@@ -6159,8 +6205,10 @@ before completion; machine-owned values stay only in structured sources.
 
 **Equipment resolver.** `coach.config.equipment_for(config, location=None)
 -> dict` is the one resolver: the main `[equipment]` table with the named
-location's keys laid over it. An unknown location is a config error
-naming it. Every reader of equipment calls it: R-24 (caps and
+location's keys laid over it. A location that sets `available` and no
+`apparatus` gets `apparatus = []`: a bench or bar at the main place says
+nothing about another. An unknown location is a config error naming
+it. Every reader of equipment calls it: R-24 (caps and
 representable loads, C22), R-23a (caps and rounding), R-41b (substitution
 in `starters draft`), R-40a, `config suggest`.
 
@@ -6171,7 +6219,10 @@ in `starters draft`), R-40a, `config suggest`.
 - `available_days`: R-41b `starters draft` default days, R-30a's
   smaller-schedule proposal, R-22 `shift` rules (a shift never lands on a
   day outside `available_days` when it is non-empty, C37), R-40a.
-- `experience`: R-41b starter recommendation, R-40a.
+- `experience`: R-41b starter recommendation, R-40a. It never confirms
+  ability: `demonstrated_exercises` does.
+- `apparatus`, `demonstrated_exercises`: R-41b substitution
+  (`coach.fit`).
 
 **Avoided exercises** (R-11). Instance library entries
 (`data/exercises.json`) may carry `"avoid": null | {"reason": "non-empty

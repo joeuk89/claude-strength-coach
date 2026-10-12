@@ -381,7 +381,11 @@ def load(root, today=None):
 
 
 def equipment_for(config, location=None):
-    """The main [equipment] table, with the named location's keys laid over it."""
+    """The main [equipment] table, with the named location's keys laid over it.
+
+    A location that lists its own `available` kit and no `apparatus` has no
+    apparatus: a bench or bar at the main place says nothing about another.
+    """
     main = {k: v for k, v in config["equipment"].items() if k != "locations"}
     if location is None:
         return main
@@ -391,7 +395,10 @@ def equipment_for(config, location=None):
         raise ConfigError(
             f"{config.path}: no [equipment.locations.{location}] table for location \"{location}\" (known: {known})"
         )
-    main.update(locations[location])
+    place = locations[location]
+    main.update(place)
+    if "available" in place and "apparatus" not in place:
+        main["apparatus"] = []
     return main
 
 

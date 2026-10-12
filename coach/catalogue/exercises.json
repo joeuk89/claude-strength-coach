@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 3,
   "exercises": [
     {
       "id": "bb_back_squat",
@@ -195,7 +195,8 @@
       },
       "substitutes": [
         "db_squat",
-        "bb_front_squat"
+        "bb_front_squat",
+        "bw_squat"
       ]
     },
     {
@@ -226,7 +227,72 @@
       },
       "substitutes": [
         "goblet_squat",
-        "bb_back_squat"
+        "bb_back_squat",
+        "bw_squat"
+      ]
+    },
+    {
+      "id": "bw_squat",
+      "name": "Bodyweight Squat",
+      "aliases": [
+        "air squat",
+        "squat (bodyweight)"
+      ],
+      "hevy_titles": [],
+      "hevy_template_ids": [],
+      "muscles": {
+        "primary": [
+          "quadriceps",
+          "glutes"
+        ],
+        "secondary": [
+          "adductors"
+        ]
+      },
+      "pattern": "squat",
+      "equipment": "bodyweight",
+      "load_mode_default": "bodyweight",
+      "increment": {
+        "kg": 2.5,
+        "lb": 5
+      },
+      "substitutes": [
+        "goblet_squat",
+        "sit_to_stand",
+        "split_squat"
+      ]
+    },
+    {
+      "id": "sit_to_stand",
+      "name": "Sit to Stand",
+      "aliases": [
+        "chair stand",
+        "chair squat"
+      ],
+      "hevy_titles": [],
+      "hevy_template_ids": [],
+      "muscles": {
+        "primary": [
+          "quadriceps",
+          "glutes"
+        ],
+        "secondary": [
+          "adductors"
+        ]
+      },
+      "pattern": "squat",
+      "equipment": "bodyweight",
+      "load_mode_default": "bodyweight",
+      "increment": {
+        "kg": 2.5,
+        "lb": 5
+      },
+      "substitutes": [
+        "bw_squat",
+        "goblet_squat"
+      ],
+      "requires": [
+        "box"
       ]
     },
     {
@@ -259,7 +325,11 @@
       },
       "substitutes": [
         "db_lunge",
-        "db_step_up"
+        "db_step_up",
+        "split_squat"
+      ],
+      "requires": [
+        "box"
       ]
     },
     {
@@ -291,7 +361,8 @@
       },
       "substitutes": [
         "db_walking_lunge",
-        "db_bulgarian_split_squat"
+        "db_bulgarian_split_squat",
+        "split_squat"
       ]
     },
     {
@@ -354,7 +425,76 @@
       },
       "substitutes": [
         "db_lunge",
-        "db_bulgarian_split_squat"
+        "db_bulgarian_split_squat",
+        "bw_step_up"
+      ],
+      "requires": [
+        "box"
+      ]
+    },
+    {
+      "id": "split_squat",
+      "name": "Split Squat",
+      "aliases": [
+        "static split squat",
+        "static lunge",
+        "bodyweight split squat"
+      ],
+      "hevy_titles": [],
+      "hevy_template_ids": [],
+      "muscles": {
+        "primary": [
+          "quadriceps",
+          "glutes"
+        ],
+        "secondary": [
+          "adductors"
+        ]
+      },
+      "pattern": "lunge",
+      "equipment": "bodyweight",
+      "load_mode_default": "bodyweight",
+      "increment": {
+        "kg": 2.5,
+        "lb": 5
+      },
+      "substitutes": [
+        "db_lunge",
+        "bw_step_up",
+        "bw_squat"
+      ]
+    },
+    {
+      "id": "bw_step_up",
+      "name": "Step Up (Bodyweight)",
+      "aliases": [
+        "bodyweight step up",
+        "box step up"
+      ],
+      "hevy_titles": [],
+      "hevy_template_ids": [],
+      "muscles": {
+        "primary": [
+          "quadriceps",
+          "glutes"
+        ],
+        "secondary": [
+          "hamstrings"
+        ]
+      },
+      "pattern": "lunge",
+      "equipment": "bodyweight",
+      "load_mode_default": "bodyweight",
+      "increment": {
+        "kg": 2.5,
+        "lb": 5
+      },
+      "substitutes": [
+        "db_step_up",
+        "split_squat"
+      ],
+      "requires": [
+        "box"
       ]
     },
     {
@@ -623,6 +763,9 @@
       "substitutes": [
         "machine_hip_thrust",
         "glute_bridge"
+      ],
+      "requires": [
+        "flat_bench"
       ]
     },
     {
@@ -839,7 +982,9 @@
       },
       "substitutes": [
         "machine_lying_leg_curl",
-        "nordic_curl"
+        "nordic_curl",
+        "db_romanian_deadlift",
+        "db_single_leg_romanian_deadlift"
       ]
     },
     {
@@ -870,7 +1015,9 @@
       },
       "substitutes": [
         "machine_seated_leg_curl",
-        "nordic_curl"
+        "nordic_curl",
+        "db_romanian_deadlift",
+        "db_single_leg_romanian_deadlift"
       ]
     },
     {
@@ -901,7 +1048,11 @@
       "substitutes": [
         "machine_seated_leg_curl",
         "machine_lying_leg_curl"
-      ]
+      ],
+      "requires": [
+        "nordic_anchor"
+      ],
+      "ability": "demonstrated"
     },
     {
       "id": "machine_standing_calf_raise",
@@ -1154,6 +1305,9 @@
       "increment": null,
       "substitutes": [
         "machine_hip_adduction"
+      ],
+      "requires": [
+        "box"
       ]
     },
     {
@@ -1187,7 +1341,11 @@
       "substitutes": [
         "db_bench_press",
         "smith_bench_press",
-        "machine_chest_press"
+        "machine_chest_press",
+        "db_floor_press"
+      ],
+      "requires": [
+        "flat_bench"
       ]
     },
     {
@@ -1221,7 +1379,11 @@
       "substitutes": [
         "bb_bench_press",
         "machine_chest_press",
+        "db_floor_press",
         "push_up"
+      ],
+      "requires": [
+        "flat_bench"
       ]
     },
     {
@@ -1253,6 +1415,9 @@
       },
       "substitutes": [
         "db_incline_bench_press"
+      ],
+      "requires": [
+        "incline_bench"
       ]
     },
     {
@@ -1283,7 +1448,42 @@
         "lb": 5
       },
       "substitutes": [
-        "bb_incline_bench_press"
+        "bb_incline_bench_press",
+        "db_bench_press",
+        "db_floor_press",
+        "push_up"
+      ],
+      "requires": [
+        "incline_bench"
+      ]
+    },
+    {
+      "id": "db_floor_press",
+      "name": "Floor Press (Dumbbell)",
+      "aliases": [
+        "dumbbell floor press"
+      ],
+      "hevy_titles": [],
+      "hevy_template_ids": [],
+      "muscles": {
+        "primary": [
+          "chest"
+        ],
+        "secondary": [
+          "triceps",
+          "front_delts"
+        ]
+      },
+      "pattern": "horizontal_push",
+      "equipment": "dumbbell",
+      "load_mode_default": "per_hand_x2",
+      "increment": {
+        "kg": 2,
+        "lb": 5
+      },
+      "substitutes": [
+        "db_bench_press",
+        "push_up"
       ]
     },
     {
@@ -1346,6 +1546,9 @@
       "substitutes": [
         "bb_bench_press",
         "triceps_dip"
+      ],
+      "requires": [
+        "flat_bench"
       ]
     },
     {
@@ -1440,7 +1643,72 @@
       },
       "substitutes": [
         "db_bench_press",
-        "machine_chest_press"
+        "machine_chest_press",
+        "incline_push_up",
+        "knee_push_up"
+      ]
+    },
+    {
+      "id": "incline_push_up",
+      "name": "Incline Push Up",
+      "aliases": [
+        "incline press up",
+        "hands elevated push up"
+      ],
+      "hevy_titles": [],
+      "hevy_template_ids": [],
+      "muscles": {
+        "primary": [
+          "chest"
+        ],
+        "secondary": [
+          "triceps",
+          "front_delts"
+        ]
+      },
+      "pattern": "horizontal_push",
+      "equipment": "bodyweight",
+      "load_mode_default": "bodyweight",
+      "increment": {
+        "kg": 2.5,
+        "lb": 5
+      },
+      "substitutes": [
+        "knee_push_up",
+        "push_up"
+      ],
+      "requires": [
+        "box"
+      ]
+    },
+    {
+      "id": "knee_push_up",
+      "name": "Knee Push Up",
+      "aliases": [
+        "kneeling push up",
+        "knee press up"
+      ],
+      "hevy_titles": [],
+      "hevy_template_ids": [],
+      "muscles": {
+        "primary": [
+          "chest"
+        ],
+        "secondary": [
+          "triceps",
+          "front_delts"
+        ]
+      },
+      "pattern": "horizontal_push",
+      "equipment": "bodyweight",
+      "load_mode_default": "bodyweight",
+      "increment": {
+        "kg": 2.5,
+        "lb": 5
+      },
+      "substitutes": [
+        "incline_push_up",
+        "push_up"
       ]
     },
     {
@@ -1474,7 +1742,11 @@
       "substitutes": [
         "assisted_dip",
         "bb_decline_bench_press"
-      ]
+      ],
+      "requires": [
+        "dip_station"
+      ],
+      "ability": "demonstrated"
     },
     {
       "id": "assisted_dip",
@@ -1536,6 +1808,9 @@
       "substitutes": [
         "cable_fly",
         "machine_pec_deck"
+      ],
+      "requires": [
+        "flat_bench"
       ]
     },
     {
@@ -2135,6 +2410,9 @@
       "substitutes": [
         "machine_seated_row",
         "db_row"
+      ],
+      "requires": [
+        "incline_bench"
       ]
     },
     {
@@ -2428,7 +2706,11 @@
         "chin_up",
         "assisted_pull_up",
         "lat_pulldown"
-      ]
+      ],
+      "requires": [
+        "pull_up_bar"
+      ],
+      "ability": "demonstrated"
     },
     {
       "id": "chin_up",
@@ -2463,7 +2745,11 @@
         "pull_up",
         "assisted_pull_up",
         "close_grip_lat_pulldown"
-      ]
+      ],
+      "requires": [
+        "pull_up_bar"
+      ],
+      "ability": "demonstrated"
     },
     {
       "id": "assisted_pull_up",
@@ -2528,7 +2814,8 @@
       "substitutes": [
         "pull_up",
         "close_grip_lat_pulldown",
-        "assisted_pull_up"
+        "assisted_pull_up",
+        "db_row"
       ]
     },
     {
@@ -2745,6 +3032,9 @@
       "substitutes": [
         "db_curl",
         "cable_curl"
+      ],
+      "requires": [
+        "incline_bench"
       ]
     },
     {
@@ -2895,7 +3185,8 @@
       },
       "substitutes": [
         "cable_overhead_triceps_extension",
-        "triceps_dip"
+        "triceps_dip",
+        "db_overhead_triceps_extension"
       ]
     },
     {
@@ -2983,6 +3274,9 @@
       },
       "substitutes": [
         "cable_overhead_triceps_extension"
+      ],
+      "requires": [
+        "flat_bench"
       ]
     },
     {
@@ -3043,7 +3337,11 @@
       "substitutes": [
         "cable_triceps_pushdown",
         "bb_close_grip_bench_press"
-      ]
+      ],
+      "requires": [
+        "dip_station"
+      ],
+      "ability": "demonstrated"
     },
     {
       "id": "plank",
@@ -3182,7 +3480,11 @@
       "substitutes": [
         "cable_crunch",
         "ab_wheel"
-      ]
+      ],
+      "requires": [
+        "pull_up_bar"
+      ],
+      "ability": "demonstrated"
     },
     {
       "id": "ab_wheel",

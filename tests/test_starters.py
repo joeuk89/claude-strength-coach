@@ -243,11 +243,11 @@ class ListTest(Case):
     def test_a_row_carries_what_the_athlete_chooses_on(self):
         row = self.ok(EMPTY, "starters", "list")["starters"][0]
         self.assertEqual(set(row), {"id", "title", "summary", "level", "days", "minutes", "equipment_required",
-                                    "recommended"})
+                                    "swaps", "unmatched", "recommended"})
 
     def test_equipment_filters_out_starters_that_need_more(self):
         found = self.ok(EMPTY, "starters", "list", "--equipment", "dumbbell,bodyweight")
-        self.assertEqual({row["id"] for row in found["starters"]}, {"push-pull-legs", "upper-lower-4"})
+        self.assertEqual({row["id"] for row in found["starters"]}, {"full-body-3", "push-pull-legs", "upper-lower-4"})
 
     def test_equipment_defaults_to_config(self):
         root = instance(self)
@@ -312,9 +312,9 @@ class DraftTest(Case):
     def test_a_dumbbell_and_bodyweight_kit_swaps_every_barbell_exercise(self):
         root = instance(self)
         path = root / "config.toml"
-        path.write_text(path.read_text(encoding="utf-8").replace('available = []',
-                                                                  'available = ["dumbbell", "bodyweight"]'),
-                        encoding="utf-8")
+        path.write_text(path.read_text(encoding="utf-8").replace(
+            'available = []', 'available = ["dumbbell", "bodyweight"]\napparatus = ["flat_bench", "incline_bench"]'),
+            encoding="utf-8")
         library = Library()
         before = starters.load("upper-lower-4")["program"]
         draft = self.draft(root, "upper-lower-4")
@@ -345,9 +345,8 @@ class DraftTest(Case):
     def test_start_loads_take_the_swapped_ids_a_dry_run_lists_as_priority(self):
         root = instance(self)
         path = root / "config.toml"
-        path.write_text(path.read_text(encoding="utf-8").replace('available = []',
-                                                                  'available = ["dumbbell", "bodyweight"]'),
-                        encoding="utf-8")
+        path.write_text(path.read_text(encoding="utf-8").replace(
+            'available = []', 'available = ["dumbbell", "bodyweight"]\napparatus = ["flat_bench"]'), encoding="utf-8")
         preview = self.ok(root, "starters", "draft", "upper-lower-4", "--dry-run")
         self.assertFalse(preview["written"])
         self.assertFalse((root / ".coach/drafts/program.json").exists())
@@ -387,7 +386,7 @@ class DraftTest(Case):
 
     def test_an_avoided_exercise_with_no_fitting_substitute_is_reported(self):
         root = instance(self)
-        for exercise_id in ("lat_pulldown", "pull_up", "close_grip_lat_pulldown", "assisted_pull_up"):
+        for exercise_id in ("lat_pulldown", "pull_up", "close_grip_lat_pulldown", "assisted_pull_up", "db_row"):
             self.ok(root, "library", "set-avoid", exercise_id, "--reason", "shoulder")
         draft = self.draft(root, "full-body-3")
         missing = [row for row in rows(draft, "no_substitute") if row["exercise_id"] == "lat_pulldown"]

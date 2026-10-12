@@ -15,6 +15,9 @@ timezone = ""                 # IANA name such as "Europe/London"; "" = this com
 experience = "intermediate"   # current level confirmed with the athlete: beginner, intermediate or advanced
 # birth_year = 1980           # optional; omitted means unknown, derived age is approximate
 # desired_sessions = 4        # sessions wanted each week, separate from available weekdays
+demonstrated_exercises = []   # skill exercises the athlete has shown they can do for working sets:
+                              # "pull_up", "chin_up", "chest_dip", "triceps_dip", "nordic_curl",
+                              # "hanging_leg_raise"; a swap picks one only once it is listed here
 available_days = []           # days the athlete can train: "mon" .. "sun"; [] = not stated
 session_minutes = 60          # default time cap per session; 0 = no cap
 
@@ -31,6 +34,10 @@ cache_max_age_hours = 24      # `coach check` warns when the Hevy cache is older
 # "band", "suspension", "bodyweight", "cardio_machine", "other".
 [equipment]
 available = []                # equipment the athlete has; [] = assume every piece
+apparatus = []                # benches, bars and supports confirmed here: "flat_bench", "incline_bench",
+                              # "pull_up_bar", "dip_station", "nordic_anchor", "box" (a sturdy box, step
+                              # or chair; a bench serves as one). [] with available = [] assumes every
+                              # piece; otherwise an unlisted one is missing
 dumbbells = []                # per-hand dumbbell weights available; [] = not checked
 # dumbbell_increment = 2.0    # smallest per-hand dumbbell jump
 # dumbbell_max = 40.0         # heaviest per-hand dumbbell; prescriptions are capped here
@@ -42,7 +49,8 @@ dumbbells = []                # per-hand dumbbell weights available; [] = not ch
 
 # Other places the athlete trains, one table each. The name uses lowercase
 # letters, digits and hyphens. Any [equipment] key may appear; at that place
-# it replaces the main table's value, and keys left out keep it.
+# it replaces the main table's value, and keys left out keep it, except that
+# a place listing its own available and no apparatus has no apparatus.
 #
 # [equipment.locations.home]
 # available = ["dumbbell", "band", "bodyweight"]

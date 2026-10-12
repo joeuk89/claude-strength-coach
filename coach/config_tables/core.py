@@ -21,6 +21,15 @@ def _time_zone(value):
     return None
 
 
+def _demonstrated(value):
+    needs = library.needs_demonstrated_ids()
+    unknown = [item for item in value if item not in needs]
+    if unknown:
+        return (f"holds only library ids of exercises that need demonstrated ability ({', '.join(needs)}); "
+                f"found {', '.join(unknown)}")
+    return None
+
+
 ATHLETE = Table(
     keys={
         "units": Key("string", choices=UNITS),
@@ -31,6 +40,7 @@ ATHLETE = Table(
         "desired_sessions": Key("integer", default=OMIT, minimum=1,
                                 check=lambda value: "must be at most 7" if value > 7 else None),
         "experience": Key("string", default="intermediate", choices=EXPERIENCE),
+        "demonstrated_exercises": Key("list", default=[], item="string", distinct=True, check=_demonstrated),
         "available_days": Key("list", default=[], item="string", item_choices=WEEKDAYS, distinct=True),
         "session_minutes": Key("integer", default=60, minimum=0),
     }
@@ -45,6 +55,7 @@ HEVY = Table(
 
 EQUIPMENT_KEYS = {
     "available": Key("list", default=[], item="string", item_choices=library.EQUIPMENT, distinct=True),
+    "apparatus": Key("list", default=[], item="string", item_choices=library.APPARATUS, distinct=True),
     "dumbbells": Key("list", default=[], item="number", distinct=True, positive=True),
     "dumbbell_increment": Key("number", default=ByUnit({"kg": 2.0}), positive=True),
     "dumbbell_max": Key("number", default=ByUnit({"kg": 40.0}), positive=True),

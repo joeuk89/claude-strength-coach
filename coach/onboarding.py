@@ -62,6 +62,12 @@ def _notes(unit, gym, equipment):
                        "a home gym, and prescriptions are capped there.",
         })
     notes.append({
+        "key": "equipment.apparatus",
+        "message": "Ask which of a flat bench, an incline bench, a pull-up bar, a dip station, somewhere to anchor "
+                   "the heels for Nordic curls, and a sturdy box or step the place has; list them in apparatus. Once "
+                   "available lists the kit, an unlisted one counts as missing.",
+    })
+    notes.append({
         "key": "equipment.plates",
         "message": f"Ask whether there are {_SMALLEST_PLATE[unit]} {unit} plates; leave that size out of plates "
                    "if not.",

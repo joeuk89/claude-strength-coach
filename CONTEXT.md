@@ -23,10 +23,24 @@ _Avoid_: proposal (a week's proposed prescriptions), candidate program, import f
 A tested program that ships with the framework for an athlete who has no
 program of their own: full body, upper/lower, push/pull/legs, a 3-week
 wave or full body by RPE. Drafting one fits it to the athlete's days,
-equipment and avoided exercises, and its lines without a known load run
-a **calibration week**: no load, and the athlete chooses one they could
-lift for the target reps at the target RPE.
+equipment, **apparatus**, **demonstrated ability** and avoided exercises,
+and its lines without a known load run a **calibration week**: no load,
+and the athlete chooses one they could lift for the target reps at the
+target RPE.
 _Avoid_: template (the repo itself), preset, stock program
+
+**Apparatus**:
+A bench, bar or support an exercise needs beyond its equipment: a flat or
+incline bench, a pull-up bar, a dip station, a Nordic anchor or a box. A
+place has only the apparatus its config lists, unless it lists no kit at
+all.
+_Avoid_: equipment (the coarse kind: barbell, dumbbell, cable), fixture
+
+**Demonstrated ability**:
+What a skill exercise such as a pull-up, dip or Nordic curl needs before a
+swap picks it: the athlete has shown they can do it for working sets.
+Experience alone never confirms it.
+_Avoid_: difficulty, level, clearance
 
 **Run mode**:
 The coaching mode for an athlete who wants their own program run as

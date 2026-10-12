@@ -2,7 +2,7 @@
   "schema_version": 1,
   "id": "full-body-3",
   "title": "Full body, 3 days",
-  "summary": "Three full-body sessions a week built on the barbell squat, bench press, deadlift and overhead press, adding load every session while the lifts keep moving.",
+  "summary": "Three full-body sessions a week built on the squat, bench press, deadlift and overhead press, adding load every session while the lifts keep moving; without a barbell, draft swaps in dumbbell and bodyweight variants.",
   "level": [
     "beginner"
   ],
@@ -16,9 +16,7 @@
     ]
   },
   "minutes_per_session": 55,
-  "equipment_required": [
-    "barbell"
-  ],
+  "equipment_required": [],
   "cites": [
     "rn:progression-training-age.3",
     "rn:volume-frequency.1",

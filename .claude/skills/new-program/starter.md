@@ -4,14 +4,17 @@ For an athlete with no program of their own who would rather start from
 a tested one than design one from scratch.
 
 1. **Pick a starter with the athlete:** run `python3 -m coach starters
-   list` (`--days N` for their training days; equipment defaults to
-   `[equipment] available`). Show each one's title, summary, days,
-   minutes and required equipment. `recommended` marks the starters that
-   suit `[athlete] experience`: advice, not a filter. `python3 -m coach
-   starters show <id>` prints a starter's session pages.
+   list` (`--days N` for their training days; `--location <name>` when
+   they will train it at another place; equipment defaults to that
+   place's `available`). Show each one's title, summary, days, minutes,
+   required equipment and `swaps`. `recommended` marks the starters that
+   suit `[athlete] experience` with every line fitting the kit
+   (`unmatched` 0): advice, not a filter. `python3 -m coach starters show
+   <id>` prints a starter's session pages.
 2. **Preview the draft:** run `python3 -m coach starters draft <id>
    --dry-run`, with `--days mon,wed,fri` when they train on days other
-   than `[athlete] available_days`. It exits 1 when the day count is
+   than `[athlete] available_days` and the same `--location` as step 1.
+   It exits 1 when the day count is
    outside the starter's range or the kit lacks the equipment its main
    lifts need: pick other days or another starter. The draft's
    `program.priority` lists the main lifts after any swap for the kit or
@@ -27,10 +30,16 @@ a tested one than design one from scratch.
    ids in the preview's `program.priority`. It writes
    `.coach/drafts/program.json`.
 5. **Show the draft's report as one table** (kind, session, exercise,
-   message). A `swapped_exercise` row is an exercise the kit cannot
-   support, or one the athlete avoids, swapped for its first fitting
-   library substitute: agree its cues. A `no_substitute` row has no
-   fitting substitute: agree a swap or drop it, and edit the draft.
+   message), before adoption. A `swapped_exercise` row is an exercise
+   the kit, an unconfirmed apparatus or ability, or the avoid list rules
+   out, swapped for its first fitting library substitute; its message
+   names each substitute passed over and why. Agree its cues. A
+   `no_substitute` row has no fitting substitute: agree a swap or drop
+   it, and edit the draft. When the athlete confirms a missing bench,
+   bar or support (`[equipment] apparatus`) or shows they can do a skill
+   exercise (`[athlete] demonstrated_exercises`), update `config.toml`
+   and draft again. Swaps can move the weekly dose: the balance picture
+   after adoption shows any gap to agree.
 6. **Adopt:** run `python3 -m coach program adopt --input
    .coach/drafts/program.json --dry-run`, then without `--dry-run`, as
    SKILL.md step 2 sets out; then Path B step 5 (design.md) for the

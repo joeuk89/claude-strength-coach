@@ -3,7 +3,9 @@
 The catalogue (`coach/catalogue/exercises.json`) ships with the framework.
 The instance file (`data/exercises.json`) holds the athlete's overrides,
 custom entries, confirmed load modes and avoided exercises; sync never
-touches it. See contract C5 ("Exercise library") and C54.
+touches it. Only the catalogue says which apparatus an exercise `requires`
+and whether it needs demonstrated `ability`. See contract C5 ("Exercise
+library") and C54.
 """
 
 import copy
@@ -28,6 +30,9 @@ EQUIPMENT = (
     "barbell", "ez_bar", "trap_bar", "dumbbell", "kettlebell", "machine", "smith_machine", "cable", "plate",
     "band", "suspension", "bodyweight", "cardio_machine", "other",
 )
+APPARATUS = ("flat_bench", "incline_bench", "pull_up_bar", "dip_station", "nordic_anchor", "box")
+APPARATUS_SERVES = {"flat_bench": ("box",), "incline_bench": ("box",)}
+DEMONSTRATED = "demonstrated"
 
 CATALOGUE_PATH = Path(__file__).resolve().parent / "catalogue" / "exercises.json"
 ID_PATTERN = re.compile(r"^[a-z0-9_]+$")
@@ -57,6 +62,12 @@ def match_key(text):
 
 def empty_instance():
     return {"schema_version": 1, "exercises": {}}
+
+
+@functools.lru_cache(maxsize=1)
+def needs_demonstrated_ids():
+    """Catalogue ids an athlete must have shown they can do before a swap picks them."""
+    return tuple(entry["id"] for entry in _catalogue_entries() if entry.get("ability") == DEMONSTRATED)
 
 
 @functools.lru_cache(maxsize=1)
@@ -137,6 +148,8 @@ class Library:
         template_id = entry["hevy_template_id"]
         if template_id is not None and template_id not in entry["hevy_template_ids"]:
             entry["hevy_template_ids"].append(template_id)
+        entry["requires"] = list(base.get("requires", [])) if source == "catalogue" else []
+        entry["ability"] = base.get("ability") if source == "catalogue" else None
         entry["source"] = source
         entry["overridden"] = sorted(name for name in CATALOGUE_FIELDS if name in own and source == "catalogue")
         entry["effective_load_mode"] = entry["load_mode"]
