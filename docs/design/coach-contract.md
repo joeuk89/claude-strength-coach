@@ -5724,8 +5724,8 @@ these headings:
   days (20; `total`, `per_hand_x2` and `single_implement` lifts only, a
   point strictly above every earlier one; the first such line names
   `stats.E1RM_LABEL`); a core-complete streak of two
-  weeks or more (30); every core session trained last week (40); part
-  items.
+  weeks or more, named as weeks with every core session trained (30);
+  every core session trained last week (40); part items.
 - An empty Changed, Watch or Wins prints one line saying so.
 - Over 60 lines: cut items from the end of Wins, then Watch, then
   Changed, until it fits; a section left with no items goes, heading
@@ -5753,9 +5753,9 @@ never show; "Nothing flagged." when empty), then a progress summary of at
 most five lines (three e1RM bests, the first naming `stats.E1RM_LABEL`;
 the core-complete streak labelled as the stricter count, "Core-complete
 streak (weeks with every core session trained): 2 weeks (longest 3
-weeks)", or "none yet" before any finished week counts; latest bodyweight
-with the same basis and sources as `progress.md`), then links
-(`this-week.md`, `progress.md`, latest record, `routine/program.md`,
+weeks)", or "none counted yet" before any finished week counts;
+latest bodyweight with the same basis and sources as `progress.md`),
+then links (`this-week.md`, `progress.md`, latest record, `routine/program.md`,
 `check-ins/`, and the template's README on GitHub for "how this works").
 The Sessions table header is within the first 12 lines. The three bests
 are the program's exercises in session order, then any others by name.
@@ -5773,9 +5773,9 @@ ordinary week, "no completed ordinary week yet, so there is nothing to
 count". It shows no percentage. The weeks adherence left out follow:
 "; left out: week of 21 Sep (illness)" for up to three, each with its
 kind in words (`planned break`, `light week`, `minimum week`, `one-off
-week`, `layoff`, `illness`), else their count by kind ("5 weeks (2
-illness, 3 layoff)"). The page only selects what leads: adherence,
-its thresholds and the streak keep their own definitions.
+week`, `layoff`, `illness`), else their count by kind in that order
+("5 weeks (3 layoff, 2 illness)"). The page only selects what leads:
+adherence, its thresholds and the streak keep their own definitions.
 
 "Last publish time" is the as-of time: `pages publish` renders the page
 just before it commits, so the two match, while a time read from git

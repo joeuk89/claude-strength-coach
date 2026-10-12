@@ -21,7 +21,7 @@
 - Best e1RM (estimated one-rep max): Back Squat 127 kg (12 Oct 2026)
 - Best e1RM: Bench Press 35 kg/hand (12 Oct 2026)
 - Best e1RM: Single Arm Row 42 kg (1 Oct 2026)
-- Core-complete streak (weeks with every core session trained): none yet
+- Core-complete streak (weeks with every core session trained): none counted yet
 
 ## Links
 

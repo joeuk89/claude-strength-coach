@@ -478,11 +478,11 @@ class StreakTest(PagesCase):
         self.assertTrue(lines[1].endswith("oldest first: ✗ ✔ ✔"), lines[1])
         wins = section(self.page("this-week.md"), "Wins")
         self.assertEqual(len(wins), 3)
-        self.assertIn("- Core-complete streak: 2 weeks", wins)
+        self.assertIn("- Core-complete streak: 2 weeks with every core session trained", wins)
         self.render("--only", "brief", env={"COACH_NOW": "2026-10-11T18:00:00Z"})
         self.assertEqual(section(self.page("this-week.md"), "Wins"), [
             "- New best e1RM (estimated one-rep max): Back Squat 122 kg (Mon 5 Oct)",
-            "- Core-complete streak: 2 weeks",
+            "- Core-complete streak: 2 weeks with every core session trained",
             "- Every core session trained last week (2 of 2)"])
 
     def test_an_unannotated_coach_led_session_does_not_break_it(self):
@@ -650,12 +650,40 @@ class ConsistencyTest(PagesCase):
                          "- Consistency: 12 of 15 planned sessions trained in 3 completed ordinary weeks "
                          "(28 Sep – 18 Oct); a full count takes 4; left out: week of 19 Oct (planned break)")
 
+    def test_more_than_three_left_out_weeks_are_counted_by_kind(self):
+        self.notes = [n for n in self.notes if n["date"] >= "2026-10-19"]
+        self.drop_note("2026-10-22", "session_id", "session-b")
+        self.note("miss", date(2026, 10, 22), session_id="session-b", tag="ill")
+        self.coach("status-days", "add", "--kind", "travel", "--from", "2026-09-28", "--to", "2026-10-18",
+                   "--note", "Away, no gym", "--no-training", env={"COACH_NOW": "2026-09-27T09:00:00Z"})
+        found = self.adherence()
+        self.assertEqual([s["kind"] for s in found["skipped"]], ["break", "break", "break", "illness"])
+        self.assertEqual(self.consistency(self.dashboard()),
+                         "- Consistency: no completed ordinary week yet, so there is nothing to count; "
+                         "left out: 4 weeks (3 planned break, 1 illness)")
+
+    def test_left_out_kinds_follow_the_contract_order_not_their_counts(self):
+        skipped = [{"week": f"2026-{week}", "kind": kind}
+                   for week, kind in (("08-03", "illness"), ("08-10", "illness"), ("08-17", "layoff"),
+                                      ("08-24", "layoff"), ("08-31", "layoff"))]
+        found = {"weeks": [{"week": "2026-09-07"}], "planned": 5, "trained": 4, "skipped": skipped}
+        self.assertEqual(pages._consistency_line(found),
+                         "Consistency: 4 of 5 planned sessions trained in 1 completed ordinary week (7 Sep – 13 Sep); "
+                         "a full count takes 4; left out: 5 weeks (3 layoff, 2 illness)")
+
+    def test_ordinary_weeks_that_planned_nothing_say_so_instead_of_zero_of_zero(self):
+        found = {"weeks": [{"week": "2026-09-07"}, {"week": "2026-09-14"}], "planned": 0, "trained": 0,
+                 "skipped": []}
+        self.assertEqual(pages._consistency_line(found),
+                         "Consistency: no planned session in 2 completed ordinary weeks (7 Sep – 20 Sep); "
+                         "a full count takes 4")
+
     def test_a_new_athlete_with_no_completed_week_sees_an_honest_empty_state(self):
         text = self.dashboard("2026-09-30T18:00:00Z")
         self.assertEqual(self.consistency(text),
                          "- Consistency: no completed ordinary week yet, so there is nothing to count")
         self.assertNotIn("%", text)
-        self.assertIn("- Core-complete streak (weeks with every core session trained): none yet",
+        self.assertIn("- Core-complete streak (weeks with every core session trained): none counted yet",
                       section(text, "Progress"))
         self.assertNotIn("0 weeks", text)
         self.assertEqual(section(self.page("progress.md"), "Consistency"),

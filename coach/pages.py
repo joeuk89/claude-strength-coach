@@ -600,7 +600,8 @@ class _View:
                                   f"({render.day_label(best['date'])})", PRIORITY["e1rm"]))
         current, _ = self.streak
         if current >= STREAK_WIN_WEEKS:
-            items.append(Item(f"Core-complete streak: {current} weeks", PRIORITY["streak"]))
+            items.append(Item(f"Core-complete streak: {current} weeks with every core session trained",
+                              PRIORITY["streak"]))
         last = self.weeks[-1] if self.weeks else None
         if last and last[3] and last[2] == last[3]:
             items.append(Item(f"Every core session trained last week ({last[2]} of {last[3]})",
@@ -736,7 +737,7 @@ def _progress_summary(view):
     if view.weeks:
         found.append(f"{STRICT_STREAK}: {_weeks_text(current)} (longest {_weeks_text(longest)})")
     else:
-        found.append(f"{STRICT_STREAK}: none yet")
+        found.append(f"{STRICT_STREAK}: none counted yet")
     basis, fallback, points = view.body_weights
     if points:
         latest = points[-1]
