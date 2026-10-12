@@ -19,7 +19,7 @@ register("load_mode_unconfirmed", owner="R-24", severities=("block",),
          summary="Line's exercise has no confirmed load mode in the library; only confirming it clears the flag.")
 register("rpe_infeasible", owner="R-24", severities=("warn",),
          summary="RPE target more than 1 away from the implied RPE at every rep target the line allows, or a "
-                 "recovery RPE ceiling more than 1 below it.")
+                 "recovery RPE ceiling or a rep-out set's cap more than 1 below it.")
 register("session_over_cap", owner="R-24", severities=("warn",),
          summary="Estimated session duration above its cap.")
 

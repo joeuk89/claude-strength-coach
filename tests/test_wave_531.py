@@ -431,6 +431,13 @@ class WavePipelineCase(ProposeCase):
 
 
 class WavePipelineTest(WavePipelineCase):
+    def test_the_rep_out_cap_is_a_stop_not_an_rpe_target(self):
+        """At a training max of 100 the + set is 85 × 5, far below RPE 9 at the squat's e1RM of 121.88."""
+        doc = self.propose("--dry-run")["overlay"]
+        last = squat(doc)["sets"][-1]
+        self.assertEqual((coaching(last["load"]), last["reps"], last.get("rep_out"), last["rpe"]), (85, 5, True, 9))
+        self.assertNotIn("rpe_infeasible", codes(doc, "bb_back_squat"))
+
     def test_four_approved_weeks_with_no_logs_repeat_week_one_and_keep_the_training_max(self):
         """Weeks without training also bring a return band, which lowers only that week's loads."""
         for week, now in (("2026-W42", "2026-10-11T18:00:00Z"), ("2026-W43", "2026-10-18T18:00:00Z"),

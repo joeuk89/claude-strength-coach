@@ -237,6 +237,21 @@ class FeasibilityTest(ValidityCase):
     def test_3x5_at_100_rpe_8_is_fine(self):
         self.assertEqual(self.squat(working(5, 8, 100)), [])
 
+    def rep_out(self, load, cap):
+        return [dict(working(5, cap, load, count=1)[0], rep_out=True)]
+
+    def test_a_rep_out_set_lighter_than_its_cap_is_fine(self):
+        """85 × 5 implies RPE 1.98 at the e1RM of 121.88: the athlete reps out further, so the cap is no target."""
+        self.assertEqual(self.squat(self.rep_out(85, 9)), [])
+        self.assertEqual(self.squat(self.rep_out(100, 9)), [])
+
+    def test_a_rep_out_set_whose_minimum_reps_pass_its_cap_is_infeasible(self):
+        self.assertEqual(self.squat(self.rep_out(105, 9)), ["rpe_infeasible"])
+        self.assertEqual(self.squat(self.rep_out(100, 7)), ["rpe_infeasible"])
+        message = next(f["message"] for f in self.found() if f["code"] == "rpe_infeasible"
+                       and f["exercise_id"] == "bb_back_squat")
+        self.assertIn("stop at RPE 7, but 100 × 5 already implies RPE 8.44", message)
+
 
 class NoE1rmTest(HistoryCase):
     """Squat logged only at 20 reps, which gives no e1RM (C18)."""

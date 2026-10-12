@@ -1717,7 +1717,7 @@ version bump (below).
 
 ```json
 {
-  "schema_version": 5,
+  "schema_version": 6,
   "program_adopted": "2026-09-01",
   "rotation": {"position": "week-a", "confirmed": true, "confirmed_at": "2026-10-11", "week": "2026-10-12"},
   "block": {
@@ -2411,7 +2411,7 @@ Reserved codes:
 | `load_geometry_unknown` | warn | R-24 | | Physical feasibility unknown: configure the known Smith, EZ-bar or trap-bar base mass. |
 | `load_mode_mismatch` | block | R-24 | | Line's load mode or load arithmetic disagrees with the library or C5. |
 | `load_mode_unconfirmed` | block | R-24 | | Line's exercise has no confirmed load mode in the library; only confirming it clears the flag. |
-| `rpe_infeasible` | warn | R-24 | | RPE target more than 1 away from the implied RPE at every rep target the line allows, or a recovery RPE ceiling more than 1 below it. |
+| `rpe_infeasible` | warn | R-24 | | RPE target more than 1 away from the implied RPE at every rep target the line allows, or a recovery RPE ceiling or a rep-out set's cap more than 1 below it. |
 | `session_over_cap` | warn | R-24 | | Estimated session duration above its cap. |
 | `hevy_template_unresolved` | block | R-14 | | A Hevy exercise template must be mapped before approval. |
 | `hevy_routine_unmapped` | info | R-14 | | A session needs an explicit create or reuse action in the write brief. |
@@ -2593,7 +2593,9 @@ coach.validity.estimate_minutes(root, session) -> int
   RPE at the fewest reps is more than 1 above it: a `deload`-kind
   overlay (deload, light and return weeks), a line with
   `provenance.decay`, the first session after illness and a line under
-  an active C26 `rpe_cap` (rn:deloads.9). A lower-bound estimate (C18)
+  an active C26 `rpe_cap` (rn:deloads.9). A rep-out set's `rpe` is its
+  cap, not a target (C10), so it is judged as a ceiling on any line,
+  never for being lighter. A lower-bound estimate (C18)
   never shows a load beyond failure or too hard for its RPE; the
   no-e1RM load-step guard below judges the line as well. Messages print
   an implied RPE outside 0–10 as a model result past failure or far from
