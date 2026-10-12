@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -10,6 +11,7 @@ from coach import load_statements, overlay
 from coach.library import Library
 from coach.checks import instance
 from tests.support import INSTANCES, REPO_ROOT, VALID, run_cli, run_module
+from tests.support.load_statements import LOAD_STATEMENTS
 
 NOW = {"COACH_NOW": "2026-10-11T18:00:00Z"}
 OVERLAY = "data/overlays/2026-10-12-weekly.json"
@@ -399,75 +401,18 @@ class BareHevyValuesTest(unittest.TestCase):
                 code, results, _ = check(tmp.root, "bare_hevy_values")
                 self.assertEqual(code, 0, failures(results, "bare_hevy_values"))
 
-    def test_explicit_dumbbell_loads_still_fail_in_separate_clauses(self):
+    def test_each_prose_line_flags_exactly_its_bare_dumbbell_loads(self):
         with TempCopy() as tmp:
-            tmp.write("profile.md", "DB bench 20 kg, leg curl 25 kg; dumbbell RDL 30 kg.")
+            tmp.write("profile.md", "\n".join(line for line, _ in LOAD_STATEMENTS) + "\n")
             _, results, _ = check(tmp.root, "bare_hevy_values")
-            failed = failures(results, "bare_hevy_values")
-            self.assertEqual(len(failed), 2, failed)
-            self.assertIn("20 kg", failed[0]["message"])
-            self.assertIn("30 kg", failed[1]["message"])
-            self.assertTrue(all("'25 kg'" not in r["message"] for r in failed))
-
-    def test_bodyweight_context_does_not_change_an_exercises_equipment(self):
-        examples = (
-            "Arnold press 20 kg at bodyweight 73 kg",
-            "Arnold press 20 kg with bodyweight down 2 kg",
-            "Arnold press 20 kg with bodyweight stable",
-            "Arnold press 20 kg: the cable step is 5 kg",
-            "Arnold press 20 kg; bodyweight 73 kg",
-            "At bodyweight 73 kg, Arnold press 20 kg",
-            "Arnold press 20 kg and bodyweight fell 2 kg",
-        )
-        for text in examples:
-            with self.subTest(text=text), TempCopy() as tmp:
-                tmp.write("profile.md", text)
-                code, results, _ = check(tmp.root, "bare_hevy_values")
-                self.assertEqual(code, 1, results)
-                [failed] = failures(results, "bare_hevy_values")
-                self.assertIn(": '20 kg' for db_arnold_press", failed["message"])
-
-    def test_conjunctions_separate_exercises_and_preserve_load_instructions(self):
-        for joint in (" and", " and then", " but", " but then", " then", " plus", " while",
-                      ",", ", and", ", then", ", and then", ", but", "; then", ". Then"):
-            for following, expected in (("leg curl 25 kg", 0),
-                                        ("3 sets of leg curl at 25 kg", 0),
-                                        ("move to 25 kg", 1),
-                                        ("dumbbell RDL 25 kg", 1)):
-                text = f"DB bench 20/hand{joint} {following}."
-                with self.subTest(text=text), TempCopy() as tmp:
-                    tmp.write("profile.md", text)
-                    code, results, _ = check(tmp.root, "bare_hevy_values")
-                    self.assertEqual(code, expected, results)
-
-    def test_comma_preserves_load_instructions_but_not_a_new_numbered_exercise(self):
-        for text, expected in (("DB bench, move to 20 kg.", 1),
-                               ("DB bench 20/hand, 3 sets of leg curl at 25 kg.", 0),
-                               ("DB bench, 20 kg, leg curl at 25 kg.", 1)):
-            with self.subTest(text=text), TempCopy() as tmp:
-                tmp.write("profile.md", text)
-                code, results, _ = check(tmp.root, "bare_hevy_values")
-                self.assertEqual(code, expected, results)
-                self.assertTrue(all("'25 kg'" not in r["message"] for r in failures(results, "bare_hevy_values")))
-
-    def test_a_clause_that_starts_with_a_load_instruction_keeps_its_exercise(self):
-        for text, flagged in (("DB bench 3x10 at 20/hand, next week 22.5 kg.", ["22.5 kg"]),
-                              ("DB bench: last week 20/hand, this week 22.5 kg.", ["22.5 kg"]),
-                              ("DB bench 3x10 at 20/hand and next week 22.5 kg.", ["22.5 kg"]),
-                              ("DB bench 20 kg per hand, and then 22 kg.", ["22 kg"]),
-                              ("DB bench 20/hand, then add 2 kg", ["2 kg"]),
-                              ("DB bench at 20 kg, then 22 kg next week", ["20 kg", "22 kg"]),
-                              ("DB bench 20/hand, but 22 kg if fresh", ["22 kg"]),
-                              ("DB bench 20/hand, aim for 22 kg", ["22 kg"]),
-                              ("DB bench 20/hand. Next week 22.5 kg.", ["22.5 kg"]),
-                              ("Arnold press, bodyweight 73 kg, move to 15 kg", ["15 kg"])):
-            with self.subTest(text=text), TempCopy() as tmp:
-                tmp.write("profile.md", text)
-                code, results, _ = check(tmp.root, "bare_hevy_values")
-                self.assertEqual(code, 1, results)
-                [failed] = failures(results, "bare_hevy_values")
-                listed = failed["message"].split(" for ")[0].split(": ", 1)[1]
-                self.assertEqual(listed, ", ".join(repr(figure) for figure in flagged))
+        reported = {}
+        for row in failures(results, "bare_hevy_values"):
+            number, listed, exercise = re.match(
+                r"profile\.md line (\d+): (.*?) for (.*?) (?:is a|are) bare dumbbell", row["message"]).groups()
+            reported.setdefault(int(number), {})[exercise] = ", ".join(re.findall(r"'([^']*)'", listed))
+        for number, (line, flagged) in enumerate(LOAD_STATEMENTS, start=1):
+            with self.subTest(line=line):
+                self.assertEqual(reported.get(number, {}), flagged)
 
     def test_measurement_exemption_does_not_hide_a_later_prescription(self):
         with TempCopy() as tmp:
@@ -476,13 +421,6 @@ class BareHevyValuesTest(unittest.TestCase):
             self.assertEqual(code, 1)
             [failed] = failures(results, "bare_hevy_values")
             self.assertIn(": '8 kg' for db_bench_press", failed["message"])
-
-    def test_a_comma_before_a_load_does_not_detach_it_from_the_exercise(self):
-        with TempCopy() as tmp:
-            tmp.write("profile.md", "DB bench, 20 kg")
-            code, results, _ = check(tmp.root, "bare_hevy_values")
-            self.assertEqual(code, 1, results)
-            self.assertIn("'20 kg'", failures(results, "bare_hevy_values")[0]["message"])
 
     def test_confirmed_per_hand_goblet_load_fails_without_hevy_requirement(self):
         with TempCopy() as tmp:
@@ -497,66 +435,6 @@ class BareHevyValuesTest(unittest.TestCase):
             self.assertIn("per-hand", failed["message"])
             self.assertNotIn("Hevy", failed["message"])
 
-    def test_equipment_context_resolves_lateral_raise_variants(self):
-        for text, expected in (("dumbbell lateral raise 10 kg", 1),
-                               ("cable lateral raise 10 kg", 0),
-                               ("lateral raise (cable) 10 kg", 0),
-                               ("cable-based lateral raise 10 kg", 0),
-                               ("lateral raise 10 kg on the cable machine", 0),
-                               ("lateral raise with 10 kg dumbbells", 1),
-                               ("lateral raise 10 kg using dumbbells", 1),
-                               ("dumbbells for lateral raise 10 kg", 1),
-                               ("lateral raise 10 kg", 1),
-                               ("rear delt fly 8 kg", 1),
-                               ("rear delt fly on the machine 30 kg", 0)):
-            with self.subTest(text=text), TempCopy() as tmp:
-                tmp.write("profile.md", text)
-                code, results, _ = check(tmp.root, "bare_hevy_values")
-                self.assertEqual(code, expected, failures(results, "bare_hevy_values"))
-
-    def test_other_equipment_named_at_a_dumbbell_only_movement_is_not_a_dumbbell_load(self):
-        with TempCopy() as tmp:
-            for text in ("barbell lunges 40 kg", "barbell lunge 40 kg", "Smith machine lunges 40 kg",
-                         "Barbell reverse lunges 3x8 at 40 kg", "barbell walking lunges 40 kg",
-                         "kettlebell lunges 16 kg", "landmine lunges 20 kg", "cable hammer curls 20 kg",
-                         "barbell step-ups 40 kg", "trap bar lunges 60 kg", "EZ bar hammer curls 20 kg",
-                         "lunges (barbell) 40 kg", "hammer curls (cable) 20 kg", "lunges with a barbell 40 kg",
-                         "lunges on the Smith machine 40 kg", "lunge on the smith machine 40 kg",
-                         "step-ups with a barbell 40 kg", "step ups using a barbell 40 kg",
-                         "walking lunges with a barbell 40 kg", "hammer curls on the cable 20 kg",
-                         "hammer curls with a rope 20 kg", "rope hammer curls 20 kg", "rope hammer curl 20 kg",
-                         "hammer curls with ropes 20 kg", "lunges with an EZ bar 40 kg",
-                         "lunges in the Smith machine 40 kg", "lunge in the smith machine 40 kg",
-                         "reverse lunges in the Smith machine 40 kg", "Lunges: barbell, 3x8 at 40 kg",
-                         "Lunge: barbell, 3x8 at 40 kg", "Lunges: Smith machine, 3x8 @ 40 kg",
-                         "lunges, barbell, 40 kg", "lunges holding a barbell 40 kg",
-                         "step-ups holding a barbell 40 kg", "hammer curls at the cable stack 20 kg"):
-                with self.subTest(text=text):
-                    self.assertEqual(self.flagged(tmp, text), [])
-            for text, exercise in (("dumbbell lunges 16 kg", "db_lunge"), ("lunges 16 kg", "db_lunge"),
-                                   ("hammer curls 14 kg", "db_hammer_curl"),
-                                   ("barbell lunges 40 kg, then hammer curls 14 kg", "db_hammer_curl"),
-                                   ("lunges (dumbbell) 16 kg", "db_lunge"), ("lunges with dumbbells 16 kg", "db_lunge"),
-                                   ("lunges with a dumbbell 16 kg", "db_lunge"), ("lunges 40 kg (barbell)", "db_lunge"),
-                                   ("Pair the barbell with lunges 16 kg", "db_lunge"),
-                                   ("Keep the barbell after lunges 16 kg", "db_lunge"),
-                                   ("Rack the barbell before lunges 16 kg", "db_lunge"),
-                                   ("Grab the barbell from lunges 16 kg", "db_lunge"),
-                                   ("Lunges: warm up on the Smith machine, then work sets at 16 kg", "db_lunge"),
-                                   ("Lunges, warm-up sets on the Smith machine, top set 16 kg", "db_lunge")):
-                with self.subTest(text=text):
-                    [(_, found)] = self.flagged(tmp, text)
-                    self.assertEqual(found, exercise)
-
-    def test_an_unmatched_equipment_word_does_not_hide_a_single_variant_load(self):
-        with TempCopy() as tmp:
-            for text in ("Arnold press 20 kg on the machine days", "Arnold press on machine days 20 kg",
-                         "Arnold press, 3x12 with a barbell warm-up first, 14 kg",
-                         "Arnold press with a barbell warm-up, then 20 kg"):
-                with self.subTest(text=text):
-                    [(_, found)] = self.flagged(tmp, text)
-                    self.assertEqual(found, "db_arnold_press")
-
     def test_hevy_on_diagnostic_shows_both_numbers_first(self):
         with TempCopy() as tmp:
             tmp.write("profile.md", "DB bench 20 kg")
@@ -564,16 +442,6 @@ class BareHevyValuesTest(unittest.TestCase):
             [failed] = failures(results, "bare_hevy_values")
             message = failed["message"]
             self.assertLess(message.index("25/hand (Hevy: 50)"), message.index("25 kg per hand"))
-
-    def flagged(self, tmp, text):
-        """[(listed figures, exercise)] for each bare_hevy_values failure on a one-line profile."""
-        tmp.write("profile.md", text)
-        _, results, _ = check(tmp.root, "bare_hevy_values")
-        found = []
-        for row in failures(results, "bare_hevy_values"):
-            listed, rest = row["message"].split(": ", 1)[1].split(" for ", 1)
-            found.append((listed, rest.split(" is a bare ")[0].split(" are bare ")[0]))
-        return found
 
     def test_a_missing_config_still_checks_with_per_hand_wording(self):
         with TempCopy() as tmp:
@@ -585,123 +453,6 @@ class BareHevyValuesTest(unittest.TestCase):
             self.assertIn("'20 kg' for db_bench_press", failed["message"])
             self.assertIn("per-hand", failed["message"])
             self.assertNotIn("Hevy", failed["message"])
-
-    def test_hyphenated_names_match_their_exercise(self):
-        with TempCopy() as tmp:
-            for text in ("step-up 20 kg", "step up 20 kg"):
-                with self.subTest(text=text):
-                    self.assertEqual(self.flagged(tmp, text), [("'20 kg'", "db_step_up")])
-
-    def test_equipment_words_in_a_measurement_leave_an_ambiguous_exercise_alone(self):
-        with TempCopy() as tmp:
-            for text in ("lateral raise 10 kg, bodyweight on the machine scale 73 kg",
-                         "lateral raise 10 kg and bodyweight on the cable scale 73 kg"):
-                with self.subTest(text=text):
-                    self.assertEqual(self.flagged(tmp, text), [("'10 kg'", "db_lateral_raise")])
-
-    def test_prescription_notation_keeps_the_load_with_its_exercise(self):
-        with TempCopy() as tmp:
-            for text, expected in (("Incline DB press, 3 × 10, 22 kg", [("'22 kg'", "db_incline_bench_press")]),
-                                   ("Arnold press, 3x12, 14 kg, 90 s rest", [("'14 kg'", "db_arnold_press")]),
-                                   ("DB bench: 4 sets of 8-10 reps, RPE 8, 22 kg", [("'22 kg'", "db_bench_press")]),
-                                   ("DB bench, top set 24 kg", [("'24 kg'", "db_bench_press")]),
-                                   ("Arnold press 3x12. Load: 14 kg.", [("'14 kg'", "db_arnold_press")]),
-                                   ("DB bench, 3x10 at 20 kg", [("'20 kg'", "db_bench_press")]),
-                                   ("DB bench, 3x10, 20 kg", [("'20 kg'", "db_bench_press")]),
-                                   ("Week 3: DB bench, 4x8, 22 kg", [("'22 kg'", "db_bench_press")]),
-                                   ("DB bench, 3 sets at 20 kg", [("'20 kg'", "db_bench_press")]),
-                                   ("DB bench, 3x10 slow, 22 kg", [("'22 kg'", "db_bench_press")]),
-                                   ("DB bench, tempo 3-1-1, rest 90 s, 22 kg", [("'22 kg'", "db_bench_press")]),
-                                   ("DB bench 20/hand, 3 sets of leg curl at 25 kg", []),
-                                   ("DB bench 20/hand, 3x10 leg curl at 25 kg", [])):
-                with self.subTest(text=text):
-                    self.assertEqual(self.flagged(tmp, text), expected)
-
-    def test_a_clause_naming_no_new_movement_keeps_the_load_with_its_exercise(self):
-        bench, arnold = "db_bench_press", "db_arnold_press"
-        with TempCopy() as tmp:
-            for text, figure, exercise in (("Arnold press, 3x12 @ 14 kg", "14 kg", arnold),
-                                           ("DB bench, about 20 kg", "20 kg", bench),
-                                           ("DB bench 3x10, keeping 20 kg", "20 kg", bench),
-                                           ("DB bench, starting at 20 kg", "20 kg", bench),
-                                           ("Arnold press, last set 14 kg", "14 kg", arnold),
-                                           ("DB bench 3x10 while keeping 20 kg", "20 kg", bench),
-                                           ("DB bench, holding 20 kg", "20 kg", bench),
-                                           ("DB bench, staying at 20 kg", "20 kg", bench),
-                                           ("DB bench, using 20 kg", "20 kg", bench),
-                                           ("DB bench, adding 2 kg next week", "2 kg", bench),
-                                           ("DB bench, dropping to 18 kg", "18 kg", bench),
-                                           ("DB bench, then deload to 18 kg", "18 kg", bench),
-                                           ("DB bench, ~20 kg", "20 kg", bench),
-                                           ("DB bench, around 22 kg", "22 kg", bench),
-                                           ("DB bench, load 20 kg", "20 kg", bench),
-                                           ("Arnold press, sets of 12 at 14 kg", "14 kg", arnold),
-                                           ("Arnold press, AMRAP at 14 kg", "14 kg", arnold),
-                                           ("Arnold press, warm-up 8 kg", "8 kg", arnold),
-                                           ("Arnold press, 2 warm-up sets then 14 kg", "14 kg", arnold),
-                                           ("Arnold press 3x12. Go heavier: 16 kg.", "16 kg", arnold),
-                                           ("DB bench 20/hand, push to 22 kg", "22 kg", bench),
-                                           ("DB bench 20/hand, raise to 22 kg", "22 kg", bench),
-                                           ("DB bench 3 or 4 sets at 20 kg", "20 kg", bench),
-                                           ("DB bench 20/hand, landmine 30 kg", "30 kg", bench)):
-                with self.subTest(text=text):
-                    self.assertEqual(self.flagged(tmp, text), [(repr(figure), exercise)])
-
-    def test_a_clause_naming_another_movement_does_not_inherit_the_exercise(self):
-        with TempCopy() as tmp:
-            for text in ("DB bench 20/hand. If leg curl 25 kg moves fast, go heavier.",
-                         "DB bench 20/hand, once leg curl 25 kg feels easy add a set",
-                         "DB bench 20/hand or leg curl 25 kg",
-                         "DB bench 20/hand, then sissy squats at 10 kg",
-                         "DB bench 20/hand, dumbbells up to 30 kg",
-                         "Equipment: dumbbell bench up to 30 kg.",
-                         "DB bench 20/hand. Weighed 74 kg this morning.",
-                         "DB bench 20/hand. Weigh-in 74 kg.",
-                         "Kit: DB bench up to 30 kg.",
-                         "DB bench 20/hand, bodyweight 73 or 74 kg",
-                         "Dumbbell squat stand in the garage, 100 kg capacity."):
-                with self.subTest(text=text):
-                    self.assertEqual(self.flagged(tmp, text), [])
-
-    def test_dumbbell_wording_names_the_dumbbell_exercise(self):
-        with TempCopy() as tmp:
-            for text, exercise in (("dumbbell romanian deadlifts 30 kg", "db_romanian_deadlift"),
-                                   ("DB RDL 30 kg", "db_romanian_deadlift"),
-                                   ("DB curls 12 kg", "db_curl"),
-                                   ("dumbbell curls 12 kg", "db_curl"),
-                                   ("DB hammer curls 14 kg", "db_hammer_curl"),
-                                   ("DB lunges 16 kg", "db_lunge"),
-                                   ("dumbbell bench 20 kg", "db_bench_press"),
-                                   ("DB flyes 10 kg", "db_fly"),
-                                   ("DB step-ups 15 kg", "db_step_up"),
-                                   ("DB press 20 kg", "DB press"),
-                                   ("DB incline press 22 kg", "DB incline press"),
-                                   ("DB split squats 16 kg", "DB split squats"),
-                                   ("DB chest press 20 kg", "DB chest press"),
-                                   ("dumbbell deadlift 30 kg", "dumbbell deadlift")):
-                with self.subTest(text=text):
-                    [(listed, found)] = self.flagged(tmp, text)
-                    self.assertEqual(found, exercise)
-
-    def test_dumbbell_wording_keeps_other_load_modes_and_equipment_prose(self):
-        with TempCopy() as tmp:
-            for text in ("DB row 20 kg", "DB single arm row 20 kg", "dumbbell goblet squat 24 kg",
-                         "dumbbells over 30 kg are too heavy",
-                         "dumbbell rack: 2-20 kg in 2 kg steps", "DB set to 30 kg."):
-                with self.subTest(text=text):
-                    self.assertEqual(self.flagged(tmp, text), [])
-
-    def test_conditional_clauses_keep_the_load_with_its_exercise(self):
-        with TempCopy() as tmp:
-            for text in ("DB bench 20/hand; if RPE under 8, 22 kg", "DB bench 20/hand. If fresh, 22 kg.",
-                         "DB bench 20/hand, if fresh 22 kg", "DB bench 20 kg per hand, so 22 kg next week",
-                         "DB bench 20/hand, which means 22 kg next", "DB bench 20/hand, rising to 22 kg"):
-                with self.subTest(text=text):
-                    self.assertEqual(self.flagged(tmp, text), [("'22 kg'", "db_bench_press")])
-            for text in ("DB bench 20/hand. If fresh, leg curl 25 kg.",
-                         "DB bench 20/hand; if fresh, Arnold press 14 kg per hand"):
-                with self.subTest(text=text):
-                    self.assertEqual(self.flagged(tmp, text), [])
 
     def test_overlay_ignores_measurements_but_still_checks_its_load(self):
         with TempCopy() as tmp:

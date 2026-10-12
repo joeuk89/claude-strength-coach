@@ -166,7 +166,8 @@ class Mentions:
     A movement name derived from an entry's name ("Lateral Raise (Cable)"
     gives "lateral raise") also matches, as does every variant of the
     movement an entry's own phrase names, but an entry that lists the phrase
-    as its own name or alias owns it unless equipment wording picks another.
+    as its own name or alias owns it unless equipment in its statement picks
+    another.
     """
 
     _EQUIPMENT = {"db": "dumbbell", "dbs": "dumbbell", "dumbbells": "dumbbell",
@@ -175,24 +176,13 @@ class Mentions:
     _SPELLINGS = {"dumbbell": r"(?:dumbbells?|dbs?)", "barbell": r"(?:barbells?|bb)",
                   "kettlebell": r"(?:kettlebells?|kb)", "cable": r"cables?"}
     _KINDS = {"smith": "smith_machine", "smith machine": "smith_machine", "trap bar": "trap_bar",
-              "hex bar": "trap_bar", "ez bar": "ez_bar", "bands": "band", "rope": "cable", "ropes": "cable"}
-    _EQUIPMENT_WORD = (r"(?:dumbbells?|dbs?|barbells?|bb|kettlebells?|kb|cables?|ropes?|smith(?:[\s-]+machine)?"
-                       r"|machine|bands?|bodyweight|landmine|(?:trap|hex|ez)[\s-]+bar)")
-    _BEFORE_EQUIPMENT = re.compile(
-        rf"\b({_EQUIPMENT_WORD})(?:-based)?\s+(?:for\s+)?"
-        r"(?:(?!(?:and|but|or|then|plus|while|whereas|with|after|before|from)\b)[a-z]+\s+){0,2}$", re.IGNORECASE,
+              "hex bar": "trap_bar", "ez bar": "ez_bar", "bar": "barbell", "bars": "barbell",
+              "machines": "machine", "bands": "band", "rope": "cable", "ropes": "cable"}
+    _EQUIPMENT_WORD = re.compile(
+        r"(?<![A-Za-z])(dumbbells?|dbs?|barbells?|bb|kettlebells?|kb|cables?|ropes?|smith(?:[\s-]+machine)?"
+        r"|machines?|bands?|landmine|(?:trap|hex|ez)[\s-]+bar|bars?|(?:weighted\s+|weight\s+)?vests?|plates?"
+        r"|sandbags?|backpacks?|medicine[\s-]+balls?|assist(?:ed|ance))(?![A-Za-z])", re.IGNORECASE,
     )
-    _AFTER_EQUIPMENT = re.compile(
-        rf"(?:\b(?:on|using|with)\s+(?:(?:the|an?)\s+)?(?:\d+(?:\.\d+)?\s*(?:kg|lb)s?\s*)?|\(\s*)"
-        rf"({_EQUIPMENT_WORD})\b", re.IGNORECASE,
-    )
-    _ATTACHED_EQUIPMENT = re.compile(
-        r"\s*(?:[:,(–—-]\s*)?"
-        r"(?:(?:on|in|at|using|with|holding|via)\s+(?:(?:the|an?)\s+)?(?:\d+(?:\.\d+)?\s*(?:kg|lb)s?\s+)?"
-        r"|(?:the|an?)\s+)?"
-        rf"({_EQUIPMENT_WORD})\b(?![\s-]+(?:days?|sessions?|weeks?|warm[\s-]?ups?)\b)", re.IGNORECASE,
-    )
-    _EQUIPMENT_STEP = re.compile(rf"\b({_EQUIPMENT_WORD})\s+(?:step|increment)\b", re.IGNORECASE)
     _NOT_MOVEMENT_WORDS = {"dumbbell", "barbell", "kettlebell", "cable", "machine", "band", "bodyweight", "smith",
                            "bar", "trap", "back", "over", "one", "two", "low", "good", "exercise", "anti", "through"}
 
@@ -273,64 +263,42 @@ class Mentions:
                 return list(self._candidates[stem].values())
         return None
 
-    def _named_equipment(self, match):
-        words = re.findall(r"[a-z]+", match.group(0).lower())
-        named = {self._EQUIPMENT.get(word, word) for word in words}
-        return named & {"dumbbell", "barbell", "kettlebell", "cable", "machine", "band", "bodyweight"}
-
     @classmethod
     def _kind(cls, word):
         word = re.sub(r"[\s-]+", " ", word.lower())
         return cls._KINDS.get(word, cls._EQUIPMENT.get(word, word))
 
-    def _equipment(self, text, match, end, measurements, ambiguous):
-        """(attached, describing): equipment written onto the mention, and all equipment describing it.
+    def _equipment(self, text):
+        """The equipment kinds `text` names outside its measurements."""
+        measurements = _measurement_spans(text)
+        return {self._kind(match.group(1)) for match in self._EQUIPMENT_WORD.finditer(text)
+                if not any(start <= match.start() < stop for start, stop in measurements)}
 
-        A modifier after the mention is written onto it only when it follows the mention directly: after
-        `:`, `,`, `-`, `(` or one connector word such as `in`, `with` or `holding`, then an optional article.
-        """
-        named = self._named_equipment(match)
-        if named:
-            return set(), named
-        before = self._BEFORE_EQUIPMENT.search(text[:match.start()])
-        modifiers = [(before, 0, True)] if before else []
-        after = text[match.end():end]
-        adjacent = self._ATTACHED_EQUIPMENT.match(after)
-        modifiers += [(m, match.end(), m is adjacent)
-                      for m in (adjacent, *self._AFTER_EQUIPMENT.finditer(after))
-                      if m and m.group(1).lower() != "bodyweight"]
-        if ambiguous:
-            modifiers += [(m, match.end(), False) for m in self._EQUIPMENT_STEP.finditer(after)]
-        kept = [(self._kind(m.group(1)), attached) for m, offset, attached in modifiers
-                if not any(start <= offset + m.start(1) < stop for start, stop in measurements)]
-        return {kind for kind, attached in kept if attached}, {kind for kind, _ in kept}
-
-    def find(self, text):
+    def find(self, statement):
         """[(start, end, exercise, mode)] in order; mode is None when the mention is ambiguous.
 
-        A dumbbell word before a movement the library does not name, or
-        names only for other equipment, is a `per_hand_x2` mention named by
-        its own words. Other equipment written onto a movement that no
-        variant uses leaves the mention ambiguous.
+        Equipment named anywhere in the statement, outside a measurement,
+        selects among a movement's variants, and a `per_hand_x2` mention in a
+        statement that names any other equipment (a barbell, a vest, a plate)
+        is ambiguous. A dumbbell word before a movement the library does not
+        name, or names only for other equipment, is a `per_hand_x2` mention
+        named by its own words.
         """
         found = []
-        measurements = _measurement_spans(text)
-        matches = list(self._pattern.finditer(text))
-        for index, match in enumerate(matches):
-            end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        equipment = self._equipment(statement)
+        for match in self._pattern.finditer(statement):
             key = self._key(match.group(0))
             candidates = self._lookup(key) or self._lookup(key.partition(" ")[2])
-            if candidates is None or ("dumbbell" in self._named_equipment(match)
+            if candidates is None or ("dumbbell" in key.split()
                                       and all(entry["equipment"] != "dumbbell" for entry, _ in candidates)):
-                found.append((match.start(), match.end(), match.group(0), PER_HAND_X2))
-                continue
-            owners = [entry for entry, owned in candidates if owned] or [entry for entry, _ in candidates]
-            attached, equipment = self._equipment(text, match, end, measurements, ambiguous=len(candidates) > 1)
-            if attached and all(entry["equipment"] not in attached for entry, _ in candidates):
-                found.append((match.start(), match.end(), match.group(0), None))
-                continue
-            entries = [entry for entry, _ in candidates if entry["equipment"] in equipment] or owners
-            modes = {e["effective_load_mode"] or e["load_mode_default"] for e in entries}
-            mode = next(iter(modes)) if len(modes) == 1 else None
-            found.append((match.start(), match.end(), entries[0]["id"], mode))
+                exercise, mode = match.group(0), PER_HAND_X2
+            else:
+                owners = [entry for entry, owned in candidates if owned] or [entry for entry, _ in candidates]
+                entries = [entry for entry, _ in candidates if entry["equipment"] in equipment] or owners
+                modes = {e["effective_load_mode"] or e["load_mode_default"] for e in entries}
+                exercise = entries[0]["id"]
+                mode = next(iter(modes)) if len(modes) == 1 else None
+            if mode == PER_HAND_X2 and equipment - {"dumbbell"}:
+                mode = None
+            found.append((match.start(), match.end(), exercise, mode))
         return found

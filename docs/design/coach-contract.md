@@ -1375,7 +1375,7 @@ the statement before it, across commas, conjunctions and sentence ends,
 and its figures keep that statement's exercise: `, 3x12 @ 14 kg`,
 `, keeping 20 kg`, `, about 20 kg`, `. If fresh, 22 kg`, `. Go heavier:
 16 kg`. That includes an exercise the library does not know whose words
-end in no such movement word (`, landmine 30 kg`, `. Sled 100 kg`): it
+end in no such movement word and name no equipment (`. Sled 100 kg`): it
 continues the statement, and its figures are checked against the
 exercise before it. A clause that opens with a
 load instruction (`, raise to 22 kg`, `, next week 22.5 kg`) always
@@ -1394,25 +1394,20 @@ matches (`DB incline press 22 kg`) or every entry it matches uses other
 equipment (`DB split squat`, `dumbbell deadlift`); a dumbbell entry the
 library knows resolves through it (`DB row` is a single implement). A dumbbell word with no
 movement after it (`dumbbells up to 30 kg`) names no exercise.
-Equipment modifiers attached to the exercise (`cable lateral raise`,
-`lateral raise on the cable machine`) select the matching variant.
-Equipment written onto the movement that no variant uses makes the
-mention ambiguous, so it is not checked. Equipment is written onto it up
-to two words before it, unless a conjunction or `with`, `after`, `before`
-or `from` comes between (`barbell lunges 40 kg`, `rope hammer curls`), or
-directly after it, following only `:`, `,`, `-`, `(` or one connector
-word (`on`, `in`, `at`, `using`, `with`, `holding`, `via`) and an
-optional article (`lunges with a barbell 40 kg`, `Lunges: barbell, 3x8 at
-40 kg`, `hammer curls (cable)`). Any other modifier that matches no
-variant leaves the owner in place (`Arnold press 20 kg on the machine
-days`, `lunges 40 kg (barbell)`, `Pair the barbell with lunges 16 kg`,
-`Lunges: warm up on the Smith machine, then 16 kg`), as does equipment
-naming days, sessions, weeks or a warm-up (`Arnold press with a barbell
-warm-up, then 20 kg`).
-Equipment words belonging to another exercise or a bodyweight
-measurement do not change its mode. A mention the library cannot
-resolve to one mode is not checked. No library load modes are changed
-to interpret prose.
+Equipment named anywhere in a statement selects the matching variants
+of its exercise (`cable lateral raise`, `lateral raise 10 kg on the
+cable machine`, `lateral raise with 10 kg dumbbells`). A `per_hand_x2`
+exercise is checked only when its statement names no equipment other
+than dumbbells. Barbells, cables, machines, kettlebells, bands, a
+landmine, a vest, plates, a sandbag, a backpack, a medicine ball or
+assistance anywhere in the statement make it ambiguous, and it is not
+checked (`barbell lunges 40 kg`, `lunges with a 10 kg vest`, `lunges 40
+kg (barbell)`, `Arnold press 20 kg on the machine days`, `DB bench
+20/hand, landmine 30 kg`). Equipment inside a bodyweight measurement
+does not count, and `bodyweight` itself is a measurement word, not
+equipment (`Arnold press 20 kg with bodyweight stable` is checked). A
+mention the library cannot resolve to one mode is not checked. No
+library load modes are changed to interpret prose.
 
 A table row's figures belong to the exercise named before them on the
 row, else to the exercise in the row's exercise cell (the column headed

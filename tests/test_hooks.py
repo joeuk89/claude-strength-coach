@@ -16,6 +16,7 @@ from unittest import mock
 from coach import checks, hooks
 from tests.support import INSTANCES, REPO_ROOT, VALID, run_cli
 from tests.support.git import git
+from tests.support.load_statements import LOAD_STATEMENTS
 
 NOW = "2026-10-11T18:00:00Z"
 ENV = {"COACH_NOW": NOW}
@@ -219,80 +220,25 @@ class SessionStartTest(unittest.TestCase):
 
 
 class PostToolUseTest(unittest.TestCase):
-    def test_measurement_and_conjunction_context_preserves_actual_load_guards(self):
-        for text, blocked in (("Arnold press 20 kg at bodyweight 73 kg", True),
-                              ("DB bench 20/hand and leg curl 25 kg.", False),
-                              ("DB bench 20/hand and move to 25 kg.", True)):
-            with self.subTest(text=text):
-                root = copy_of(self, VALID)
-                profile = root / "profile.md"
-                profile.write_text(text, encoding="utf-8")
-                code, response, _ = run_hook("posttooluse", root, edit_input(profile))
-                self.assertEqual(code, 0)
-                if blocked:
-                    self.assertIsNotNone(response)
-                    self.assertEqual(response["decision"], "block")
-                    self.assertIn("bare_hevy_values", response["reason"])
-                else:
-                    self.assertIsNone(response)
+    def test_profile_lines_without_a_bare_dumbbell_load_do_not_block(self):
+        root = copy_of(self, VALID)
+        profile = root / "profile.md"
+        profile.write_text("\n".join(line for line, flagged in LOAD_STATEMENTS if not flagged) + "\n",
+                           encoding="utf-8")
+        code, response, _ = run_hook("posttooluse", root, edit_input(profile))
+        self.assertEqual((code, response), (0, None))
 
-    def test_comma_load_context_blocks_only_the_actual_dumbbell_prescription(self):
-        for text, blocked in (("DB bench, move to 20 kg.", True),
-                              ("DB bench 20/hand, then move to 25 kg.", True),
-                              ("DB bench 20/hand, and move to 25 kg.", True),
-                              ("DB bench 3x10 at 20/hand, next week 22.5 kg.", True),
-                              ("DB bench 20/hand, 3 sets of leg curl at 25 kg.", False),
-                              ("DB bench 20/hand, and leg curl 25 kg.", False),
-                              ("DB bench 20/hand. If leg curl 25 kg moves fast, go heavier.", False),
-                              ("DB bench 20/hand, once leg curl 25 kg feels easy add a set", False)):
-            with self.subTest(text=text):
-                root = copy_of(self, VALID)
-                profile = root / "profile.md"
-                profile.write_text(text, encoding="utf-8")
-                code, response, _ = run_hook("posttooluse", root, edit_input(profile))
-                self.assertEqual(code, 0)
-                if blocked:
-                    self.assertEqual(response["decision"], "block")
-                    self.assertIn("bare_hevy_values", response["reason"])
-                else:
-                    self.assertIsNone(response)
-
-    def test_prescription_notation_and_dumbbell_wording_block_the_bare_load(self):
-        for text in ("Incline DB press, 3 × 10, 22 kg", "Arnold press, 3x12, 14 kg, 90 s rest",
-                     "DB bench: 4 sets of 8-10 reps, RPE 8, 22 kg", "DB bench, top set 24 kg",
-                     "Arnold press 3x12. Load: 14 kg.", "DB curls 12 kg", "DB RDL 30 kg", "DB press 20 kg",
-                     "DB bench 20/hand. If fresh, 22 kg.", "Arnold press, 3x12 @ 14 kg", "DB bench, about 20 kg",
-                     "DB bench 3x10, keeping 20 kg", "DB bench, starting at 20 kg", "Arnold press, last set 14 kg"):
-            with self.subTest(text=text):
-                root = copy_of(self, VALID)
-                profile = root / "profile.md"
-                profile.write_text(text, encoding="utf-8")
-                code, response, _ = run_hook("posttooluse", root, edit_input(profile))
-                self.assertEqual(code, 0)
-                self.assertIsNotNone(response)
-                self.assertEqual(response["decision"], "block")
-                self.assertIn("bare_hevy_values", response["reason"])
-
-    def test_other_equipment_at_a_dumbbell_only_movement_does_not_block(self):
-        for text, blocked in (("barbell lunges 40 kg", False), ("Smith machine lunges 40 kg", False),
-                              ("cable hammer curls 20 kg", False), ("barbell step-ups 40 kg", False),
-                              ("lunges with a barbell 40 kg", False), ("lunges on the Smith machine 40 kg", False),
-                              ("step-ups with a barbell 40 kg", False), ("hammer curls on the cable 20 kg", False),
-                              ("lunges in the Smith machine 40 kg", False), ("Lunges: barbell, 3x8 at 40 kg", False),
-                              ("Arnold press, 3x12 with a barbell warm-up first, 14 kg", True),
-                              ("dumbbell lunges 16 kg", True), ("lunges 16 kg", True),
-                              ("lunges with dumbbells 16 kg", True), ("lunges 40 kg (barbell)", True)):
-            with self.subTest(text=text):
-                root = copy_of(self, VALID)
-                profile = root / "profile.md"
-                profile.write_text(text, encoding="utf-8")
-                code, response, _ = run_hook("posttooluse", root, edit_input(profile))
-                self.assertEqual(code, 0)
-                if blocked:
-                    self.assertEqual(response["decision"], "block")
-                    self.assertIn("bare_hevy_values", response["reason"])
-                else:
-                    self.assertIsNone(response)
+    def test_profile_lines_with_a_bare_dumbbell_load_block_for_each_one(self):
+        root = copy_of(self, VALID)
+        profile = root / "profile.md"
+        flagging = [(line, flagged) for line, flagged in LOAD_STATEMENTS if flagged]
+        profile.write_text("\n".join(line for line, _ in flagging) + "\n", encoding="utf-8")
+        code, response, _ = run_hook("posttooluse", root, edit_input(profile))
+        self.assertEqual(code, 0)
+        self.assertEqual(response["decision"], "block")
+        shown = response["reason"].count("bare_hevy_values: ")
+        more = re.search(r"and (\d+) more \(python3 -m coach check\)", response["reason"])
+        self.assertEqual(shown + (int(more.group(1)) if more else 0), sum(len(f) for _, f in flagging))
 
     def test_equipment_profile_write_does_not_block(self):
         root = copy_of(self, VALID)
