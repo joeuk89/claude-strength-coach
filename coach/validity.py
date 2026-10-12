@@ -374,10 +374,9 @@ class _Checker:
         elif source is not None:
             top, before = _top_load(sound), _top_load(source["sets"])
             if top is not None and before is not None:
-                allowed = before * band.load_factor + self.increment(line, session)
+                allowed, words = self.decay_ceiling(line, session, before, band.load_factor)
                 if top > allowed + 1e-9:
-                    problems.append(f"{lead}: load {_number(top)} is above {_number(before)} × {band.load_factor} "
-                                    f"plus one increment ({_number(allowed)})")
+                    problems.append(f"{lead}: load {_number(top)} is above {words}")
         if source is not None and band.set_delta:
             most = max(1, len(source["sets"]) + band.set_delta)
             if len(working) > most:
@@ -389,6 +388,23 @@ class _Checker:
                 problems.append(f"{lead}: every working set needs RPE {band.rpe_cap} or below "
                                 f"({len(over)} set(s) are not)")
         return problems
+
+    def decay_ceiling(self, line, session, before, factor):
+        """(heaviest decayed load, words): the load the kit makes for `before` × `factor` by the cut rule, else
+        that product plus one increment when the kit is unknown."""
+        target = before * factor
+        try:
+            available = available_loads(self.library, self.config, line["exercise_id"], line["load_mode"],
+                                        session["location"]) if self.library is not None else None
+        except ConfigError:
+            available = None
+        if available is not None and available.declarable and not available.geometry_warning:
+            allowed = available.select_cut(target, before)
+            if allowed is not None:
+                return allowed, (f"{_number(allowed)}, the kit's nearest load to {_number(before)} × {factor} "
+                                 f"({_number(target)}) no heavier than {_number(before)}")
+        allowed = target + self.increment(line, session)
+        return allowed, f"{_number(before)} × {factor} plus one increment ({_number(allowed)})"
 
     def decay_source(self, exercise_id, derived):
         """The exposure a decayed line derives from, or None and why it can't serve as the baseline."""

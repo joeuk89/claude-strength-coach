@@ -443,7 +443,7 @@ class LayoffTest(unittest.TestCase):
         }
         write_json(path, doc)
         [flag] = self.squat_flags()
-        self.assertIn("load 95 is above 100 × 0.9", flag["message"])
+        self.assertIn("load 95 is above 90, the kit's nearest load to 100 × 0.9 (90)", flag["message"])
         self.assertIn("3 working sets, at most 2", flag["message"])
 
     def decayed_without_a_source(self, derived_from):

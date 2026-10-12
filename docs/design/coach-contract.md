@@ -2386,6 +2386,7 @@ Reserved codes:
 | `prescription_unknown` | warn | R-23a | | Historical prescription unknown; no prescribed hit or miss inferred. Prescription validation still runs. |
 | `incomplete_exposure` | warn | R-23a | | Fewer working sets logged than prescribed and none fell short: linear counts no miss and holds the load, or still resets it when the misses already counted reach the limit (a coaching heuristic); below the limit, confirm whether the sets were skipped or failed. |
 | `linear_below_start` | info | R-23a | | Linear reset fell below the starting load; review progression without automatic adjustment. |
+| `load_cut_held` | info, warn | R-23a | | A reset, return-band or deload load cut that the kit cannot make holds the load, and the rationale gives the target and actual cut. Info when the line's set or effort cuts still apply; warn when nothing is cut, naming the next lighter load the kit makes so the coach chooses. |
 | `rpe_drift` | warn | R-23a | | Compound or recovery-capped exercise: logged RPE at least 1 over target on two or more working sets of the last exposure. |
 | `range_effort_mismatch` | warn | R-23a | | Double progression held a load whose derived-from exposure had a working set below its set group's rep range or 2 or more RPE over target; review a lighter load or a different rep range. |
 | `return_week` | info | R-23a | | Decay applied; names the band and days off. A lifting line's flag adds the load change (`loads × 0.9`, or `assistance held` on an `assisted` line), the set change and any RPE cap. |
@@ -2492,8 +2493,13 @@ coach.validity.estimate_minutes(root, session) -> int
 
 - **Valid line**: `days_off` falls in band `0-10`, or the line's
   `provenance.decay.band` equals `band_for(days_off)` and its working
-  load is at most the derived-from load × `load_factor` (plus one
-  increment for rounding). For an `assisted` line, where more assistance
+  load is at most the load the C23 cut rule selects for the derived-from
+  load × `load_factor`: the nearest load the kit makes no heavier than
+  the derived-from load, ties to the lighter (`AvailableLoads.select_cut`,
+  the function proposals use). When the kit is unknown (no declarable
+  kit, an unknown bar mass or no library), the ceiling stays that product
+  plus one increment. A hand-built load above the ceiling is stale.
+  For an `assisted` line, where more assistance
   is a lighter lift, the band cuts no assistance: its least working
   assistance is at least the derived-from exposure's least assistance
   minus one increment, and the message says the assistance is below the
@@ -2656,9 +2662,10 @@ instance plugins, plus the C5 ×2 scan.
 
 **Units.** Every load a plugin sees or returns is the coaching number in
 athlete units (C18). The core then applies, in order: decay, the week's
-transform, constraints (C26), caps, rounding to increments (toward the
-lighter lift when the load is below the derived-from load, nearest
-otherwise), and only then `units.make_load`. A plugin therefore cannot
+transform, constraints (C26), caps, rounding to the kit (a cut to the
+nearest load no heavier than the derived-from load; other loads toward
+the lighter lift when below the derived-from load, nearest otherwise),
+and only then `units.make_load`. A plugin therefore cannot
 double a load.
 
 ```python
@@ -2783,8 +2790,12 @@ and `plugins test` runs them. Loaded with
   transform needs no import. A transform's `apply` gets the context with
   `params` replaced by the transform's own merged `PARAMS`.
 - `Proposal` also carries `round_down` (default false): a scheme whose
-  load is an estimate (`fixed_reps_rpe`) asks for its loads rounded
-  down; decay and the deload transforms set it too.
+  load is an effort ceiling from an estimate (`fixed_reps_rpe`,
+  `rpe_anchored`) asks for its loads rounded down. It also carries
+  `load_cut` (default false): the loads are a percentage cut from the
+  derived-from load. Decay, the `standard`, `light` and `return`
+  transforms, a `linear` reset and `wave_531`'s deload and decay set it;
+  `round_down` still wins on a line that has both.
 - The `Exposure` a plugin sees is `coach.plugins.base.Exposure`: C17's
   fields with every load as the coaching number, plus `prescribed` (the
   working sets the overlay in force that day asked for; empty when unknown)
@@ -2818,6 +2829,9 @@ and `plugins test` runs them. Loaded with
   a load cap). Otherwise the count runs on, so a reset ignored for the
   old load, or a running count that a lowered limit reaches, still
   resets. The comparison is numeric, as the reset multiplies the load.
+  The rationale calls the reset a target ("the reset targets 90 % of
+  80"); a reset the kit cannot make holds the load, so the athlete trains
+  the old load and the count runs on.
   When either load is unknown, a count at the limit starts a new count
   and a lower one runs on. Before new training, a changed
   `misses_before_reset` re-reads the stored count: a kept reset under a
@@ -2890,10 +2904,20 @@ and `plugins test` runs them. Loaded with
   racks and plate combinations (single plates for bodyweight added load)
   win, otherwise the physical increment grid applies as above; a load
   with no declarable kit stays as requested, within its cap. Historical loads never anchor that grid or
-  bypass it. A load no heavier than the derived-from load (a hold
-  included), or marked `round_down`, rounds toward the lighter lift: down,
-  or up for assistance. When selection changes a load, the rationale says
-  so ("the kit makes 25/hand, not 24.5/hand"). Caps and
+  bypass it. A `load_cut` load takes the nearest load the kit makes no
+  heavier than the derived-from load (or the cap), ties to the lighter
+  load; the percentage is a target before rounding. Assistance is never
+  cut, so an `assisted` line keeps the rule below. Any other load no
+  heavier than the derived-from load (a hold included), or marked
+  `round_down`, rounds toward the lighter lift: down, or up for
+  assistance. When selection changes a load, the rationale says so
+  ("the kit makes 25/hand, not 24.5/hand"); for a cut's top load it
+  gives the target and the actual cut instead ("a 10 % cut from 80
+  targets 72; the kit makes 72.5, an actual 9.4 % cut", percentages to
+  one decimal). A cut the kit cannot make holds the load: the rationale
+  says so, any set and effort cuts still apply, and `load_cut_held` is
+  raised, at warn when nothing else was cut (a reset), naming the next
+  lighter load the kit makes for the coach to choose. Caps and
   clipped constraints remain upper numeric bounds, with a buildable load
   below the cap taking precedence when assistance cannot round up within
   it. A load with nothing on its lighter side (under the lightest

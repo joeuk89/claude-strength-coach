@@ -141,7 +141,7 @@ and its sources.
   | 22–42 | loads −10 %, one working set fewer per exercise (rn:detraining-return.3) |
   | 43+ | a re-test: every load −15 % from its pre-layoff working load, every set at RPE 7 or below, one working set fewer; next week's loads come from what this week logged (rn:detraining-return.3) |
 
-  The bands are coaching heuristics: the cuts are deeper than the measured strength loss, to ease the athlete back in, and the next week's progression corrects them from what the return week logged (rn:detraining-return.3).
+  The bands are coaching heuristics: the cuts are deeper than the measured strength loss, to ease the athlete back in, and the next week's progression corrects them from what the return week logged (rn:detraining-return.3). Each cut is a target before rounding: the load is the nearest the kit makes no heavier than the pre-layoff load, and when that holds the load, the set cut and RPE cap still apply (rn:detraining-return.3).
 
   **Illness adds:** after a mild illness with symptoms above the neck only, no training until 48 hours symptom-free, and every exercise in the first session back capped at RPE 7, whatever the gap (rn:detraining-return.4).
   This is a coaching heuristic too: no study sets a fixed symptom-free period (rn:detraining-return.4).

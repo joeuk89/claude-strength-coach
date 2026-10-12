@@ -388,6 +388,8 @@ class WeightedBodyweightOnMicroplatesTest(ProposeCase):
         self.assertNotIn("the kit makes", line["provenance"]["rationale"])
         self.assertNotIn("load_unrepresentable", codes(data["overlay"], "pull_up"))
 
-    def test_a_deload_takes_a_load_the_plates_make(self):
-        line = find_line(self.propose("--kind", "deload", "--dry-run")["overlay"], "pull_up")
-        self.assertEqual({coaching(s["load"]) for s in working(line)}, {0})
+    def test_a_deload_the_plates_cannot_make_holds_the_added_load(self):
+        doc = self.propose("--kind", "deload", "--dry-run")["overlay"]
+        line = find_line(doc, "pull_up")
+        self.assertEqual({coaching(s["load"]) for s in working(line)}, {1.25})
+        self.assertIn("load_cut_held", codes(doc, "pull_up"))

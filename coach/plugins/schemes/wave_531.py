@@ -144,7 +144,7 @@ def deload(ctx, proposal):
     if not maxes:
         return base.standard_deload(proposal, **base.STANDARD_DELOAD)
     training_max = min(maxes)
-    return replace(proposal, sets=_sets(ctx, training_max, DELOAD, False), round_down=True,
+    return replace(proposal, sets=_sets(ctx, training_max, DELOAD, False), load_cut=True,
                    target_note="Deload week: 40/50/60 % of the training max, no set to failure")
 
 
@@ -168,5 +168,5 @@ def decay(ctx, proposal, days_off):
         sets = tuple(replace(s, load=min(s.load, ceiling)) if s.working and s.load is not None else s for s in sets)
     if band.rpe_cap is not None:
         sets = base.rpe_capped(sets, band.rpe_cap)
-    return replace(proposal, sets=sets, state=dict(proposal.state, training_max=lowered), round_down=True,
+    return replace(proposal, sets=sets, state=dict(proposal.state, training_max=lowered), load_cut=True,
                    target_note=f"Wave week {week} of 3, return week: no set to failure")

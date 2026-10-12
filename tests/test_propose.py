@@ -608,8 +608,7 @@ class DeloadTest(ProposeCase):
         data = self.propose("--kind", "deload", "--dry-run")
         doc = data["overlay"]
         self.assertEqual((data["id"], doc["kind"]), ("2026-10-12-deload", "deload"))
-        derived = {"bb_back_squat": 97.5, "db_bench_press": 22.5, "db_single_arm_row": 30, "pull_up": 0}
-        increment = {"bb_back_squat": 2.5, "db_bench_press": 2, "db_single_arm_row": 2, "pull_up": 2.5}
+        nearest = {"bb_back_squat": 87.5, "db_bench_press": 20, "db_single_arm_row": 27.5, "pull_up": 0}
         for session in doc["sessions"]:
             self.assertTrue(session["temporary"])
             self.assertTrue(session["title"].startswith("Deload — "))
@@ -618,10 +617,7 @@ class DeloadTest(ProposeCase):
                     sets = working(line)
                     self.assertEqual(len(sets), 2)
                     self.assertEqual({s["rpe"] for s in sets}, {6})
-                    target = derived[line["exercise_id"]] * 0.9
-                    for s in sets:
-                        self.assertLessEqual(coaching(s["load"]), target + 1e-9)
-                        self.assertGreater(coaching(s["load"]), target - increment[line["exercise_id"]] - 1e-9)
+                    self.assertEqual({coaching(s["load"]) for s in sets}, {nearest[line["exercise_id"]]})
 
 
 class OverrideTest(ProposeCase):

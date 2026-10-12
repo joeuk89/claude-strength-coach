@@ -86,6 +86,16 @@ class AvailableLoads:
             return units.round_grid_load(value, self.increment, direction, cap, self.base_weight or 0)
         return value
 
+    def select_cut(self, value, baseline=None, cap=None):
+        """The load a cut to `value` gets: the nearest the kit makes no heavier than `baseline` or the cap, ties to
+        the lighter load; None when nothing fits."""
+        bound = min((b for b in (baseline, cap) if b is not None), default=None)
+        lower = self.select(value, "down", bound)
+        upper = self.select(value, "up", bound)
+        if lower is None or upper is None:
+            return upper if lower is None else lower
+        return lower if value - lower <= upper - value + 1e-9 else upper
+
     def problem(self, value):
         if self.geometry_warning or not self.declarable:
             return None

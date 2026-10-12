@@ -32,4 +32,4 @@ def apply(ctx, proposal):
         return proposal
     sets = base.keep_working(proposal.sets, base.return_set_count(proposal, ctx.params["set_delta"]))
     sets = base.lightened(sets, 1.0, proposal.derived_from, ctx.exercise.load_direction)
-    return replace(proposal, sets=base.rpe_capped(sets, ctx.params["rpe_cap"]), round_down=True)
+    return replace(proposal, sets=base.rpe_capped(sets, ctx.params["rpe_cap"]), load_cut=True)

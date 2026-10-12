@@ -16,6 +16,9 @@ register("incomplete_exposure", owner=OWNER, severities=("warn",),
                  "counted; a coaching heuristic.")
 register("linear_below_start", owner=OWNER, severities=("info",),
          summary="Linear reset fell below the starting load; review progression without automatic adjustment.")
+register("load_cut_held", owner=OWNER, severities=("info", "warn"),
+         summary="A reset, return band or deload load cut that the kit cannot make holds the load: info when the "
+                 "line's set or effort cuts still apply, warn when nothing is cut and the coach chooses the load.")
 register("rpe_drift", owner=OWNER, severities=("warn",),
          summary="Compound or recovery-capped exercise: logged RPE at least 1 over target on two or more working "
                  "sets of the last exposure.")

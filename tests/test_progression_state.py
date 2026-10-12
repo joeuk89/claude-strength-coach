@@ -63,7 +63,7 @@ class IncompleteExposureTest(unittest.TestCase):
                 self.assertIs(base.missed(attempt), True)
                 proposal = linear([attempt])
                 self.assertEqual({load for load, _ in loads_and_reps(proposal)}, {90})
-                self.assertIn("resets", proposal.rationale)
+                self.assertIn("reset targets", proposal.rationale)
                 self.assertNotIn("incomplete_exposure", [f["code"] for f in proposal.flags])
 
     def test_every_set_logged_at_its_reps_is_neither_missed_nor_incomplete(self):
@@ -110,7 +110,7 @@ class LinearResetStateTest(unittest.TestCase):
             with self.subTest(limit=limit):
                 legacy = linear([miss], limit=limit, state={"misses": 0, "through": "2026-10-05"})
                 self.assertEqual({load for load, _ in loads_and_reps(legacy)}, {94.5})
-                self.assertIn("resets", legacy.rationale)
+                self.assertIn("reset targets", legacy.rationale)
                 self.assertEqual(legacy.state, {"misses": limit, "through": "2026-10-05"})
         hit = prescribed(date(2026, 10, 5), (8, 8, 8), load=105)
         climbed = linear([hit], state={"misses": 0, "through": "2026-10-05"})
@@ -148,7 +148,7 @@ class LinearResetStateTest(unittest.TestCase):
         missed_again = prescribed(date(2026, 10, 12), (5, 5, 4), load=94.5, logged=105)
         reset = linear([missed_again, miss], limit=2, state=kept_reset)
         self.assertEqual({load for load, _ in loads_and_reps(reset)}, {94.5})
-        self.assertIn("resets", reset.rationale)
+        self.assertIn("reset targets", reset.rationale)
         self.assertEqual(reset.state, {"misses": 3, "through": "2026-10-12"})
         hit = prescribed(date(2026, 10, 12), (8, 8, 8), load=94.5, logged=105)
         climbed = linear([hit, miss], limit=2, state=kept_reset)
@@ -284,7 +284,7 @@ class LinearResetPipelineTest(ProposeCase):
         self.assertTrue(lines)
         for line in lines:
             rationale = line["provenance"]["rationale"]
-            self.assertIn("resets to 90 % of 97.5", rationale)
+            self.assertIn("reset targets 90 % of 97.5", rationale)
             self.assertNotIn("every prescribed rep was hit", rationale)
             self.assertTrue(all(coaching(s["load"]) <= load for s in working(line)), line["sets"])
         return lines

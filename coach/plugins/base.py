@@ -184,6 +184,7 @@ class Proposal:
     target_note: Optional[str] = None
     focus: Optional[str] = None
     round_down: bool = False
+    load_cut: bool = False
 
 
 @dataclass(frozen=True)
@@ -575,7 +576,7 @@ def default_decay(ctx, proposal, days_off):
         sets = keep_working(sets, return_set_count(proposal, band.set_delta))
     if band.rpe_cap is not None:
         sets = rpe_capped(sets, band.rpe_cap)
-    return replace(proposal, sets=sets, round_down=True)
+    return replace(proposal, sets=sets, load_cut=True)
 
 
 def standard_deload(proposal, set_factor, load_factor, rpe, load_direction=1):
@@ -587,4 +588,4 @@ def standard_deload(proposal, set_factor, load_factor, rpe, load_direction=1):
     sets = keep_working(proposal.sets, max(1, round(count * set_factor)))
     sets = lightened(sets, load_factor, proposal.derived_from, load_direction)
     sets = tuple(replace(s, rpe=rpe) if s.working else s for s in sets)
-    return replace(proposal, sets=sets, round_down=True)
+    return replace(proposal, sets=sets, load_cut=True)
