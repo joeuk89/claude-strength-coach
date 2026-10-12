@@ -2137,9 +2137,8 @@ progression: return-week logs remain the next week's baseline.
   or for a manual workout its `session_id`, inside the overlay span,
   matched once, nearest date first; `moved: true` when the date differs;
   or a `trained_unlogged` annotation, with `unlogged: true`), `missed`
-  (with `tag` from a `miss` annotation for that session inside the
-  overlay span or on a moved session's original date, each matched
-  once, nearest date first; else `untagged`),
+  (with `tag` from a `miss` annotation, each matched once, nearest date
+  first; else `untagged`),
   `upcoming`.
   Workouts matching no planned session are listed as `extra`.
 - Exercise `status` for a trained session, comparing working sets in order:
@@ -2156,7 +2155,8 @@ progression: return-week logs remain the next week's baseline.
 - Each session row: `session_id`, `date`, `title`, `overlay_id`,
   `status`, `workout_id`, `workout_date`, `moved`, `unlogged`, `tag` and
   `exercises`. A matching `miss` or `trained_unlogged` annotation names
-  the session and a date inside its overlay's span. A conditioning
+  the session and a date inside its overlay's span or, for a moved
+  session, its original date (`moved_from`). A conditioning
   session (C17) has `conditioning: true` and no exercises.
 - `data.summary`: `planned` (sessions dated today or earlier),
   `trained`, `missed` (counts by tag), `missed_total`, `upcoming`, and
@@ -5201,8 +5201,10 @@ coach.structure.ordinary_weeks(root, until, n=4, reach=12) -> list[str]
   only (KPIs, e1RM, validity), never misses. A session an overlay moved
   (`moved_from`, C37) is one planned session, on its new date, when the
   overlay holding the moved copy is in force there; its original date
-  plans nothing. A `miss` annotation on that date is not counted on its
-  own: it tags the moved copy when that is missed too. A session
+  plans nothing. A `miss` or `trained_unlogged` annotation on that date
+  is not counted on its own: a `trained_unlogged` one marks the moved
+  copy trained (unlogged), and a `miss` one tags the moved copy when
+  that is missed too. A session
   for the same id that moves nothing is a separate planned session.
   `coach.overlay.planned` applies the overlay rules for both
   `structure` and `stats adherence --span` (so the check-in card), and

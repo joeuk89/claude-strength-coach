@@ -400,6 +400,20 @@ class MovedSessionTest(PlannedSessionCase):
         self.assertEqual((missed["by_tag"]["family"], missed["by_tag"]["untagged"], missed["sessions_missed"]),
                          (1, 0, 1))
 
+    def test_a_moved_session_trained_unlogged_on_its_original_day_counts_once(self):
+        now = "2026-10-18T19:00:00Z"
+        self.coach("history", "annotate", "--kind", "trained_unlogged", "--date", "2026-10-12",
+                   "--session", "session-a", "--note", "trained after all, phone dead", now=now)
+        report = self.week("2026-10-12", now=now)
+        self.assertEqual([(s["date"], s["status"], s.get("unlogged")) for s in report["sessions"]
+                          if s["session_id"] == "session-a"], [("2026-10-17", "trained", True)])
+        self.assertEqual((report["planned"], report["trained"]), (2, 2))
+        span = self.coach("stats", "adherence", "--span", "2026-10-12..2026-10-18", now=now)
+        self.assertEqual([(s["date"], s["status"], s["unlogged"], s["workout_date"]) for s in span["sessions"]
+                          if s["session_id"] == "session-a"], [("2026-10-17", "trained", True, "2026-10-12")])
+        missed = self.coach("checkin", "misses", "--since", "2026-10-12", "--until", "2026-10-18", now=now)
+        self.assertEqual(missed["sessions_missed"], 0)
+
     def test_a_pending_move_leaves_no_miss_on_the_original_day(self):
         report = self.week("2026-10-12", now="2026-10-16T19:00:00Z")
         self.assertEqual(self.rows(report), [("2026-10-15", "session-b", "trained"),
