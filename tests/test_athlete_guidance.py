@@ -216,6 +216,25 @@ class WeekFocusTest(RebuildCase):
         doc = self.run_coach("propose", "finalize", "--proposal", W43)["overlay"]
         self.assertEqual((doc["focus"], line(doc, "bb_back_squat")["target_note"]), (FOCUS, ADJUST))
 
+    def test_a_note_on_a_line_with_a_kept_standing_override_survives_rebuild(self):
+        self.run_coach("propose", "week", "--week", "2026-W43")
+        self.run_coach("propose", "override", "--proposal", W43, "--session", "session-a", "--exercise",
+                       "bb_back_squat", "--load", "100", "--reason", "hold while the knee settles", "--standing")
+        self.run_coach("propose", "finalize", "--proposal", W43)
+        self.run_coach("overlay", "approve", W43)
+        now = "2026-10-25T19:00:00Z"
+        week = self.run_coach("propose", "week", "--week", "2026-W44", now=now)
+        self.assertEqual(line(week["overlay"], "bb_back_squat")["override"]["reason"], "hold while the knee settles")
+        self.run_coach("propose", "note", "--proposal", week["id"], "--session", "session-a",
+                       "--exercise", "bb_back_squat", "--target-note", "stop at RPE 9", now=now)
+        rebuilt = self.run_coach("propose", "rebuild", "--proposal", week["id"], now=now)
+        squat = line(rebuilt["overlay"], "bb_back_squat")
+        self.assertEqual((squat["target_note"], squat["override"]["reason"]),
+                         ("stop at RPE 9", "hold while the knee settles"))
+        self.assertEqual(rebuilt["guidance_kept"], [{"session_id": "session-a", "date": "2026-10-26",
+                                                     "exercise_id": "bb_back_squat", "fields": ["target_note"]}])
+        self.assertEqual((rebuilt["kept"], rebuilt["guidance_lost"]), ([], []))
+
     def test_a_hand_edited_note_is_not_an_unexplained_change(self):
         self.run_coach("propose", "week", "--week", "2026-W43")
         self.edit_json(f".coach/proposals/{W43}.json",

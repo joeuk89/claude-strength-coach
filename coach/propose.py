@@ -2099,14 +2099,12 @@ def _carry_edits(root, proposal_id, draft, proposed, new_draft, unit, show_hevy)
     kept, lost = [], []
     for session in draft.get("sessions", []):
         for line in session.get("exercises", []):
-            reason = ((line.get("override") or {}).get("reason") or "").strip()
-            if not reason:
-                continue
             key = _line_key(session, line)
-            row = {"session_id": key[0], "date": key[1], "exercise_id": key[2], "reason": reason}
             original = originals.get(key) or {}
-            if original.get("override") == line["override"] and original.get("sets") == line["sets"]:
+            if not _is_explained_edit(line, original):
                 continue
+            reason = line["override"]["reason"].strip()
+            row = {"session_id": key[0], "date": key[1], "exercise_id": key[2], "reason": reason}
             if key not in targets:
                 lost.append(row)
                 continue
@@ -2125,9 +2123,17 @@ def _carry_edits(root, proposal_id, draft, proposed, new_draft, unit, show_hevy)
     return kept, lost
 
 
+def _is_explained_edit(line, original):
+    """True when `line` carries an override reason and its override or sets differ from the proposed
+    `original`. An override kept from a standing decision or the overlay in force matches the original."""
+    if not ((line.get("override") or {}).get("reason") or "").strip():
+        return False
+    return original.get("override") != line["override"] or original.get("sets") != line["sets"]
+
+
 def _carry_guidance(draft, proposed, new_draft):
-    """Copy the draft's edited week focus, and each guidance field edited on a line without an override reason
-    (`_carry_edits` carries those), onto `new_draft`. Returns (kept rows, lost rows) for the lines."""
+    """Copy the draft's edited week focus, and each guidance field edited on a line that is not an explained
+    edit (`_carry_edits` carries those), onto `new_draft`. Returns (kept rows, lost rows) for the lines."""
     if draft.get("focus") != proposed.get("focus"):
         new_draft["focus"] = draft["focus"]
     originals = _lines_by_key(proposed)
@@ -2135,10 +2141,10 @@ def _carry_guidance(draft, proposed, new_draft):
     kept, lost = [], []
     for session in draft.get("sessions", []):
         for line in session.get("exercises", []):
-            if ((line.get("override") or {}).get("reason") or "").strip():
-                continue
             key = _line_key(session, line)
             original = originals.get(key) or {}
+            if _is_explained_edit(line, original):
+                continue
             edited = [field for field in GUIDANCE_FIELDS if line.get(field) != original.get(field)]
             if not edited:
                 continue

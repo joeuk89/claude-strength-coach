@@ -26,7 +26,8 @@ wave or full body by RPE. Drafting one fits it to the athlete's days,
 equipment, **apparatus**, **demonstrated ability** and avoided exercises,
 and its lines without a known load run a **calibration week**: no load,
 and the athlete chooses one they could lift for the target reps at the
-target RPE.
+target RPE, then adjusts it after the first working set. A calibration
+note in the line's **athlete guidance** says so, and names no number.
 _Avoid_: template (the repo itself), preset, stock program
 
 **Apparatus**:
@@ -224,6 +225,13 @@ with that condition however the flags are reordered or checked again. A
 condition that changes or disappears takes its reference with it;
 nothing else inherits it.
 _Avoid_: flag index, flag number
+
+**Athlete guidance**:
+What the athlete reads beside a prescription: the week focus, and each
+line's focus, target note and cues ("10 per leg", "stop at RPE 9"). It
+reaches the record and the **session sheets**; an override's reason does
+not, because that is the coach's audit of the change.
+_Avoid_: override note, coach note (for the audit reason)
 
 **Missed-day rule**:
 The program's standing answer to one missed session, agreed before the
@@ -439,9 +447,10 @@ _Avoid_: stats page, PR list
 **Session sheets**:
 `this-week-sheets.md`, rendered for an athlete without Hevy: each session
 of the week's overlay as a table of sets, reps, load, RPE and rest, with
-an empty Done column, then its cues. Loads show the athlete's number
-only (`25/hand`). What the athlete trains from when there are no Hevy
-routines.
+an empty Done column, then its **athlete guidance**. Loads show the
+athlete's number only (`25/hand`). A beginner's sheets end with a short
+RPE and rep-range key. What the athlete trains from when there are no
+Hevy routines.
 _Avoid_: workout card, printout, routine (Hevy's word)
 
 **Manual log**:

@@ -3453,7 +3453,8 @@ id follows C10. `data.lines_digest` (R-21b) is the C7 canonical hash of
   date and exercise, with the new scheme sets as `proposed_sets`; one
   whose line is gone is listed in `lost`. An edited week `focus` carries
   over, and so does each guidance field (`target_note`, `focus`, `cues`)
-  edited on a line without an override reason: `guidance_kept` and
+  edited on any other line, including one whose override was kept from
+  a standing decision or the overlay in force: `guidance_kept` and
   `guidance_lost` list those lines (`session_id`, `date`,
   `exercise_id`, `fields`). Flag resolutions carry to identical flags,
   and each session's planned `start` and `duration_minutes` carry to the
