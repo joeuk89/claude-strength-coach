@@ -6052,12 +6052,13 @@ Flags (registered in `coach/flags/block.py`; rows in C20):
   `0-10` and the last lifting workout before the first such session is more
   than 10 days back (R-02: a return week follows a layoff of 11+ days, so
   one stale lift rotated back in never ends a block); `low` when trained is
-  under half of planned; `hard` when trained as prescribed is at least three
-  quarters of planned; else `partial` (also with nothing planned). A partial
-  break's covered sessions leave `planned` (C41 `on_break`), so the sessions
-  left are classed as usual. Trained as prescribed counts coach-led sessions
-  `done` and core sessions logged against the overlay line (or the program
-  session when no overlay covered the day), comparing
+  under half of planned; `hard` when the sessions that passed the hard-week
+  session gate are at least three quarters of planned; else `partial` (also
+  with nothing planned). A partial break's covered sessions leave `planned`
+  (C41 `on_break`), so the sessions left are classed as usual. The
+  hard-week session gate passes coach-led sessions `done` and core
+  sessions logged against the overlay line (or the program session when
+  no overlay covered the day), comparing
   `min(logged, prescribed)` working sets per line; a `trained_unlogged`
   session has no logged sets, so it is not.
 - **Triggers**: readiness and sleep only for the week `--week` names
@@ -6093,13 +6094,15 @@ Flags (registered in `coach/flags/block.py`; rows in C20):
   out for an unchanged repeat (`coach.block.repeated_decline`): the newest
   light-week decision not withdrawn declined an earlier proposal in this
   block (its `details.week` on or after `block.started`) of the same type
-  and reason, and the newest closed week fired no two triggers outside its
-  `details.triggers`. `deep_review.repeat_of` names that decision (null
-  otherwise) and `light_week_due` says the repeat alone does not make the
-  check-in deep. A watch never makes a check-in deep. A first proposal, a
-  proposal after an adoption or in a new block, a changed type or reason,
-  or a new pair of triggers is deep as before, and the other reasons apply
-  unchanged. R-02's prose names the
+  and reason, and the proposal ran on without a break: every week closed in
+  this block from `details.week` through `block.last_closed_week` has
+  outcome `due` and fired no two triggers outside `details.triggers`.
+  `deep_review.repeat_of` names that decision (null otherwise) and
+  `light_week_due` says the repeat alone does not make the check-in deep.
+  A watch never makes a check-in deep. A first proposal, a proposal after
+  an adoption or in a new block, a changed type or reason, a new pair of
+  triggers, or a proposal that lapsed for a week and came back is deep as
+  before, and the other reasons apply unchanged. R-02's prose names the
   adherence trigger, not every structural flag, so `volume_undershoot`
   and `add_session_type_blocked` do not make a check-in deep. `--deep`
   marks the closed week `deep` and sets `last_deep_review` to today.

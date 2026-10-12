@@ -230,8 +230,8 @@ reviewed in depth. 42 days is six calendar weeks, the same number as
 claim 3's default ceiling, so a block that runs to its ceiling with no
 missed weeks gets one deep review. A block that counts fewer hard weeks
 than calendar weeks still gets one every six weeks. A light week proposed
-again, unchanged, after the athlete declined it does not make another
-check-in deep on its own: an application decision the maintainer
+again, unchanged and without a break, after the athlete declined it does
+not make another check-in deep on its own: an application decision the maintainer
 approved, which no source or claim sets.
 
 **Claim 13.** This is bookkeeping, not a research finding. Claim 2's

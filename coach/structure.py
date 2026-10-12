@@ -561,8 +561,8 @@ def _report(inst, span, rows, extra, sessions_by_key, workouts, on_break=()):
     sessions.sort(key=lambda s: (s["date"], s.get("session_id") or s.get("external_id")))
     break_rows.sort(key=lambda s: (s["date"], s.get("session_id") or s.get("external_id")))
     return {"week": span.start.isoformat(), "label": span.label(), "span": span.to_json(), "kind": None,
-            "kind_reason": None, "sessions": sessions, "planned": counted_planned, "trained": counted_trained, "on_break": break_rows,
-            "muscles": muscles, "by_session": by_session, "flags": raised}
+            "kind_reason": None, "sessions": sessions, "planned": counted_planned, "trained": counted_trained,
+            "on_break": break_rows, "muscles": muscles, "by_session": by_session, "flags": raised}
 
 
 def week(root, week_start, *, today=None, now=None):

@@ -479,15 +479,16 @@ def _restructure_required(inst):
     return any(f["code"] == "restructure_required" for f in report["flags"])
 
 
-def repeated_decline(block_state, entry, decisions_doc):
+def repeated_decline(block_state, ledger, decisions_doc):
     """The declined `light_week` decision a proposal repeats unchanged, or None.
 
     Unchanged: the newest standing light-week decision declined an earlier proposal in this block, of the same
-    type for the same reason, and the newest closed week fired no pair of triggers that decision had not seen.
-    A repeat alone does not make a check-in deep; a new or changed proposal does.
+    type for the same reason, and every week closed since that proposal was due again without a break, firing no
+    pair of triggers that decision had not seen. A repeat alone does not make a check-in deep; a new, changed or
+    returning proposal does.
     """
     light = block_state["light_week"]
-    if light["status"] != "proposed" or decisions_doc is None:
+    if light["status"] != "proposed" or decisions_doc is None or ledger is None:
         return None
     standing = [d for d in decisions_doc["decisions"] if d["kind"] == "light_week" and d["status"] != "withdrawn"]
     newest = max(standing, key=lambda d: (d["made_at"], d["id"]), default=None)
@@ -498,9 +499,15 @@ def repeated_decline(block_state, entry, decisions_doc):
         return None
     if (details["type"], details["reason"]) != (light["type"], light["reason"]):
         return None
-    fired = entry["triggers"] if entry and entry["week"] == block_state["last_closed_week"] else []
-    if len(fired) >= TRIGGERS_FOR_LIGHT and not set(fired) <= set(details["triggers"]):
+    last = block_state["last_closed_week"] or ""
+    since = [w for w in ledger["blocks"][-1]["weeks"] if details["week"] <= w["week"] <= last]
+    if not since or since[0]["week"] != details["week"]:
         return None
+    seen = set(details["triggers"])
+    for week in since:
+        fired = set(week["triggers"])
+        if week["outcome"] != "due" or (len(fired) >= TRIGGERS_FOR_LIGHT and not fired <= seen):
+            return None
     return newest
 
 
@@ -509,8 +516,7 @@ def deep_review(inst, block_state):
     reasons, last = _deep_tier(inst, block_state)
     repeat = None
     if block_state["light_week"]["status"] == "proposed":
-        entry = _newest_entry(inst.ledger) if inst.ledger else None
-        repeat = repeated_decline(block_state, entry, inst.decisions)
+        repeat = repeated_decline(block_state, inst.ledger, inst.decisions)
         if repeat is None:
             reasons.append("light_week_proposed")
     if _restructure_required(inst):

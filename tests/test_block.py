@@ -591,6 +591,33 @@ class DeepReviewTest(BlockCase):
         self.assertEqual(data["deep_review"]["reasons"], ["light_week_proposed"])
         self.assertIsNone(data["deep_review"]["repeat_of"])
 
+    def fatigue_proposal_declined(self):
+        """Close W41 deep with two fatigue triggers (3 hard weeks) and decline the light week it proposes."""
+        self.init(2)
+        self.assertEqual(self.close("2026-W41", "--readiness", "poor", "--sleep", "poor", "--deep")
+                         ["block"]["light_week"]["reason"], "triggers")
+        return self.data("block", "decide", "--outcome", "declined", "--reason", "work trip")["decision"]
+
+    def test_a_fatigue_proposal_running_on_unchanged_is_a_repeat(self):
+        decision = self.fatigue_proposal_declined()
+        self.train_week("2026-10-12")
+        data = self.close("2026-W42", "--readiness", "poor", "--sleep", "poor", now=NEXT_SUNDAY)
+        self.assertEqual((data["deep_review"]["due"], data["deep_review"]["repeat_of"]), (False, decision["id"]))
+
+    def test_a_fatigue_proposal_that_lapsed_and_returns_is_new_and_deep(self):
+        self.fatigue_proposal_declined()
+        self.train_week("2026-10-12")
+        lapsed = self.close("2026-W42", "--readiness", "ok", "--sleep", "ok", now=NEXT_SUNDAY)
+        self.assertEqual(lapsed["block"]["light_week"]["status"], "not_due")
+        self.train_week("2026-10-19")
+        data = self.close("2026-W43", "--readiness", "poor", "--sleep", "poor", now="2026-10-25T18:00:00Z")
+        self.assertEqual((data["block"]["light_week"]["status"], data["block"]["light_week"]["reason"]),
+                         ("proposed", "triggers"))
+        self.assertEqual(data["deep_review"]["reasons"], ["light_week_proposed"])
+        self.assertIsNone(data["deep_review"]["repeat_of"])
+        due = next(f for f in data["flags"] if f["code"] == "light_week_due")
+        self.assertNotIn("proposed again", due["message"])
+
     def test_an_independent_deep_reason_still_applies_to_a_repeat(self):
         flag = flags.make("restructure_required", message="58 %")
         with mock.patch("coach.structure.adherence", return_value={"flags": [flag]}):
@@ -861,22 +888,44 @@ class RegistryTest(unittest.TestCase):
                     "status": "active", "reason": "competition week",
                     "details": {"type": "deload", "week": "2026-10-12", "reason": "ceiling", "triggers": [],
                                 "hard_weeks": 6}}
-        entry = {"week": "2026-10-12", "triggers": ["sleep"]}
+        w41 = {"week": "2026-10-05", "triggers": [], "outcome": "due"}
+        w42 = {"week": "2026-10-12", "triggers": ["sleep"], "outcome": "due"}
 
-        def repeat(state=state, entry=entry, *changes):
+        def repeat(state=state, weeks=(w41, w42), *changes):
             found = copy.deepcopy(declined)
             for change in changes:
                 change(found)
-            return block.repeated_decline(state, entry, {"decisions": [found]})
+            return block.repeated_decline(state, {"blocks": [{"weeks": list(weeks)}]}, {"decisions": [found]})
         self.assertEqual(repeat()["id"], "d-0001")
-        self.assertIsNone(repeat(state, {"week": "2026-10-12", "triggers": ["readiness", "sleep"]}))
+        self.assertIsNone(repeat(state, (w41, dict(w42, triggers=["readiness", "sleep"]))))
         self.assertIsNone(repeat(dict(state, started="2026-10-19")))
-        self.assertIsNone(repeat(state, entry, lambda d: d.update(outcome="adopted")))
-        self.assertIsNone(repeat(state, entry, lambda d: d.update(status="withdrawn")))
-        self.assertIsNone(repeat(state, entry, lambda d: d["details"].update(reason="triggers")))
-        self.assertIsNone(repeat(state, entry, lambda d: d["details"].update(type="light")))
-        self.assertIsNone(repeat(state, entry, lambda d: d["details"].update(week="2026-10-19")))
-        self.assertIsNone(block.repeated_decline(state, entry, {"decisions": []}))
+        self.assertIsNone(repeat(state, (w41, w42), lambda d: d.update(outcome="adopted")))
+        self.assertIsNone(repeat(state, (w41, w42), lambda d: d.update(status="withdrawn")))
+        self.assertIsNone(repeat(state, (w41, w42), lambda d: d["details"].update(reason="triggers")))
+        self.assertIsNone(repeat(state, (w41, w42), lambda d: d["details"].update(type="light")))
+        self.assertIsNone(repeat(state, (w41, w42), lambda d: d["details"].update(week="2026-10-19")))
+        self.assertIsNone(block.repeated_decline(state, {"blocks": [{"weeks": [w41, w42]}]}, {"decisions": []}))
+
+    def test_a_repeat_needs_the_proposal_due_every_week_since_the_decline(self):
+        state = {"started": "2026-08-31", "last_closed_week": "2026-10-19",
+                 "light_week": {"status": "proposed", "type": "light", "reason": "triggers", "week": "2026-10-26",
+                                "decision_id": None}}
+        declined = {"id": "d-0001", "kind": "light_week", "made_at": "2026-10-11T18:00:00Z", "outcome": "declined",
+                    "status": "active", "reason": "work trip",
+                    "details": {"type": "light", "week": "2026-10-12", "reason": "triggers",
+                                "triggers": ["readiness", "sleep"], "hard_weeks": 3}}
+        w41 = {"week": "2026-10-05", "triggers": ["readiness", "sleep"], "outcome": "due"}
+        w43 = {"week": "2026-10-19", "triggers": ["readiness", "sleep"], "outcome": "due"}
+
+        def repeat(w42):
+            return block.repeated_decline(state, {"blocks": [{"weeks": [w41, w42, w43]}]}, {"decisions": [declined]})
+        self.assertEqual(repeat({"week": "2026-10-12", "triggers": ["sleep", "readiness"], "outcome": "due"})["id"],
+                         "d-0001")
+        self.assertIsNone(repeat({"week": "2026-10-12", "triggers": [], "outcome": "none"}))
+        self.assertIsNone(repeat({"week": "2026-10-12", "triggers": ["sleep"], "outcome": "watch"}))
+        self.assertIsNone(repeat({"week": "2026-10-12", "triggers": ["readiness", "niggle"], "outcome": "due"}))
+        self.assertIsNone(block.repeated_decline(state, {"blocks": [{"weeks": [w41, w43]}]},
+                                                 {"decisions": [declined]}))
 
     def test_outcome_rules(self):
         self.assertEqual(block.outcome_for("hard", 6, [], 6), ("due", "deload", "ceiling"))

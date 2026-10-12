@@ -124,6 +124,21 @@ class IllnessTest(NoHevyWeekCase):
         self.assertEqual(self.skipped()["reason"], "illness: planned training missed while ill, session-b on "
                                                    "2026-10-15 (status day s-0001)")
 
+    def test_a_coach_led_session_not_done_on_an_ill_day_is_enough(self):
+        program = self.root / "data" / "program.json"
+        doc = read_json(program)
+        doc["external_sessions"] = [{"id": "pt-wed", "title": "PT", "weekday": "wed", "estimated_sets": {"chest": 3}}]
+        write_json(program, doc)
+        self.train("session-a", W42)
+        self.train("session-b", "2026-10-15")
+        self.coach("history", "annotate", "--kind", "external", "--date", "2026-10-14", "--external", "pt-wed",
+                   "--not-done")
+        self.status_day("ill", "2026-10-14", "2026-10-14")
+        skipped = self.skipped()
+        self.assertEqual((skipped["kind"], skipped["planned"], skipped["trained"]), ("illness", 3, 2))
+        self.assertEqual(skipped["reason"], "illness: planned training missed while ill, pt-wed on 2026-10-14 "
+                                            "(status day s-0001)")
+
     def test_illness_on_days_with_no_planned_work_leaves_the_week_ordinary(self):
         self.train("session-a", W42)
         self.status_day("ill", "2026-10-13", "2026-10-14")
