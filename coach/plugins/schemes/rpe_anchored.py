@@ -54,6 +54,13 @@ def _shape(ctx):
     return warmups, top, backoff, count
 
 
+def _backoff_rpe_programmed(ctx):
+    """Whether the back-offs have an effort target to keep when no e1RM loads them: the param, or an RPE on a
+    working set after the program's first."""
+    return (ctx.params["backoff_rpe"] is not None
+            or any(s.rpe is not None for s in base.working(base.expand(ctx.slot.sets))[1:]))
+
+
 def _calibration(ctx, source):
     """(e1RM, words) from the newest logged top set with reps and an RPE, else the 42-day best, else (None, None)."""
     if source is not None:
@@ -80,6 +87,22 @@ def _share(load, pct):
     return round(load * pct, 4) if load is not None else None
 
 
+def _hold_rationale(ctx, why, load, backoff, count, share, provisional):
+    if load is None:
+        text = f"RPE-anchored: {why} and no start load, so the coach picks the first loads"
+    else:
+        text = f"RPE-anchored: {why}, so the top set holds at {base.load_words(ctx, load)}"
+    if count:
+        text += f", then {count}×{backoff.reps}" if backoff.reps is not None else f", then {count} back-off sets"
+        if load is not None:
+            text += f" at {base.number(share * 100)} % of it"
+        if backoff.rpe is not None:
+            text += f" at RPE {base.number(backoff.rpe)}"
+    if provisional and load is not None:
+        text += "; the loads are provisional until a logged top set with reps and an RPE sets the e1RM"
+    return text
+
+
 def propose(ctx):
     source = base.baseline(ctx.exposures)
     warmups, top, backoff, count = _shape(ctx)
@@ -87,9 +110,10 @@ def propose(ctx):
     value, words = _calibration(ctx, source)
     if value is None or top.reps is None or top.rpe is None:
         load = source.top_load if source else base.start_load(ctx)
+        share = HOLD_BACKOFF_PCT if pct is None else pct
+        backoff = replace(backoff, rpe=backoff.rpe if _backoff_rpe_programmed(ctx) else None, load=_share(load, share))
         why = "no e1RM in the last 42 days" if value is None else "no top-set reps or RPE target"
-        rationale = f"RPE-anchored: {why}, so the top set holds at {base.load_words(ctx, load)}"
-        backoff = replace(backoff, rpe=None, load=_share(load, HOLD_BACKOFF_PCT if pct is None else pct))
+        rationale = _hold_rationale(ctx, why, load, backoff, count, share, provisional=value is None)
         round_down = False
     else:
         load = _floored(load_for(value, top.reps, top.rpe), ctx.exercise.increment)
