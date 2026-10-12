@@ -127,6 +127,19 @@ def _lift_lines(root, timeline, overlay, start, end):
     return lines
 
 
+def heavy_lower_params(root):
+    """The heavy-lower thresholds: the program's `quality_before_heavy_lower` params, else the C51 defaults."""
+    rule = next((r for r in program_rules(root) if r["name"] == "quality_before_heavy_lower"), None)
+    params = rule["params"] if rule else {}
+    return {"heavy_rpe": params.get("heavy_rpe", HEAVY_RPE), "heavy_max_reps": params.get("heavy_max_reps", HEAVY_MAX_REPS)}
+
+
+def is_heavy_lower_session(session, library, params):
+    """True when an overlay session holds heavy squat or hinge work under `params` (C51)."""
+    return _heavy_lower([(line["exercise_id"], line.get("sets", [])) for line in session.get("exercises", [])],
+                        library, params)
+
+
 def _heavy_lower(exercises, library, params):
     """True when a compound squat or hinge has a working set at RPE ≥ heavy_rpe, or reps ≤ heavy_max_reps without RPE."""
     heavy_rpe = params.get("heavy_rpe", HEAVY_RPE)

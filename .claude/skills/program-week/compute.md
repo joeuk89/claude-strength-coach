@@ -83,6 +83,14 @@ and the rotation position, and settle its flags:
   moves anything. Agree with the athlete what moves, usually the run,
   or keep the plan and resolve the flag with the reason (step 4).
   `python3 -m coach interference list` shows the program's rules.
+- `event_window_heavy_lower` (heavy squat or hinge work inside a goal
+  event's agreed window; the message names the event, its date, the
+  window and the session): keep it and resolve the flag with the reason,
+  or change the line with `propose override` (step 3). Loads, sessions
+  and the block count stay as the scheme set them unless the athlete
+  agrees a change. `event_window_pending` (an upcoming event with no
+  window decision): ask whether to agree one, with dates and why, or
+  none, and record it with `python3 -m coach events window`.
 - `conditioning_dropped` (the drop rule: sleep debt, a status day on the
   date, or a quality activity the day either side): at info, an optional
   conditioning session left the draft, listed in `data.dropped` with its
