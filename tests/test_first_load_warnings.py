@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from coach import first_loads
+from coach import first_loads, units
 from tests.support import INSTANCES, run_cli
 from tests.support.skills import flat, step_text
 
@@ -198,6 +198,18 @@ class MessageTest(unittest.TestCase):
         self.assertEqual([s["date"] for s, _ in first_loads.occurrences(flag, sessions)], [MONDAY, WEDNESDAY])
         dated = dict(flag, message=first_loads.message("Back Squat", WEDNESDAY, "no usable exposure"))
         self.assertEqual([s["date"] for s, _ in first_loads.occurrences(dated, sessions)], [WEDNESDAY])
+
+    def test_the_resolution_follows_the_hevy_setting(self):
+        load = units.make_load(25, "per_hand_x2", "kg")
+        line = {"exercise_id": "db_press", "load_mode": "per_hand_x2", "sets": [{"type": "normal", "load": load}]}
+        sessions = [{"session_id": "session-a", "date": MONDAY, "exercises": [line]}]
+        flag = {"code": "no_data", "severity": "warn", "session_id": "session-a", "exercise_id": "db_press",
+                "message": first_loads.message("DB Press", MONDAY, "no usable exposure"), "resolved": False,
+                "resolution": None}
+        for show_hevy, loads in ((True, "25/hand (Hevy: 50)"), (False, "25/hand")):
+            with self.subTest(show_hevy=show_hevy):
+                [settled] = first_loads.settle([flag], sessions, show_hevy)
+                self.assertEqual(settled["resolution"], f"first load set: {loads} on {MONDAY}, not yet trained")
 
 
 class GuidanceTest(unittest.TestCase):

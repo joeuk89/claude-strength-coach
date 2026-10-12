@@ -50,9 +50,11 @@ def missing_load(line):
         overlay.is_working(s) and s.get("load") is None for s in line["sets"])
 
 
-def settle(found, sessions):
-    """`found` with each first-load flag settled against its lines in `sessions` (a built overlay's)."""
-    return [_settled(flag, occurrences(flag, sessions)) if is_first_load(flag) else flag for flag in found]
+def settle(found, sessions, show_hevy=True):
+    """`found` with each first-load flag settled against its lines in `sessions` (a built overlay's); with
+    `show_hevy` false a resolution's loads leave out the Hevy value."""
+    return [_settled(flag, occurrences(flag, sessions), show_hevy) if is_first_load(flag) else flag
+            for flag in found]
 
 
 def belongs(flag, session, line, sessions):
@@ -62,19 +64,19 @@ def belongs(flag, session, line, sessions):
     return not is_first_load(flag) or any(s["date"] == session["date"] for s, _ in occurrences(flag, sessions))
 
 
-def _settled(flag, lines):
+def _settled(flag, lines, show_hevy):
     if not lines:
         return flag
     if any(missing_load(line) for _, line in lines):
         return dict(flag, resolved=False, resolution=None) if is_automatic(flag) else flag
     if flag["resolved"] and not is_automatic(flag):
         return flag
-    return dict(flag, resolved=True, resolution=_resolution(lines))
+    return dict(flag, resolved=True, resolution=_resolution(lines, show_hevy))
 
 
-def _resolution(lines):
+def _resolution(lines, show_hevy):
     parts = []
     for session, line in lines:
-        loads = [units.format_load(s["load"]) for s in line["sets"] if overlay.is_working(s)]
+        loads = [units.format_load(s["load"], show_hevy=show_hevy) for s in line["sets"] if overlay.is_working(s)]
         parts.append(f"{', '.join(dict.fromkeys(loads))} on {session['date']}")
     return f"{RESOLVED}{'; '.join(parts)}, not yet trained"

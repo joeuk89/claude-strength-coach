@@ -1321,7 +1321,7 @@ def _build_week(root, config, today, now, span, kind, transform_name, plan_file=
     if proposal_id is not None:
         draft["id"] = proposal_id
     doc = overlay.build(draft, config, root=root, now=now)
-    doc["flags"] = _checked_flags(root, doc)
+    doc["flags"] = _checked_flags(root, config, doc)
     doc["flags"] += _week_flags(root, config, today, span, doc) + drop_flags
     doc["flags"] += external.requirement_flags(root, doc, config.hevy.enabled)
     draft = dict(draft, id=doc["id"], flags=doc["flags"])
@@ -1494,9 +1494,10 @@ def _locate(draft, session_id, exercise_id, day=None):
     return found
 
 
-def _checked_flags(root, doc):
+def _checked_flags(root, config, doc):
     """The built overlay's flags with the R-24 findings judged afresh and each first-load flag settled by its line."""
-    return first_loads.settle(validity.merge_flags(doc, validity.check_overlay(root, doc)), doc["sessions"])
+    return first_loads.settle(validity.merge_flags(doc, validity.check_overlay(root, doc)), doc["sessions"],
+                              config.hevy.enabled)
 
 
 def override(root, config, proposal_id, session_id, exercise_id, new_sets, load, reason, standing, until, now,
@@ -1538,7 +1539,7 @@ def override(root, config, proposal_id, session_id, exercise_id, new_sets, load,
     if until is not None and not standing:
         raise UsageError("--until goes with --standing")
     doc = overlay.build(draft, config, root=root, now=now)
-    draft["flags"] = _checked_flags(root, doc)
+    draft["flags"] = _checked_flags(root, config, doc)
     decision = None
     if standing:
         until_date = decisions.standing_until(today, until)
@@ -1611,7 +1612,7 @@ def restore(root, config, proposal_id, session_id, reason, now, today, dry_run):
             if flag["code"] == "conditioning_dropped" and flag["message"] == entry["message"] and not flag["resolved"]:
                 flag.update(resolved=True, resolution=reason)
     doc = overlay.build(draft, config, root=root, now=now)
-    doc["flags"] = _checked_flags(root, doc)
+    doc["flags"] = _checked_flags(root, config, doc)
     span = dates.Span(dates.parse_date(meta["span"]["start"]), dates.parse_date(meta["span"]["end"]))
     known = {validity.flag_key(f) for f in doc["flags"]}
     doc["flags"] += [f for f in _week_flags(root, config, today, span, doc) if validity.flag_key(f) not in known]
@@ -1651,7 +1652,7 @@ def rebuild(root, config, proposal_id, today, now, dry_run):
     kept, lost = _carry_edits(root, proposal_id, draft, proposed, new_draft, config.athlete.units,
                               config.hevy.enabled)
     doc = overlay.build(new_draft, config, root=root, now=now)
-    doc["flags"] = _checked_flags(root, doc)
+    doc["flags"] = _checked_flags(root, config, doc)
     resolved = {_flag_identity(f): f for f in draft.get("flags", [])
                 if f.get("resolved") and not first_loads.is_automatic(f)}
     carried_resolutions = 0
@@ -1746,7 +1747,7 @@ def discard(root, proposal_id, today, dry_run):
 def show(root, config, proposal_id, now):
     draft, proposed, meta = load_proposal(root, proposal_id)
     doc = overlay.build(draft, config, root=root, now=now)
-    doc["flags"] = first_loads.settle(doc["flags"], doc["sessions"])
+    doc["flags"] = first_loads.settle(doc["flags"], doc["sessions"], config.hevy.enabled)
     lines = lines_of(doc, config.athlete.units, config.hevy.enabled)
     return {"id": proposal_id, "kind": meta["kind"], "span": meta["span"], "overlay": doc, "lines": lines,
             "lines_digest": jsonio.canonical_hash(lines), "unexplained": unexplained_changes(draft, proposed),
@@ -1827,7 +1828,7 @@ def finalize(root, config, proposal_id, now, dry_run, today=None):
                               "reason; use propose override, or give the line's override a reason",
                               details=unexplained)
     doc = overlay.build(draft, config, root=root, now=now)
-    doc["flags"] = _checked_flags(root, doc)
+    doc["flags"] = _checked_flags(root, config, doc)
     blocks = overlay.unresolved_blocks(doc)
     if blocks:
         raise RefusedError(
