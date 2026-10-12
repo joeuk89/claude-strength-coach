@@ -82,7 +82,7 @@ coach/                       # framework: synced to instances
   nutrition.py               # nutrition config, readings, status                        (R-33a)
   protein.py                 # protein reference mass, floor, target, stretch            (R-33a)
   calories.py                # no-app starting calorie estimate per phase                (R-33a)
-  load_statements.py         # load-figure parser, statements, bare-load diagnostics     (R-16)
+  load_statements.py         # load figures, statements, exercise mentions, diagnostics  (R-16)
   recipes.py                 # recipe cards, index, import                               (R-33b)
   meals.py                   # meal plans, shopping list                                 (R-33c)
   log.py, sheets.py          # manual log and session sheets                             (R-40c)
@@ -1342,7 +1342,8 @@ in its chain, says per hand (`/hand`, `per hand`, `each`) or gives the
 Hevy value (`(Hevy: 50)`). Per-hand-only wording is valid whether Hevy
 is enabled or disabled. With Hevy enabled, diagnostics show the
 two-number form first and per-hand wording as the minimum; with Hevy
-disabled they request per-hand wording only.
+disabled, or without a readable `config.toml`, they request per-hand
+wording only.
 In a table, a figure is also explicit when its column header says per
 hand (`Per hand (kg)`, `Load/hand (kg)`), when it sits in a Hevy-headed
 column, or, in a load column, when the same row has a number in a
@@ -1369,14 +1370,26 @@ opens with a load instruction continues the statement before it, across
 commas, conjunctions and sentence ends: a weight (`, 22 kg if fresh`),
 a load verb with its weight (`, then move to 22.5 kg`, `, aim for 22 kg`),
 either after a time anchor (`, next week 22.5 kg`), or a bodyweight
-measurement. A clause that opens with anything else, such as a numbered
-exercise clause (`3 sets of leg curl at 25 kg`), does not.
-Equipment names alone do not identify an exercise prescription.
+measurement. So does a clause that opens with prescription notation
+(sets × reps, `N sets`, `RPE 8`, `top set`, `Load:`, rest or tempo), a
+condition (`if`, `unless`, `when`, `once`) or a consequence (`so`,
+`which means`), when its load comes straight after the opener or the
+clause has no load: `, 3x10, 22 kg`, `. If fresh, 22 kg`. A clause
+that names something else before its load, such as a numbered exercise
+clause (`3 sets of leg curl at 25 kg`), starts a new statement.
 Library names, aliases, Hevy titles and ids identify exercises, and so
 does an entry's name without its parenthetical equipment (`Lateral Raise
-(Cable)` gives `lateral raise`). An entry that lists the phrase as its
-own name, alias, Hevy title or id owns it; a phrase only derived for
-variants with different load modes is ambiguous and is not checked.
+(Cable)` gives `lateral raise`). Hyphens and spaces match each other,
+`DB` and `dumbbells` are spellings of `dumbbell`, and a final plural
+matches (`DB step-ups`, `DB curls`). A phrase also matches every variant
+of the movement it names (`RDL with dumbbells` finds the dumbbell RDL).
+An entry that lists the phrase as its own name, alias, Hevy title or id
+owns it; a phrase only derived for variants with different load modes
+is ambiguous and is not checked. A dumbbell word followed by movement
+words the library uses names a `per_hand_x2` exercise when no entry
+matches (`DB incline press 22 kg`); one the library knows resolves
+through it (`DB row` is a single implement). A dumbbell word with no
+movement after it (`dumbbells up to 30 kg`) names no exercise.
 Equipment modifiers attached to the exercise (`cable lateral raise`,
 `lateral raise on the cable machine`) select the matching variant; a
 modifier that matches no variant leaves the owner in place. Equipment

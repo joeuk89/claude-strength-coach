@@ -144,22 +144,57 @@ def bare_message(rel, where, figures, exercise, text, hevy_enabled):
             f"{guidance}")
 
 
-_LOAD_CONTINUATION = re.compile(
+_LOAD_LEAD = (
     r"\s*(?:(?:next|this|last|following)\s+(?:week|session|time|block|workout)|today|tomorrow)?[\s:]*"
-    r"(?:(?:move|go|work|increase|reduce|hold|stay|add|drop|raise|lower|bump|build|aim|target|try|use|keep)\s+)?"
+    r"(?:(?:move|moving|go|going|work|increase|increasing|reduce|hold|stay|add|drop|raise|rising|lower|bump"
+    r"|build|building|climb|climbing|progress|progressing|aim|target|try|use|keep)\s+)?"
     r"(?:(?:up|down|back)\s+)?(?:(?:to|at|by|for|with)\s+)?"
     r"\d+(?:\.\d+)?\s*(?:kgs?|lbs?|kilos?|pounds?|/\s*hand|per\s+hand|each|→|->|=>|⇒)(?![A-Za-z])"
-    rf"|\s*(?:at\s+)?{_MEASUREMENT_SUBJECT_WORDS}\b",
-    re.IGNORECASE,
 )
+_LOAD_LED = re.compile(_LOAD_LEAD, re.IGNORECASE)
+_MEASUREMENT_LED = re.compile(rf"\s*(?:at\s+)?{_MEASUREMENT_SUBJECT_WORDS}\b", re.IGNORECASE)
+_RANGE = r"\d+(?:\.\d+)?(?:\s*[-–]\s*\d+(?:\.\d+)?)*"
+_SECONDS = r"(?:s|secs?|seconds?|mins?|minutes?)\b"
+_NOTATION_ITEM = (
+    rf"(?:\d+\s*[×xX*]\s*{_RANGE}(?:\s*reps?\b)?"
+    rf"|{_RANGE}\s*(?:sets?|reps?)\b(?:\s+of\s+{_RANGE}(?:\s*reps?\b)?)?"
+    rf"|(?:@\s*)?(?:rpe|rir)\s*[:@]?\s*{_RANGE}"
+    r"|(?:top|back[\s-]?off|working|heavy)\s+sets?\b|(?:load|weight)\s*:"
+    rf"|\d+\s*{_SECONDS}\s+rest\b|rest\s*:?\s*{_RANGE}\s*(?:{_SECONDS})?|tempo\s*:?\s*[\dxX]+(?:\s*[-–]\s*[\dxX]+)*)"
+)
+_NOTATION_LED = re.compile(rf"\s*{_NOTATION_ITEM}(?:[\s@]*{_NOTATION_ITEM})*", re.IGNORECASE)
+_CONSEQUENCE_LED = re.compile(r"\s*(?:so|which\s+means|meaning)\b", re.IGNORECASE)
+_CONDITION_LED = re.compile(r"\s*(?:if|unless|when|once)\b", re.IGNORECASE)
+_CONDITION_WORDS = re.compile(r"(?:\s+[A-Za-z]+){1,2}?(?=" + _LOAD_LEAD + ")", re.IGNORECASE)
+
+
+def _has_load(text):
+    return any(figure.unit for figure in _figures(text))
+
+
+def _continues(fragment):
+    """Whether a clause carries on the statement before it instead of naming a new subject."""
+    if _LOAD_LED.match(fragment) or _MEASUREMENT_LED.match(fragment):
+        return True
+    for opener in (_NOTATION_LED, _CONSEQUENCE_LED, _CONDITION_LED):
+        led = opener.match(fragment)
+        if not led:
+            continue
+        rest = fragment[led.end():]
+        if opener is _CONDITION_LED and _CONDITION_WORDS.match(rest):
+            return True
+        return bool(_LOAD_LED.match(rest)) or not _has_load(rest)
+    return False
 
 
 def statements(text):
     """Split text into one statement per subject.
 
-    Punctuation and conjunctions start a new subject. A clause that opens
-    with a load instruction or a bodyweight measurement continues the
-    statement before it, so its figures keep that statement's exercise.
+    Punctuation and conjunctions start a new subject. A clause continues the
+    statement before it, so its figures keep that statement's exercise, when
+    it opens with a load instruction or a bodyweight measurement, or with
+    prescription notation, a condition or a consequence that is followed by
+    its load or by no load at all.
     """
     parts = _CLAUSE_SEPARATOR.split(text)
     found = [parts[0]]
@@ -169,9 +204,117 @@ def statements(text):
         if not following.strip():
             joint += following
             continue
-        if _LOAD_CONTINUATION.match(following):
+        if _continues(following):
             found[-1] += joint + following
         else:
             found.append(following)
         joint = ""
     return found
+
+
+PER_HAND_X2 = "per_hand_x2"
+
+
+class Mentions:
+    """Exercise mentions resolved only when their load mode is unambiguous.
+
+    A movement name derived from an entry's name ("Lateral Raise (Cable)"
+    gives "lateral raise") also matches, as does every variant of the
+    movement an entry's own phrase names, but an entry that lists the phrase
+    as its own name or alias owns it unless equipment wording picks another.
+    """
+
+    _EQUIPMENT = {"db": "dumbbell", "dbs": "dumbbell", "dumbbells": "dumbbell",
+                  "bb": "barbell", "kb": "kettlebell", "cables": "cable",
+                  "kettlebells": "kettlebell", "barbells": "barbell"}
+    _SPELLINGS = {"dumbbell": r"(?:dumbbells?|dbs?)", "barbell": r"(?:barbells?|bb)",
+                  "kettlebell": r"(?:kettlebells?|kb)", "cable": r"cables?"}
+    _EQUIPMENT_WORD = r"(?:dumbbells?|dbs?|barbells?|bb|kettlebells?|kb|cables?|machine|band|bodyweight)"
+    _BEFORE_EQUIPMENT = re.compile(rf"\b({_EQUIPMENT_WORD})(?:-based)?\s+(?:for\s+)?$", re.IGNORECASE)
+    _AFTER_EQUIPMENT = re.compile(
+        rf"(?:\b(?:on|using|with)\s+(?:the\s+)?(?:\d+(?:\.\d+)?\s*(?:kg|lb)s?\s*)?|\(\s*)"
+        rf"({_EQUIPMENT_WORD})\b", re.IGNORECASE,
+    )
+    _EQUIPMENT_STEP = re.compile(rf"\b({_EQUIPMENT_WORD})\s+(?:step|increment)\b", re.IGNORECASE)
+    _NOT_MOVEMENT_WORDS = {"dumbbell", "barbell", "kettlebell", "cable", "machine", "band", "bodyweight", "smith",
+                           "bar", "trap", "back", "over", "one", "two", "low", "good", "exercise", "anti", "through"}
+
+    def __init__(self, lib):
+        entries = list(lib.entries())
+        movement = {e["id"]: self._key(re.sub(r"\s*\([^)]*\)", "", e["name"])) for e in entries}
+        variants = {}
+        for entry in entries:
+            variants.setdefault(movement[entry["id"]], []).append(entry)
+        candidates = {}
+        for entry in entries:
+            for phrase in (entry["name"], *entry["aliases"], *entry["hevy_titles"], entry["id"]):
+                candidates.setdefault(self._key(phrase), {})[entry["id"]] = (entry, True)
+        for entry in entries:
+            for phrase in (entry["name"], *entry["aliases"], *entry["hevy_titles"], entry["id"]):
+                for variant in variants[movement[entry["id"]]]:
+                    candidates[self._key(phrase)].setdefault(variant["id"], (variant, False))
+            candidates.setdefault(movement[entry["id"]], {}).setdefault(entry["id"], (entry, False))
+        self._candidates = candidates
+        alternatives = "|".join(self._phrase_pattern(key) for key in sorted(candidates, key=len, reverse=True))
+        words = {word for entry in entries if entry["load_mode_default"] not in ("distance", "duration")
+                 for phrase in (movement[entry["id"]], *entry["aliases"])
+                 for word in self._key(phrase).split()
+                 if word.isalpha() and len(word) > 2 and word not in self._NOT_MOVEMENT_WORDS}
+        word = "(?:" + "|".join(sorted(words, key=len, reverse=True)) + r")(?:e?s)?(?![A-Za-z0-9_])"
+        dumbbell_movement = rf"{self._SPELLINGS['dumbbell']}(?:[\s-]+{word}){{1,3}}"
+        self._pattern = re.compile(rf"(?<![A-Za-z0-9_])(?:(?:{alternatives})(?:e?s)?(?![A-Za-z0-9_])"
+                                   rf"|{dumbbell_movement})", re.IGNORECASE)
+
+    @classmethod
+    def _key(cls, phrase):
+        return " ".join(cls._EQUIPMENT.get(word, word) for word in phrase.lower().replace("-", " ").split())
+
+    @classmethod
+    def _phrase_pattern(cls, key):
+        return r"[\s-]+".join(cls._SPELLINGS.get(token, re.escape(token)) for token in key.split())
+
+    def _lookup(self, key):
+        for stem in (key, key[:-1] if key.endswith("s") else None, key[:-2] if key.endswith("es") else None):
+            if stem in self._candidates:
+                return list(self._candidates[stem].values())
+        return None
+
+    def _equipment(self, text, match, end, measurements, ambiguous):
+        words = re.findall(r"[a-z]+", match.group(0).lower())
+        named = {self._EQUIPMENT.get(word, word) for word in words}
+        named &= {"dumbbell", "barbell", "kettlebell", "cable", "machine", "band", "bodyweight"}
+        if named:
+            return named
+        before = self._BEFORE_EQUIPMENT.search(text[:match.start()])
+        modifiers = [(before, 0)] if before else []
+        after = text[match.end():end]
+        modifiers += [(m, match.end()) for m in self._AFTER_EQUIPMENT.finditer(after)
+                      if m.group(1).lower() != "bodyweight"]
+        if ambiguous:
+            modifiers += [(m, match.end()) for m in self._EQUIPMENT_STEP.finditer(after)]
+        return {self._EQUIPMENT.get(m.group(1).lower(), m.group(1).lower()) for m, offset in modifiers
+                if not any(start <= offset + m.start(1) < stop for start, stop in measurements)}
+
+    def find(self, text):
+        """[(start, end, exercise, mode)] in order; mode is None when the mention is ambiguous.
+
+        A dumbbell word before a movement the library does not name is a
+        `per_hand_x2` mention named by its own words.
+        """
+        found = []
+        measurements = measurement_spans(text)
+        matches = list(self._pattern.finditer(text))
+        for index, match in enumerate(matches):
+            end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+            key = self._key(match.group(0))
+            candidates = self._lookup(key) or self._lookup(key.partition(" ")[2])
+            if candidates is None:
+                found.append((match.start(), match.end(), match.group(0), PER_HAND_X2))
+                continue
+            owners = [entry for entry, owned in candidates if owned] or [entry for entry, _ in candidates]
+            equipment = self._equipment(text, match, end, measurements, ambiguous=len(candidates) > 1)
+            entries = [entry for entry, _ in candidates if entry["equipment"] in equipment] or owners
+            modes = {e["effective_load_mode"] or e["load_mode_default"] for e in entries}
+            mode = next(iter(modes)) if len(modes) == 1 else None
+            found.append((match.start(), match.end(), entries[0]["id"], mode))
+        return found

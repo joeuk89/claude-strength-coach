@@ -528,6 +528,96 @@ class BareHevyValuesTest(unittest.TestCase):
             message = failed["message"]
             self.assertLess(message.index("25/hand (Hevy: 50)"), message.index("25 kg per hand"))
 
+    def flagged(self, tmp, text):
+        """[(listed figures, exercise)] for each bare_hevy_values failure on a one-line profile."""
+        tmp.write("profile.md", text)
+        _, results, _ = check(tmp.root, "bare_hevy_values")
+        found = []
+        for row in failures(results, "bare_hevy_values"):
+            listed, rest = row["message"].split(": ", 1)[1].split(" for ", 1)
+            found.append((listed, rest.split(" is a bare ")[0].split(" are bare ")[0]))
+        return found
+
+    def test_a_missing_config_still_checks_with_per_hand_wording(self):
+        with TempCopy() as tmp:
+            (tmp.root / "config.toml").unlink()
+            tmp.write("profile.md", "DB bench 20 kg")
+            code, results, _ = check(tmp.root, "bare_hevy_values")
+            self.assertEqual(code, 1, results)
+            [failed] = failures(results, "bare_hevy_values")
+            self.assertIn("'20 kg' for db_bench_press", failed["message"])
+            self.assertIn("per-hand", failed["message"])
+            self.assertNotIn("Hevy", failed["message"])
+
+    def test_hyphenated_names_match_their_exercise(self):
+        with TempCopy() as tmp:
+            for text in ("step-up 20 kg", "step up 20 kg"):
+                with self.subTest(text=text):
+                    self.assertEqual(self.flagged(tmp, text), [("'20 kg'", "db_step_up")])
+
+    def test_equipment_words_in_a_measurement_leave_an_ambiguous_exercise_alone(self):
+        with TempCopy() as tmp:
+            for text in ("lateral raise 10 kg, bodyweight on the machine scale 73 kg",
+                         "lateral raise 10 kg and bodyweight on the cable scale 73 kg"):
+                with self.subTest(text=text):
+                    self.assertEqual(self.flagged(tmp, text), [("'10 kg'", "db_lateral_raise")])
+
+    def test_prescription_notation_keeps_the_load_with_its_exercise(self):
+        with TempCopy() as tmp:
+            for text, expected in (("Incline DB press, 3 × 10, 22 kg", [("'22 kg'", "db_incline_bench_press")]),
+                                   ("Arnold press, 3x12, 14 kg, 90 s rest", [("'14 kg'", "db_arnold_press")]),
+                                   ("DB bench: 4 sets of 8-10 reps, RPE 8, 22 kg", [("'22 kg'", "db_bench_press")]),
+                                   ("DB bench, top set 24 kg", [("'24 kg'", "db_bench_press")]),
+                                   ("Arnold press 3x12. Load: 14 kg.", [("'14 kg'", "db_arnold_press")]),
+                                   ("DB bench, 3x10 at 20 kg", [("'20 kg'", "db_bench_press")]),
+                                   ("DB bench, 3x10, 20 kg", [("'20 kg'", "db_bench_press")]),
+                                   ("Week 3: DB bench, 4x8, 22 kg", [("'22 kg'", "db_bench_press")]),
+                                   ("DB bench, 3 sets at 20 kg", [("'20 kg'", "db_bench_press")]),
+                                   ("DB bench, 3x10 slow, 22 kg", [("'22 kg'", "db_bench_press")]),
+                                   ("DB bench, tempo 3-1-1, rest 90 s, 22 kg", [("'22 kg'", "db_bench_press")]),
+                                   ("DB bench 20/hand, 3 sets of leg curl at 25 kg", []),
+                                   ("DB bench 20/hand, 3x10 leg curl at 25 kg", [])):
+                with self.subTest(text=text):
+                    self.assertEqual(self.flagged(tmp, text), expected)
+
+    def test_dumbbell_wording_names_the_dumbbell_exercise(self):
+        with TempCopy() as tmp:
+            for text, exercise in (("dumbbell romanian deadlifts 30 kg", "db_romanian_deadlift"),
+                                   ("DB RDL 30 kg", "db_romanian_deadlift"),
+                                   ("DB curls 12 kg", "db_curl"),
+                                   ("dumbbell curls 12 kg", "db_curl"),
+                                   ("DB hammer curls 14 kg", "db_hammer_curl"),
+                                   ("DB lunges 16 kg", "db_lunge"),
+                                   ("dumbbell bench 20 kg", "db_bench_press"),
+                                   ("DB flyes 10 kg", "db_fly"),
+                                   ("DB step-ups 15 kg", "db_step_up"),
+                                   ("DB press 20 kg", "DB press"),
+                                   ("DB incline press 22 kg", "DB incline press"),
+                                   ("DB split squats 16 kg", "DB split squats")):
+                with self.subTest(text=text):
+                    [(listed, found)] = self.flagged(tmp, text)
+                    self.assertEqual(found, exercise)
+
+    def test_dumbbell_wording_keeps_other_load_modes_and_equipment_prose(self):
+        with TempCopy() as tmp:
+            for text in ("DB row 20 kg", "DB single arm row 20 kg", "dumbbell goblet squat 24 kg",
+                         "dumbbell deadlift 30 kg", "dumbbells over 30 kg are too heavy",
+                         "dumbbell rack: 2-20 kg in 2 kg steps", "DB set to 30 kg."):
+                with self.subTest(text=text):
+                    self.assertEqual(self.flagged(tmp, text), [])
+
+    def test_conditional_clauses_keep_the_load_with_its_exercise(self):
+        with TempCopy() as tmp:
+            for text in ("DB bench 20/hand; if RPE under 8, 22 kg", "DB bench 20/hand. If fresh, 22 kg.",
+                         "DB bench 20/hand, if fresh 22 kg", "DB bench 20 kg per hand, so 22 kg next week",
+                         "DB bench 20/hand, which means 22 kg next", "DB bench 20/hand, rising to 22 kg"):
+                with self.subTest(text=text):
+                    self.assertEqual(self.flagged(tmp, text), [("'22 kg'", "db_bench_press")])
+            for text in ("DB bench 20/hand. If fresh, leg curl 25 kg.",
+                         "DB bench 20/hand; if fresh, Arnold press 14 kg per hand"):
+                with self.subTest(text=text):
+                    self.assertEqual(self.flagged(tmp, text), [])
+
     def test_overlay_ignores_measurements_but_still_checks_its_load(self):
         with TempCopy() as tmp:
             tmp.edit_overlay(lambda doc: db_bench(doc).update(

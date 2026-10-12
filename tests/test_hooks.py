@@ -255,6 +255,21 @@ class PostToolUseTest(unittest.TestCase):
                 else:
                     self.assertIsNone(response)
 
+    def test_prescription_notation_and_dumbbell_wording_block_the_bare_load(self):
+        for text in ("Incline DB press, 3 × 10, 22 kg", "Arnold press, 3x12, 14 kg, 90 s rest",
+                     "DB bench: 4 sets of 8-10 reps, RPE 8, 22 kg", "DB bench, top set 24 kg",
+                     "Arnold press 3x12. Load: 14 kg.", "DB curls 12 kg", "DB RDL 30 kg", "DB press 20 kg",
+                     "DB bench 20/hand. If fresh, 22 kg."):
+            with self.subTest(text=text):
+                root = copy_of(self, VALID)
+                profile = root / "profile.md"
+                profile.write_text(text, encoding="utf-8")
+                code, response, _ = run_hook("posttooluse", root, edit_input(profile))
+                self.assertEqual(code, 0)
+                self.assertIsNotNone(response)
+                self.assertEqual(response["decision"], "block")
+                self.assertIn("bare_hevy_values", response["reason"])
+
     def test_equipment_profile_write_does_not_block(self):
         root = copy_of(self, VALID)
         profile = root / "profile.md"

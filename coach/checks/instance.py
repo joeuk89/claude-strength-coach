@@ -25,11 +25,10 @@ from coach.config import equipment_for
 from coach.errors import ConfigError, ValidationError
 from coach.hevy.cache import HevyCache
 from coach.library import Library
-from coach.load_statements import bare_figures, bare_message, measurement_spans, statements
+from coach.load_statements import PER_HAND_X2, Mentions, bare_figures, bare_message, statements
 
 OWNER = "R-16"
 PATHS_KEY = "x-coach-paths"
-PER_HAND_X2 = "per_hand_x2"
 SNAPSHOT_KINDS = ("cardio",)
 OVERLAY_TEXT_FIELDS = ("target_note", "change", "cues", "focus")
 MIGRATE_RUN = "run python3 -m coach migrate run"
@@ -346,77 +345,20 @@ def _overlay_text(line):
         yield "override.reason", line["override"]["reason"]
 
 
-class _Mentions:
-    """Exercise mentions resolved only when their load mode is unambiguous.
-
-    A movement name derived from an entry's name ("Lateral Raise (Cable)"
-    gives "lateral raise") also matches, but an entry that lists the phrase
-    as its own name or alias owns it unless equipment wording picks another.
-    """
-
-    _EQUIPMENT = {"db": "dumbbell", "dbs": "dumbbell", "dumbbells": "dumbbell",
-                  "bb": "barbell", "kb": "kettlebell", "cables": "cable",
-                  "kettlebells": "kettlebell", "barbells": "barbell"}
-    _EQUIPMENT_WORD = r"(?:dumbbells?|dbs?|barbells?|bb|kettlebells?|kb|cables?|machine|band|bodyweight)"
-    _BEFORE_EQUIPMENT = re.compile(rf"\b({_EQUIPMENT_WORD})(?:-based)?\s+(?:for\s+)?$", re.IGNORECASE)
-    _AFTER_EQUIPMENT = re.compile(
-        rf"(?:\b(?:on|using|with)\s+(?:the\s+)?(?:\d+(?:\.\d+)?\s*(?:kg|lb)s?\s*)?|\(\s*)"
-        rf"({_EQUIPMENT_WORD})\b", re.IGNORECASE,
-    )
-    _EQUIPMENT_STEP = re.compile(rf"\b({_EQUIPMENT_WORD})\s+(?:step|increment)\b", re.IGNORECASE)
-
-    def __init__(self, lib):
-        candidates = {}
-        for entry in lib.entries():
-            movement = re.sub(r"\s*\([^)]*\)", "", entry["name"])
-            own = (entry["name"], *entry["aliases"], *entry["hevy_titles"], entry["id"])
-            for phrase, owned in [(phrase, True) for phrase in own] + [(movement, False)]:
-                candidates.setdefault(self._key(phrase), {}).setdefault(entry["id"], (entry, owned))
-        self._candidates = candidates
-        alternatives = sorted(candidates, key=len, reverse=True)
-        body = "|".join(r"[\s-]+".join(re.escape(token) for token in phrase.split()) for phrase in alternatives)
-        self._pattern = re.compile(rf"(?<![A-Za-z0-9_])(?:{body})(?![A-Za-z0-9_])", re.IGNORECASE)
-
-    @staticmethod
-    def _key(phrase):
-        return " ".join(phrase.lower().replace("-", " ").split())
-
-    def _equipment(self, text, match, end, measurements, ambiguous):
-        words = re.findall(r"[a-z]+", match.group(0).lower())
-        named = {self._EQUIPMENT.get(word, word) for word in words}
-        named &= {"dumbbell", "barbell", "kettlebell", "cable", "machine", "band", "bodyweight"}
-        if named:
-            return named
-        before = self._BEFORE_EQUIPMENT.search(text[:match.start()])
-        modifiers = [(before, 0)] if before else []
-        after = text[match.end():end]
-        modifiers += [(m, match.end()) for m in self._AFTER_EQUIPMENT.finditer(after)
-                      if m.group(1).lower() != "bodyweight"]
-        if ambiguous:
-            modifiers += [(m, match.end()) for m in self._EQUIPMENT_STEP.finditer(after)]
-        return {self._EQUIPMENT.get(m.group(1).lower(), m.group(1).lower()) for m, offset in modifiers
-                if not any(start <= offset + m.start(1) < stop for start, stop in measurements)}
-
-    def find(self, text):
-        """[(start, end, exercise, mode)] in order; mode is None when the mention is ambiguous."""
-        found = []
-        measurements = measurement_spans(text)
-        matches = list(self._pattern.finditer(text))
-        for index, match in enumerate(matches):
-            end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
-            candidates = list(self._candidates[self._key(match.group(0))].values())
-            owners = [entry for entry, owned in candidates if owned] or [entry for entry, _ in candidates]
-            equipment = self._equipment(text, match, end, measurements, ambiguous=len(candidates) > 1)
-            entries = [entry for entry, _ in candidates if entry["equipment"] in equipment] or owners
-            modes = {e["effective_load_mode"] or e["load_mode_default"] for e in entries}
-            mode = next(iter(modes)) if len(modes) == 1 else None
-            found.append((match.start(), match.end(), entries[0]["id"], mode))
-        return found
-
-
 def _attribute(position, mentions, carried):
     before = [m for m in mentions if m[1] <= position]
     return before[-1] if before else carried
+
+
+def _bare_results(rel, number, text, positioned, mentions, carried, hevy_enabled):
+    """A failure per per-hand exercise owning any of `positioned`, given as [(figure, offset in text)]."""
+    bare = {}
+    for figure, position in positioned:
+        mention = _attribute(position, mentions, carried)
+        if mention and mention[3] == PER_HAND_X2:
+            bare.setdefault(mention[2], []).append(figure)
+    return [Result("fail", bare_message(rel, f"line {number}", listed, exercise, text, hevy_enabled), rel)
+            for exercise, listed in bare.items()]
 
 
 _REGION = re.compile(r"<!-- coach:begin ([a-z-]+) (\S+) -->.*?<!-- coach:end \1 \2 -->", re.DOTALL)
@@ -486,15 +428,9 @@ def _prose_results(rel, text, mentions, hevy_enabled):
             table = _Table()
         if not is_row:
             for statement in statements(line):
-                found = mentions.find(statement)
-                bare = {}
-                for figure in bare_figures(statement):
-                    mention = _attribute(figure.start, found, None)
-                    if mention and mention[3] == PER_HAND_X2:
-                        bare.setdefault(mention[2], []).append(figure)
-                for exercise, listed in bare.items():
-                    results.append(Result("fail", bare_message(rel, f"line {number}", listed, exercise,
-                                                               statement, hevy_enabled), rel))
+                positioned = [(figure, figure.start) for figure in bare_figures(statement)]
+                results += _bare_results(rel, number, statement, positioned, mentions.find(statement), None,
+                                         hevy_enabled)
             continue
         found = mentions.find(line)
         cells = _cells(line)
@@ -505,15 +441,7 @@ def _prose_results(rel, text, mentions, hevy_enabled):
         if name_cell.strip():
             named = mentions.find(name_cell)
             carried = named[-1] if named else None
-        figures = _row_figures(line, table)
-        bare = {}
-        for figure, position in figures:
-            mention = _attribute(position, found, carried)
-            if mention and mention[3] == PER_HAND_X2:
-                bare.setdefault(mention[2], []).append(figure)
-        for exercise, listed in bare.items():
-            results.append(Result("fail", bare_message(rel, f"line {number}", listed, exercise, line,
-                                                       hevy_enabled), rel))
+        results += _bare_results(rel, number, line, _row_figures(line, table), found, carried, hevy_enabled)
     return results
 
 
@@ -543,7 +471,7 @@ def bare_hevy_values(ctx):
                                                                line["exercise_id"], text, hevy_enabled), rel))
     prose = _prose_files(ctx)
     if prose:
-        mentions = _Mentions(_library(ctx) or Library())
+        mentions = Mentions(_library(ctx) or Library())
         for path in prose:
             results += _prose_results(_rel(ctx, path), path.read_text(encoding="utf-8"), mentions, hevy_enabled)
     return results

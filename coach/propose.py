@@ -21,10 +21,10 @@ from coach import dates, decisions, flags, followups, history, jsonio, niggles, 
 from coach import cardio, conditioning, external, program, research, weekflags
 from coach import state as state_module
 from coach import stats, units, validity
-from coach.checks.instance import PER_HAND_X2, cap_for
+from coach.checks.instance import cap_for
 from coach.errors import ConfigError, RefusedError, UsageError, ValidationError
 from coach.library import Library, e1rm_supported
-from coach.load_statements import bare_figures, bare_message
+from coach.load_statements import PER_HAND_X2, bare_figures, bare_message
 from coach.plugins import base
 
 KINDS = ("weekly", "midweek", "deload")
