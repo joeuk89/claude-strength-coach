@@ -228,7 +228,8 @@ class DoubleProgressionAfterOwnOverlayTest(ProposeCase):
 
 
 class DoubleProgressionEffortCase(ProposeCase):
-    """The 8–10 @8 bench slot as `exercise_id`, last logged 3×10 at 24/hand and RPE 8, 9 and 9.5.
+    """The 8–10 @8 bench slot as `exercise_id` on a 2 kg dumbbell step, last logged 3×10 at 24/hand
+    and RPE 8, 9 and 9.5.
 
     `db_curl` matches `db_bench_press` in load mode and increment, so only
     the library pattern separates the two outcomes.
@@ -239,6 +240,7 @@ class DoubleProgressionEffortCase(ProposeCase):
 
     def setUp(self):
         super().setUp()
+        self.set_config("dumbbell_increment = 2.5", "dumbbell_increment = 2.0")
         for path in (self.root / "data").rglob("*.json"):
             text = path.read_text(encoding="utf-8")
             path.write_text(text.replace('"db_bench_press"', f'"{self.exercise_id}"'), encoding="utf-8")
@@ -688,7 +690,7 @@ class OverrideTest(ProposeCase):
 
     def test_corrected_per_hand_reason_can_be_approved_and_checked(self):
         self.coach("propose", "override", "--proposal", FIRST_ID, "--session", "session-a",
-                   "--exercise", "db_bench_press", "--load", "8", "--reason", "move to 8 kg per hand",
+                   "--exercise", "db_bench_press", "--load", "7.5", "--reason", "move to 7.5 kg per hand",
                    "--standing")
         self.coach("propose", "finalize", "--proposal", FIRST_ID)
         self.coach("overlay", "approve", FIRST_ID)
