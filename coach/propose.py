@@ -1934,7 +1934,7 @@ def set_time(root, config, proposal_id, session_id, day, start, minutes, today, 
     draft["flags"] = doc["flags"]
     if not dry_run:
         _write_proposal(root, proposal_id, draft, None, None)
-    collisions = [f for f in doc["flags"] if f["code"] in interference.codes(root)]
+    collisions = flags.with_refs([f for f in doc["flags"] if f["code"] in interference.codes(root)])
     return {"id": proposal_id, "session_id": session_id, "date": session["date"], "start": session["start"],
             "duration_minutes": session["duration_minutes"], "interference": collisions,
             "finalized": overlay.path_for(root, proposal_id).exists(), "written": not dry_run}

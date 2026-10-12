@@ -3389,8 +3389,8 @@ id follows C10. `data.lines_digest` (R-21b) is the C7 canonical hash of
   draft holds the session twice), or clears both, then judges the
   interference rules again (C51). Only the session's timing changes, so
   finalize needs no override reason. It returns `{id, session_id, date,
-  start, duration_minutes, interference, finalized, written}`;
-  `finalized` true means an overlay of that id exists, so finalize
+  start, duration_minutes, interference, finalized, written}`, each
+  `interference` flag with its `ref`; `finalized` true means an overlay of that id exists, so finalize
   again. A start on another date exits 1.
 - `propose restore --proposal ID --session S --reason TEXT [--dry-run]` (R-44b) puts
   a dropped conditioning session back and resolves its flag with the

@@ -188,6 +188,19 @@ class ProposalTest(Case):
         self.assertEqual((flag["severity"], flag["session_id"]), ("info", "session-b"))
         self.assertIn("lift first, keep at least 6 h between", flag["message"])
 
+    def test_a_collision_raised_after_the_draft_was_saved_shows_and_resolves_by_its_ref(self):
+        proposal = self.data("propose", "week", "--week", "2026-W42")["id"]
+        self.planned("2026-10-15", "Threshold", quality=True)
+        shown = [f for f in self.collisions(self.data("propose", "show", proposal)["flags"])
+                 if "same_day" in f["message"]]
+        self.assertEqual(len(shown), 1, shown)
+        ref = shown[0]["ref"]
+        resolved = self.data("propose", "resolve", "--proposal", proposal, "--flag", ref,
+                             "--resolution", "run after lifting, 7 h apart")["flag"]
+        self.assertEqual((resolved["ref"], resolved["resolved"]), (ref, True))
+        again = [f for f in self.data("propose", "show", proposal)["flags"] if f["ref"] == ref]
+        self.assertEqual([(f["resolved"], f["resolution"]) for f in again], [(True, "run after lifting, 7 h apart")])
+
     def test_an_easy_run_on_session_b_day_adds_nothing(self):
         before = self.collisions(self.proposal()["overlay"]["flags"])
         self.planned("2026-10-15", "Easy 6 km", quality=False)

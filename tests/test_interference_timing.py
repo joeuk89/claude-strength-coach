@@ -291,6 +291,8 @@ class ProposalTimingTest(Case):
         cleared = self.data("propose", "time", "--proposal", proposal, "--session", "session-a", "--clear")
         [flag] = self.heavy_collisions(cleared["interference"])
         self.assertIn("no start time for planned Session A", flag["message"])
+        shown = self.data("propose", "show", proposal)["flags"]
+        self.assertIn(flag["ref"], [f["ref"] for f in self.heavy_collisions(shown)])
 
 
 class OneOffInterferenceTest(Case):
