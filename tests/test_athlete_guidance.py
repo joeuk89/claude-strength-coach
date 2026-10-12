@@ -216,6 +216,17 @@ class WeekFocusTest(RebuildCase):
         doc = self.run_coach("propose", "finalize", "--proposal", W43)["overlay"]
         self.assertEqual((doc["focus"], line(doc, "bb_back_squat")["target_note"]), (FOCUS, ADJUST))
 
+    def test_a_rebuild_keeps_both_line_guidance_and_the_session_start(self):
+        self.run_coach("propose", "week", "--week", "2026-W43")
+        self.note("--session", "session-a", "--exercise", "bb_back_squat", "--target-note", ADJUST)
+        self.run_coach("propose", "time", "--proposal", W43, "--session", "session-a", "--start", "18:00",
+                       "--duration-min", "60")
+        rebuilt = self.run_coach("propose", "rebuild", "--proposal", W43)
+        session = next(s for s in rebuilt["overlay"]["sessions"] if s["session_id"] == "session-a")
+        self.assertEqual((session["start"], session["duration_minutes"]), ("2026-10-19T18:00:00Z", 60))
+        self.assertEqual(line(rebuilt["overlay"], "bb_back_squat")["target_note"], ADJUST)
+        self.assertEqual([r["exercise_id"] for r in rebuilt["guidance_kept"]], ["bb_back_squat"])
+
     def test_a_note_on_a_line_with_a_kept_standing_override_survives_rebuild(self):
         self.run_coach("propose", "week", "--week", "2026-W43")
         self.run_coach("propose", "override", "--proposal", W43, "--session", "session-a", "--exercise",
