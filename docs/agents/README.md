@@ -27,3 +27,12 @@ config says so: `coach.workspace = template`, or no setting and an `origin`
 on the canonical GitHub repository. A fork or local development copy runs
 `git config --local coach.workspace template`. Any other copy gets the
 `/setup` prompt. Contract C52 has the full rule.
+
+### Documentation
+
+User docs live in `docs/guide/` (index: `docs/README.md`); `docs/development.md`
+is for contributors. Neither is synced to instances: athletes read them on
+GitHub, so a change to a skill, a `coach` command, a config key or a
+coaching rule updates the guide page that describes it in the same PR.
+`docs/guide/cli.md` is generated from `--help`; regenerate it when a
+command or flag changes.
