@@ -1,9 +1,9 @@
 """The proposal pipeline behind `coach propose` (contract C24).
 
 `propose week` turns the program, its state, the history and the decisions
-into an editable draft overlay: each slot's scheme proposes, then the core
-decays stale lines, applies the week's transform, the load constraints,
-caps and rounding, and any standing override. Loads stay coaching numbers
+into an editable draft overlay: each slot's scheme proposes, or a standing
+override keeps its sets, then the core decays stale lines, applies the
+week's transform, the load constraints, caps and rounding. Loads stay coaching numbers
 until `coach.overlay.build` makes load objects through `coach.units`.
 `propose finalize` turns the edited draft into the overlay R-13 approves.
 """
@@ -476,7 +476,8 @@ def apply_constraints(sets, active, newest_load, direction):
 
 
 def propose_line(run, session, day, exercise, ctx_extra):
-    """One program slot through the pipeline: scheme, decay, transform, constraints, illness cap, caps, rounding, override."""
+    """One program slot through the pipeline: scheme or standing override, decay, transform, constraints, illness cap,
+    caps, rounding."""
     session_id, exercise_id = session["id"], exercise["exercise_id"]
     slot_key = f"{session_id}/{exercise_id}"
     mode = exercise["load_mode"]
@@ -501,7 +502,7 @@ def propose_line(run, session, day, exercise, ctx_extra):
                            start_load=exercise["start_load"]),
         params=params, state=state, exposures=exposures, e1rm=run.e1rm(exercise_id, day),
         last_prescription=run.last_prescription(session_id, exercise_id),
-        last_override=decisions.last_override(run.decisions, session_id, exercise_id, run.today),
+        last_override=decisions.last_override(run.decisions, session_id, exercise_id, day),
         days_off=days_off, constraints=tuple(active), scheme=scheme_name,
         scheme_deload=getattr(plugin.module, "deload", None),
     )
@@ -530,10 +531,14 @@ def propose_line(run, session, day, exercise, ctx_extra):
                                                    f"{f', RPE cap {band.rpe_cap}' if band.rpe_cap else ''})"))
 
     transform = ctx_extra["transform"]
-    if transform is not None:
+
+    def transformed(found, scheme_deload):
         plugin_t, transform_params = transform
-        proposal = plugin_t.module.apply(replace(ctx, params=transform_params), proposal)
-        adjusted.append(f"the {plugin_t.name} deload")
+        return plugin_t.module.apply(replace(ctx, params=transform_params, scheme_deload=scheme_deload), found)
+
+    if transform is not None:
+        proposal = transformed(proposal, ctx.scheme_deload)
+        adjusted.append(f"the {transform[0].name} deload")
     newest = base.newest(exposures)
     first_after_illness = ctx_extra["illness"] is not None and day == ctx_extra["first_day"]
     try:
@@ -584,28 +589,48 @@ def propose_line(run, session, day, exercise, ctx_extra):
         adjusted += constraint_words
     if adjusted:
         clauses.append(f"adjusted for {', '.join(adjusted)}: {sets_text(sets, mode, run.unit)}")
-    clauses += [f"the kit makes {_load_text(after, mode, run.unit)}, not {_load_text(before, mode, run.unit)}"
-                for before, after in kit_changes.items()]
+    clauses += _kit_words(kit_changes, mode, run.unit)
     if cut is not None:
         clauses.append(_cut_words(cut, mode, run.unit))
 
     override = None
     last = ctx.last_override
     if last is not None and last["standing"]:
-        chosen = base.Proposal(sets=tuple(base.SetSpec.from_dict(s) for s in last["chosen_sets"]), rationale="kept",
-                               derived_from=source, state={})
+        kept = tuple(base.SetSpec.from_dict(s) for s in last["chosen_sets"])
+        chosen = base.Proposal(sets=kept, rationale="kept", derived_from=source, state={})
         chosen_cut_from = _cut_from(chosen)
+        kept_adjusted = []
         if decay is not None:
             chosen = plugin.module.decay(ctx, chosen, days_off)
-        chosen_sets, _, _ = limited(chosen.sets, chosen.round_down, chosen.load_cut, chosen_cut_from)
+            kept_adjusted.append(f"return band {decay['band']} after {days_off} days off")
+        if transform is not None:
+            # A scheme's own deload rebuilds the scheme's prescription and would drop the coach's sets.
+            chosen = transformed(chosen, None)
+            kept_adjusted.append(f"the {transform[0].name} deload")
+        chosen_sets, kept_words, kept_kit_changes = limited(chosen.sets, chosen.round_down, chosen.load_cut,
+                                                            chosen_cut_from)
+        cut = (_load_cut(chosen_cut_from, chosen, kept, chosen_sets, kept_kit_changes, rounding)
+               if chosen.load_cut else None)
+        if cut is not None:
+            kept_kit_changes.pop(cut["target"], None)
+        if first_after_illness:
+            kept_adjusted.append(f"an RPE {validity.ILLNESS_RPE_CAP} cap on the first session after illness")
+        kept_adjusted += kept_words
         override = {"reason": last["reason"], "proposed_sets": [s.to_dict() for s in sets]}
         scheme_text = sets_text(sets, mode, run.unit)
+        kept_text = sets_text(chosen_sets, mode, run.unit)
+        if kept_adjusted:
+            kept_text = (f"{sets_text(kept, mode, run.unit)}, adjusted for {', '.join(kept_adjusted)}: "
+                         f"{kept_text},")
         clauses = [f"standing override until {last['until']} ({last['reason'].rstrip('. ')}) kept as "
-                   f"{sets_text(chosen_sets, mode, run.unit)} instead of the scheme's {scheme_text}"]
+                   f"{kept_text} instead of the scheme's {scheme_text}"]
+        clauses += _kit_words(kept_kit_changes, mode, run.unit)
+        if cut is not None:
+            clauses.append(_cut_words(cut, mode, run.unit))
         line_flags.append(line_flag("override_standing", f"Standing override {last['id']} until {last['until']} "
                                                          f"kept; the scheme proposed {scheme_text}"))
         sets = chosen_sets
-    elif cut is not None and cut["held"]:
+    if cut is not None and cut["held"]:
         line_flags.append(line_flag("load_cut_held", _held_cut_words(cut, info.name, mode, run.unit),
                                     "info" if cut["other_cuts"] and not cut["rose"] else "warn"))
 
@@ -617,12 +642,14 @@ def propose_line(run, session, day, exercise, ctx_extra):
 
     rationale = "; ".join(c for c in clauses if c) + "."
     rationale = rationale[0].upper() + rationale[1:]
+    final_note = getattr(plugin.module, "final_note", None)
+    target_note = final_note(ctx, proposal, sets) if final_note is not None else proposal.target_note
     previous = ctx.last_prescription
     draft_line = {
         "exercise_id": exercise_id,
         "hevy_template_id": _template_id(entry),
         "load_mode": mode, "rest_seconds": exercise["rest_seconds"], "superset_id": exercise["superset_id"],
-        "cues": exercise["cues"], "focus": proposal.focus, "target_note": proposal.target_note,
+        "cues": exercise["cues"], "focus": proposal.focus, "target_note": target_note,
         "change": change_text(previous["sets"] if previous else None, sets, mode, run.unit),
         "override": override,
         "provenance": {"scheme": scheme_name, "derived_from": source.ref() if source else None, "inferred": False,
@@ -822,6 +849,11 @@ def _rounded(sets, clipped, round_down, cut_from, rounding):
             off_ladder.append(value)
         found.append(replace(s, load=units.json_number(max(0, value))))
     return tuple(found), changes, off_ladder
+
+
+def _kit_words(kit_changes, mode, unit):
+    return [f"the kit makes {_load_text(after, mode, unit)}, not {_load_text(before, mode, unit)}"
+            for before, after in kit_changes.items()]
 
 
 def _cut_from(proposal):
@@ -1299,7 +1331,7 @@ def show(root, config, proposal_id, now):
             "dropped": [_dropped_row(e) for e in meta.get("dropped", [])]}
 
 
-def finalize(root, config, proposal_id, now, today, dry_run):
+def finalize(root, config, proposal_id, now, dry_run):
     """Write the overlay, one-week override decisions and pending scheme state, once every change is explained (C24).
 
     Everything is built and checked before the first write, so a refusal or a dry run writes nothing.
@@ -1327,16 +1359,18 @@ def finalize(root, config, proposal_id, now, today, dry_run):
     decision_doc = decisions.load(root)
     recorded = {(d["overlay_id"], d["scope"].get("session_id"), d["scope"].get("exercise_id"))
                 for d in decision_doc["decisions"] if d["kind"] == "override"}
-    standing = {(d["scope"].get("session_id"), d["scope"].get("exercise_id"))
-                for d in decision_doc["decisions"]
-                if d["kind"] == "override" and d["standing"] and decisions.effective_status(d, today) == "active"}
+    standing = [d for d in decision_doc["decisions"] if d["kind"] == "override" and d["standing"]]
     appended = []
     for session in draft["sessions"]:
+        day = dates.parse_date(session["date"])
         for line in session["exercises"]:
             if not line.get("override"):
                 continue
             scope = (session["session_id"], line["exercise_id"])
-            if (proposal_id, *scope) in recorded or scope in standing:
+            kept = any(d["scope"] == {"session_id": scope[0], "exercise_id": scope[1]}
+                       and d["reason"] == line["override"]["reason"] and decisions.effective_status(d, day) == "active"
+                       for d in standing)
+            if (proposal_id, *scope) in recorded or kept:
                 continue
             record = decisions.override(_timestamp(now), doc["id"], scope[0], scope[1], line["override"]["reason"],
                                         line["override"]["proposed_sets"], line["sets"], False, doc["span"]["end"])

@@ -360,6 +360,26 @@ class AssistanceLadderTest(unittest.TestCase):
         self.assertEqual(loads_and_reps(proposal), [(0, 12)] * 3)
         self.assertIn("incline push-up", proposal.target_note)
 
+    def final_note(self, loads, week_kind="weekly", params=None):
+        ctx = replace(self.ladder({"rung": 0, "through": "2026-09-28"}), week_kind=week_kind,
+                      params=dict(self.PARAMS, **(params or {})))
+        proposal = base.Proposal(sets=(), rationale="x", derived_from=None, state={"rung": 1, "through": None},
+                                 flags=(), target_note="Rung 2 of 3: medium band")
+        sets = tuple(base.SetSpec(reps=8, rpe=6, load=load) for load in loads)
+        return scheme("assistance_ladder").module.final_note(ctx, proposal, sets)
+
+    def test_the_final_note_names_the_rung_the_sets_deliver(self):
+        self.assertEqual(self.final_note((30, 30)), "Rung 2 of 3: medium band")
+        self.assertEqual(self.final_note((20, 20)), "Rung 3 of 3: light band")
+        self.assertEqual(self.final_note((40, 40), "deload"),
+                         "Rung 1 of 3: heavy band; rung 2 waits for an ordinary week")
+
+    def test_a_final_note_off_the_rungs_names_the_load_or_nothing(self):
+        self.assertEqual(self.final_note((35, 35)), "Between rungs this week: 35 kg of assistance")
+        self.assertIsNone(self.final_note((40, 30)))
+        self.assertEqual(self.final_note((None, None), params={"rungs": [{"name": "a", "load": None}] * 3}),
+                         "Rung 2 of 3: medium band")
+
 
 class Wave531Test(unittest.TestCase):
     def wave(self, state, params=None, e1rm=None, exercise=SQUAT, days_off=0, exposures=(), session_date=SESSION_DATE,

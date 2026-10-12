@@ -118,16 +118,42 @@ def propose(ctx):
                          derived_from=source, state=state, target_note=_note(ctx, rung))
 
 
-def override_state(params, state, sets, load_mode):
-    """The state after an approved override: on the rung whose load every overridden working set carries, so the
-    coach's switch to that rung stands; an override off the rungs leaves the state as proposed."""
+def _rung_of(params, sets, load_mode):
+    """The one rung whose load every working set carries, or None."""
     loads = {s.load for s in base.working(sets)}
     if len(loads) != 1 or None in loads:
-        return dict(state)
+        return None
     [load] = loads
     rung_loads = [_rung_load(load_mode, rung) for rung in params["rungs"]]
     found = [i for i, rung_load in enumerate(rung_loads) if rung_load is not None and abs(rung_load - load) < 1e-9]
-    return dict(state, rung=found[0]) if len(found) == 1 else dict(state)
+    return found[0] if len(found) == 1 else None
+
+
+def override_state(params, state, sets, load_mode):
+    """The state after an approved override: on the rung whose load every overridden working set carries, so the
+    coach's switch to that rung stands; an override off the rungs leaves the state as proposed."""
+    rung = _rung_of(params, sets, load_mode)
+    return dict(state) if rung is None else dict(state, rung=rung)
+
+
+def final_note(ctx, proposal, sets):
+    """The note for the rung the line delivers once a deload's held assistance, a constraint or a standing override
+    has moved its load off the proposed rung; a deload names the climb it leaves for an ordinary week."""
+    loads = {s.load for s in base.working(sets)}
+    if loads <= {None}:
+        return proposal.target_note
+    rung = _rung_of(ctx.params, sets, ctx.exercise.load_mode)
+    if rung is None:
+        if len(loads) != 1:
+            return None
+        [load] = loads
+        words = (f"{base.number(load)} {ctx.unit} of assistance" if ctx.exercise.load_direction < 0
+                 else base.load_words(ctx, load))
+        return f"Between rungs this week: {words}"
+    proposed = proposal.state["rung"]
+    if ctx.week_kind == "deload" and rung < proposed:
+        return f"{_note(ctx, rung)}; rung {proposed + 1} waits for an ordinary week"
+    return _note(ctx, rung)
 
 
 def decay(ctx, proposal, days_off):

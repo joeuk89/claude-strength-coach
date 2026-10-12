@@ -2653,6 +2653,7 @@ def propose(ctx: SchemeContext) -> Proposal                          # schemes
 def decay(ctx: SchemeContext, proposal: Proposal, days_off: int) -> Proposal   # schemes; may return base.default_decay(...)
 def deload(ctx: SchemeContext, proposal: Proposal) -> Proposal       # schemes, optional (used by the `scheme` transform)
 def override_state(params: dict, state: dict, sets: tuple[SetSpec, ...], load_mode: str) -> dict  # schemes, optional (finalize)
+def final_note(ctx: SchemeContext, proposal: Proposal, sets: tuple[SetSpec, ...]) -> str | None  # schemes, optional (the line's target_note)
 def plan(ctx: ScheduleContext) -> SchedulePlan                       # schedules
 def apply(ctx: SchemeContext, proposal: Proposal) -> Proposal        # transforms
 ```
@@ -3014,7 +3015,13 @@ and `plugins test` runs them. Loaded with
   `through` is null) logged every target set at its target reps (the
   top of a range) at or under the target RPE. A slot trained twice a
   week therefore climbs one rung a week, never two. `target_note` names
-  the rung. `decay` steps back `bands_back(days_off)` rungs from the
+  the rung the line delivers (`final_note`): the rung whose load every
+  final working set carries, `Between rungs this week: <load>` for one
+  load off the rungs, none for mixed loads, and the proposed rung when
+  no set carries a load (a `band` line). When a deload's held assistance
+  delivers an easier rung than the one earned, the note adds `rung <n>
+  waits for an ordinary week`; the deload stores no state, so the next
+  ordinary week judges the climb again. `decay` steps back `bands_back(days_off)` rungs from the
   lower of the stored and the proposed rung (never below the first),
   so a climb never reaches a return week, with the band's set cut and
   RPE cap and no load cut. `override_state` moves `rung` to the rung
@@ -3060,7 +3067,11 @@ propose week  ──►  .coach/proposals/<id>.json (+ .proposed.json)  ──�
 3. Per exercise line: build `SchemeContext`; `propose`; then decay
    (when `days_off` > 10), the deload transform (kind `deload`: the
    program's `blocks.deload_rule`, or `--transform NAME` for this run),
-   constraints, caps, rounding, standing override (C25).
+   constraints, caps, rounding. A standing override (C25) active on the
+   session's date replaces the scheme's sets before decay and runs the
+   same steps, so the transform applies once to the sets the line
+   delivers. A scheme defining `final_note` then names the line's
+   `target_note` from those final sets.
 4. Core flags: `no_data`, `stalled`, `rpe_drift`, `convention_slip`,
    `return_week`, `return_after_illness`, `constraint_applied`,
    `override_standing`, `scheme_reset`, `rotation_unconfirmed`.
@@ -3133,7 +3144,9 @@ constrained mode) stay coach-built through `overlay build`.
   runs.
 - `propose finalize` also appends a one-week override decision
   (`standing: false`, `until` the overlay's span end) for each line whose
-  `override` no decision yet records.
+  `override` no decision yet records: neither one made for this proposal
+  nor a standing decision for that scope, with the same reason, active
+  on the line's session date.
 - `propose show ID` returns the built overlay, `lines`, `unexplained`
   (what finalize would refuse with exit 1) and `unresolved_blocks`.
 - `schedule confirm --position P [--week W]` records the position for
@@ -3179,11 +3192,15 @@ constrained mode) stay coach-built through `overlay build`.
   read (`until` passed); `decisions withdraw ID --reason` closes one.
   Records are never deleted.
 - **`last_override`** for a slot = the newest `override` decision for
-  that scope with effective status `active`, or null. When `standing`,
-  the core keeps `chosen_sets` (re-deriving loads only through decay,
-  the load constraints, the illness cap, caps and rounding), puts the scheme's own proposal in the rationale, and raises
-  `override_standing`. A one-week override (not standing) is only
-  information to the scheme.
+  that scope with effective status `active` on the session's date (not
+  the day the week is proposed), or null. When `standing`, the core
+  keeps `chosen_sets`, re-deriving them only through decay, the week's
+  transform, the load constraints, the illness cap, caps and rounding.
+  Under the `scheme` transform the kept sets take the standard deload,
+  since a scheme's own `deload` rebuilds the scheme's sets. The
+  rationale names the kept sets, each adjustment and the scheme's own
+  proposal, and the line raises `override_standing`. A one-week override
+  (not standing) is only information to the scheme.
 - Standing overrides need an `until` date, default four weeks after
   `made_at`, at most eight. Renewing one is another `propose override
   --standing`: the newest active decision for a scope wins.

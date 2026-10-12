@@ -97,4 +97,4 @@ def restore(args, ctx):
     writes=True,
 )
 def finalize(args, ctx):
-    return propose.finalize(ctx.root, ctx.config, args.proposal, ctx.now(), ctx.today(), args.dry_run)
+    return propose.finalize(ctx.root, ctx.config, args.proposal, ctx.now(), args.dry_run)

@@ -109,11 +109,11 @@ Run `python3 -m coach propose override --proposal <id> --session
 --reason "<why>"`; a timed hold takes seconds, `--sets "2x35s rpe7"`.
 Add `--standing` (and `--until <date>`, eight weeks at most; four by
 default) when the change should hold in later weeks — a niggle, an
-agreed hold — so the scheme stops proposing it away. A per-exercise
-**focus** drawn from check-in findings ("slow the eccentric") may go
-into the draft line, with an `override` reason saying why; any line
-changed without a reason is refused. An approved override onto an
-assistance ladder's rung moves the ladder to that rung.
+agreed hold — so the scheme stops proposing it away; it covers sessions
+to that date, and a deload or light week still cuts it. A per-exercise
+**focus** from check-in findings ("slow the eccentric") may go into the
+draft line, with an `override` reason; a line changed without a reason
+is refused. An approved override onto a rung moves the ladder to that rung.
 
 Niggle limits are already in the proposal: `propose week` applies each
 active niggle's constraints to every matching line and names the niggle

@@ -169,9 +169,9 @@ def withdraw(root, decision_id, reason, closed_at, dry_run):
     return closed
 
 
-def last_override(doc, session_id, exercise_id, today):
-    """The newest active override decision for a slot, or None (C25)."""
+def last_override(doc, session_id, exercise_id, day):
+    """The newest override decision for a slot that is active on `day`, the session's date, or None (C25)."""
     found = [d for d in doc["decisions"] if d["kind"] == "override"
              and d["scope"] == {"session_id": session_id, "exercise_id": exercise_id}
-             and effective_status(d, today) == "active"]
+             and effective_status(d, day) == "active"]
     return max(found, key=lambda d: (d["made_at"], d["id"])) if found else None
