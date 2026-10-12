@@ -398,6 +398,8 @@ def build(draft, config, *, root=None, now=None):
     `created_at` when the draft has none. Raises ValidationError, with a
     JSONPath per problem, when the draft or the overlay it builds is invalid.
     """
+    if isinstance(draft, dict) and draft.get("schema_version") == 5:
+        draft = dict(draft, schema_version=6)  # v6 only added optional session fields
     draft_errors = validate_schema(draft, jsonio.load_schema(DRAFT_SCHEMA))
     if draft_errors:
         raise ValidationError(

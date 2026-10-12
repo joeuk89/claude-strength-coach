@@ -1092,13 +1092,16 @@ for every non-GET request, success or failure, once its retries are over.
   session's (judged in the text's own offset when that is not UTC, else
   in `[athlete] timezone`). A stored C7 timestamp has lost its travel
   offset, so it reads back when any real offset (-12:00 to +14:00) puts
-  it on the session's date. The draft schema takes `schema_version` 5 or
-  6, so a proposal drafted before v6 still builds, untimed. Every mode
+  it on the session's date. `overlay build` reads a draft at
+  `schema_version` 5 as 6, so a proposal drafted before v6 still builds,
+  untimed. Every mode
   keeps both: a proposal's finalize and rebuild, a one-off draft and a
   missed-day rule's copy (a shifted session drops its `start`, which
   belonged to the old date).
   `overlay build` replaces the overlay's interference flags with the
-  rules' judgement of its sessions (C51).
+  rules' judgement of its sessions (C51). With an invalid library it
+  keeps the draft's flags, since the rules need the library to find heavy
+  lower-body work, and `overlay approve` exits 1 until it is repaired.
 
 ## C11. Rendered markdown markers (R-13, R-16, R-17a; later renderers follow it)
 
