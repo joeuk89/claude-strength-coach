@@ -3084,8 +3084,12 @@ and `plugins test` runs them. Loaded with
   and `problems` refuses a first working group whose `count` is not 3
   (or no working group), so no set is lost silently. Warm-up groups stay
   where they are; every later working group stays after the wave sets
-  as back-off sets with its own reps and RPE, loaded at the first wave
-  set's load (5/3/1's "first set last").
+  as back-off sets with its own reps and RPE. A back-off group with an
+  RPE is loaded from `ctx.e1rm` by `load_for` at its reps and RPE,
+  floored to the increment, so its load and its RPE agree and R-24 has
+  nothing to flag; in week 1 that load can pass the + set's. A group
+  without an RPE, or any group with no e1RM, takes the first wave set's
+  load (5/3/1's "first set last"), its RPE kept.
   State `{completed_weeks 0..2, training_max, through}`: the weeks of the
   current wave completed, and `through` `{date, workout_id}` the newest
   exposure judged (`workout_id` null: every exposure that day). Each
@@ -3112,13 +3116,14 @@ and `plugins test` runs them. Loaded with
   A deload run (`scheme` transform) calls its `deload`: 40/50/60 % × 5
   of the lower of the stored and the proposed training max, so a raise
   waits for the next wave, with no rep-out set and the back-offs at
-  40 %. Its rationale names the percentages and the week the wave
-  resumes at; the core keeps it over the scheme's own, and a deload run
-  writes no pending state. Its `decay` is a temporary return week: the
-  week's percentages of the lower of the two training maxes times the
-  band's `load_factor`, with no rep-out set, `return_set_count` sets,
-  each load capped at the derived-from load × `load_factor` and the
-  band's RPE cap, so the line passes R-24's decay check. The stored
+  40 % with no RPE. Its rationale names the percentages and the week the
+  wave resumes at; the core keeps it over the scheme's own, and a deload
+  run writes no pending state. Its `decay` is a temporary return week:
+  the week's percentages of the lower of the two training maxes times
+  the band's `load_factor` (e1RM-loaded back-offs times it too), with no
+  rep-out set, `return_set_count` sets, each load capped at the
+  derived-from load × `load_factor` and the band's RPE cap, so the line
+  passes R-24's decay check. The stored
   training max is kept, so the next ordinary week resumes it; the
   return week's exposure is `decayed` and completes nothing. Its
   rationale adds the band's percentage, the training max it lowered,
@@ -6079,8 +6084,10 @@ Rules (R-02's prose, scripted; the prose stays the human copy):
   `as_prescribed` counts the sessions that pass it): a trained session
   passes when at least two thirds of its prescribed working sets were
   logged and its mean logged RPE (over sets with both values) is no more
-  than 1.5 below target; sets without a logged RPE count as on target. A
-  coach-led session passes when its `external` annotation says done.
+  than 1.5 below target; sets without a logged RPE count as on target,
+  and a rep-out set's cap counts as its target, here and against the
+  prescription. A coach-led session passes when its `external`
+  annotation says done.
   Session counts come from `coach.structure.week` (C41). The gate counts
   training stress for fatigue; it is not proof the prescription was met,
   so a session with failed reps or a grind past its target still passes.

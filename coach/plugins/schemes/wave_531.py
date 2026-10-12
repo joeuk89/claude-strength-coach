@@ -8,9 +8,11 @@ rule that a week counts only when its wave sets were logged at their
 reps and loads within their caps are coaching heuristics.
 """
 
+import math
 from dataclasses import replace
 
 from coach.plugins import base
+from coach.stats import load_for
 
 API = 1
 KIND = "scheme"
@@ -91,10 +93,14 @@ def _rep_out_cap(ctx):
     return base.REP_OUT_RPE_CAP if ctx.params["amrap"] else None
 
 
-def _sets(ctx, training_max, scheme, cap):
+def _sets(ctx, training_max, scheme, cap, light=False, backoff_factor=1):
     """The program's set groups with the first working group replaced by the wave sets, the last of them a rep-out
-    set capped at `cap` (none when `cap` is None), and every later working group kept as back-off sets at the
-    first wave set's load."""
+    set capped at `cap` (none when `cap` is None), and every later working group kept as back-off sets.
+
+    A back-off group with an RPE is loaded from the e1RM at its reps and RPE, times `backoff_factor`, so its load
+    and its effort target agree; one without an RPE, or with no e1RM, takes the first wave set's load. When
+    `light`, every back-off takes the first wave set's load and no RPE.
+    """
     wave = [base.SetSpec(type="normal", reps=reps, load=round(training_max * pct, 4)) for pct, reps in scheme]
     if cap is not None:
         wave[-1] = replace(wave[-1], rep_out=True, rpe=cap)
@@ -106,16 +112,33 @@ def _sets(ctx, training_max, scheme, cap):
         elif not placed:
             found += wave
             placed = True
+        elif light:
+            found += [replace(s, load=wave[0].load, rpe=None) for s in sets]
         else:
-            found += [replace(s, load=wave[0].load) for s in sets]
+            found += [replace(s, load=_backoff_load(ctx, s, wave[0].load, backoff_factor)) for s in sets]
     return tuple(found)
 
 
+def _from_e1rm(ctx, spec):
+    return spec.rpe is not None and spec.target_reps is not None and ctx.e1rm is not None
+
+
+def _backoff_load(ctx, spec, first_load, factor):
+    if not _from_e1rm(ctx, spec):
+        return first_load
+    load = load_for(ctx.e1rm, spec.target_reps, spec.rpe) * factor
+    step = ctx.exercise.increment
+    return math.floor(load / step + 1e-9) * step if step else round(load, 4)
+
+
 def _backoff_words(ctx, sets):
-    backoffs = len(base.working(sets)) - WAVE_SETS
-    if backoffs <= 0:
+    backoffs = base.working(sets)[WAVE_SETS:]
+    if not backoffs:
         return None
-    return f"{backoffs} back-off set{'s' if backoffs > 1 else ''} at the first wave set's load"
+    count = f"{len(backoffs)} back-off set{'s' if len(backoffs) > 1 else ''}"
+    if any(_from_e1rm(ctx, s) for s in backoffs):
+        return f"{count} loaded from the e1RM of {base.number(ctx.e1rm)} at their reps and RPE"
+    return f"{count} at the first wave set's load"
 
 
 def _marker(exposure):
@@ -292,7 +315,7 @@ def deload(ctx, proposal):
     raised = proposal.state["training_max"]
     if raised is not None and raised > training_max:
         resumes += f" with the training max raised to {base.load_words(ctx, raised)}"
-    sets = _sets(ctx, training_max, DELOAD, None)
+    sets = _sets(ctx, training_max, DELOAD, None, light=True)
     words = [f"5/3/1 deload: 40/50/60 % of the training max of {base.load_words(ctx, training_max)}, 5 reps each "
              f"and no + set", resumes]
     backoffs = _backoff_words(ctx, sets)
@@ -314,7 +337,7 @@ def decay(ctx, proposal, days_off):
     training_max = min(maxes)
     lowered = round(training_max * band.load_factor, 2)
     week = proposal.state["completed_weeks"] + 1
-    sets = _sets(ctx, lowered, WEEKS[week], None)
+    sets = _sets(ctx, lowered, WEEKS[week], None, backoff_factor=band.load_factor)
     if band.set_delta:
         sets = base.keep_working(sets, base.return_set_count(replace(proposal, sets=sets), band.set_delta))
     source = proposal.derived_from

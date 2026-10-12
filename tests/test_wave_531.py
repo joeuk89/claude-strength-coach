@@ -17,6 +17,7 @@ SLOT = "session-a/bb_back_squat"
 BACK_OFFS = {"count": 3, "type": "normal", "reps": 5, "rpe": 7}
 WAVE_GROUP = {"count": 3, "type": "normal", "reps": 5}
 THROUGH = {"date": "2026-10-01", "workout_id": None}
+WAVE_SETS = 3
 
 
 def state(completed=0, training_max=100, through=THROUGH):
@@ -219,13 +220,23 @@ class TrainedWorkTest(unittest.TestCase):
 
 
 class BackOffTest(unittest.TestCase):
-    def test_programmed_back_offs_follow_the_wave_sets_at_the_first_wave_set_s_load(self):
+    def test_a_back_off_group_with_an_rpe_is_loaded_from_the_e1rm_at_its_reps_and_rpe(self):
+        """5 at RPE 7 is 8 reps to failure: 121.88 / (1 + 8/30) = 96.2, floored to the 2.5 increment."""
         warm_up = {"count": 1, "type": "warmup", "reps": 5}
-        proposal = run(wave(sets=(warm_up, WAVE_GROUP, BACK_OFFS)))
+        proposal = run(wave(sets=(warm_up, WAVE_GROUP, BACK_OFFS), e1rm=121.88))
         self.assertEqual(proposal.sets[0].type, "warmup")
         self.assertEqual(shape(proposal), [(65, 5, False, None), (75, 5, False, None), (85, 5, True, 9)]
-                         + [(65, 5, False, 7)] * 3)
-        self.assertIn("3 back-off sets at the first wave set's load", proposal.rationale)
+                         + [(95, 5, False, 7)] * 3)
+        self.assertIn("3 back-off sets loaded from the e1RM of 121.88 at their reps and RPE", proposal.rationale)
+        self.assertAlmostEqual(stats.implied_rpe(121.88, 95, 5), 7, delta=1)
+
+    def test_back_offs_without_an_rpe_or_an_e1rm_take_the_first_wave_set_s_load(self):
+        cases = (((WAVE_GROUP, BACK_OFFS), None, 7), ((WAVE_GROUP, dict(BACK_OFFS, rpe=None)), 121.88, None))
+        for sets, e1rm, rpe in cases:
+            with self.subTest(e1rm=e1rm, rpe=rpe):
+                proposal = run(wave(sets=sets, e1rm=e1rm))
+                self.assertEqual(shape(proposal)[WAVE_SETS:], [(65, 5, False, rpe)] * 3)
+                self.assertIn("3 back-off sets at the first wave set's load", proposal.rationale)
 
     def test_a_wave_group_that_is_not_three_sets_is_refused(self):
         module = scheme("wave_531").module
@@ -242,7 +253,7 @@ class DeloadAndReturnTest(unittest.TestCase):
         proposal = run(ctx)
         deloaded = scheme("wave_531").module.deload(ctx, proposal)
         self.assertEqual(shape(deloaded), [(40, 5, False, None), (50, 5, False, None), (60, 5, False, None)]
-                         + [(40, 5, False, 7)] * 3)
+                         + [(40, 5, False, None)] * 3)
         self.assertEqual(deloaded.state, ctx.state)
         self.assertIn("40/50/60 % of the training max of 100", deloaded.rationale)
         self.assertIn("training max raised to 105", deloaded.rationale)
@@ -269,6 +280,17 @@ class DeloadAndReturnTest(unittest.TestCase):
         self.assertEqual(shape(after), [(65, 5, False, None), (75, 5, False, None), (85, 5, True, 9)])
         self.assertEqual(after.state["training_max"], 100)
         self.assertIn("week 1 again after the return week on 2026-10-12", after.rationale)
+
+    def test_a_return_week_cuts_back_offs_loaded_from_the_e1rm_by_the_band(self):
+        """22-42 days off: 90 % of the e1RM-loaded 96.2 is 86.6, floored to 85, under the 95 × 0.9 ceiling."""
+        logged = tuple(base.LoggedSet(index=i, type="normal", reps=5, rpe=None, load=load)
+                       for i, load in enumerate((65, 75, 85, 95, 95, 95)))
+        source = base.Exposure(date=date(2026, 9, 14), workout_id="w", session_id="session-a",
+                               exercise_id=SQUAT.id, load_mode="total", sets=logged)
+        ctx = wave(state(0, 100, None), exposures=(source,), days_off=28, sets=(WAVE_GROUP, BACK_OFFS), e1rm=121.88)
+        decayed = scheme("wave_531").module.decay(ctx, run(ctx), 28)
+        self.assertEqual(shape(decayed), [(58.5, 5, False, None), (67.5, 5, False, None), (76.5, 5, False, None)]
+                         + [(85, 5, False, 7)] * 2)
 
     def test_a_return_week_of_a_kept_override_takes_the_standard_return_band(self):
         ctx = wave(state(0, 100, None), exposures=(trained(date(2026, 9, 14), 1),), days_off=28)
@@ -513,12 +535,18 @@ class WavePipelineTest(WavePipelineCase):
         meta = read_json(self.root / ".coach" / "proposals" / f"{data['id']}.meta.json")
         self.assertEqual(meta["scheme_state"], {})
 
-    def test_programmed_back_offs_reach_the_overlay(self):
+    def test_programmed_back_offs_reach_the_overlay_at_a_load_their_rpe_can_reach(self):
+        """At the squat's e1RM of 121.88, with the program's training max of 100 or the default 90 % of the e1RM."""
         self.edit_program(lambda doc: self.slot(doc, "session-a", "bb_back_squat").update(
             sets=[WAVE_GROUP, BACK_OFFS]))
-        line = squat(self.propose("--dry-run")["overlay"])
-        self.assertEqual([(coaching(s["load"]), s["reps"], s["rpe"]) for s in working(line)],
-                         [(65, 5, None), (75, 5, None), (85, 5, 9)] + [(65, 5, 7)] * 3)
+        for params in ({"training_max": 100}, {}):
+            with self.subTest(params=params):
+                self.set_scheme("session-a", "bb_back_squat", "wave_531", params)
+                doc = self.propose("--dry-run")["overlay"]
+                line = squat(doc)
+                self.assertEqual([(coaching(s["load"]), s["reps"], s["rpe"]) for s in working(line)][WAVE_SETS:],
+                                 [(95, 5, 7)] * 3)
+                self.assertNotIn("rpe_infeasible", codes(doc, "bb_back_squat"))
 
     def test_program_validate_refuses_a_wave_group_that_would_lose_sets(self):
         self.edit_program(lambda doc: self.slot(doc, "session-a", "bb_back_squat").update(
