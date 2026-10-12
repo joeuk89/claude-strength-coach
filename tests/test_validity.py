@@ -8,7 +8,7 @@ import unittest
 from datetime import date
 from pathlib import Path
 
-from coach import flags, overlay, research, units, validity
+from coach import flags, overlay, research, sheets, units, validity
 from tests.support import INSTANCES, REPO_ROOT, VALID, run_cli
 from tests.support.history import (R_A, W, HistoryCase, hevy_exercise, hevy_set, hevy_workout, read_json,
                                    write_json)
@@ -67,7 +67,8 @@ class IllnessNumbersLiveInValidityTest(unittest.TestCase):
     """Text the athlete reads takes 48 hours and RPE 7 from validity, so the numbers change in one place."""
 
     ILLNESS_LITERAL = re.compile(r"\b48 ?h(ours?)?\b|\bRPE 7\b")
-    LOGGING_EXAMPLE = "Put your session RPE in the workout description, e.g. 'RPE 7'."
+    # Neither names the illness cap: one is a logging example, the other the RPE-to-reps-left scale.
+    NOT_ILLNESS = {"Put your session RPE in the workout description, e.g. 'RPE 7'.", sheets.RPE_KEY}
 
     def test_no_string_outside_validity_hardcodes_them(self):
         found = []
@@ -78,7 +79,7 @@ class IllnessNumbersLiveInValidityTest(unittest.TestCase):
             docstrings = {id(node) for node in _docstring_nodes(tree)}
             for node in ast.walk(tree):
                 if (isinstance(node, ast.Constant) and isinstance(node.value, str) and id(node) not in docstrings
-                        and node.value != self.LOGGING_EXAMPLE and self.ILLNESS_LITERAL.search(node.value)):
+                        and node.value not in self.NOT_ILLNESS and self.ILLNESS_LITERAL.search(node.value)):
                     found.append(f"{path.relative_to(REPO_ROOT)}:{node.lineno}: {node.value!r}")
         self.assertEqual(found, [])
 
