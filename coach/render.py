@@ -46,12 +46,19 @@ def _reps(set_):
     if set_.get("rep_range") is not None:
         return f"{set_['rep_range']['start']}–{set_['rep_range']['end']}"
     if set_.get("reps") is not None:
-        return _number(set_["reps"])
+        return _number(set_["reps"]) + ("+" if set_.get("rep_out") else "")
     if set_.get("duration_seconds") is not None:
         return f"{_number(set_['duration_seconds'])} s"
     if set_.get("distance_meters") is not None:
         return f"{_number(set_['distance_meters'])} m"
     return "?"
+
+
+def rpe_cell(set_):
+    """A set's RPE for a table cell: its target, or `stop at N` for a rep-out set's cap."""
+    if set_.get("rpe") is None:
+        return ""
+    return f"stop at {_number(set_['rpe'])}" if set_.get("rep_out") else _number(set_["rpe"])
 
 
 def _needs_load(exercise, set_):
@@ -92,7 +99,7 @@ def target_line(exercise):
         if load:
             part += f" @ {load}"
         if set_.get("rpe") is not None:
-            part += f" @ RPE {_number(set_['rpe'])}"
+            part += f" (stop at RPE {_number(set_['rpe'])})" if set_.get("rep_out") else f" @ RPE {_number(set_['rpe'])}"
         parts.append(part)
     line = "Target: " + " + ".join(parts)
     if any(_needs_load(exercise, s) for s in working):
@@ -146,7 +153,7 @@ def _exercise_rows(exercise):
         if set_.get("type") in _SET_LABELS:
             sets += f" {_SET_LABELS[set_['type']]}"
         load = _load_text(exercise, set_, with_unit=False) or "—"
-        rpe = _number(set_["rpe"]) if set_.get("rpe") is not None else ""
+        rpe = rpe_cell(set_)
         if index == 0:
             rest = f"{exercise['rest_seconds']} s" if exercise.get("rest_seconds") is not None else ""
             rows.append(_row([exercise["exercise_id"], sets, load, rpe, rest, exercise.get("change"),

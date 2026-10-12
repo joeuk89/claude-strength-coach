@@ -44,6 +44,7 @@ def show(args, ctx):
           arg("--session", required=True, metavar="S", help="program session id"),
           arg("--exercise", required=True, metavar="E", help="library exercise id"),
           arg("--sets", metavar="SPEC", help='working sets, e.g. "3x5@100 rpe7" or "1x5@100 rpe8, 3x5@90 rpe7"; '
+                                             'a rep-out set "1x5+@120" (RPE 9 stop unless rpe is given); '
                                              'seconds for a duration line, e.g. "2x35s rpe7"'),
           arg("--load", type=float, metavar="N", help="one load for every working set (athlete units, per hand for "
                                                       "per-hand modes)"),

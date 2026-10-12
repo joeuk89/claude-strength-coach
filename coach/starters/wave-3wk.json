@@ -57,7 +57,7 @@
             ],
             "rest_seconds": 180,
             "superset_id": null,
-            "cues": "glutes and abs tight · bar close to the face · finish with the head through · ramp up over 2–3 lighter sets",
+            "cues": "glutes and abs tight · bar close to the face · finish with the head through · ramp up over 2–3 lighter sets, logged as warm-ups",
             "constraints": [],
             "scheme": {
               "name": "wave_531",
@@ -186,7 +186,7 @@
             ],
             "rest_seconds": 180,
             "superset_id": null,
-            "cues": "bar over mid-foot · flat back, lats tight · push the floor away · ramp up over 2–3 lighter sets",
+            "cues": "bar over mid-foot · flat back, lats tight · push the floor away · ramp up over 2–3 lighter sets, logged as warm-ups",
             "constraints": [],
             "scheme": {
               "name": "wave_531",
@@ -291,7 +291,7 @@
             ],
             "rest_seconds": 180,
             "superset_id": null,
-            "cues": "shoulder blades back and down · bar to lower chest · feet planted · ramp up over 2–3 lighter sets",
+            "cues": "shoulder blades back and down · bar to lower chest · feet planted · ramp up over 2–3 lighter sets, logged as warm-ups",
             "constraints": [],
             "scheme": {
               "name": "wave_531",
@@ -444,7 +444,7 @@
             ],
             "rest_seconds": 180,
             "superset_id": null,
-            "cues": "brace before you descend · knees track over toes · hips and chest rise together · ramp up over 2–3 lighter sets",
+            "cues": "brace before you descend · knees track over toes · hips and chest rise together · ramp up over 2–3 lighter sets, logged as warm-ups",
             "constraints": [],
             "scheme": {
               "name": "wave_531",
@@ -597,7 +597,7 @@
             ],
             "rest_seconds": 180,
             "superset_id": null,
-            "cues": "brace before you descend · knees track over toes · hips and chest rise together · ramp up over 2–3 lighter sets",
+            "cues": "brace before you descend · knees track over toes · hips and chest rise together · ramp up over 2–3 lighter sets, logged as warm-ups",
             "constraints": [],
             "scheme": {
               "name": "maintenance",
@@ -618,7 +618,7 @@
             ],
             "rest_seconds": 180,
             "superset_id": null,
-            "cues": "shoulder blades back and down · bar to lower chest · feet planted · ramp up over 2–3 lighter sets",
+            "cues": "shoulder blades back and down · bar to lower chest · feet planted · ramp up over 2–3 lighter sets, logged as warm-ups",
             "constraints": [],
             "scheme": {
               "name": "maintenance",
@@ -747,7 +747,7 @@
             ],
             "rest_seconds": 180,
             "superset_id": null,
-            "cues": "bar over mid-foot · flat back, lats tight · push the floor away · ramp up over 2–3 lighter sets",
+            "cues": "bar over mid-foot · flat back, lats tight · push the floor away · ramp up over 2–3 lighter sets, logged as warm-ups",
             "constraints": [],
             "scheme": {
               "name": "maintenance",
@@ -768,7 +768,7 @@
             ],
             "rest_seconds": 180,
             "superset_id": null,
-            "cues": "glutes and abs tight · bar close to the face · finish with the head through · ramp up over 2–3 lighter sets",
+            "cues": "glutes and abs tight · bar close to the face · finish with the head through · ramp up over 2–3 lighter sets, logged as warm-ups",
             "constraints": [],
             "scheme": {
               "name": "maintenance",

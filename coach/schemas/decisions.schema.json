@@ -1,11 +1,11 @@
 {
-  "title": "Coaching decisions, data/decisions.json: overrides, adherence triggers and light weeks (contract C25)",
+  "title": "Coaching decisions, data/decisions.json: overrides, adherence triggers, light weeks and training-max changes (contract C25)",
   "description": "Records are appended and never deleted. `status` is stored as written; an active decision whose `until` has passed reads as expired. `details` is null for an override and validated per kind for the others by coach.decisions.",
   "type": "object",
   "required": ["schema_version", "decisions"],
   "additionalProperties": false,
   "properties": {
-    "schema_version": {"const": 1},
+    "schema_version": {"const": 2},
     "decisions": {"type": "array", "items": {"$ref": "#/$defs/decision"}}
   },
   "$defs": {
@@ -20,7 +20,7 @@
       "additionalProperties": false,
       "properties": {
         "id": {"type": "string", "pattern": "^d-\\d{4,}$"},
-        "kind": {"enum": ["override", "adherence_trigger", "light_week"]},
+        "kind": {"enum": ["override", "adherence_trigger", "light_week", "training_max"]},
         "made_at": {"$ref": "#/$defs/timestamp"},
         "overlay_id": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}-[a-z0-9-]+$"},
         "scope": {
@@ -60,7 +60,8 @@
         "rpe": {"type": ["number", "null"], "minimum": 1, "maximum": 10},
         "load": {"type": ["number", "null"], "minimum": 0},
         "duration_seconds": {"type": ["integer", "null"], "minimum": 1},
-        "distance_meters": {"type": ["number", "null"], "minimum": 0}
+        "distance_meters": {"type": ["number", "null"], "minimum": 0},
+        "rep_out": {"type": "boolean"}
       }
     }
   }

@@ -337,6 +337,8 @@ def _set_errors(set_, path, mode, flagged):
         errors.append(Error(path, "give reps or rep_range"))
     if rep_range is not None and rep_range["start"] > rep_range["end"]:
         errors.append(Error(f"{path}.rep_range", f"start {rep_range['start']} is above end {rep_range['end']}"))
+    if set_.get("rep_out") and (set_.get("type") != "normal" or reps is None or timed):
+        errors.append(Error(f"{path}.rep_out", "a rep-out set is a normal set with fixed reps"))
     if mode == "duration" and set_.get("duration_seconds") is None:
         errors.append(Error(path, "a duration set needs duration_seconds"))
     if mode == "distance" and set_.get("distance_meters") is None:
@@ -477,6 +479,8 @@ def _build_set(draft_set, mode, unit, path, load_errors):
     for key in ("duration_seconds", "distance_meters"):
         if draft_set.get(key) is not None:
             built[key] = draft_set[key]
+    if draft_set.get("rep_out"):
+        built["rep_out"] = True
     return built
 
 

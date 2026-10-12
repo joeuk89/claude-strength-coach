@@ -259,10 +259,20 @@ _Avoid_: conditioning progression, density progression, finisher
 
 **Training max**:
 The load a wave's percentages are taken from: 90 % of the e1RM by
-default, or a load the program sets, raised by a fixed increment at the
-start of each wave and lowered by a return band after time off. It is
-kept in the exercise's scheme state, never in the program.
+default, or a load the program sets. It rises by a fixed increment once
+the athlete completes a whole wave, every wave set at its reps and
+prescribed load within its cap; untrained or short weeks repeat. A return week lowers only
+that week's loads, and only an explicit change the athlete agrees
+(`state set-training-max`) lowers it for good. It is kept in the
+exercise's scheme state, never in the program.
 _Avoid_: TM, working max, 1RM (the training max sits below it)
+
+**Rep-out set**:
+A set written `5+`: at least those reps, then as many more as the
+athlete can before its RPE cap (9 by default, a coaching heuristic; a
+lower cap that applies wins). It is not a set to failure, and it
+counts toward a wave only when its minimum reps were met within the cap.
+_Avoid_: AMRAP set to failure, plus set as failure, last set (another set may follow it)
 
 **Standing override**:
 A coach's change to one exercise's proposed prescription that holds in

@@ -562,7 +562,7 @@ class _Checker:
                 "cannot show a load beyond failure"))
         unearned, off = [], []
         for s, load, targets in sets:
-            verdict = judge_set(best, load, targets, s.get("rpe"), ceiling is not None)
+            verdict = judge_set(best, load, targets, s.get("rpe"), ceiling is not None or bool(s.get("rep_out")))
             if verdict.unearned:
                 unearned.append((verdict, s, targets))
             elif verdict.off:
@@ -575,10 +575,13 @@ class _Checker:
                       f"{reps_words(verdict.reps, targets)} implies {implied_words(verdict.implied)} at {basis}")
         if off:
             verdict, s, targets = max(off, key=lambda item: abs(item[1]["rpe"] - item[0].implied))
-            kind = "RPE ceiling" if ceiling else "target RPE"
+            if s.get("rep_out"):
+                kind, implies = "stop at RPE", "already implies"
+            else:
+                kind, implies = "RPE ceiling" if ceiling else "target RPE", "implies"
             self.flag("rpe_infeasible", session, line,
                       f"{self.where(session, line)}: {kind} {units.json_number(s['rpe'])}, but "
-                      f"{units.format_load(s['load'])} × {reps_words(verdict.reps, targets)} implies "
+                      f"{units.format_load(s['load'])} × {reps_words(verdict.reps, targets)} {implies} "
                       f"{implied_words(verdict.implied)} at {basis}")
         if stats.is_lower_bound(best):
             return _feasibility("lower_bound", ceiling, (

@@ -4,7 +4,7 @@
   "required": ["schema_version", "program_adopted", "rotation", "block", "one_off", "scheme_state", "hevy"],
   "additionalProperties": false,
   "properties": {
-    "schema_version": {"const": 5},
+    "schema_version": {"const": 6},
     "program_adopted": {"type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
     "rotation": {
       "type": "object",

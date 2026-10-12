@@ -4,7 +4,7 @@
   "required": ["schema_version", "id", "kind", "created_at", "span", "supersedes", "focus", "flags", "approval", "sessions"],
   "additionalProperties": false,
   "properties": {
-    "schema_version": {"const": 4},
+    "schema_version": {"const": 5},
     "id": {"$ref": "#/$defs/overlay_id"},
     "kind": {"enum": ["weekly", "midweek", "deload", "one_off"]},
     "created_at": {"$ref": "#/$defs/timestamp"},
@@ -150,7 +150,8 @@
         "rpe": {"type": ["number", "null"], "minimum": 1, "maximum": 10},
         "load": {"$ref": "#/$defs/load"},
         "duration_seconds": {"type": ["integer", "null"], "minimum": 1},
-        "distance_meters": {"type": ["number", "null"], "minimum": 0}
+        "distance_meters": {"type": ["number", "null"], "minimum": 0},
+        "rep_out": {"type": "boolean"}
       }
     },
     "load": {

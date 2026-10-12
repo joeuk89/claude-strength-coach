@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "id": "2026-10-12-weekly",
   "kind": "weekly",
   "created_at": "2026-10-11T18:00:00Z",
@@ -12,7 +12,7 @@
   "flags": [],
   "approval": {
     "approved_at": "2026-10-11T19:00:00Z",
-    "hash": "sha256:8476a864c0eee9a49cb5f095b533561495eed10e2371a1f46f299bb22b7c32d3"
+    "hash": "sha256:17806afda3422034b39986d7d4e2ba2b57f554668828a4ebcd968403c7f2bc99"
   },
   "sessions": [
     {

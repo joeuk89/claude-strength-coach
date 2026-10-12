@@ -18,6 +18,7 @@ API = 1
 WORKING_TYPES = ("normal", "dropset", "failure")
 WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 STANDARD_DELOAD = {"set_factor": 0.67, "load_factor": 0.9, "rpe": 6}
+REP_OUT_RPE_CAP = 9
 EMPTY_SCHEMA = {"type": "object", "additionalProperties": False, "properties": {}}
 DATE_PATTERN = "^\\d{4}-\\d{2}-\\d{2}$"
 E1RM_MODES = _stats.SERIES_MODES
@@ -25,7 +26,11 @@ E1RM_MODES = _stats.SERIES_MODES
 
 @dataclass(frozen=True)
 class SetSpec:
-    """One prescribed set. `rep_range` is a (start, end) pair; `load` a coaching number or None."""
+    """One prescribed set. `rep_range` is a (start, end) pair; `load` a coaching number or None.
+
+    A `rep_out` set asks for at least its `reps` and as many more as the athlete can take before its `rpe`, the cap;
+    it is a normal set, never a set to failure.
+    """
 
     type: str = "normal"
     reps: Optional[int] = None
@@ -34,6 +39,7 @@ class SetSpec:
     load: Optional[float] = None
     duration_seconds: Optional[int] = None
     distance_meters: Optional[float] = None
+    rep_out: bool = False
 
     @property
     def working(self):
@@ -61,16 +67,20 @@ class SetSpec:
             rep_range=(rep_range["start"], rep_range["end"]) if rep_range else None,
             rpe=item.get("rpe"), load=load if load is not None else _plain_load(item.get("load")),
             duration_seconds=item.get("duration_seconds"), distance_meters=item.get("distance_meters"),
+            rep_out=bool(item.get("rep_out")),
         )
 
     def to_dict(self):
-        """The set in the overlay draft's shape (athlete units)."""
-        return {
+        """The set in the overlay draft's shape (athlete units); `rep_out` appears only on a rep-out set."""
+        found = {
             "type": self.type, "reps": self.reps,
             "rep_range": {"start": self.rep_range[0], "end": self.rep_range[1]} if self.rep_range else None,
             "rpe": self.rpe, "load": self.load, "duration_seconds": self.duration_seconds,
             "distance_meters": self.distance_meters,
         }
+        if self.rep_out:
+            found["rep_out"] = True
+        return found
 
 
 def _plain_load(value):
@@ -99,7 +109,7 @@ class Exposure:
     `prescribed` holds the working sets the overlay in force that day asked
     for, or is empty when the historical prescription is unknown.
     `week_kind` is that overlay's kind, `return` for return work (a return-band cut or a week agreed as a
-    return week), or None.
+    return week), or None. `decayed` is True when that line was a return week's (its provenance carries a decay).
     """
 
     date: date
@@ -112,6 +122,7 @@ class Exposure:
     excluded: bool = False
     prescribed: tuple = ()
     week_kind: Optional[str] = None
+    decayed: bool = False
 
     @property
     def usable(self):
@@ -583,12 +594,13 @@ def default_decay(ctx, proposal, days_off):
 
 
 def standard_deload(proposal, set_factor, load_factor, rpe, load_direction=1):
-    """Fewer working sets (at least one), each load times `load_factor` from the derived-from load, all at `rpe`.
+    """Fewer working sets (at least one), each load times `load_factor` from the derived-from load, all at `rpe`,
+    with no rep-out set.
 
     Assistance is never cut (see `lightened`).
     """
     count = len(working(proposal.sets))
     sets = keep_working(proposal.sets, max(1, round(count * set_factor)))
     sets = lightened(sets, load_factor, proposal.derived_from, load_direction)
-    sets = tuple(replace(s, rpe=rpe) if s.working else s for s in sets)
+    sets = tuple(replace(s, rpe=rpe, rep_out=False) if s.working else s for s in sets)
     return replace(proposal, sets=sets, load_cut=True)

@@ -44,6 +44,7 @@
       "Bash(python3 -m coach starters show:*)",
       "Bash(python3 -m coach starters draft:*)",
       "Bash(python3 -m coach state show:*)",
+      "Bash(python3 -m coach state set-training-max:*)",
       "Bash(python3 -m coach migrate status:*)",
       "Bash(python3 -m coach meals template:*)",
       "Bash(python3 -m coach meals show:*)",
