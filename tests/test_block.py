@@ -232,9 +232,9 @@ class WeekClassTest(BlockCase):
 
     def test_a_week_with_an_overlay_is_judged_against_the_overlay(self):
         proposal = self.data("propose", "week", "--week", "2026-W42")
-        for index, flag in enumerate(proposal["overlay"]["flags"]):
+        for flag in proposal["flags"]:
             if flag["severity"] == "block":
-                self.data("propose", "resolve", "--proposal", proposal["overlay"]["id"], "--flag", str(index),
+                self.data("propose", "resolve", "--proposal", proposal["overlay"]["id"], "--flag", flag["ref"],
                           "--resolution", "test week")
         self.data("propose", "finalize", "--proposal", proposal["overlay"]["id"])
         self.train_week("2026-10-12")

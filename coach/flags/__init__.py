@@ -10,10 +10,12 @@ import pkgutil
 import re
 from dataclasses import dataclass
 
+from coach import jsonio
 from coach.config_tables.coaching import COACH, MODES
 
 SEVERITIES = ("info", "warn", "block")
 RUN_PREFIX = "run mode: "
+REF_DIGITS = 6
 _CODE = re.compile(r"^[a-z][a-z0-9_]*$")
 _REGISTRY = {}
 _discovered = False
@@ -72,6 +74,22 @@ def make(code, severity=None, *, session_id=None, exercise_id=None, message):
         raise ValueError(f"flag {code!r} takes severity {', '.join(entry.severities)}, not {severity!r}")
     return {"code": code, "severity": severity, "session_id": session_id, "exercise_id": exercise_id,
             "message": message, "resolved": False, "resolution": None}
+
+
+def condition(flag):
+    """What a flag states, without its resolution; a hand-edited draft flag may omit its session and exercise."""
+    return flag["code"], flag["severity"], flag.get("session_id"), flag.get("exercise_id"), flag["message"]
+
+
+def ref(flag):
+    """A flag's stable reference, `<code>:<6 hex>`: a digest of the condition it states, never of its list
+    position or resolution, so it survives reordering, saving and revalidation while the condition stands."""
+    return f"{flag['code']}:{jsonio.canonical_hash(list(condition(flag))).split(':', 1)[1][:REF_DIGITS]}"
+
+
+def with_refs(found):
+    """Copies of the flags, each with its `ref`, for command output; stored flags never carry one."""
+    return [dict(flag, ref=ref(flag)) for flag in found]
 
 
 def for_mode(flags, mode):

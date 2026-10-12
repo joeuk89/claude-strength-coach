@@ -253,12 +253,12 @@ class IllnessTest(ReturnCase):
         excluded = [f for f in doc["flags"] if f["code"] == "ill_day_excluded"]
         self.assertEqual([(f["session_id"], f["severity"]) for f in excluded], [(None, "info")])
         self.assertIn("(session-a) on 2026-10-26 is left out: ill status day s-0001", excluded[0]["message"])
-        index, flag = next((i, f) for i, f in enumerate(doc["flags"]) if f["code"] == "return_after_illness")
+        flag = next(f for f in data["flags"] if f["code"] == "return_after_illness")
         self.assertEqual((flag["session_id"], flag["severity"], flag["resolved"]), ("session-b", "block", False))
         self.assertTrue(all(s["rpe"] is not None and s["rpe"] <= 7
                             for line in doc["sessions"][0]["exercises"] for s in working(line)))
         refused = self.coach("propose", "finalize", "--proposal", data["id"], expect=3, now=SUNDAY_25)
         self.assertIn("return_after_illness", refused["error"]["message"] + str(refused["error"].get("details")))
-        self.data("propose", "resolve", "--proposal", data["id"], "--flag", str(index), "--resolution",
+        self.data("propose", "resolve", "--proposal", data["id"], "--flag", flag["ref"], "--resolution",
                   "Athlete confirmed 48 hours symptom-free on 25 Oct, symptoms above the neck only", now=SUNDAY_25)
         self.data("propose", "finalize", "--proposal", data["id"], now=SUNDAY_25)

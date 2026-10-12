@@ -117,9 +117,9 @@ professional, never diagnose. `followup_due`: raise it.
 ## 4. Keep a flag
 
 Keep a flag you and the athlete decide to accept with `python3 -m coach
-propose resolve --proposal <id> --flag <index> --resolution "<why>"`.
-A `load_mode_unconfirmed` flag cannot be kept: ask the athlete how they
-load the exercise, then run the command its message names.
+propose resolve --proposal <id> --flag <ref> --resolution "<why>"`, the `ref`
+from the newest `data.flags`, never a list position. A `load_mode_unconfirmed`
+flag cannot be kept: ask how the athlete loads it, then run what its message names.
 
 ## 5. Structural changes (normal and midweek)
 

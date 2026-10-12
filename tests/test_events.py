@@ -167,8 +167,8 @@ class WindowReviewTest(EventCase):
         self.data(*WINDOW)
         draft = self.data("propose", "week", "--week", "2026-W43")
         proposal_id = draft["overlay"]["id"]
-        index = next(i for i, f in enumerate(draft["overlay"]["flags"]) if f["code"] == "event_window_heavy_lower")
-        self.data("propose", "resolve", "--proposal", proposal_id, "--flag", str(index),
+        ref = next(f["ref"] for f in draft["flags"] if f["code"] == "event_window_heavy_lower")
+        self.data("propose", "resolve", "--proposal", proposal_id, "--flag", ref,
                   "--resolution", "keep it: the squats are at RPE 7 and the race is a test")
         shown = self.data("propose", "show", proposal_id)
         [flag] = [f for f in shown["overlay"]["flags"] if f["code"] == "event_window_heavy_lower"]

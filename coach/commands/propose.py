@@ -34,7 +34,7 @@ def week(args, ctx):
 @command("propose show", help="Show a proposal draft built as an overlay, its lines and what finalize would refuse",
          args=(arg("id", metavar="ID", help="proposal id"),))
 def show(args, ctx):
-    return propose.show(ctx.root, ctx.config, args.id, ctx.now())
+    return propose.show(ctx.root, ctx.config, args.id, ctx.now(), ctx.today())
 
 
 @command(
@@ -72,12 +72,14 @@ def override(args, ctx):
     "propose resolve",
     help="Resolve one flag of a proposal with the reason it stands",
     args=(_PROPOSAL,
-          arg("--flag", required=True, type=int, metavar="INDEX", help="the flag's index in the draft's flags (0 first)"),
+          arg("--flag", required=True, metavar="REF", help="the flag's ref (code:digest) from propose week, show or "
+                                                           "override"),
           arg("--resolution", required=True, metavar="TEXT", help="how the flag is settled")),
     writes=True,
 )
 def resolve(args, ctx):
-    return propose.resolve(ctx.root, args.proposal, args.flag, args.resolution, args.dry_run)
+    return propose.resolve(ctx.root, ctx.config, args.proposal, args.flag, args.resolution, ctx.now(), args.dry_run,
+                           ctx.today())
 
 
 @command(
