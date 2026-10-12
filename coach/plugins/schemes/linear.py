@@ -1,10 +1,7 @@
 """Linear: add the increment after every exposure that hits its prescribed reps; reset after repeated misses.
 
-State `misses` counts the missed exposures running through `through`. A
-count at the reset threshold is kept, so the reset is proposed again until
-an exposure after `through` is judged; that exposure starts a new count. An
-`incomplete` exposure holds the load and leaves the count alone: a set that
-was never logged is not a failed attempt.
+State follows the C23 linear-state rule: a reset is kept until new training is judged, and an incomplete exposure
+holds the load without counting a miss.
 """
 
 from datetime import date
@@ -57,6 +54,9 @@ def propose(ctx):
     judged = base.usable_oldest_first(ctx.exposures, date.fromisoformat(through) if through else None)
     if judged and misses >= limit:
         misses = 0
+    elif not judged and not misses and through == source.date.isoformat() and base.missed(source) is True:
+        # Older versions cleared the count once a reset was proposed, leaving this state over the missed exposure.
+        misses = limit
     for exposure in judged:
         missed = base.missed(exposure)
         if missed:
@@ -88,7 +88,7 @@ def propose(ctx):
             derived_from=source, state=state, round_down=True, flags=review,
         )
     if base.incomplete(source) and not base.missed(source):
-        return _incomplete(ctx, sets, source, load, misses, limit, state)
+        return _incomplete_hold(ctx, sets, source, misses, state)
     if misses:
         return base.Proposal(
             sets=base.with_load(sets, load),
@@ -105,7 +105,8 @@ def propose(ctx):
     )
 
 
-def _incomplete(ctx, sets, source, load, misses, limit, state):
+def _incomplete_hold(ctx, sets, source, misses, state):
+    load, limit = source.top_load, ctx.params["misses_before_reset"]
     logged, wanted = len(base.working(source.sets)), len(base.working(source.prescribed))
     when = source.date.isoformat()
     standing = f"; miss {misses} of {limit} stands" if misses else ""

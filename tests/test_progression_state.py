@@ -5,8 +5,10 @@ import json
 import unittest
 from dataclasses import replace
 from datetime import date
+from unittest import mock
 
-from coach import units
+from coach import propose, units
+from coach.errors import ValidationError
 from coach.plugins import base
 from tests.support.history import W, R_B, read_json
 from tests.support.skills import flat, step_text
@@ -98,6 +100,18 @@ class LinearResetStateTest(unittest.TestCase):
         self.assertEqual({load for load, _ in loads_and_reps(incomplete)}, {94.5})
         self.assertEqual(incomplete.state, {"misses": 0, "through": "2026-10-12"})
 
+    def test_a_reset_approved_before_resets_were_kept_is_proposed_again(self):
+        miss = prescribed(date(2026, 10, 5), (5, 5, 4), load=105)
+        for limit in (1, 2):
+            with self.subTest(limit=limit):
+                legacy = linear([miss], limit=limit, state={"misses": 0, "through": "2026-10-05"})
+                self.assertEqual({load for load, _ in loads_and_reps(legacy)}, {94.5})
+                self.assertIn("resets", legacy.rationale)
+                self.assertEqual(legacy.state, {"misses": limit, "through": "2026-10-05"})
+        hit = prescribed(date(2026, 10, 5), (8, 8, 8), load=105)
+        climbed = linear([hit], state={"misses": 0, "through": "2026-10-05"})
+        self.assertEqual({load for load, _ in loads_and_reps(climbed)}, {107.5})
+
     def test_misses_judged_together_with_no_reset_between_them_still_reset(self):
         misses = [prescribed(date(2026, 10, day), (8, 8, 6)) for day in (12, 8, 5)]
         proposal = linear(misses, limit=2)
@@ -121,6 +135,16 @@ class LadderOverrideStateTest(unittest.TestCase):
             with self.subTest(loads=loads):
                 self.assertEqual(self.override_state({"rung": 0, "through": None}, loads),
                                  {"rung": 0, "through": None})
+
+    def test_an_override_state_that_fails_the_state_schema_is_refused(self):
+        plugin = scheme("assistance_ladder")
+        program_doc = {"sessions": [{"id": "session-a", "exercises": [
+            {"exercise_id": "pull_up", "scheme": {"name": "assistance_ladder", "params": self.PARAMS}}]}]}
+        line = {"override": {"reason": "synthetic"}, "sets": [{"type": "normal", "reps": 8, "rpe": 8, "load": 25}]}
+        with mock.patch.object(plugin.module, "override_state", return_value={"rung": -1, "through": None}):
+            with self.assertRaises(ValidationError) as caught:
+                propose._override_state(program_doc, plugin, "session-a/pull_up", {"rung": 0, "through": None}, line)
+        self.assertIn("fails its STATE schema", str(caught.exception))
 
     def test_only_the_ladder_defines_an_override_state(self):
         for name in ("linear", "double_progression", "wave_531", "hold"):
@@ -159,6 +183,15 @@ class LinearResetPipelineTest(ProposeCase):
         self.assert_reset(self.propose("--dry-run", env={"COACH_NOW": "2026-10-12T06:00:00Z"})["overlay"])
         next_week = self.propose("--dry-run", env={"COACH_NOW": "2026-10-18T18:00:00Z"}, week="2026-W43")
         self.assert_reset(next_week["overlay"])
+
+    def test_a_reset_approved_before_resets_were_kept_is_retained(self):
+        self.propose()
+        self.coach("propose", "finalize", "--proposal", FIRST_ID)
+        slot = "session-a/bb_back_squat"
+        through = read_json(self.root / "data" / "state.json")["scheme_state"][slot]["pending"]["data"]["through"]
+        self.edit_json("data/state.json", lambda doc: doc["scheme_state"].update({slot: {
+            "scheme": "linear", "data": {"misses": 0, "through": through}, "pending": None}}))
+        self.assert_reset(self.propose("--dry-run")["overlay"])
 
     def test_a_slot_trained_twice_in_one_pass_keeps_its_reset_in_both_sessions(self):
         self.edit_program(lambda doc: doc["schedule"]["params"].update(days={"mon": "session-a", "thu": "session-a"}))

@@ -2756,6 +2756,8 @@ and `plugins test` runs them. Loaded with
   proposes the reset and is kept, so the reset is proposed again (in a
   later run, or for the slot's later session in the same run) until an
   exposure after `through` is judged; that exposure starts a new count.
+  A stored count of 0 whose `through` is a missed newest exposure,
+  written by older versions after a reset, counts as a kept reset.
   An incomplete exposure with no short set holds the load, leaves the
   count alone and raises `incomplete_exposure`, a coaching heuristic;
   an attempted short set is a miss.
@@ -2978,8 +2980,11 @@ id follows C10. `data.lines_digest` (R-21b) is the C7 canonical hash of
   overlay, decisions and pending scheme state. It builds and checks all
   three first, the updated state against the program included (C16), so
   a refusal or `--dry-run` writes nothing. It writes the state, then the
-  decisions, then the overlay, so an interrupted write leaves nothing to
-  approve; running it again is safe.
+  decisions, then the overlay, so an interrupted first write leaves no
+  overlay to approve; running it again is safe. If a run over an earlier
+  unapproved overlay fails at the overlay write, that earlier overlay
+  stays approvable against the new pending state, so finalize again
+  before approving.
 
 A hand edit of the draft is allowed; finalize catches unexplained
 changes. One-off weeks for travel or limited kit (`program-week`'s
