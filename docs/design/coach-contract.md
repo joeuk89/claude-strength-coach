@@ -257,6 +257,7 @@ Phase 2 to 4 command inventory. No command here writes to Hevy.
 | `wellness add`, `wellness void ID --reason TEXT`, `planned add`, `planned void ID --reason TEXT` | R-42a | W |
 | `cardio week --week W`, `cardio reconcile --week W`, `cardio flags (--week W \| --span A..B)` | R-43 | |
 | `cardio render --week W [--into FILE]` | R-43 | W with `--into` |
+| `cardio associate ACTIVITY_ID (--planned-id ID \| --clear)` | R-43 | W |
 | `status-days list [--active]` | R-43 | |
 | `status-days add`, `status-days end ID --date D`, `status-days withdraw ID --reason TEXT` | R-43 | W |
 | `interference list`, `interference check (--week W \| --span A..B)` | R-44a | |
@@ -3441,7 +3442,8 @@ R-32 and is registered in `coach/flags/research.py`.
   `coach.activity.store.ActivityStore(root, config)`:
   - `activities(span, kinds=None) -> list[dict]`: resolved Activities
     (C30), deduplicated, sorted by `start`.
-  - `planned(span, kinds=None) -> list[dict]`: resolved planned activities.
+  - `planned(span=None, kinds=None) -> list[dict]`: resolved planned
+    activities; every one when `span` is None.
   - `wellness_days(span) -> list[dict]`: one resolved day per date in the
     span that has any value.
   - `asleep_days(span) -> list[{date, asleep_hours, in_bed_hours,
@@ -6358,7 +6360,8 @@ coach.cardio.bouts(root, span, mode, overlay=None, today=None) -> list[Bout]
 #   mode "proposal": the overlay's sessions (kind "conditioning" for a conditioning session, else
 #                    "lifting"; ref "<overlay id>/<session id>", minutes None), external sessions
 #                    placed on their `weekday`, and at tier review|program the planned activities
-#                    no logged Activity matched; with `today`, only dates from today on.
+#                    no logged Activity matched (an ambiguous plan with a candidate activity is
+#                    left out); with `today`, only dates from today on.
 #                    No logged bouts: `evaluate` reads those itself (see Flags)
 coach.cardio.match(planned, logged, move_days, today=None, associations=None, quality_rpe_min=7) -> list[dict]   # the reconcile matcher; R-44b reuses it
 #   planned: C30 planned records; logged: resolved Activities. With today None every
@@ -6382,17 +6385,20 @@ for both.
   candidates before date. Each available distinguishing measure must
   agree on a mutually unique best candidate; distance and duration prefer
   the smallest absolute difference. Quality inherited from a candidate
-  is never matching evidence. A unique candidate can match a shorter or
-  longer completion. With no distinguishing identity or measurable targets,
-  a unique nearest date can settle candidates whose plans have the same
-  quality. A tie remains ambiguous. For a moved candidate, contradictory
-  observed effort (logged RPE judged using C48's threshold, or explicit
-  name quality) needs corroborating exact name, distance or duration;
-  otherwise it stays ambiguous. RPE never defeats corroborated identity
-  and still determines delivered quality. Conditioning retains C48's kind
-  precedence in matching: it is quality regardless of a plan's quality
-  flag, low logged RPE or easy wording. Matches are one-to-one and
-  input-order independent.
+  is never matching evidence. Logged effort (RPE judged by C48's
+  threshold) only splits candidates those measures leave tied; it never
+  unmatches a sole candidate, and still determines delivered quality.
+  A unique candidate can match a shorter or longer completion.
+- Date proximity then settles what identity leaves tied, where no quality
+  can transfer: an activity tied between plans of one quality takes the
+  unique nearest plan; a plan whose candidate activities each identify only
+  with plans of its quality, no more activities than those plans, takes
+  the unique nearest activity. So identical plans run on their days are
+  `done` despite small distance differences. A tie between plans of
+  different quality, or an equal date gap, remains ambiguous. Conditioning
+  retains C48's kind precedence in matching: it is quality regardless of a
+  plan's quality flag, low logged RPE or easy wording. Matches are
+  one-to-one and input-order independent.
 - A matched local date is `done`; a different date is `moved`, with
   `moved_days`. Unmatched plans before today are `missed`, otherwise
   `upcoming`; unmatched activities are `extra`. Tied or conflicting
@@ -6414,7 +6420,8 @@ for both.
   weekly bout JSON also carries `planned_id` and `match_basis` beside
   sRPE's estimation method. `summary` counts each status.
 - `cardio associate ACTIVITY_ID --planned-id PLANNED_ID [--dry-run]`
-  stores an explicit link; `--clear` removes it. Both IDs must be live,
+  stores an explicit link; `--clear` removes it. Giving neither or both
+  exits 2; any rule below that refuses exits 1 and writes nothing. Both IDs must be live,
   of the same kind and within the move window. One plan cannot be
   associated to multiple activities. Source IDs are stored separately in
   `data/activity/associations.json` as
@@ -6473,7 +6480,8 @@ def flags(ctx: WeekFlagContext) -> list[dict]     # coach.flags.make(...) result
 `propose week` runs every provider at C24 step 5a and appends their flags
 to the overlay. `cardio flags` runs them over the span with logged bouts
 dated up to today and, at `review`/`program`, planned bouts dated today or
-later that no logged Activity matched. A provider that raises fails the
+later that no logged Activity matched, leaving out ambiguous plans whose
+candidate activity already counts. A provider that raises fails the
 command (exit 9); it is never skipped silently. `cardio flags` returns
 `{span, tier, today, sleep_judged_to, flags, skipped, bouts}`; `skipped`
 lists the runs `run_volume_spike` could not judge (`{ref, date, source,

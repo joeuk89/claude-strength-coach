@@ -14,7 +14,7 @@ from coach import config as config_module
 from coach import dates, flags, history, niggles, render, stats, statusdays, units, validity, weekflags
 from coach import program as program_module
 from coach.activity.store import ActivityStore
-from coach.activity import associations, records
+from coach.activity import associations
 from coach.cardio_matching import QUALITY_WORDS, resolve
 
 CITES = ("rn:running-load.1", "rn:running-load.2", "rn:running-load.3", "rn:running-load.4")
@@ -185,8 +185,7 @@ class _Week:
         self.store = _store(root, config)
         activities = self.store.activity_groups() if self.store else []
         self.activities = [a for a in activities if span.contains(dates.parse_date(a["local_date"]))]
-        planned = ([records.strip(p) for p in self.store.records("planned")]
-                   if self.store and plans_read(config) else [])
+        planned = self.store.planned() if self.store and plans_read(config) else []
         links = associations.load(root)["associations"] if self.store and plans_read(config) else {}
         all_items = match(planned, activities, self.settings["reconcile_move_days"], today, links,
                           self.settings["quality_rpe_min"])
@@ -246,9 +245,10 @@ class _Week:
         return found
 
     def upcoming_planned(self):
-        """Planned bouts no logged Activity matched (tier review or program): from today on, or all with no today."""
+        """Planned bouts no logged Activity matched or might have (tier review or program): from today on, or all with no today."""
         return [_planned_bout(i["_planned"]) for i in self.items
-                if i["_planned"] and not i["_activity"] and self.span.contains(dates.parse_date(i["date"]))
+                if i["_planned"] and not i["_activity"] and not i["candidate_ids"]
+                and self.span.contains(dates.parse_date(i["date"]))
                 and (self.today is None or dates.parse_date(i["date"]) >= self.today)]
 
 

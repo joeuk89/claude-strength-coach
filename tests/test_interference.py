@@ -157,6 +157,11 @@ class MigrationTest(Case):
 
 
 class ProposalTest(Case):
+    def setUp(self):
+        super().setUp()
+        # Unplanned, Thursday's run would reconcile as Sunday's tempo done early.
+        self.planned("2026-10-08", "Easy 5 km", quality=False)
+
     def test_a_quality_run_the_day_before_heavy_squats_is_one_collision_warn(self):
         found = self.collisions(self.proposal()["overlay"]["flags"])
         self.assertEqual(len(found), 1, found)

@@ -1,6 +1,7 @@
 """Activity identity regressions across reconciliation, persisted corrections and rendered records."""
 
 import json
+from datetime import timedelta
 
 from coach import cardio, dates, jsonio, paths
 from coach.activity import records
@@ -246,8 +247,11 @@ class IdentityTest(CardioCase):
         self.assertEqual(sum(i["activity_id"] == "manual:long" for i in rows), 1)
 
     def test_interference_observes_the_resolved_quality_on_the_logged_date(self):
+        from coach import flags
         from tests.test_interference import PLUGIN_TEST, custom_rule
 
+        saved = dict(flags.registry())
+        self.addCleanup(lambda: (flags._REGISTRY.clear(), flags._REGISTRY.update(saved)))
         self.swapped()
         directory = self.root / "plugins" / "interference"
         directory.mkdir(parents=True, exist_ok=True)
@@ -273,3 +277,101 @@ class IdentityTest(CardioCase):
                 [row] = self.reconcile()
                 self.assertEqual((row["status"], row["activity_id"], row["quality"], row["quality_basis"]),
                                  ("moved", "manual:a", True, "kind"))
+
+    def test_identical_plans_done_on_their_days_match_by_date(self):
+        days = ("2026-10-05", "2026-10-07", "2026-10-09")
+        for actuals in ((5000, 5000, 5000), (5100, 4900, 5200)):
+            with self.subTest(actuals=actuals):
+                self.set_records([plan(f"manual:p{i}", day, 5000) for i, day in enumerate(days)],
+                                 [activity(f"manual:a{i}", day, meters) for i, (day, meters)
+                                  in enumerate(zip(days, actuals))])
+                rows = self.reconcile()
+                self.assertEqual([(i["status"], i["planned_id"][-1], i["activity_id"][-1]) for i in rows],
+                                 [("done", "0", "0"), ("done", "1", "1"), ("done", "2", "2")])
+                self.assertTrue(all("date_proximity" in i["match_basis"] for i in rows))
+                week = self.data("cardio", "week", "--week", "2026-W41")
+                self.assertEqual({b["planned_id"] for b in week["bouts"] if b["kind"] == "run"},
+                                 {"manual:p0", "manual:p1", "manual:p2"})
+                self.assertEqual({b["srpe"]["method"] for b in week["bouts"] if b["kind"] == "run"}, {"planned"})
+
+    def test_an_identical_easy_run_moved_a_day_still_matches(self):
+        days = ("2026-10-05", "2026-10-07", "2026-10-09")
+        self.set_records([plan(f"manual:p{i}", day, 5000) for i, day in enumerate(days)],
+                         [activity("manual:a0", "2026-10-05", 5100), activity("manual:a1", "2026-10-08", 4900),
+                          activity("manual:a2", "2026-10-09", 5200)])
+        rows = {i["planned_id"]: (i["status"], i["activity_id"]) for i in self.reconcile()}
+        self.assertEqual(rows, {"manual:p0": ("done", "manual:a0"), "manual:p1": ("moved", "manual:a1"),
+                                "manual:p2": ("done", "manual:a2")})
+
+    def test_a_training_plan_week_run_on_schedule_is_done_across_weeks(self):
+        shape = ((1, 8000, True, 8150), (3, 6000, False, 6180), (4, 6000, False, 5820), (6, 16000, False, 15800))
+        plans, acts = [], []
+        for start in (dates.parse_date("2026-09-28"), dates.parse_date("2026-10-05")):
+            for offset, target, quality, actual in shape:
+                day = (start + timedelta(days=offset)).isoformat()
+                plans.append(plan(f"manual:p-{day}", day, target, quality))
+                acts.append(activity(f"manual:a-{day}", day, actual))
+        self.set_records(plans, acts)
+        for week in ("2026-W40", "2026-W41"):
+            rows = self.data("cardio", "reconcile", "--week", week)["items"]
+            self.assertEqual({i["status"] for i in rows}, {"done"})
+            self.assertTrue(all(i["planned_id"][10:] == i["activity_id"][10:] for i in rows))
+
+    def test_identical_plans_mid_week_leave_the_later_plan_upcoming(self):
+        self.set_records([plan("manual:tue", "2026-10-06", 5000), plan("manual:thu", "2026-10-08", 5000)],
+                         [activity("manual:a", "2026-10-06", 5100)])
+        rows = self.coach("cardio", "reconcile", "--week", "2026-W41", now="2026-10-06T18:00:00Z")["data"]["items"]
+        self.assertEqual([(i["status"], i["planned_id"], i["activity_id"]) for i in rows],
+                         [("done", "manual:tue", "manual:a"), ("upcoming", "manual:thu", None)])
+
+    def test_a_lone_moved_run_with_contradicting_effort_still_matches(self):
+        cases = ((True, 10000, 6000, 5, -4000, False), (True, 10000, 10040, 6, 40, False),
+                 (False, 6000, 6100, 8, 100, True))
+        for quality, target, actual, rpe, delta, delivered in cases:
+            with self.subTest(quality=quality, rpe=rpe):
+                self.set_records([plan("manual:p", "2026-10-06", target, quality)],
+                                 [activity("manual:a", "2026-10-07", actual, rpe=rpe)])
+                [row] = self.reconcile()
+                self.assertEqual((row["status"], row["delta"]["distance_meters"], row["quality"],
+                                  row["quality_basis"]), ("moved", delta, delivered, "rpe"))
+
+    def test_logged_effort_breaks_a_tie_between_plans_of_different_quality(self):
+        self.set_records([plan("manual:p1", "2026-10-06", 10000, True), plan("manual:p2", "2026-10-07", 10000)],
+                         [activity("manual:a1", "2026-10-06", 10000, rpe=8),
+                          activity("manual:a2", "2026-10-07", 10000)])
+        rows = {i["planned_id"]: (i["status"], i["activity_id"]) for i in self.reconcile()}
+        self.assertEqual(rows, {"manual:p1": ("done", "manual:a1"), "manual:p2": ("done", "manual:a2")})
+        p1 = next(i for i in self.reconcile() if i["planned_id"] == "manual:p1")
+        self.assertIn("effort", p1["match_basis"])
+
+    def test_ambiguous_plans_are_not_counted_beside_their_logged_candidate(self):
+        from coach import config as config_module
+
+        self.set_records([plan("manual:p1", "2026-10-06", 10000, True), plan("manual:p2", "2026-10-07", 10000)],
+                         [activity("manual:a1", "2026-10-06", 10000), activity("manual:a2", "2026-10-07", 10000)])
+        span = dates.parse_week("2026-W41", "monday")
+        found = cardio.flag_bouts(self.root, config_module.load(self.root), span, dates.parse_date("2026-10-06"))
+        self.assertEqual([(b.date.isoformat(), b.source, b.ref) for b in found if b.kind == "run"],
+                         [("2026-10-06", "logged", "manual:a1")])
+
+    def test_associate_rejections_write_nothing(self):
+        self.set_records([plan("manual:p", "2026-10-06", 10000), plan("manual:far", "2026-10-11", 10000),
+                          dict(plan("manual:ride", "2026-10-06", None), kind="ride"),
+                          plan("manual:taken", "2026-10-07", 10000)],
+                         [activity("manual:a", "2026-10-06", 10000), activity("manual:b", "2026-10-07", 10000)])
+        self.data("cardio", "associate", "manual:b", "--planned-id", "manual:taken")
+        path = self.root / paths.ACTIVITY_ASSOCIATIONS
+        before = path.read_bytes()
+        cases = ((("manual:a", "--planned-id", "manual:ride"), 1, "same kind within reconcile_move_days"),
+                 (("manual:a", "--planned-id", "manual:far"), 1, "same kind within reconcile_move_days"),
+                 (("manual:missing", "--planned-id", "manual:p"), 1, "live activity ID and a live planned ID"),
+                 (("manual:a", "--planned-id", "manual:missing"), 1, "live activity ID and a live planned ID"),
+                 (("manual:a", "--planned-id", "manual:taken"), 1, "planned ID already associated"),
+                 (("manual:a", "--clear"), 1, "no association for activity 'manual:a'"),
+                 (("manual:a",), 2, "give --planned-id or --clear"),
+                 (("manual:a", "--planned-id", "manual:p", "--clear"), 2, "give --planned-id or --clear"))
+        for argv, code, message in cases:
+            with self.subTest(argv=argv):
+                envelope = self.coach("cardio", "associate", *argv, expect=code)
+                self.assertIn(message, json.dumps(envelope))
+                self.assertEqual(path.read_bytes(), before)

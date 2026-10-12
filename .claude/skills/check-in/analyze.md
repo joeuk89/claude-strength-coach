@@ -24,6 +24,10 @@ athlete hit the prescribed load × reps @ RPE?
   `quality_stack`, `sleep_debt`, `status_active`, `niggle_link`, and
   `collision` from the program's interference rules). Name each flag in
   the Coach's read.
+  An `ambiguous` reconcile row has no confident match and lends no plan
+  its quality: show the athlete its `candidate_ids`, and once they say
+  which run was which plan, run `python3 -m coach cardio associate
+  ACTIVITY_ID --planned-id PLANNED_ID`.
 - When an outside running plan or endurance event is relevant, consult
   `reference/runner-review.md` for its strength and fuelling claims,
   using the Sunday reply. Otherwise skip runner-specific research and

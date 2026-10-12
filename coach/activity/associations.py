@@ -8,12 +8,12 @@ SCHEMA = "activity_associations"
 
 def load(root):
     path = root / paths.ACTIVITY_ASSOCIATIONS
-    return jsonio.read_doc(path, SCHEMA) if path.is_file() else {"schema_version": 1, "associations": {}}
+    if path.is_file():
+        return jsonio.read_doc(path, SCHEMA)
+    return {"schema_version": jsonio.current_version(jsonio.load_schema(SCHEMA)), "associations": {}}
 
 
 def associate(store, activity_id, planned_id, clear, dry_run):
-    if clear == (planned_id is not None):
-        raise ValidationError("give --planned-id or --clear")
     doc = load(store.root)
     links = doc["associations"]
     activities = store.activity_groups()

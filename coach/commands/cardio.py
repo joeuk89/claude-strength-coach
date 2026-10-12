@@ -87,4 +87,6 @@ def render_block(args, ctx):
 @command("cardio associate", help="Associate an activity ID with a planned ID, or clear its association",
          args=(arg("activity_id"), arg("--planned-id"), arg("--clear", action="store_true")), writes=True)
 def associate(args, ctx):
+    if args.clear == (args.planned_id is not None):
+        raise UsageError("give --planned-id or --clear")
     return associations.associate(actions.store_for(ctx), args.activity_id, args.planned_id, args.clear, args.dry_run)

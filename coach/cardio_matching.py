@@ -3,6 +3,7 @@
 from coach import dates
 
 QUALITY_WORDS = ("interval", "tempo", "threshold", "hill", "fartlek", "track", "race")
+IDENTITY_KEYS = ("name", "quality", "distance_meters", "duration_seconds")
 
 
 def _name_quality(activity):
@@ -14,14 +15,18 @@ def _name_quality(activity):
     return None
 
 
+def _planned_quality(plan):
+    return True if plan["kind"] == "conditioning" else bool(plan["quality"])
+
+
 def _evidence(plan, activity, rpe_min):
     target = plan.get("target") or {}
     name = (activity.get("name") or "").strip().casefold()
-    planned_quality = plan["quality"]
+    planned_quality = _planned_quality(plan)
     quality = _name_quality(activity)
     effort = activity["rpe"] >= rpe_min if activity.get("rpe") is not None else None
     if activity["kind"] == "conditioning":
-        planned_quality = quality = effort = True
+        quality = effort = True
     values = {"name": int(name != plan["title"].strip().casefold()) if name else None,
               "quality": int(quality != planned_quality) if quality is not None else None,
               "effort": int(effort != planned_quality) if effort is not None else None}
@@ -31,33 +36,72 @@ def _evidence(plan, activity, rpe_min):
     return values
 
 
-def _best(options, evidence, plans, activities):
-    if len(options) <= 1:
-        return set(options), ["unique_candidate"]
+def _narrow(options, evidence, keys):
     choices, basis = set(options), []
-    for key in ("name", "quality", "distance_meters", "duration_seconds"):
+    for key in keys:
         values = [evidence[edge][key] for edge in options]
         if any(value is None for value in values) or len(set(values)) == 1:
             continue
-        best = min(values)
-        choices &= {edge for edge in options if evidence[edge][key] == best}
+        choices &= {edge for edge in options if evidence[edge][key] == min(values)}
         basis.append(key)
-    if not basis and len({plans[pi]["quality"] for pi, _ in options}) == 1:
-        measured = any(evidence[edge][key] is not None for edge in options
-                       for key in ("distance_meters", "duration_seconds"))
-        if not measured:
-            gaps = {edge: abs((dates.parse_date(plans[edge[0]]["date"])
-                              - dates.parse_date(activities[edge[1]]["local_date"])).days) for edge in options}
-            choices = {edge for edge in options if gaps[edge] == min(gaps.values())}
-            basis = ["date_proximity"]
     return choices, basis
+
+
+def _identify(options, evidence):
+    """Every identity measure must agree; logged effort only splits what they leave tied."""
+    if len(options) == 1:
+        return set(options), ["unique_candidate"]
+    choices, basis = _narrow(options, evidence, IDENTITY_KEYS)
+    if len(choices) > 1:
+        choices, effort = _narrow(choices, evidence, ("effort",))
+        basis += effort
+    return choices, basis
+
+
+def _nearest(choices, basis, gaps):
+    if len(choices) <= 1:
+        return choices, basis
+    closest = min(gaps[edge] for edge in choices)
+    return {edge for edge in choices if gaps[edge] == closest}, basis + ["date_proximity"]
+
+
+def _choose(remaining, evidence, plans, gaps):
+    """Each plan's and each activity's preferred edges for one round of mutual matching.
+
+    An activity tied between plans of one quality takes the nearest date: no quality can transfer.
+    A plan whose candidates all identify with its quality pool, and fit in it, also takes the
+    nearest date, so distance noise cannot pull identical plans onto each other's runs.
+    """
+    by_plan, by_activity = {}, {}
+    for edge in remaining:
+        by_plan.setdefault(edge[0], []).append(edge)
+        by_activity.setdefault(edge[1], []).append(edge)
+    identified = {ai: _identify(edges, evidence) for ai, edges in by_activity.items()}
+    activity_choices = {}
+    for ai, (choices, basis) in identified.items():
+        if len({_planned_quality(plans[pi]) for pi, _ in choices}) == 1:
+            choices, basis = _nearest(choices, basis, gaps)
+        activity_choices[ai] = choices, basis
+    plan_choices = {}
+    for pi, edges in by_plan.items():
+        quality = _planned_quality(plans[pi])
+        members = {edge for edge in edges if edge in identified[edge[1]][0]
+                   and all(_planned_quality(plans[p]) == quality for p, _ in identified[edge[1]][0])}
+        pool = {p for edge in members for p, _ in identified[edge[1]][0]}
+        if members and len(members) <= len(pool):
+            plan_choices[pi] = _nearest(members, [], gaps)
+        else:
+            plan_choices[pi] = _nearest(*_identify(edges, evidence), gaps)
+    return plan_choices, activity_choices
 
 
 def resolve(plans, activities, move_days, associations, rpe_min):
     pairs, basis, plan_review, activity_review = {}, {}, {}, {}
-    candidates = {(pi, ai) for pi, p in enumerate(plans) for ai, a in enumerate(activities)
-                  if p["kind"] == a["kind"] and abs((dates.parse_date(p["date"])
-                     - dates.parse_date(a["local_date"])).days) <= move_days}
+    plan_days = [dates.parse_date(p["date"]) for p in plans]
+    activity_days = [dates.parse_date(a["local_date"]) for a in activities]
+    gaps = {(pi, ai): abs((plan_days[pi] - activity_days[ai]).days)
+            for pi, p in enumerate(plans) for ai, a in enumerate(activities) if p["kind"] == a["kind"]}
+    candidates = {edge for edge, gap in gaps.items() if gap <= move_days}
     by_id = {p["id"]: pi for pi, p in enumerate(plans)}
     aliases = {key: ai for ai, a in enumerate(activities) for key in a.get("merged_from", [a["id"]])}
     requests = {}
@@ -92,21 +136,8 @@ def resolve(plans, activities, move_days, associations, rpe_min):
     remaining = {edge for edge in candidates if edge[0] not in reserved_plans
                  and edge[1] not in reserved_activities}
     evidence = {edge: _evidence(plans[edge[0]], activities[edge[1]], rpe_min) for edge in remaining}
-    contradicted = set()
-    for edge, values in evidence.items():
-        pi, ai = edge
-        corroborated = any(values[key] == 0 for key in ("name", "distance_meters", "duration_seconds"))
-        contradictory_effort = values["quality"] == 1 or values["effort"] == 1
-        if contradictory_effort and plans[pi]["date"] != activities[ai]["local_date"] and not corroborated:
-            contradicted.add(edge)
-            plan_review[pi] = activity_review[ai] = (
-                "observed effort conflicts with the moved plan; associate IDs to resolve")
-    remaining -= contradicted
     while remaining:
-        plan_choices = {pi: _best([edge for edge in remaining if edge[0] == pi], evidence, plans, activities)
-                        for pi in {edge[0] for edge in remaining}}
-        activity_choices = {ai: _best([edge for edge in remaining if edge[1] == ai], evidence, plans, activities)
-                            for ai in {edge[1] for edge in remaining}}
+        plan_choices, activity_choices = _choose(remaining, evidence, plans, gaps)
         accepted = []
         for pi, (choices, reasons) in plan_choices.items():
             if len(choices) != 1:
