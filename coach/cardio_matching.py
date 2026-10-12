@@ -115,7 +115,9 @@ def _activity_order(activity):
 
 
 def _session(plan):
-    return plan["date"], plan["kind"], _planned_quality(plan)
+    target = plan.get("target") or {}
+    return (plan["date"], plan["kind"], _planned_quality(plan), plan["title"].strip().casefold(),
+            target.get("distance_meters"), target.get("duration_seconds"))
 
 
 class Resolution(NamedTuple):
@@ -170,7 +172,8 @@ def resolve(plans, activities, move_days, associations, rpe_min):
         sessions.setdefault(_session(plans[pi]), []).append(pi)
 
     def claim_twins(matched):
-        """Per other source, the first free plan for a matched plan's session: one session planned twice."""
+        """Per other source, the first free plan for a matched plan's session (date, kind, quality,
+        title and targets). Plans that differ in any of these are separate sessions the athlete sees."""
         for pi in sorted(matched, key=lambda i: plans[i]["id"]):
             claimed = {plans[pi].get("source")}
             for other in sessions[_session(plans[pi])]:

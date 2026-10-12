@@ -414,6 +414,13 @@ class IdentityTest(CardioCase):
         self.assertEqual(cardio.match(tempo, [activity("manual:r", "2026-10-06", 8050)], 3),
                          cardio.match(list(reversed(tempo)), [activity("manual:r", "2026-10-06", 8050)], 3))
 
+    def test_a_tempo_planned_by_two_sources_with_titles_differing_only_in_case_counts_once(self):
+        tempo = [dict(plan(f"{source}:t1", "2026-10-06", 8000, True, title=title), source=source)
+                 for source, title in (("manual", "Tempo"), ("runna", " tempo"))]
+        rows = cardio.match(tempo, [activity("manual:r", "2026-10-06", 8050)], 3)
+        self.assertEqual([(i["status"], i["planned_id"]) for i in rows],
+                         [("done", "manual:t1"), ("duplicate", "runna:t1")])
+
     def test_a_double_day_from_one_source_with_one_run_leaves_the_other_missed(self):
         plans = [plan("manual:am", "2026-10-06", 5000), plan("manual:pm", "2026-10-06", 5000)]
         rows = cardio.match(plans, [activity("manual:r", "2026-10-06", 5000)], 3)
@@ -494,6 +501,32 @@ class IdentityTest(CardioCase):
         rows = cardio.match(plans, [dict(activity("manual:a", "2026-10-06", None, 720), kind="conditioning")], 3)
         self.assertEqual([(i["status"], i["planned_id"]) for i in rows],
                          [("done", "manual:c"), ("duplicate", "runna:c")])
+
+    def test_a_different_session_from_another_source_on_the_day_is_not_a_duplicate(self):
+        easy = plan("manual:easy", "2026-10-06", 5000, title="Easy 5k")
+        long_run = dict(plan("runna:long", "2026-10-06", 20000, title="Long Run"), source="runna")
+        self.set_records([easy, long_run], [activity("manual:a", "2026-10-06", 5000)])
+        rows = self.reconcile()
+        self.assertEqual([(i["status"], i["planned_id"], i["activity_id"]) for i in rows],
+                         [("done", "manual:easy", "manual:a"), ("missed", "runna:long", None)])
+        self.assertCountEqual(self.flagged_runs(today="2026-10-06"), [("manual:a", False), ("runna:long", False)])
+        for other in (dict(easy, target={"distance_meters": 5000, "duration_seconds": 1800}),
+                      dict(easy, target={"distance_meters": 8000, "duration_seconds": None})):
+            with self.subTest(target=other["target"]):
+                rows = cardio.match([easy, dict(other, id="runna:easy", source="runna")],
+                                    [activity("manual:a", "2026-10-06", 5000)], 3)
+                self.assertEqual([i["status"] for i in rows], ["done", "missed"])
+
+    def test_a_run_tied_between_different_quality_plans_stays_ambiguous_beside_another_source(self):
+        tempo = dict(plan("runna:tempo", "2026-10-07", 20000, True, title="Tempo"), source="runna")
+        long_run = dict(plan("runna:long", "2026-10-06", 20000, title="Long Run"), source="runna")
+        self.set_records([plan("manual:easy", "2026-10-06", 5000, title="Easy 5k"), long_run, tempo],
+                         [activity("manual:a", "2026-10-06", 5000),
+                          activity("manual:b", "2026-10-07", 20000, 6000, name="Outdoor Run")])
+        rows = self.reconcile()
+        self.assertEqual([(i["status"], i["planned_id"], i["activity_id"], i["quality"]) for i in rows],
+                         [("done", "manual:easy", "manual:a", False), ("ambiguous", "runna:long", None, False),
+                          ("ambiguous", None, "manual:b", False), ("ambiguous", "runna:tempo", None, True)])
 
     def test_every_reconcile_row_has_one_shape(self):
         self.set_records([plan("manual:p", "2026-10-06", 5000), plan("manual:q", "2026-10-10", 5000, True)],

@@ -6364,7 +6364,7 @@ coach.cardio.bouts(root, span, mode, overlay=None, today=None) -> list[Bout]
 #                    no logged Activity matched (an ambiguous plan is left out unless every
 #                    candidate activity is dated before it); with `today`, only dates from today on.
 #                    No logged bouts: `evaluate` reads those itself (see Flags)
-coach.cardio.match(planned, logged, move_days, today=None, associations=None, quality_rpe_min=7) -> list[dict]   # the reconcile matcher; R-44b reuses it
+coach.cardio.match(planned, logged, move_days, today=None, links=None, quality_rpe_min=7) -> list[dict]   # the reconcile matcher; R-44b reuses it
 #   planned: C30 planned records; logged: resolved Activities. With today None every
 #   uncontested unmatched plan is "missed".
 coach.cardio.flag_bouts(root, config, span, today) -> list[Bout]   # what `cardio flags` judges
@@ -6406,9 +6406,12 @@ for both.
 - A matched local date is `done`; a different date is `moved`, with
   `moved_days`. Unmatched plans before today are `missed`, otherwise
   `upcoming`; unmatched activities are `extra`. When a plan matches, the
-  first plan by ID from each other source for the same day, kind and
-  quality (conditioning always quality) is `duplicate` (C30) and leaves
-  matching, so a second activity that day cannot take it. A duplicate is
+  first plan by ID from each other source for the same session is
+  `duplicate` and leaves matching, so a second activity that day cannot
+  take it. The same session means the same day, kind, quality
+  (conditioning always quality), title (trimmed, case-insensitive) and
+  target distance and duration; a plan that differs in any of these is a
+  separate session (C30) and stays `missed`, `upcoming` or a candidate. A duplicate is
   neither missed nor a planned bout, and its `review_reason` names the
   matched plan; the rendered record states it as information, not a
   review. Tied or conflicting candidates

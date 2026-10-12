@@ -122,12 +122,12 @@ def quality_of(activity, planned, rpe_min):
     return False, "none"
 
 
-def match(planned, logged, move_days, today=None, associations=None,
+def match(planned, logged, move_days, today=None, links=None,
           quality_rpe_min=CARDIO.keys["quality_rpe_min"].default):
     """Match only mutually unique identities; unresolved candidates never supply inferred quality."""
     plans = sorted(planned, key=lambda p: (p["date"], p["id"]))
     acts = sorted(logged, key=lambda a: (a["local_date"], a["start"], a["id"]))
-    found = resolve(plans, acts, move_days, associations or {}, quality_rpe_min)
+    found = resolve(plans, acts, move_days, links or {}, quality_rpe_min)
     pairs, plan_review, activity_review, candidates = (found.pairs, found.plan_review, found.activity_review,
                                                        found.candidates)
     items = []
