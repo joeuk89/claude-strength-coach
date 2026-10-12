@@ -751,6 +751,12 @@ def _upstream(root, env):
     return name, remote, merge
 
 
+def _ahead(root, env):
+    """Commits on HEAD that the upstream's remote-tracking ref lacks, or None when that ref is unknown."""
+    counted = _git(root, "rev-list", "--count", "@{upstream}..HEAD", env=env)
+    return int(counted.stdout.strip()) if counted.returncode == 0 else None
+
+
 def publish(root, overlay_id, now, record_date=None, dry_run=False, env=None):
     """Render and publish the pages, applicable session sheets, overlay and record (C38 publishing).
 
@@ -800,7 +806,7 @@ def publish(root, overlay_id, now, record_date=None, dry_run=False, env=None):
     message = publish_message(doc)
     report = {"overlay_id": overlay_id, "record": record.path.as_posix(), "paths": publish_paths, "message": message,
               "branch": branch, "remote": remote, "upstream": merge, "commit": None, "pushed": False,
-              "dry_run": dry_run}
+              "ahead": None, "dry_run": dry_run}
     if dry_run:
         return report
     report["rendered"] = write(root, now, KINDS)["pages"]
@@ -811,6 +817,7 @@ def publish(root, overlay_id, now, record_date=None, dry_run=False, env=None):
     if added.returncode != 0:
         raise ValidationError(f"git add failed: {added.stderr.strip()}")
     if _git(root, "diff", "--cached", "--quiet", env=env).returncode == 0:
+        report["ahead"] = _ahead(root, env)
         return report
     committed = _git(root, "commit", "-q", "-m", message, env=env)
     if committed.returncode != 0:
@@ -822,6 +829,7 @@ def publish(root, overlay_id, now, record_date=None, dry_run=False, env=None):
         reason = None if pushed.returncode == 0 else (pushed.stderr.strip().splitlines() or ["no output"])[-1]
     except subprocess.TimeoutExpired as exc:
         reason = f"no answer after {exc.timeout:g} s"
+    report["ahead"] = _ahead(root, env)
     if reason is not None:
         raise NetworkError(f"git push to {remote} failed ({reason}); the commit {report['commit'][:12]} is kept: "
                            "push it by hand with git push", data=report)

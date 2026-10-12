@@ -16,8 +16,10 @@ edits pass `python3 -m coach config validate`.
    sheets, then pushes them.
 4. Run `python3 -m coach check --only pages_fresh` and quote it.
 
-Done means step 3's publish reported `pushed: true` and step 4 reports
-`pass` for every page.
+Done means step 3's publish exits 0, its `ahead` is 0, and step 4
+reports `pass` for every page. `ahead` counts the commits the remote
+lacks, so 0 covers both outcomes: `pushed: true`, or `commit: null`
+because the published pages already matched.
 
 **Anything short of that is reported as not done**, in the close-out,
 with what fixes it:
@@ -25,11 +27,15 @@ with what fixes it:
 - `brief_overlay` null or not approved: the pages here are current,
   and the phone keeps the old ones until the next approved week
   publishes.
-- A publish that exits 3 (no upstream, another file already staged,
-  `README.md` not coach's) or exits 4 (the push failed; the commit is
-  kept): quote its message and the fix it names, as
-  `program-week/write.md` → "Close out" handles them. Leave the index
-  and the files as the refusal left them.
+- `commit: null` with `ahead` above 0: an earlier commit is still
+  unpushed, so the phone has not got it; the fix is `git push`.
+- `commit: null` with `ahead` null: the publish cannot tell whether the
+  remote has the pages; the fix is `git fetch`, then step 3 again.
+- A render or publish that exits 3 (no upstream, another file already
+  staged, `README.md` not coach's) or a publish that exits 4 (the push
+  failed; the commit is kept): quote its message and the fix it names,
+  as `program-week/write.md` → "Close out" handles them. Leave the
+  index and the files as the refusal left them.
 
 `config.toml` and `profile.md` stay out of the publish. Commit them only
 when the athlete asks: show the diff, then stage those two paths by name

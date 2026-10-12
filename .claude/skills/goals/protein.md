@@ -35,13 +35,13 @@ at or above intake plus 15 g (rn:protein-energy-deficit.8). The floor
 stays between two bounds, and `floor.clamped` says which one applied:
 
 - `null`: neither; the floor is `from_intake_g`.
-- `"min"`: intake plus 15–20 g falls short of the minimum, so the floor
+- `"min"`: `from_intake_g` falls short of the minimum, so the floor
   is `g_min`, set by `g_per_kg_min`: 1.2 g/kg for bodyweight or goal
   weight and 1.5 g/kg for fat-free mass, because muscle loss while
   losing weight is more likely below it (rn:protein-energy-deficit.7,
   low-confidence evidence). Say the floor asks for more than a 15–20 g
   step and let the anchors close the gap.
-- `"target"`: intake plus 15 g passes the target, so the floor is
+- `"target"`: `from_intake_g` passes the target, so the floor is
   `target.g`. Intake at or above the target stays compatible with the
   floor, so never tell the athlete to eat less protein
   (rn:protein-energy-deficit.8).

@@ -66,6 +66,20 @@ class CloseOutDocsTest(unittest.TestCase):
         self.assertIn("check --only pages_fresh", close_out)
         self.assertIn("not done", close_out)
 
+    def test_the_short_passes_still_end_with_the_publish_step(self):
+        goals = flat(skill_text("goals"))
+        scope = goals[goals.index("**Scope check:**"):goals.index("## 2.")]
+        for short_pass in ("planned phase change", "renewing an override"):
+            self.assertIn(short_pass, scope)
+        self.assertIn("Both still end with step 10", scope)
+        self.assertIn("Every pass that changes `config.toml`, the short ones too, ends with", goals)
+
+    def test_done_means_nothing_is_left_unpushed_including_when_nothing_changed(self):
+        doc = flat(step_text("goals", "publish.md"))
+        for needle in ("`ahead` is 0", "`commit: null`", "`git push`", "`git fetch`",
+                       "render or publish that exits 3"):
+            self.assertIn(needle, doc)
+
 
 @unittest.skipIf(shutil.which("git") is None, "needs git")
 class GoalsCloseOutTest(PublishCase):
@@ -120,6 +134,18 @@ class GoalsCloseOutTest(PublishCase):
         self.assertIn(" M profile.md", changed)
         self.assertEqual(git(self.root, "diff", "--cached", "--name-only", env=self.git_env), "")
         self.assertIn('phase = "recomp"', git(self.remote, "show", "main:config.toml", env=self.git_env))
+
+    def test_a_close_out_with_nothing_new_is_done_because_nothing_is_left_unpushed(self):
+        self.assertEqual(self.run_close_out()["publish"]["data"]["ahead"], 0)
+        again = self.run_close_out()["publish"]["data"]
+        self.assertEqual((again["commit"], again["pushed"], again["ahead"]), (None, False, 0))
+        self.assertEqual(set(self.fresh()), {"pass"})
+
+    def test_a_close_out_with_nothing_new_reports_a_commit_an_earlier_push_left_behind(self):
+        self.run_close_out()
+        git(self.root, "commit", "-q", "--allow-empty", "-m", "kept after a failed push", env=self.git_env)
+        again = self.run_close_out()["publish"]["data"]
+        self.assertEqual((again["commit"], again["pushed"], again["ahead"]), (None, False, 1))
 
     def test_without_a_remote_the_publish_refuses_with_its_fix_and_commits_nothing(self):
         git(self.root, "remote", "remove", "origin", env=self.git_env)

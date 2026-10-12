@@ -152,7 +152,8 @@ def _warn_below_resting(estimate, ctx):
             "steps alone: sedentary: sedentary or lightly active, such as a seated job with everyday walking and "
             "two or three training sessions a week; active: active or moderately active, an on-your-feet job or "
             "about an hour of moderate-to-vigorous exercise a day on top of a seated one; vigorous: vigorously "
-            "active, hard physical work or about two hours of strenuous exercise a day"),
+            "active, hard physical work for several hours a day, or an on-your-feet job plus about two hours of "
+            "strenuous exercise a day"),
         arg("--phase", action="append", metavar="PHASE:RATE", help="a phase and its weekly rate in bodyweight "
             "units, such as cut:-0.5; repeat for each phase (default: [nutrition] phase and target_rate_per_week)"),
     ),

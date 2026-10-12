@@ -51,10 +51,10 @@ the conversation hasn't covered:
   tracks sleep; otherwise how they sleep, in their words.
 - How training and recovery feel; anything coming up (travel, events).
 
-**Scope check:** even a yes/no entry point ("should the bulk still
-start?") runs the full flow if profile fields are TBD or stale. Confirming
-a planned phase change needs only a light confirm-and-record pass when the
-plan is current; renewing an override needs only step 7 and the record.
+**Scope check:** a yes/no entry point ("should the bulk still start?")
+runs the full flow if profile fields are TBD or stale. A planned phase
+change on a current plan needs only a confirm-and-record pass, renewing an
+override only step 7 and the record. Both still end with step 10.
 
 ## 2. The athlete states the goal
 
@@ -119,6 +119,6 @@ bump `profile.md`'s `_Last reviewed_` date.
 
 ## 10. Publish the pages
 
-Every pass that changes `config.toml` ends with
-[publish.md](publish.md): done when the publish pushed and `pages_fresh`
-passes, or when the close-out names what is not done.
+Every pass that changes `config.toml`, the short ones too, ends with
+[publish.md](publish.md). Check-ins take it from here: weekly readings,
+the trend, the floor's raises, overrides expiring.

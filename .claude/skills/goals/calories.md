@@ -25,13 +25,15 @@ are lifestyles (rn:protein-energy-deficit.15), as `--help` describes:
 `sedentary` is sedentary or lightly active, which includes a seated job
 with everyday walking and two or three lifting sessions a week;
 `active` needs an on-your-feet job or about an hour of
-moderate-to-vigorous exercise a day; `vigorous` is hard physical work or
-about two hours of strenuous exercise a day. When the week sits between
-two, name both, pick the closer one and say why.
+moderate-to-vigorous exercise a day; `vigorous` is hard physical work
+for several hours a day, or an on-your-feet job plus about two hours of
+strenuous exercise a day. When the week sits between two, name both,
+pick the closer one and say why.
 
 Say plainly the estimate is a rough starting point: each level is a
-range of lifestyles, not a measurement of this athlete, and the weight
-trend corrects it (rn:protein-energy-deficit.16). After that, calories
+range of lifestyles, not a measurement of this athlete
+(rn:protein-energy-deficit.15), and the weight trend corrects it
+(rn:protein-energy-deficit.16). After that, calories
 change **only from the weight trend**: when a 2–3-week trend misses the
 target rate, `/check-in` moves the target by ~100–150 kcal/day in the
 direction the trend needs. A new estimate comes only with a new phase.

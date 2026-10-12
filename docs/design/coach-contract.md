@@ -4511,7 +4511,9 @@ coach did not generate is not checked; skip when no page exists) and
 `pages_line_ceiling` (fail: `this-week.md` over 60 lines; skip when
 absent). The renderers are `coach.pages.render_brief(root, as_of)`,
 `render_dashboard(root, as_of)` and `render_progress(root, as_of)`;
-`render_all(root, now, kinds)` renders from one read of the instance.
+`render_all(root, now, kinds, view=None)` renders from one read of the
+instance; a caller that already holds that read passes it as `view`,
+which must be of the same `root` and `now`.
 
 **As-of reads** (C17, C18). `coach.history.workouts`, `annotations` and
 `all_exposures`, and `coach.stats.e1rm_series` and `adherence`, take
@@ -4549,15 +4551,21 @@ before its local date. Withdrawals created later do not apply.
    `coach: publish week of <span.start> (<ID>)`, and pushes `HEAD` to the
    current branch's upstream (never `--force`). A failed commit exits 1. A
    failed push exits 4 and keeps the commit; the message says to push by
-   hand.
+   hand. When nothing staged differs from `HEAD`, it commits and pushes
+   nothing and reports `commit: null`, `pushed: false`. The report's
+   `ahead` counts the commits on `HEAD` that the upstream's
+   remote-tracking ref lacks (null when that ref is unknown, and on a
+   dry run).
 5. `--dry-run` reports the paths and message and changes nothing.
 
 `pages render` reports `brief_overlay`: `{id, approved}` for the overlay
 the brief shows, or null when none covers its week. After approved
 nutrition edits, `/goals` validates the config, renders, publishes that
-overlay when it is approved and checks `pages_fresh`; a missing or
-unapproved overlay or a publish refusal leaves the close-out reported as
-not done. It never stages `config.toml` or `profile.md`.
+overlay when it is approved and checks `pages_fresh`. It is done when
+the publish exits 0 with `ahead` 0 and every page passes; a missing or
+unapproved overlay, a refusal, a failed push, or a publish with nothing
+new that leaves `ahead` above 0 or null is reported as not done. It
+never stages `config.toml` or `profile.md`.
 
 Metadata: `writes`, `git_write`. It is allowlisted (C2).
 
