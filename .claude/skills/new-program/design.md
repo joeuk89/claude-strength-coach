@@ -50,16 +50,18 @@ and `config.toml` (units, equipment and its increments).
      "dose_targets": {"chest": 4, "lats": 4, "quadriceps": 4, "hamstrings": 0},
      "dose_intent": {"goal": "maintenance", "baseline": {"chest": 12, "lats": 12, "quadriceps": 10},
                      "reasons": {"chest": "a third of their own 12 sets while the new job settles",
-                                 "hamstrings": "trained by their weekly hill sprints for now"}}
+                                 "quadriceps": "kept low while weekly hill sprints add leg fatigue",
+                                 "hamstrings": "no hinge kit at their work gym; restore it next block"}}
      ```
 
      Hypertrophy: a muscle without a target falls back to 10
      (rn:volume-frequency.1). Strength: set targets from the agreed
      priority emphasis. Maintenance: record `baseline` and agree each
      target from it; for an athlete about 60 or older keep it nearer the
-     baseline (rn:minimum-effective-dose.2). Running counts no sets: say
-     in `reasons` how it shaped a target. A 0 with a reason records a
-     deliberate omission.
+     baseline (rn:minimum-effective-dose.2). Running counts no sets and
+     never replaces lifting for a muscle: when its fatigue shaped a
+     target, say so in `reasons`. A 0 with a reason records a deliberate
+     omission.
    - Before showing the draft, run `python3 -m coach structure balance
      --program .coach/drafts/program.json`. It only reads, and needs no
      adopted program. Settle each `dose_coverage_gap` (a target, or a 0

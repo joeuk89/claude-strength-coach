@@ -51,6 +51,11 @@ class FirstProgramDraftTest(StructureCase):
         self.assertFalse((self.root / "data" / "program.json").exists())
         self.assertFalse((self.root / "data" / "state.json").exists())
 
+    def test_the_minimum_week_of_a_draft_checks_without_an_adopted_program(self):
+        data = self.data("structure", "balance", "--program", str(self.root / DRAFT), "--variant", "minimum")
+        self.assertTrue(data["passed"], data)
+        self.assertFalse((self.root / "data" / "program.json").exists())
+
     def test_the_bare_inner_program_balances_the_same(self):
         path = self.root / "candidate.json"
         write_json(path, self.draft["program"])
@@ -66,6 +71,14 @@ class FirstProgramDraftTest(StructureCase):
         error = self.coach("structure", "balance", "--program", str(self.root / "broken.json"), expect=1)["error"]
         self.assertIn("not a valid program draft", error["message"])
         self.assertTrue(any("source" in d["message"] or d["path"] == "$.source" for d in error["details"]), error)
+
+        broken = copy.deepcopy(self.draft)
+        del broken["program"]
+        write_json(self.root / "broken.json", broken)
+        error = self.coach("structure", "balance", "--program", str(self.root / "broken.json"), expect=1)["error"]
+        self.assertIn("not a valid program draft", error["message"])
+        self.assertTrue(any("program" in d["message"] for d in error["details"]), error)
+        self.assertNotIn("migrate", str(error))
 
         broken = copy.deepcopy(self.draft)
         broken["program"]["dose_targets"]["pecs"] = 10
@@ -129,7 +142,7 @@ class CoverageTest(StructureCase):
         self.assertIn("calves", gaps)
 
     def test_an_agreed_zero_with_a_reason_is_a_visible_omission(self):
-        reason = "hamstrings come from the athlete's twice-weekly hill sprints for now"
+        reason = "no hinge kit at the athlete's work gym; restore it next block"
         self.targets({"hamstrings": 0}, {"hamstrings": reason})
         data = self.data("structure", "balance")
         self.assertEqual(data["muscles"]["hamstrings"],
@@ -298,7 +311,7 @@ class SkillTextTest(unittest.TestCase):
         text = flat(step_text("new-program", "design.md"))
         for phrase in ('"dose_targets": {', '"dose_intent": {"goal": "maintenance", "baseline"', "**target**",
                        "**ordinary baseline**", "**minimum week**", "never from the nutrition phase",
-                       "rn:minimum-effective-dose.2"):
+                       "rn:minimum-effective-dose.2", "never replaces lifting for a muscle"):
             self.assertIn(phrase, text)
 
     def test_every_path_checks_the_draft_balance_before_adoption(self):

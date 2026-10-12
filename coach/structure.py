@@ -598,6 +598,7 @@ def _muscle_rows(program_doc, library, average):
     explicit = program_doc.get("dose_targets") or {}
     baseline, reasons = intent.get("baseline") or {}, intent.get("reasons") or {}
     trained = _core_primary_muscles(program_doc, library)
+    fallback = _uses_fallback(program_doc)
     names = sorted(set(explicit) | trained | set(COVERAGE) | {m for m, v in average.items() if v})
     rows, raised = {}, []
     for muscle in names:
@@ -606,9 +607,9 @@ def _muscle_rows(program_doc, library, average):
         if muscle in explicit:
             target = explicit[muscle]
             source = "omitted" if target == 0 and muscle in reasons else "explicit"
-        elif muscle in trained and _uses_fallback(program_doc):
+        elif muscle in trained and fallback:
             target, source = DEFAULT_TARGET, "fallback"
-        elif not _uses_fallback(program_doc) and (muscle in trained or muscle in COVERAGE):
+        elif not fallback and (muscle in trained or muscle in COVERAGE):
             source = "pending"
         rows[muscle] = {"target": target, "average": planned, "met": None if target is None else planned >= target,
                         "source": source, "baseline": baseline.get(muscle), "reason": reasons.get(muscle)}
@@ -655,13 +656,13 @@ def _balance_notes(inst, program_doc, muscles, conditioning):
 def _balance(inst, program_doc, candidate):
     reference = inst.week(inst.today + timedelta(days=1))
     external = _week_external(program_doc, reference)
-    positions, totals, conditioning = [], {}, {}
+    positions, totals, conditioning_counts = [], {}, {}
     for position, planned in _cycle(inst, program_doc, reference):
         rows = [{"date": day.isoformat(), "session_id": session_id,
                  "tier": inst.program_session(session_id, program_doc)["tier"]} for day, session_id in planned]
         for _, session_id in planned:
             if not inst.is_lifting(session_id, program_doc):
-                conditioning[session_id] = conditioning.get(session_id, 0) + 1
+                conditioning_counts[session_id] = conditioning_counts.get(session_id, 0) + 1
         dose = _ordinary_dose(inst, program_doc, planned, external)
         _add(totals, dose)
         positions.append({"position": position, "sessions": rows,
@@ -671,9 +672,11 @@ def _balance(inst, program_doc, candidate):
     muscles, raised = _muscle_rows(program_doc, inst.library, average)
     coverage = {m: "planned" if muscles[m]["average"] else "omitted" if muscles[m]["source"] == "omitted" else "gap"
                 for m in COVERAGE}
-    conditioning = [{"session_id": session_id, "title": inst.program_session(session_id, program_doc)["title"],
-                     "tier": inst.program_session(session_id, program_doc)["tier"],
-                     "per_week": _round(count / len(positions))} for session_id, count in sorted(conditioning.items())]
+    conditioning = []
+    for session_id, count in sorted(conditioning_counts.items()):
+        session = inst.program_session(session_id, program_doc)
+        conditioning.append({"session_id": session_id, "title": session["title"], "tier": session["tier"],
+                             "per_week": _round(count / len(positions))})
     sessions = {}
     for session in program_doc["sessions"]:
         if session["status"] != "active" or session["kind"] != "lifting":

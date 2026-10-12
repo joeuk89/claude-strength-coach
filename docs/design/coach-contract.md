@@ -4882,7 +4882,7 @@ from profile prose:
 "dose_intent": {"goal": "maintenance",
                 "baseline": {"chest": 12, "lats": 12},
                 "reasons": {"chest": "a third of the athlete's own 12 sets while travelling",
-                            "hamstrings": "trained by the athlete's hill sprints for now"}}
+                            "hamstrings": "no hinge kit while travelling; restore it next block"}}
 ```
 
 - `goal`: `hypertrophy`, `strength` or `maintenance`; any other value
