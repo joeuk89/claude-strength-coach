@@ -1,4 +1,4 @@
-"""Recorded coaching decisions: overrides, adherence triggers, light weeks (contract C25).
+"""Recorded coaching decisions: overrides, adherence triggers, light weeks, training-max changes (contract C25).
 
 `data/decisions.json` is append-only: a decision is closed by withdrawing it
 or expires when its `until` passes, and is never deleted. Expiry is worked
@@ -15,7 +15,8 @@ from coach.validate import Error
 from coach.validate import validate as validate_schema
 
 SCHEMA = "decisions"
-KINDS = ("override", "adherence_trigger", "light_week")
+KINDS = ("override", "adherence_trigger", "light_week", "training_max")
+SLOT_KINDS = ("override", "training_max")
 STANDING_DEFAULT_DAYS = 28
 STANDING_MAX_DAYS = 56
 _ID = re.compile(r"^d-(\d+)$")
@@ -38,6 +39,14 @@ _DETAILS = {
             "reason": {"type": "string", "pattern": "\\S"},
             "triggers": {"type": "array", "items": {"type": "string", "pattern": "\\S"}},
             "hard_weeks": {"type": "integer", "minimum": 0},
+        },
+    },
+    "training_max": {
+        "type": "object", "required": ["scheme", "from", "to"], "additionalProperties": False,
+        "properties": {
+            "scheme": {"type": "string", "pattern": "^[a-z0-9_]+$"},
+            "from": {"type": ["number", "null"], "minimum": 0},
+            "to": {"type": "number", "minimum": 0},
         },
     },
 }
@@ -74,15 +83,15 @@ def problems(doc):
             errors.append(Error(f"{path}.id", f"{decision['id']} appears twice"))
         seen.add(decision["id"])
         kind = decision["kind"]
+        if kind in SLOT_KINDS and set(decision["scope"]) != {"session_id", "exercise_id"}:
+            errors.append(Error(f"{path}.scope", f"a {kind} decision's scope names session_id and exercise_id"))
         if kind == "override":
-            if set(decision["scope"]) != {"session_id", "exercise_id"}:
-                errors.append(Error(f"{path}.scope", "an override's scope names session_id and exercise_id"))
             if decision["details"] is not None:
                 errors.append(Error(f"{path}.details", "an override has no details"))
             if decision["standing"] and decision["until"] is None:
                 errors.append(Error(f"{path}.until", "a standing override needs an until date"))
         else:
-            if decision["scope"]:
+            if kind not in SLOT_KINDS and decision["scope"]:
                 errors.append(Error(f"{path}.scope", f"a {kind} decision is program-wide; its scope is {{}}"))
             for key in ("proposed_sets", "chosen_sets"):
                 if decision[key] is not None:
@@ -141,6 +150,17 @@ def override(made_at, overlay_id, session_id, exercise_id, reason, proposed_sets
         "scope": {"session_id": session_id, "exercise_id": exercise_id}, "outcome": "adopted", "reason": reason,
         "standing": standing, "until": until, "revisit_on": None, "proposed_sets": proposed_sets,
         "chosen_sets": chosen_sets, "details": None, "status": "active", "closed_at": None, "closed_reason": None,
+    }
+
+
+def training_max(made_at, session_id, exercise_id, scheme, before, after, reason):
+    """A new training-max decision (no id yet): the coach and athlete set a wave's training max explicitly."""
+    return {
+        "id": None, "kind": "training_max", "made_at": made_at, "overlay_id": None,
+        "scope": {"session_id": session_id, "exercise_id": exercise_id}, "outcome": "adopted", "reason": reason,
+        "standing": False, "until": None, "revisit_on": None, "proposed_sets": None, "chosen_sets": None,
+        "details": {"scheme": scheme, "from": before, "to": after}, "status": "active", "closed_at": None,
+        "closed_reason": None,
     }
 
 

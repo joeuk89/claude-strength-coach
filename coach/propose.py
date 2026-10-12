@@ -31,7 +31,7 @@ from coach.plugins import base
 KINDS = ("weekly", "midweek", "deload")
 DECAY_AFTER_DAYS = validity.RETURN_BANDS[0].upper
 STALL_EXPOSURES = 3
-_SET_SPEC = re.compile(r"^\s*(\d+)\s*[x×]\s*(\d+)(?:\s*-\s*(\d+))?\s*(s)?\s*(?:@\s*(\d+(?:\.\d+)?))?\s*"
+_SET_SPEC = re.compile(r"^\s*(\d+)\s*[x×]\s*(\d+)(?:\s*-\s*(\d+))?\s*(\+)?\s*(s)?\s*(?:@\s*(\d+(?:\.\d+)?))?\s*"
                        r"(?:rpe\s*(\d+(?:\.\d+)?))?\s*$", re.IGNORECASE)
 
 
@@ -96,12 +96,12 @@ def sets_text(sets, mode, unit):
                 str(s.reps) if s.reps is not None else
                 f"{s.duration_seconds} s" if s.duration_seconds else
                 f"{units.json_number(s.distance_meters)} m" if s.distance_meters is not None else "?")
-        words = reps
+        words = f"{reps}+" if s.rep_out else reps
         load = _load_text(s.load, mode, unit)
         if load:
             words += f" @ {load}"
         if s.rpe is not None:
-            words += f" RPE {units.json_number(s.rpe)}"
+            words += f" {'stop at ' if s.rep_out else ''}RPE {units.json_number(s.rpe)}"
         if groups and groups[-1][1] == words:
             groups[-1][0] += 1
         else:
@@ -110,15 +110,20 @@ def sets_text(sets, mode, unit):
 
 
 def parse_sets(spec):
-    """Working sets from a SPEC like "3x5@100 rpe7, 1x5@90", a range "3x8-10@25 rpe8", or seconds "2x35s rpe7"."""
+    """Working sets from a SPEC like "3x5@100 rpe7, 1x5@90", a range "3x8-10@25 rpe8", seconds "2x35s rpe7", or a
+    rep-out set "1x5+@145" (at least 5 reps, then as many as possible before its RPE cap, base.REP_OUT_RPE_CAP when
+    no rpe is given)."""
     found, timed = [], set()
     for part in spec.split(","):
         match = _SET_SPEC.fullmatch(part)
         if not match:
-            raise UsageError(f"--sets: {part.strip()!r} is not COUNTxREPS[-REPS][@LOAD][ rpeN] or COUNTxSECONDSs"
-                             f"[ rpeN], e.g. 3x5@100 rpe7 or 2x35s rpe7")
-        count, reps, top, seconds, load, rpe = match.groups()
+            raise UsageError(f"--sets: {part.strip()!r} is not COUNTxREPS[-REPS][+][@LOAD][ rpeN] or "
+                             f"COUNTxSECONDSs[ rpeN], e.g. 3x5@100 rpe7, 1x5+@120 or 2x35s rpe7")
+        count, reps, top, plus, seconds, load, rpe = match.groups()
         rep_range = (int(reps), int(top)) if top else None
+        if plus and (rep_range or seconds):
+            raise UsageError(f"--sets: {part.strip()!r} puts + on a {'range' if rep_range else 'timed set'}; a "
+                             f"rep-out set takes fixed reps, e.g. 1x5+@120")
         if seconds and (rep_range or load):
             raise UsageError(f"--sets: {part.strip()!r} gives a timed set a {'range' if rep_range else 'load'}; "
                              f"a timed set takes one duration and no load, e.g. 2x35s rpe7")
@@ -129,8 +134,11 @@ def parse_sets(spec):
         if seconds:
             found += [base.SetSpec(type="normal", duration_seconds=int(reps), rpe=rpe)] * int(count)
             continue
+        if plus and rpe is None:
+            rpe = base.REP_OUT_RPE_CAP
         found += [base.SetSpec(type="normal", reps=None if rep_range else int(reps), rep_range=rep_range, rpe=rpe,
-                               load=units.json_number(float(load)) if load else None)] * int(count)
+                               load=units.json_number(float(load)) if load else None,
+                               rep_out=bool(plus))] * int(count)
     if len(timed) > 1:
         raise UsageError(f"--sets: {spec.strip()!r} mixes reps and seconds; give one or the other")
     return tuple(found)
@@ -191,7 +199,7 @@ class Run:
 
     def _exposure(self, raw, overlay_id):
         doc = self.by_id.get(overlay_id)
-        prescribed = self._prescribed(doc, raw["session_id"], raw["exercise_id"], raw["date"])
+        prescribed, decayed = self._prescribed(doc, raw["session_id"], raw["exercise_id"], raw["date"])
         sets = tuple(base.LoggedSet(index=s["index"], type=s["type"], reps=s["reps"], rpe=s["rpe"],
                                     load=history.coaching_number(s["load"]),
                                     duration_seconds=s.get("duration_seconds"),
@@ -203,10 +211,11 @@ class Run:
         return base.Exposure(
             date=dates.parse_date(raw["date"]), workout_id=raw["workout_id"], session_id=raw["session_id"],
             exercise_id=raw["exercise_id"], load_mode=raw["load_mode"], sets=sets, suspect=raw["suspect"],
-            excluded=raw["excluded"], prescribed=prescribed, week_kind=week_kind,
+            excluded=raw["excluded"], prescribed=prescribed, week_kind=week_kind, decayed=decayed,
         )
 
     def _prescribed(self, doc, session_id, exercise_id, day):
+        """(the working sets the overlay prescribed, whether that line was a return week's), or ((), False)."""
         if doc is not None:
             sessions = [s for s in doc["sessions"] if s["session_id"] == session_id]
             if sessions:
@@ -214,9 +223,10 @@ class Run:
                 session = min(sessions, key=lambda s: abs((dates.parse_date(s["date"]) - target).days))
                 line = next((e for e in session["exercises"] if e["exercise_id"] == exercise_id), None)
                 if line is not None:
-                    return tuple(base.SetSpec.from_dict(s, load=history.coaching_number(s.get("load")))
+                    sets = tuple(base.SetSpec.from_dict(s, load=history.coaching_number(s.get("load")))
                                  for s in line["sets"] if overlay.is_working(s))
-        return ()
+                    return sets, bool((line.get("provenance") or {}).get("decay"))
+        return (), False
 
     def slot(self, session_id, exercise_id):
         session = self.sessions.get(session_id)
@@ -569,7 +579,10 @@ def propose_line(run, session, day, exercise, ctx_extra):
         return plugin_t.module.apply(replace(ctx, params=transform_params, scheme_deload=scheme_deload), found)
 
     if transform is not None:
+        before = proposal.rationale
         proposal = transformed(proposal, ctx.scheme_deload)
+        if proposal.rationale != before:
+            clauses[0] = proposal.rationale.rstrip(". ")
         adjusted.append(f"the {transform[0].name} deload")
     newest = base.newest(exposures)
     first_after_illness = ctx_extra["illness"] is not None and day == ctx_extra["first_day"]
@@ -1326,7 +1339,7 @@ def override(root, config, proposal_id, session_id, exercise_id, new_sets, load,
             problem = _metric_problem(exercise_id, line["load_mode"], new_sets)
             if problem:
                 raise ValidationError(problem)
-            sets = tuple(s for s in current if not s.working) + new_sets
+            sets = tuple(s for s in current if not s.working) + _rep_out_capped(root, session, line, new_sets)
         else:
             sets = base.with_load(current, load)
         if line["load_mode"] not in units.LOADED_MODES and any(s.load is not None for s in sets):
@@ -1351,6 +1364,22 @@ def override(root, config, proposal_id, session_id, exercise_id, new_sets, load,
         _write_proposal(root, proposal_id, draft, None, None)
     return {"id": proposal_id, "session_id": session_id, "exercise_id": exercise_id, "lines": changed,
             "decision": decision, "flags": draft["flags"], "written": not dry_run}
+
+
+def _rep_out_capped(root, session, line, sets):
+    """`sets` with each rep-out set capped at the lowest RPE cap that applies to the line: an active `rpe_cap`
+    constraint (C26) or its return band's (C22)."""
+    if not any(s.rep_out for s in sets):
+        return sets
+    day = dates.parse_date(session["date"])
+    caps = [c["value"] for c in constraints_module.active(root, session["session_id"], line["exercise_id"], day)
+            if c["kind"] == "rpe_cap"]
+    decay = (line.get("provenance") or {}).get("decay") or {}
+    if decay.get("rpe_cap") is not None:
+        caps.append(decay["rpe_cap"])
+    if not caps:
+        return sets
+    return tuple(base.rpe_capped((s,), min(caps))[0] if s.rep_out else s for s in sets)
 
 
 def resolve(root, proposal_id, index, resolution, dry_run):
@@ -1526,3 +1555,54 @@ def _override_state(program_doc, plugin, slot, data, line):
         raise ValidationError(f"Scheme {plugin.name} returned an override state that fails its STATE schema",
                               details=[e.to_json() for e in errors])
     return found
+
+
+def _approved(root, overlay_id):
+    return overlay.path_for(root, overlay_id).is_file() and overlay.is_approved(overlay.load(root, overlay_id))
+
+
+def set_training_max(root, session_id, exercise_id, value, reason, now, today, dry_run):
+    """Set one slot's training max explicitly, keeping its place in the wave, and record why as a `training_max`
+    decision (C23, C25). A pending state its overlay's approval already holds is taken as the slot's state first; a
+    pending state still waiting for approval takes the new training max too, so approving it later keeps the change."""
+    if not reason or not reason.strip():
+        raise UsageError("--reason must say why the training max changes")
+    if value <= 0:
+        raise UsageError("--value must be above 0")
+    program_doc = program.load(root)
+    exercise = next((e for s in program_doc["sessions"] if s["id"] == session_id for e in s["exercises"]
+                     if e["exercise_id"] == exercise_id), None)
+    if exercise is None:
+        raise ValidationError(f"The program has no {exercise_id} in session {session_id}")
+    name = exercise["scheme"]["name"]
+    plugin = plugins.load(root).get("scheme", name)
+    if plugin is None or "training_max" not in plugins.initial_state(plugin):
+        raise ValidationError(f"{session_id}/{exercise_id} runs {name}, which keeps no training max")
+    slot = f"{session_id}/{exercise_id}"
+    state_doc = state_module.load(root)
+    stored = state_doc["scheme_state"].get(slot)
+    if stored is None or stored["scheme"] not in (None, name):
+        data, pending = plugins.initial_state(plugin), None
+    else:
+        data, pending = dict(stored["data"]), stored["pending"]
+        if pending and _approved(root, pending["overlay_id"]):
+            data, pending = dict(pending["data"]), None
+        if plugins.state_errors(plugin, data):
+            data = plugins.initial_state(plugin)
+    before = data["training_max"]
+    value = units.json_number(value)
+    data["training_max"] = value
+    if data.get("through", False) is None:
+        data["through"] = {"date": today.isoformat(), "workout_id": None}
+    if pending and not plugins.state_errors(plugin, pending["data"]):
+        pending = dict(pending, data=dict(pending["data"], training_max=value))
+    state_doc["scheme_state"][slot] = {"scheme": name, "data": data, "pending": pending}
+    _check_state(state_doc, program_doc)
+    record = decisions.training_max(_timestamp(now), session_id, exercise_id, name, before, value, reason.strip())
+    decision_doc, decision = decisions.append(root, decisions.load(root), record, True)
+    if not dry_run:
+        jsonio.write_doc(state_module.path_for(root), state_doc, False)
+        jsonio.write_doc(decisions.path_for(root), decision_doc, False)
+    return {"slot": slot, "scheme": name, "from": before, "to": value, "state": data, "decision": decision,
+            "written": not dry_run}
+

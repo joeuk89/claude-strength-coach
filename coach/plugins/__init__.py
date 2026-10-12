@@ -370,7 +370,8 @@ def _supported_path(registry, mode):
 
 def program_problems(doc, registry):
     """(JSONPath, message) for every scheme, session scheme, schedule rule, deload rule and interference rule the
-    registry lacks or whose params fail, and every slot whose load mode its scheme's LOAD_MODES leaves out."""
+    registry lacks or whose params fail, every slot whose load mode its scheme's LOAD_MODES leaves out, and every
+    slot whose sets its scheme's `problems` refuses."""
     found = []
 
     def check(kind, name, params, path):
@@ -394,6 +395,11 @@ def program_problems(doc, registry):
                 found.append((f"{path}.name", f"{scheme['name']} programs only {', '.join(modes)} lines; this slot "
                                               f"is {exercise['load_mode']}"
                                               f"{_supported_path(registry, exercise['load_mode'])}"))
+            hook = getattr(plugin.module, "problems", None) if plugin else None
+            if hook is not None and not any(p.startswith(f"{path}.params") for p, _ in found):
+                merged, _ = merged_params(plugin, scheme["params"])
+                slot = f"$.sessions[{s_index}].exercises[{e_index}]"
+                found.extend((f"{slot}{where[1:]}", message) for where, message in hook(merged, exercise["sets"]))
     for s_index, session in enumerate(doc["sessions"]):
         scheme = session.get("scheme")
         if scheme is None or session["kind"] != "conditioning":

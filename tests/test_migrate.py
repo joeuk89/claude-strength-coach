@@ -157,7 +157,7 @@ class StatusAndPlanTest(unittest.TestCase):
     def test_a_newer_file_is_a_problem(self):
         with Instance() as root:
             doc = json.loads((root / OVERLAY).read_text(encoding="utf-8"))
-            doc["schema_version"] = 5
+            doc["schema_version"] = overlay.current_version() + 1
             (root / OVERLAY).write_text(json.dumps(doc), encoding="utf-8")
             rows = {row["path"]: row for row in migrate.status(root)}
             _, problems = migrate.plan(root)

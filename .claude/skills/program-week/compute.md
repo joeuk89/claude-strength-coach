@@ -50,77 +50,80 @@ sets (loads through `units format`), the `change`, a one-sentence
 
 ## 2. Read every line against the check-in
 
-Read each line against the athlete's notes on how sets felt, niggles
-and the rotation position, and settle its flags:
+Read each line against the athlete's notes on how sets felt, niggles and the
+rotation position, and settle its flags:
 
-- `rpe_drift` (logged RPE 1 or more over target on 2 or more working
-  sets of a compound lift or a set carrying a **recovery cap**): hold or
-  back off. RPE drift alone never holds back isolation work: it
-  progresses on reps as the scheme says, unless the athlete's notes
-  report pain or form breakdown.
-- `range_effort_mismatch` (a held double-progression line whose last
-  exposure fell below the rep range or 2 or more RPE over target):
-  agree a lighter load or a different rep range with the athlete and
-  override the line, or resolve the flag with the reason the load
-  stands (step 4).
-- `convention_slip`: an exact 2× jump at unchanged reps and RPE is a
-  convention slip, not progress. Raise it with the athlete.
-- `return_week`, `return_after_illness`, `ill_day_excluded`: in a return week the
-  matching return band sets this week's loads, set counts and any RPE cap instead of
-  the progression scheme, measured from the pre-layoff working loads; with illness,
-  the first session back carries the illness cap. Name the band in the week focus;
-  with illness, ask whether the symptoms stayed above the neck and confirm 48 hours
-  symptom-free (rn:detraining-return.4); whole-body symptoms mean a qualified
-  professional first; resolve the `return_after_illness` block (step 4) only on that
-  confirmation, never on the ill status day ending. Ill days plan no session (exit 3
-  while an open row covers them all). The next pass progresses from the return week.
-- `collision` (an interference rule: a quality activity on a lifting
-  day, or in the 24 hours before a heavy squat or hinge session; the
-  message names the rule, both bouts and the gap): the script never
-  moves anything. Agree with the athlete what moves, usually the run,
-  or keep the plan and resolve the flag with the reason (step 4).
-  `python3 -m coach interference list` shows the program's rules.
-- `conditioning_dropped` (the drop rule: sleep debt, a status day on the
-  date, or a quality activity the day either side): at info, an optional
-  conditioning session left the draft, listed in `data.dropped` with its
-  trigger. If the athlete still wants it, put it back with
-  `python3 -m coach propose restore --proposal <id> --session <session>
-  --reason "<why>"`, which resolves the flag. At warn, a core conditioning
-  session stayed: agree whether to ease or move it, then resolve the
-  flag (step 4).
-- `incomplete_exposure` (fewer sets logged than prescribed, none short):
-  no miss counts. If the counted misses already reach
-  `misses_before_reset`, the line resets anyway and needs no question.
-  Else the load holds: ask whether the missing sets were skipped or
-  failed. A failed set is a miss: at the limit, override the line to the
-  reset load (step 3); below it, name the miss at the next check-in.
-- `load_cut_held` (the kit cannot make a reset, return or deload cut, so
-  the load holds; the rationale gives target and actual): at warn nothing
-  else was cut, so agree holding it or the lighter load it names (step 3).
+- `rpe_drift` (logged RPE 1 or more over target on 2 or more working sets of a
+  compound lift or a set carrying a **recovery cap**): hold or back off. RPE
+  drift alone never holds back isolation work: it progresses on reps as the
+  scheme says, unless the athlete's notes report pain or form breakdown.
+- `range_effort_mismatch` (a held double-progression line whose last exposure
+  fell below the rep range or 2 or more RPE over target): agree a lighter load
+  or a different rep range with the athlete and override the line, or resolve
+  the flag with the reason the load stands (step 4).
+- `convention_slip`: an exact 2× jump at unchanged reps and RPE is a convention
+  slip, not progress. Raise it with the athlete.
+- `return_week`, `return_after_illness`, `ill_day_excluded`: in a return week
+  the matching return band sets this week's loads, set counts and any RPE cap
+  instead of the progression scheme, measured from the pre-layoff working loads;
+  with illness, the first session back carries the illness cap. Name the band in
+  the week focus; with illness, ask whether the symptoms stayed above the neck
+  and confirm 48 hours symptom-free (rn:detraining-return.4); whole-body
+  symptoms mean a qualified professional first; resolve the
+  `return_after_illness` block (step 4) only on that confirmation, never on the
+  ill status day ending. Ill days plan no session (exit 3 while an open row
+  covers them all). The next pass progresses from the return week; a wave keeps
+  its training max.
+- `collision` (an interference rule: a quality activity on a lifting day, or in
+  the 24 hours before a heavy squat or hinge session; the message names the
+  rule, both bouts and the gap): the script never moves anything. Agree with
+  the athlete what moves, usually the run, or keep the plan and resolve the
+  flag with the reason (step 4). `python3 -m coach interference list` shows the
+  program's rules.
+- `conditioning_dropped` (the drop rule: sleep debt, a status day on the date,
+  or a quality activity the day either side): at info, an optional conditioning
+  session left the draft, listed in `data.dropped` with its trigger. If the
+  athlete still wants it, put it back with `python3 -m coach propose restore
+  --proposal <id> --session <session> --reason "<why>"`, which resolves the
+  flag. At warn, a core conditioning session stayed: agree whether to ease or
+  move it, then resolve the flag (step 4).
+- `incomplete_exposure` (fewer sets logged than prescribed, none short): no
+  miss counts. If the counted misses already reach `misses_before_reset`, the
+  line resets anyway and needs no question. Else the load holds: ask whether
+  the missing sets were skipped or failed. A failed set is a miss: at the
+  limit, override the line to the reset load (step 3); below it, name the miss
+  at the next check-in.
+- `load_cut_held` (the kit cannot make a reset, return or deload cut, so the
+  load holds; the rationale gives target and actual): at warn nothing else was
+  cut, so agree holding it or the lighter load it names (step 3).
+- `wave_review` (a wave week short of its reps or past its RPE cap): the week
+  repeats and the training max holds; review it with the athlete. To change it,
+  show them `python3 -m coach state set-training-max --session <s> --exercise
+  <e> --value <n> --reason "<why>" --dry-run`, and run it without on their yes.
 - `no_data` (set the first load with the athlete), `stalled`,
   `constraint_applied`, `override_standing`, `scheme_reset`,
-  `rotation_unconfirmed` (state the position for confirmation, as
-  context.md says); build.md's check settles its own flags.
+  `rotation_unconfirmed` (state the position for confirmation, as context.md
+  says); build.md's check settles its own flags.
 
 ## 3. Change a line
 
-Run `python3 -m coach propose override --proposal <id> --session
-<session> --exercise <exercise> (--sets "3x5@95 rpe7" | --load <n>)
---reason "<why>"`; a timed hold takes seconds, `--sets "2x35s rpe7"`.
-Add `--standing` (and `--until <date>`, eight weeks at most; four by
-default) when the change should hold in later weeks — a niggle, an
-agreed hold — so the scheme stops proposing it away; it covers sessions
-to that date, and a deload or light week still cuts it. A per-exercise
-**focus** from check-in findings ("slow the eccentric") may go into the
-draft line, with an `override` reason; a line changed without a reason
-is refused. An approved override onto a rung moves the ladder to that rung.
+Run `python3 -m coach propose override --proposal <id> --session <session>
+--exercise <exercise> (--sets "3x5@95 rpe7" | --load <n>) --reason "<why>"`; a
+timed hold takes seconds, `--sets "2x35s rpe7"`, and a wave's rep-out set keeps
+its `+`, `--sets "1x5+@120"`. Add `--standing` (and `--until <date>`, eight
+weeks at most; four by default) when the change should hold in later weeks — a
+niggle, an agreed hold — so the scheme stops proposing it away; it covers
+sessions to that date, and a deload or light week still cuts it. A per-exercise
+**focus** from check-in findings ("slow the eccentric") may go into the draft
+line, with an `override` reason; a line changed without a reason is refused. An
+approved override onto a rung moves the ladder to that rung.
 
-Niggle limits are already in the proposal: `propose week` applies each
-active niggle's constraints to every matching line and names the niggle
-in `constraint_applied`; `python3 -m coach niggles constraints` lists
-them. A `niggle_escalate` flag means recommend a qualified professional
-and keep programming around it, never diagnose; a `followup_due` flag
-names a follow-up to raise with the athlete.
+Niggle limits are already in the proposal: `propose week` applies each active
+niggle's constraints to every matching line and names the niggle in
+`constraint_applied`; `python3 -m coach niggles constraints` lists them. A
+`niggle_escalate` flag means recommend a qualified professional and keep
+programming around it, never diagnose; a `followup_due` flag names a follow-up
+to raise with the athlete.
 
 ## 4. Keep a flag
 

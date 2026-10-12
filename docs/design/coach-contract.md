@@ -199,6 +199,7 @@ Command inventory (owner in brackets). Read-only unless marked W
 | `routines create --overlay ID [--reuse SESSION=ROUTINE]... [--expect-plan HASH] [--dry-run]` | R-14b | H |
 | `gate pretooluse` | R-15 | |
 | `program show`, `program validate`, `state show`, `migrate status` | R-17a | |
+| `state set-training-max --session S --exercise E --value N --reason TEXT` | R-23b | W |
 | `program render`, `migrate run`, `program reconcile-mode ID --basis old\|confirmed [--input FILE]` | R-17a | W |
 
 Phase 2 to 4 command inventory. No command here writes to Hevy.
@@ -1001,7 +1002,12 @@ for every non-GET request, success or failure, once its retries are over.
   a `distance` set needs `distance_meters`; for those two modes `reps` and
   `rep_range` are optional (at most one). `rep_range.start` is at most
   `end`. `rpe` is 1 to 10. Working sets are `normal`, `dropset` and
-  `failure`.
+  `failure`. `rep_out: true` (v5) marks a rep-out (+) set: a `normal`
+  set with fixed `reps` that asks for at least those reps and as many
+  more as the athlete can take before its `rpe`, the cap. It is never a
+  set to failure, which stays type `failure`. Absent means false. The
+  Hevy writer sends a rep-out set as a `normal` set; the C12 note carries
+  the `+` and the cap.
 - Loads: every load object passes `units.check_load`, its `mode` equals
   the line's `load_mode` and its `unit` equals `[athlete] units`. The
   validator reports each problem at the field's JSONPath
@@ -1062,7 +1068,10 @@ for every non-GET request, success or failure, once its retries are over.
   `overlay build` warns once per such line, and nothing when the library
   is invalid.
 - Later versions: v2 adds line `provenance` (R-24, C21); v3 adds line
-  `fold` and session `moved_from` (R-22, C37).
+  `fold` and session `moved_from` (R-22, C37); v5 adds a set's `rep_out`
+  (C23). Its migration turns the `failure` set of each wave line
+  (`provenance.scheme` `wave_531`, no `override`) into a rep-out set, as
+  earlier versions wrote a wave's rep-out set that way.
 
 ## C11. Rendered markdown markers (R-13, R-16, R-17a; later renderers follow it)
 
@@ -1143,7 +1152,9 @@ Cues: <cues>
 
 - Warm-up sets are left out of the Target line. Consecutive working sets
   with equal reps or range, load and RPE collapse to `N×reps`; groups join
-  with ` + `. A `total` load carries its unit (`3×5 @ 100 kg @ RPE 7`, as
+  with ` + `. A rep-out set prints its reps with `+` and its cap as
+  `(stop at RPE 9)`, not `@ RPE 9`: `1×5+ @ 85 kg (stop at RPE 9)`. In
+  the week-ahead and sheet tables its RPE cell reads `stop at 9`. A `total` load carries its unit (`3×5 @ 100 kg @ RPE 7`, as
   in `reference/hevy-api.md`); every other load prints exactly as
   `format_load` gives it.
 - The Target line is absolute. It never carries `target_note` or `change`:
@@ -1914,7 +1925,10 @@ Program bumps: R-22 (executable `missed_day_rules`, C37), R-30b (`priority`, `mi
 (`interference`, C51), R-44b (session `scheme`, C51), v8
 (`minimum_week.external_sessions`, C40), v9 (`dose_intent`, C40). State bump: R-31
 took state to v4 (`block`, C42); the adoption date took it to v5
-(`program_adopted`, C41). Overlay: R-24 takes it to v2 (C21), R-22 to v3 (C37) and R-30b to v4 (C40). A
+(`program_adopted`, C41), and the wave's trained-work state to v6 (C23).
+Overlay: R-24 takes it to v2 (C21), R-22 to v3 (C37), R-30b to v4 (C40),
+and rep-out sets take it and its draft to v5 (C10, C23). Decisions v2
+adds rep-out override sets and the `training_max` kind (C25). A
 brief or section that names a version number means the next free one.
 
 ## C17. History cache (R-20 writes; R-21a, R-23a, R-24, R-25, R-30a, R-31, R-43 read)
@@ -2406,6 +2420,7 @@ Reserved codes:
 | `incomplete_exposure` | warn | R-23a | | Fewer working sets logged than prescribed and none fell short: linear counts no miss and holds the load, or still resets it when the misses already counted reach the limit (a coaching heuristic); below the limit, confirm whether the sets were skipped or failed. |
 | `linear_below_start` | info | R-23a | | Linear reset fell below the starting load; review progression without automatic adjustment. |
 | `load_cut_held` | info, warn | R-23a | | A reset, return-band or deload load cut that the kit cannot make holds the load, and the rationale gives the target and actual cut. Info when the line's set or effort cuts still apply; warn when nothing is cut, naming the next lighter load the kit makes so the coach chooses, or when the kit makes nothing that light and the load rises. |
+| `wave_review` | warn | R-23a | | A 5/3/1 wave week was trained but a wave set fell short of its reps or past its RPE cap: the week repeats and no training-max raise is earned; review the training max with the athlete (a coaching heuristic). |
 | `rpe_drift` | warn | R-23a | | Compound or recovery-capped exercise: logged RPE at least 1 over target on two or more working sets of the last exposure. |
 | `range_effort_mismatch` | warn | R-23a | | Double progression held a load whose derived-from exposure had a working set below its set group's rep range or 2 or more RPE over target; review a lighter load or a different rep range. |
 | `return_week` | info | R-23a | | Decay applied; names the band and days off. A lifting line's flag adds the load change (`loads × 0.9`, or `assistance held` on an `assisted` line), the set change and any RPE cap. |
@@ -2696,6 +2711,7 @@ def decay(ctx: SchemeContext, proposal: Proposal, days_off: int) -> Proposal   #
 def deload(ctx: SchemeContext, proposal: Proposal) -> Proposal       # schemes, optional (used by the `scheme` transform)
 def override_state(params: dict, state: dict, sets: tuple[SetSpec, ...], load_mode: str) -> dict  # schemes, optional (finalize)
 def final_note(ctx: SchemeContext, proposal: Proposal, sets: tuple[SetSpec, ...]) -> str | None  # schemes, optional (the line's target_note)
+def problems(params: dict, sets: list[dict]) -> [(path, message)]  # schemes, optional (program validate)
 def plan(ctx: ScheduleContext) -> SchedulePlan                       # schedules
 def apply(ctx: SchemeContext, proposal: Proposal) -> Proposal        # transforms
 ```
@@ -2738,7 +2754,8 @@ class SchemeContext:
 
 @dataclass(frozen=True)
 class Proposal:
-    sets: tuple[SetSpec, ...]     # type, reps | rep_range, rpe, load (coaching number | None), duration, distance
+    sets: tuple[SetSpec, ...]     # type, reps | rep_range, rpe, load (coaching number | None), duration, distance,
+                                  # rep_out (a + set: at least reps, more up to its rpe cap)
     rationale: str                # one plain sentence
     derived_from: Exposure | None
     state: dict                   # validated against STATE before it is kept
@@ -2856,7 +2873,8 @@ and `plugins test` runs them. Loaded with
   and `week_kind` (that overlay's kind, or `return` for return work:
   a line with a return-band cut, or a week an adopted `light_week`
   decision of type `return` covers; `coach.capacity.line_kind` is the
-  shared rule). Logged sets retain reps, duration
+  shared rule), and `decayed` (that line was a return week's: its
+  provenance carries a `decay`). Logged sets retain reps, duration
   and distance as well as load and RPE. Unknown historical prescriptions
   are never filled from today's program: linear and ladder hold, double
   progression holds load, and `prescription_unknown` makes the uncertainty
@@ -2948,6 +2966,15 @@ and `plugins test` runs them. Loaded with
   `hold`; otherwise the schemes that program the mode.
   Band work has no load to add: at the top of the range the line holds
   and its rationale asks the coach for a harder band.
+- A scheme may define `problems(params, sets)`: `program validate`
+  reports each `(path, message)` for a slot's program set groups the
+  scheme cannot use, at the slot's path plus `path` (`$.sets[0].count`),
+  once its params pass. `wave_531` defines it.
+- `base.REP_OUT_RPE_CAP` is 9: a rep-out set's default cap, a coaching
+  heuristic (no research sets an exact cap). A lower cap that applies
+  wins: the pipeline's `rpe_capped` steps (an `rpe_cap` constraint, the
+  illness cap, a return band, the `light` and `return` transforms) lower
+  it like any other RPE. `base.standard_deload` clears `rep_out`.
 - The pipeline reads caps through `coach.checks.instance.cap_for(config,
   exercise_id, mode, location)` (R-16's `load_caps` rule) and increments
   through `coach.stats.load_increment(library, config, exercise_id,
@@ -3042,29 +3069,50 @@ and `plugins test` runs them. Loaded with
   `ctx.e1rm`), `increment_upper` and `increment_lower` (null: 2.5 and 5
   in kg, 5 and 10 in lb), `region` (null: lower for the squat, hinge,
   lunge, knee, calf and hip patterns, else upper), `amrap` (true: the
-  last set of each wave week is type `failure`, its `reps` the minimum).
-  State `{wave_week 0..3, training_max, proposed_for, proposed_on}`:
-  `proposed_for` is the latest session date proposed at this wave week,
-  `proposed_on` the `today` of that run. A `weekly` run advances one
-  wave week. It repeats the week for a later session of the same run
-  (`proposed_on` is today) and for a session on or before
-  `proposed_for` (a weekly run again over a week already proposed). A
-  `midweek` or `deload` run always repeats it. Session-date distance
-  alone can't decide, because `next_in_sequence`,
-  `alternating_external_anchor` and `explicit_calendar` move a
-  session's weekday from week to week. Two weekly runs on the same day
-  for consecutive weeks therefore repeat the week in the second.
-  After week 3 the next proposal starts week 1 with the training max
-  raised. A deload run (`scheme` transform) calls its `deload`: 40/50/60 %
-  × 5 of the lower of the stored and the proposed training max, so the
-  raise waits for the next wave. Its `decay` takes the lower of the
-  stored and the proposed training max, so a return week never carries
-  a wave's raise, and lowers it by the band's `load_factor` (kept in
-  state). It rebuilds the week without a `failure` set, keeps `return_set_count` sets, caps each load at the
-  derived-from load × `load_factor` and applies the band's RPE cap, so
-  the line passes R-24's decay check. With no training max and no
-  e1RM it holds the program's sets at the last or start load.
-  `LOAD_MODES` is `E1RM_MODES`.
+  last wave set of each week is a rep-out set, `rep_out` with `rpe`
+  `base.REP_OUT_RPE_CAP`; false: a plain set).
+  Sets: the slot's first working set group holds the three wave sets
+  and `problems` refuses a first working group whose `count` is not 3
+  (or no working group), so no set is lost silently. Warm-up groups stay
+  where they are; every later working group stays after the wave sets
+  as back-off sets with its own reps and RPE, loaded at the first wave
+  set's load (5/3/1's "first set last").
+  State `{completed_weeks 0..2, training_max, through}`: the weeks of the
+  current wave completed, and `through` `{date, workout_id}` the newest
+  exposure judged (`workout_id` null: every exposure that day). Each
+  proposal judges the slot's usable exposures after `through`, oldest
+  first. One completes the next week when its prescription was that
+  week's three wave sets at this training max (each `reps` equal and
+  each load within one increment or 2.5 % of the training max of its
+  target, a matching tolerance) and it is neither a `deload` week's nor
+  `decayed`. Its first three logged working sets must each reach their
+  reps, with no logged RPE over a set's cap. Fewer than three logged
+  sets repeat the week with `incomplete_exposure`; a short set or a
+  passed cap repeats it with `wave_review` (warn), holding the training
+  max for the coach's review. A completed third week raises the training
+  max by the region's increment once and starts the next wave at week 1.
+  Anything else (an unknown or other prescription, a second session of
+  a week already completed) is judged and earns nothing, so approvals,
+  re-proposals, same-week repeats and unrelated sessions never move
+  the wave. The completion and effort gate is a coaching heuristic. The
+  first training max (from params or the e1RM) marks the newest
+  exposure judged, so history before the wave never counts.
+  A deload run (`scheme` transform) calls its `deload`: 40/50/60 % × 5
+  of the lower of the stored and the proposed training max, so a raise
+  waits for the next wave, with no rep-out set and the back-offs at
+  40 %. Its rationale names the percentages and the week the wave
+  resumes at; the core keeps it over the scheme's own, and a deload run
+  writes no pending state. Its `decay` is a temporary return week: the
+  week's percentages of the lower of the two training maxes times the
+  band's `load_factor`, with no rep-out set, `return_set_count` sets,
+  each load capped at the derived-from load × `load_factor` and the
+  band's RPE cap, so the line passes R-24's decay check. The stored
+  training max is kept, so the next ordinary week resumes it; the
+  return week's exposure is `decayed` and completes nothing. With no
+  training max and no e1RM it holds the program's sets at the last or
+  start load. Only `state set-training-max` (C24) changes a stored
+  training max by hand; an override never does. `LOAD_MODES` is
+  `E1RM_MODES`.
 - `assistance_ladder` params: `rungs` (ordered easiest first, each
   `{name, load}`; `load` is the assistance for `assisted`, the added load
   for `bodyweight`, where null means 0, and null for `band`), `reps`,
@@ -3206,16 +3254,33 @@ constrained mode) stay coach-built through `overlay build`.
   `{"sessions": [{"date", "session_id"}], "flags": [...]}`; other keys
   are ignored and the rotation is left unchanged.
 - `propose override` takes `--sets SPEC`, comma-separated groups
-  `COUNTxREPS[-REPS][@LOAD][ rpeN]` (`"3x5@95 rpe7"`) or, for a
+  `COUNTxREPS[-REPS][+][@LOAD][ rpeN]` (`"3x5@95 rpe7"`) or, for a
   `duration` line, `COUNTxSECONDSs[ rpeN]` (`"2x35s rpe7"`), which
   replace the line's working sets and keep its warm-ups, or `--load N`.
-  A spec mixing reps and seconds, or a timed group with a range or a
+  A `+` after fixed reps makes a rep-out set (`"1x5+@145"`), capped at
+  its `rpe`, else at `base.REP_OUT_RPE_CAP`, then at any lower `rpe_cap`
+  constraint active for the slot or the line's return band cap; `--load`
+  keeps every set's `rep_out`. A spec mixing reps and seconds, a `+` on
+  a range or a timed group, or a timed group with a range or a
   load, exits 2; seconds on any other line, reps on a `duration` line
   or any `--sets` on a `distance` line exit 1. Both refuse before
   anything is written. It re-runs the R-24 check and stores the merged
   flags in the draft, so a block an override creates can be resolved
   there. A standing override's decision is appended when the command
   runs.
+- With `--transform`, a transform that returns a new rationale (a
+  scheme's `deload`) replaces the scheme's own clause, so the line never
+  explains the week it no longer prescribes.
+- `state set-training-max --session S --exercise E --value N --reason
+  TEXT [--dry-run]` sets the training max of a slot whose scheme keeps
+  one (`wave_531`), in athlete units (per hand for per-hand modes). A
+  pending state its overlay's approval holds is taken as the slot's
+  state first; one still waiting for approval takes the new training max
+  too. The wave keeps its place (`completed_weeks`); a null `through`
+  becomes today, so no earlier history is judged. It appends a
+  `training_max` decision (C25) with the reason, after the athlete has
+  agreed it from the dry run's preview. A slot whose scheme keeps no
+  training max exits 1; `--dry-run` writes nothing.
 - `propose finalize` also appends a one-week override decision
   (`standing: false`, `until` the overlay's span end) for each line whose
   `override` no decision yet records: neither one made for this proposal
@@ -3250,7 +3315,11 @@ constrained mode) stay coach-built through `overlay build`.
 
 - `kind`: `override` (R-23a), `adherence_trigger` (R-30a), `light_week`
   (R-31). The enum holds all three from v1 so R-30a and R-31 need no bump.
-- `scope`: `{session_id, exercise_id}` for overrides; `{}` for program-wide kinds.
+  v2 adds `training_max`: an explicit training-max change from `state
+  set-training-max` (C24).
+- `scope`: `{session_id, exercise_id}` for overrides and training-max
+  changes; `{}` for program-wide kinds. Override sets may carry
+  `rep_out` (v2, C10).
 - `outcome`: `adopted`, `declined`, `deferred`. `revisit_on` is the date a
   declined or deferred decision is presented again (R-02).
 - `proposed_sets`, `chosen_sets`: overrides only, null otherwise; set
@@ -3261,6 +3330,8 @@ constrained mode) stay coach-built through `overlay build`.
   `rule` `restructure` or `add_session`, `weeks` the ordinary weeks used.
   `light_week` (R-31):
   `{"type": "deload", "week": "2026-10-12", "reason": "ceiling", "triggers": [], "hard_weeks": 6}`.
+  `training_max`: `{"scheme": "wave_531", "from": 170, "to": 165}`,
+  `from` null when no training max was stored.
   The field is part of decisions v1.
 - `status`: `active`, `expired`, `withdrawn`. Expiry is computed when
   read (`until` passed); `decisions withdraw ID --reason` closes one.
@@ -6645,7 +6716,10 @@ their own row and the exercise name on its first row, then one bullet
 per exercise with its focus and cues. Loads print with
 `format_load(load, show_hevy=False)`; a null load on a loaded mode
 prints "choose the load". An unapproved overlay renders with a "Not
-approved yet" line and a warning. A footer says how to log ("reply to
+approved yet" line and a warning. A rep-out set prints `N×5+` with
+`stop at 9` in its RPE cell (C12), and the footer then first explains
+the `+` set: at least those reps, more until the next would pass its
+RPE stop, not a set to failure. A footer says how to log ("reply to
 the coach with what you did; differences only"). Check
 `sheets_render_fresh`: skip when Hevy is enabled or there is neither a
 file nor an overlay; warn when there is no file yet, or when the file

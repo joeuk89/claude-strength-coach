@@ -14,6 +14,10 @@ register("prescription_unknown", owner=OWNER, severities=("warn",),
 register("incomplete_exposure", owner=OWNER, severities=("warn",),
          summary="Fewer working sets logged than prescribed and none fell short: progression holds and no miss is "
                  "counted; a coaching heuristic.")
+register("wave_review", owner=OWNER, severities=("warn",),
+         summary="A 5/3/1 wave week was trained but a wave set fell short of its reps or past its RPE cap: the week "
+                 "repeats and no training-max raise is earned; review the training max with the athlete (a coaching "
+                 "heuristic).")
 register("linear_below_start", owner=OWNER, severities=("info",),
          summary="Linear reset fell below the starting load; review progression without automatic adjustment.")
 register("load_cut_held", owner=OWNER, severities=("info", "warn"),

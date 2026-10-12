@@ -154,7 +154,7 @@ class CapacityEvidenceTest(NoHevyCase):
                     "details": {"type": "light", "week": "2026-10-12", "reason": "coach", "triggers": [],
                                 "hard_weeks": 4}, "status": "active", "closed_at": None, "closed_reason": None}
         decision.update(updates)
-        write_json(decisions.path_for(self.root), {"schema_version": 1, "decisions": [decision]})
+        write_json(decisions.path_for(self.root), dict(decisions.empty(), decisions=[decision]))
         return decision
 
     def test_adopted_light_decision_is_bounded_by_as_of(self):
