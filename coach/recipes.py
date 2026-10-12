@@ -10,6 +10,7 @@ import html as html_lib
 import json
 import math
 import re
+from collections import Counter
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from pathlib import Path
@@ -485,6 +486,12 @@ _THOUSANDS = r"\d{1,3}(?:,\d{3})+(?![\d,])(?:\.\d+)?"
 _DECIMAL = r"\d+(?:[.,]\d+)?"
 _QTY = re.compile(rf"(\d+\s+\d+/\d+|\d+/\d+|(?:{_THOUSANDS}|{_DECIMAL})\s*[½¼¾⅓⅔]?|[½¼¾⅓⅔])")
 _MULTIPLIER = re.compile(r"^[x×]\s*\d", re.I)
+_COMPOUND_QTY = re.compile(r"(?:\b(?:and|or|plus)\b|[&+;,])\s*(?:\d|[½¼¾⅓⅔])", re.I)
+_PREP_CLAUSE = (r"(?:(?:finely|roughly|thinly|thickly) )?"
+                r"(?:chopped|diced|sliced|crushed|minced|grated|halved|quartered|peeled|deseeded|drained|rinsed"
+                r"|beaten|trimmed|cubed|zested|juiced|divided)"
+                r"(?: (?:finely|roughly|thinly|thickly))?")
+_PREPARATION = re.compile(rf"{_PREP_CLAUSE}(?: and {_PREP_CLAUSE})*")
 _UNITS = {
     "g": ("g", 1), "gr": ("g", 1), "gram": ("g", 1), "grams": ("g", 1),
     "kg": ("g", 1000), "kilogram": ("g", 1000), "kilograms": ("g", 1000),
@@ -504,8 +511,9 @@ _CONTAINERS = {
 }
 _AISLE_KEYWORDS = (
     ("frozen", ("frozen",)),
+    ("meat-fish", ("ground beef", "ground pork", "ground lamb", "ground turkey", "ground chicken")),
     ("tins-jars-dry", ("stock", "paste", "sauce", "powder", "tinned", "tin", "can", "jar", "dried", "ground",
-                       "peanut butter", "cube")),
+                       "peanut butter", "egg noodles", "egg noodle", "butter beans", "coconut milk", "cube")),
     ("meat-fish", ("chicken", "beef", "pork", "lamb", "turkey", "mince", "bacon", "ham", "sausage", "sausages",
                    "chorizo", "salmon", "cod", "haddock", "tuna", "prawn", "prawns", "fish", "steak", "duck")),
     ("dairy-eggs", ("milk", "yoghurt", "yogurt", "cheese", "egg", "eggs", "butter", "cream", "feta", "mozzarella",
@@ -574,7 +582,8 @@ def parse_ingredient(line):
         return None
     qty = _qty_value(match.group(1))
     rest = text[match.end():].lstrip()
-    if re.match(r"^(?:-|–|to\s)\s*\d", rest) or _MULTIPLIER.match(rest):
+    if (re.match(r"^(?:-|–|to\s)\s*\d", rest) or _MULTIPLIER.match(rest)
+            or _COMPOUND_QTY.search(rest) or re.match(r"^each\b", rest, re.I)):
         return None
     unit, container = "each", None
     word = re.match(r"^([A-Za-z]+)\.?(?=\s|\(|$)", rest)
@@ -587,7 +596,9 @@ def parse_ingredient(line):
         rest = rest[word.end():]
     rest = re.sub(r"^\s*\([^)]*\)", "", rest).strip()
     rest = re.sub(r"^of\s+", "", rest)
-    item = rest.lower().strip(" ,.;:")
+    parts = rest.lower().strip(" ,.;:").split(",")
+    item = ", ".join(part.strip() for i, part in enumerate(parts)
+                     if i == 0 or not _PREPARATION.fullmatch(part.strip()))
     if not item or qty <= 0:
         return None
     if container:
@@ -745,6 +756,42 @@ def _grams(value):
     return _tidy_number(round(number, 1))
 
 
+@dataclass(frozen=True)
+class _Collected:
+    """Ingredient lines parsed, with lines of the same item and unit summed.
+
+    `summed_lines` maps each item summed from several lines in one unit to those lines; `mixed_lines`
+    maps each item left in more than one unit to its lines.
+    """
+    ingredients: list
+    unparsed: list
+    guessed: list
+    summed_lines: dict
+    mixed_lines: dict
+
+
+def _collect_ingredients(lines):
+    by_key, unparsed, guessed, source_lines = {}, [], [], {}
+    for text in lines:
+        ingredient, matched = ingredient_with_aisle(text)
+        if ingredient is None:
+            unparsed.append(text)
+            continue
+        key = (ingredient["item"], ingredient["unit"])
+        if key in by_key:
+            by_key[key]["qty"] = _tidy_number(by_key[key]["qty"] + ingredient["qty"])
+        else:
+            by_key[key] = ingredient
+        source_lines.setdefault(key[0], []).append(text)
+        if not matched and key[0] not in guessed:
+            guessed.append(key[0])
+    unit_counts = Counter(item for item, _ in by_key)
+    mixed_lines = {item: source_lines[item] for item, count in unit_counts.items() if count > 1}
+    summed_lines = {item: item_lines for item, item_lines in source_lines.items()
+                    if len(item_lines) > 1 and item not in mixed_lines}
+    return _Collected(list(by_key.values()), unparsed, guessed, summed_lines, mixed_lines)
+
+
 def import_jsonld(page_html, url=None):
     """Return (draft, flags) from a saved recipe page's schema.org JSON-LD; nothing is fetched."""
     recipe = extract_recipe(page_html)
@@ -766,13 +813,18 @@ def import_jsonld(page_html, url=None):
         flags.append({"code": "servings_missing", "message": "the page gives no yield; servings = 1 is a guess"})
     draft["servings"] = servings
     draft["prep"] = "cook"
-    total = _iso_minutes(recipe.get("totalTime"))
-    if total is None:
-        parts = [_iso_minutes(recipe.get(key)) for key in ("prepTime", "cookTime")]
-        total = sum(p for p in parts if p) if any(parts) else None
-    if total is None:
-        flags.append({"code": "time_missing", "message": "the page gives no time; time_min = 0 until you set it"})
-    draft["time_min"] = total or 0
+    source_times = {key: recipe[key] for key in ("prepTime", "cookTime", "totalTime") if recipe.get(key)}
+    prep_minutes = _iso_minutes(recipe.get("prepTime"))
+    draft["time_min"] = prep_minutes or 0
+    if source_times:
+        proposed = (f"time_min = {prep_minutes} uses prepTime as a starting estimate"
+                    if prep_minutes is not None else "time_min = 0 is a placeholder")
+        flags.append({"code": "active_time_uncertain", "source_times": source_times,
+                      "message": f"{proposed}; confirm total active minutes from the method, including active "
+                                 "cooking. prepTime does not prove cooking is passive and totalTime is elapsed time"})
+    else:
+        flags.append({"code": "time_missing",
+                      "message": "the page gives no time; set active minutes before accepting time_min = 0"})
     draft["status"] = "active"
 
     nutrition = recipe.get("nutrition") or {}
@@ -817,26 +869,27 @@ def import_jsonld(page_html, url=None):
     elif ambiguous:
         flags.append({"code": "per_serving_doubt", "message": f"the yield is ambiguous ({recipe.get('recipeYield')!r})"})
 
-    ingredients, unparsed, guessed = [], [], []
     lines = recipe.get("recipeIngredient") or recipe.get("ingredients") or []
-    for line in lines if isinstance(lines, list) else [lines]:
-        text = _clean(line)
-        ingredient, matched = ingredient_with_aisle(text)
-        if ingredient is None:
-            unparsed.append(text)
-            continue
-        ingredients.append(ingredient)
-        if not matched:
-            guessed.append(ingredient["item"])
-    if ingredients:
-        draft["ingredients"] = ingredients
-    if unparsed:
+    collected = _collect_ingredients([_clean(line) for line in (lines if isinstance(lines, list) else [lines])])
+    if collected.ingredients:
+        draft["ingredients"] = collected.ingredients
+    if collected.summed_lines:
+        flags.append({"code": "summed_ingredient_lines", "items": list(collected.summed_lines),
+                      "lines": [line for item_lines in collected.summed_lines.values() for line in item_lines],
+                      "message": "lines for the same food and unit were added into one quantity; check each "
+                                 "line buys the same product"})
+    if collected.mixed_lines:
+        flags.append({"code": "incompatible_ingredient_units", "items": list(collected.mixed_lines),
+                      "lines": [line for item_lines in collected.mixed_lines.values() for line in item_lines],
+                      "message": "same-food quantities use incompatible units and remain separate; reconcile "
+                                 "them into one exact unit per item before validating the card"})
+    if collected.unparsed:
         flags.append({"code": "unparsed_ingredients",
-                      "message": f"{len(unparsed)} ingredient line(s) need an exact qty, unit and item",
-                      "lines": unparsed})
-    if guessed:
+                      "message": f"{len(collected.unparsed)} ingredient line(s) need an exact qty, unit and item",
+                      "lines": collected.unparsed})
+    if collected.guessed:
         flags.append({"code": "aisle_guessed", "message": f"no aisle keyword matched; {DEFAULT_AISLE_GUESS} is a guess",
-                      "items": guessed})
+                      "items": collected.guessed})
     return draft, flags
 
 
@@ -998,19 +1051,13 @@ def convert_yaml_card(text, slug=None):
     notes += [f"front matter key {key} is not carried over" for key in meta if key not in _LEGACY_KEYS]
     draft["per_serving"] = {k: (0 if v is None else v) for k, v in draft["per_serving"].items()}
 
-    ingredients, unparsed, guessed_aisles, variations = [], [], [], []
+    ingredient_lines, variations = [], []
     for heading, chunk in _sections(body):
         if heading is None:
             continue
         bullets = [line.strip() for line in chunk.splitlines()[1:] if re.match(r"^\s*[-*]\s", line)]
         if heading.lower() == "ingredients":
-            for line in bullets:
-                ingredient, matched = ingredient_with_aisle(line)
-                if ingredient is None:
-                    unparsed.append(re.sub(r"^[-*]\s*", "", line))
-                    continue
-                ingredients.append(ingredient)
-                guessed_aisles.append({"item": ingredient["item"], "aisle": ingredient["aisle"], "matched": matched})
+            ingredient_lines += [re.sub(r"^[-*]\s*", "", line) for line in bullets]
         elif heading.lower() == "variations":
             for line in bullets:
                 variation, note = _variation_from_line(line)
@@ -1020,6 +1067,14 @@ def convert_yaml_card(text, slug=None):
                 variations.append(variation)
                 if note:
                     notes.append(note)
+    collected = _collect_ingredients(ingredient_lines)
+    ingredients, unparsed = collected.ingredients, collected.unparsed
+    guessed_aisles = [{"item": i["item"], "aisle": i["aisle"], "matched": i["item"] not in collected.guessed}
+                      for i in ingredients]
+    notes += [f"{item}: {len(item_lines)} lines summed into one quantity ({'; '.join(item_lines)})"
+              for item, item_lines in collected.summed_lines.items()]
+    notes += [f"{item} is in more than one unit ({'; '.join(item_lines)}); reconcile to one unit"
+              for item, item_lines in collected.mixed_lines.items()]
     if ingredients:
         draft["ingredients"] = ingredients
     if variations:

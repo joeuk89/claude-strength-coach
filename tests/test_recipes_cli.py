@@ -3,9 +3,10 @@ import shutil
 import tempfile
 import tomllib
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
-from coach import recipes
+from coach import meals, recipes
 from tests.support import FIXTURES, INSTANCES, VALID, run_cli, run_module
 
 YAML_CARDS = INSTANCES / "yaml-cards"
@@ -225,6 +226,47 @@ class ImportDraftTest(CliMixin, unittest.TestCase):
             self.run_ok(root, "recipes", "render")
             self.run_ok(root, "check", "--only", "recipe_cards,recipe_render_fresh,recipe_index_fresh")
 
+    def test_reviewed_import_reaches_shopping_without_quantity_loss(self):
+        with InstanceCopy(VALID) as root:
+            page = FIXTURES / "recipes" / "jsonld-review.html"
+            before = snapshot(root)
+            data = self.run_ok(root, "recipes", "import", "--html", str(page))["data"]
+            self.assertEqual(snapshot(root), before)
+            by_code = {f["code"]: f for f in data["flags"]}
+            self.assertEqual(by_code["unparsed_ingredients"]["lines"], ["2 red and 2 yellow peppers"])
+            self.assertIn("active_time_uncertain", by_code)
+            data["card"]["ingredients"] += [
+                {"qty": 2, "unit": "each", "item": "red peppers", "aisle": "produce"},
+                {"qty": 2, "unit": "each", "item": "yellow peppers", "aisle": "produce"},
+            ]
+            data["card"]["time_min"] = 25
+            data["flags"] = []
+            draft_path = root / "reviewed.json"
+            draft_path.write_text(json.dumps(data), encoding="utf-8")
+            text = self.run_ok(root, "recipes", "draft", "--input", str(draft_path))["data"]["text"]
+            self.assertFalse((menu(root) / f"{data['slug']}.md").exists())
+            (menu(root) / f"{data['slug']}.md").write_text(text, encoding="utf-8")
+            self.run_ok(root, "recipes", "validate", data["slug"])
+            self.assertIn("https://recipes.example.com/vegetable-noodles", text)
+            draft = {
+                "span": {"start": "2026-10-12", "end": "2026-10-14"},
+                "exceptions": [
+                    {"date": date, "slot": "dinner", "entry": {"recipe": data["slug"]}}
+                    for date in ("2026-10-12", "2026-10-13", "2026-10-14")
+                ],
+            }
+            plan = meals.build(draft, root, now=datetime(2026, 10, 11, tzinfo=timezone.utc))
+            pool = next(row for row in plan["pool"] if row["recipe"] == data["slug"])
+            self.assertEqual(pool["batches"], 2)
+            lines = plan["shopping"]["buy"] + plan["shopping"]["check"]
+            for item, unit, qty in (("olive oil", "tbsp", 12), ("garlic cloves", "each", 6),
+                                    ("onion", "each", 2), ("red peppers", "each", 4),
+                                    ("yellow peppers", "each", 4), ("egg noodles", "g", 400)):
+                with self.subTest(item=item):
+                    matches = [line for line in lines if line["item"] == item and line["unit"] == unit]
+                    self.assertEqual(len(matches), 1)
+                    self.assertEqual(matches[0]["qty"], qty)
+
     def test_draft_that_fails_validation(self):
         with InstanceCopy(VALID) as root:
             draft_file = root / "draft.json"
@@ -330,6 +372,17 @@ class ConvertCommandTest(CliMixin, unittest.TestCase):
 
             again = self.run_code(1, root, "recipes", "convert", "--apply", "--input", str(input_file), env=NOW)
             self.assertIn("not an old YAML card", again["error"]["message"])
+
+    def test_apply_accepts_a_card_whose_lines_differ_only_by_preparation(self):
+        with InstanceCopy(YAML_CARDS) as root:
+            (menu(root) / "mince.md").write_text(
+                "---\nname: mince\nslot: [dinner]\nkcal: 500\nprotein: 40\ncarbs: 40\nfat: 20\n---\n\n# Mince\n\n"
+                "## Ingredients\n- 1 onion, chopped\n- 1 onion, sliced\n- 400 g beef mince\n", encoding="utf-8")
+            data = reviewed(self.run_ok(root, "recipes", "convert", "--parse")["data"])
+            input_file = root / "reviewed.json"
+            input_file.write_text(json.dumps(data), encoding="utf-8")
+            self.run_ok(root, "recipes", "convert", "--apply", "--input", str(input_file), env=NOW)
+            self.assertIn('qty = 2\nunit = "each"\nitem = "onion"\n', recipes.read_text(menu(root) / "mince.md"))
 
     def test_apply_refuses_a_failing_card_and_writes_nothing(self):
         with InstanceCopy(YAML_CARDS) as root:

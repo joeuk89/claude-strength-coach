@@ -3463,12 +3463,27 @@ the block after TOML parsing):
   title, then benched cards. A slot with no cards says so.
 - `recipes import` returns `data: {slug, card, toml, prose, flags}`.
   `slug` is a suggestion from the title; `card` is the draft block;
-  `prose` is the method as `## Method` steps. Flag codes:
-  `unparsed_ingredients` (with `lines`), `missing_nutrition`,
+  `prose` is the method as `## Method` steps. A draft without all four
+  macros leaves out `per_serving`. A page host of a known meal kit
+  (`gousto`, `hellofresh`) adds the tags `meal-kit` and the provider.
+  Flag codes: `unparsed_ingredients` (with `lines`), `missing_nutrition`,
   `per_serving_doubt`, `macro_sum` (with `severity`), `slot_guessed`,
-  `servings_missing`, `time_missing`, `aisle_guessed`. A draft without
-  all four macros leaves out `per_serving`. A page host of a known meal
-  kit (`gousto`, `hellofresh`) adds the tags `meal-kit` and the provider.
+  `servings_missing`, `time_missing`, `active_time_uncertain` (with raw
+  `source_times`), `aisle_guessed`, `incompatible_ingredient_units` and
+  `summed_ingredient_lines` (each with `items` and source `lines`).
+  Resolve flags before athlete approval and writing a card. Ingredient
+  rules, shared with `recipes convert`:
+  - Compound quantities that cannot be read exactly stay in
+    `unparsed_ingredients`.
+  - Supported preparation clauses, alone or joined by "and", are removed
+    from the item name; cooked/raw and colour distinctions stay.
+  - Lines with the same item and unit sum, after the supported kg-to-g
+    and litre-to-ml normalisation. An item left in more than one unit
+    stays separate for review and fails card validation until reconciled.
+  - Specific food phrases take priority over misleading aisle tokens.
+  - `time_min` means active minutes: prepTime is only a flagged starting
+    estimate (zero if absent), never proven total active time, and
+    totalTime is not imported as active time.
 - `recipes draft --input FILE` takes `{slug, card, prose}` (the import
   output works as is) and returns `{slug, path, exists, text, results}`;
   a failing draft exits 1.
@@ -3477,10 +3492,13 @@ the block after TOML parsing):
   row: `slug`, `title`, the four macros, `ingredients` (count), `unparsed`
   (lines), `guessed_aisles` (`{item, aisle, matched}`), `variations`
   (count), `variations_to_fill` (names; none on eat-out cards), `notes`
-  (including every front-matter line it could not read and every key it
-  does not carry over). `slot_notes` maps each configured slot to the prose
-  under its heading in the old hand-kept index; `slot_notes_toml` is that
-  map as a `[nutrition.bank.slot_notes]` table for the coach to add to
+  (including every front-matter line it could not read, every key it
+  does not carry over, each item summed from several lines and each item
+  left in more than one unit, with its source lines). Ingredient lines
+  come from every `## Ingredients` section. `slot_notes` maps each
+  configured slot to the prose under its heading in the old hand-kept
+  index; `slot_notes_toml` is that map as a
+  `[nutrition.bank.slot_notes]` table for the coach to add to
   `config.toml`; `slot_notes_unplaced` lists `{heading, note}` for prose
   under no slot heading. The table lists the slot notes after the cards.
   `--apply --input FILE` takes `{cards: [{slug, card}]}`, refuses (exit 1,

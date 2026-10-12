@@ -27,16 +27,32 @@ no-method cards skip it.
    `reference/recipe-cards.md`, the method as prose, and flags to
    resolve before the athlete sees the card:
    - `unparsed_ingredients`: lines it could not turn into an exact
-     quantity, unit and item (ranges, "to taste"). Make each exact or
-     drop it.
+     quantity, unit and item (ranges, "to taste", compound lines such as
+     "2 red and 2 yellow peppers"). Enter each food with its own exact
+     quantity, or drop the line.
    - `missing_nutrition`: the page has no per-serving macros. Estimate
      them from the ingredients and set `nutrition = "estimated"`.
    - `per_serving_doubt`: an ambiguous yield ("2 or 4 servings") or a
      figure too large for one serving. Check the numbers are per serving.
    - `macro_sum`: the published kcal disagrees with 4/4/9. Find out why
      rather than copying it.
-   - `slot_guessed`, `servings_missing`, `time_missing`,
-     `aisle_guessed`: fields it had to guess.
+   - `active_time_uncertain`: `time_min` is a proposal (prepTime, or 0),
+     and `source_times` holds the page's raw times. Read the method and
+     set the real active minutes; totalTime is elapsed time, not active.
+   - `time_missing`: the page gives no time. Set active minutes from the
+     method.
+   - `incompatible_ingredient_units`: one food appears in units the
+     importer does not add together, such as tbsp and ml, or tsp and tbsp
+     (`items`, with source `lines`). Convert them into one exact unit per
+     item; the card fails validation until you do.
+   - `summed_ingredient_lines`: lines for the same food and unit were
+     added into one quantity (`items`, with source `lines`). Check the
+     lines buy the same product: "beef, diced" and "beef, minced" do not,
+     so split them into two items.
+   - `slot_guessed`, `servings_missing`, `aisle_guessed`: fields it had
+     to guess. Check each one.
+   `reference/recipe-cards.md` ("Reviewing an import") explains what the
+   importer already normalised.
    Then normalise: metric quantities, per-serving amounts for `servings`,
    and `nutrition = "published"` only while the site's numbers still
    describe the food. Per `reference/recipe-cards.md`, an ingredient swap
