@@ -9,8 +9,9 @@ from coach.plugins import base
 from coach.plugins.schemes import double_progression
 from tests.support.history import read_json
 from tests.support.skills import flat, step_text
+from tests.support.templates import cache_catalogue_templates
 from tests.test_progression_schemes import context, exposure, run
-from tests.test_propose import FIRST_ID, ProposeCase, find_line, working
+from tests.test_propose import FIRST_ID, NOW, ProposeCase, find_line, working
 
 DAY = date(2026, 10, 5)
 BENCH = base.ExerciseInfo(id="bb_bench_press", name="Bench press", pattern="horizontal_push", muscles={},
@@ -187,6 +188,7 @@ class ExtraSlotCase(ProposeCase):
         super().setUp()
         self.edit_program(lambda doc: doc["sessions"][1]["exercises"].append(dict(self.extra_slot)))
         self.coach("library", "set-mode", self.extra_slot["exercise_id"], self.extra_slot["load_mode"])
+        cache_catalogue_templates(self.root, NOW)
 
     def override(self, exercise, spec, expect=0):
         envelope = self.coach("propose", "override", "--proposal", FIRST_ID, "--session", "session-b",
