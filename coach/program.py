@@ -628,7 +628,8 @@ def _priority_lines(doc, library):
                   f"Sessions: {', '.join(f'`{session_id}`' for session_id in minimum['sessions'])}. "
                   f"Schedule rule: {_named(minimum['schedule']['rule'], minimum['schedule']['params'])}."]
         if minimum.get("external_sessions"):
-            lines.append(f"Retained coach-led sessions: {', '.join(minimum['external_sessions'])}.")
+            retained = ', '.join(f'`{external_id}`' for external_id in minimum['external_sessions'])
+            lines.append(f"Retained coach-led sessions: {retained}.")
     return lines
 
 

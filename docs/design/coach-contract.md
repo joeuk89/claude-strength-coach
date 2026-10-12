@@ -4734,9 +4734,9 @@ null`:
   the one the ordinary balance counts for that position: its scheduled
   active core lifting sessions plus every coach-led session once a week,
   with or without a `weekday` (`date` null when it has none). The
-  minimum's planned dose counts its scheduled standby lifting sessions plus
-  each explicitly retained coach-led session once; an omitted one adds
-  nothing. Every muscle in either dose is visible, independently of
+  minimum's planned dose counts its scheduled standby core lifting sessions
+  plus each explicitly retained coach-led session once; an omitted one, or
+  an optional standby session, adds nothing. Every muscle in either dose is visible, independently of
   hypertrophy targets; zero ordinary dose means zero required dose.
 - A fixed minimum is checked against each ordinary rotation position; a
   fixed ordinary schedule supplies the reference for each minimum position.
@@ -4749,6 +4749,9 @@ null`:
   Matching positions retain dose comparisons; an unmatched position
   reports its planned dose but sets `reference_position`, `reference_sessions`,
   `reference_external`, and each muscle's `ordinary`, `third`, `met` to null.
+  A fixed ordinary schedule has no position name, so its matched references
+  also have a null `reference_position`; a null `reference_sessions` alone
+  marks an unmatched position.
   The check never silently pairs unrelated positions or averages them away.
 - The two-session limit and R-24 time caps apply to self-programmed minimum
   sessions; retained coach-led work is reported separately. Session minutes

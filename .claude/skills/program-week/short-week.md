@@ -13,7 +13,8 @@ through the normal brief and approval before editing `data/program.json`:
 1. Copy suitable ordinary sessions with new ids and `status: standby`.
    Keep usable exercises, load modes, progression schemes, working loads and
    effort; reduce sets to fit the available time while retaining priority
-   lift floors. Standby sessions stay out of the ordinary schedule.
+   lift floors. Keep `tier: core`: an optional standby session adds no
+   planned dose. Standby sessions stay out of the ordinary schedule.
 2. Set `minimum_week.sessions` to those ids and `minimum_week.schedule`
    to the rule and params that place them on the available days. For
    `fixed_weekdays`, for example, use

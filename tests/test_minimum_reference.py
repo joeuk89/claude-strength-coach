@@ -16,7 +16,8 @@ class MinimumReferenceTest(MinimumCase):
         return structure.balance(self.root, variant="minimum", today="2026-10-11")
 
     def ordinary_bench(self, count):
-        self.edit_json("data/program.json", lambda doc: doc["sessions"][0]["exercises"][1]["sets"][0].update(count=count))
+        self.edit_json("data/program.json",
+                       lambda doc: doc["sessions"][0]["exercises"][1]["sets"][0].update(count=count))
 
     def external(self, retained=False, weekday="wed"):
         def change(doc):
@@ -77,11 +78,12 @@ class MinimumReferenceTest(MinimumCase):
                                  [("pt", None)])
                 self.assertEqual([s["external_id"] for s in position["external"]], ["pt"] if retained else [])
 
-    def rotation(self, minimum_names=None):
+    def rotation(self, minimum_names=None, ordinary=True):
         def change(doc):
-            doc["schedule"] = {"rule": "alternating_external_anchor", "params": {"weeks": [
-                {"name": "a", "days": {"mon": "session-a"}},
-                {"name": "b", "days": {"mon": "session-a", "thu": "session-b"}}]}}
+            if ordinary:
+                doc["schedule"] = {"rule": "alternating_external_anchor", "params": {"weeks": [
+                    {"name": "a", "days": {"mon": "session-a"}},
+                    {"name": "b", "days": {"mon": "session-a", "thu": "session-b"}}]}}
             if minimum_names:
                 doc["minimum_week"]["schedule"] = {"rule": "alternating_external_anchor", "params": {"weeks": [
                     {"name": minimum_names[0], "days": {"tue": "min-a"}},
@@ -97,16 +99,33 @@ class MinimumReferenceTest(MinimumCase):
         self.assertEqual(positions[1]["muscles"]["lats"]["ordinary"], 6)
         self.assertEqual([s["session_id"] for s in positions[1]["reference_sessions"]], ["session-a", "session-b"])
 
+    def test_rotating_minimum_compares_each_position_with_a_fixed_ordinary_week(self):
+        self.ordinary_bench(30)
+        self.rotation(("a", "b"), ordinary=False)
+        report = self.report()
+        self.assertEqual([r["position"] for r in report["positions"]], ["a", "b"])
+        for row in report["positions"]:
+            with self.subTest(position=row["position"]):
+                self.assertIsNone(row["reference_position"])
+                self.assertEqual([s["session_id"] for s in row["reference_sessions"]], ["session-a", "session-b"])
+                self.assertEqual(row["reference_external"], [])
+                self.assertEqual(row["muscles"]["chest"], {"ordinary": 30, "third": 10, "planned": 4, "met": False})
+                self.assertIn(f"{row['position']}: chest: 4 fractional sets planned, below a third of its ordinary "
+                              "dose of 30 (10)", report["reasons"])
+        self.assertFalse(report["passed"])
+
     def test_matching_rotations_compare_like_positions_and_keep_other_failures(self):
         self.rotation(("a", "b"))
         self.edit_json("data/program.json", lambda doc: doc["priority"][0]["floor"].update(sets=5))
         with (self.root / "config.toml").open("a") as handle:
             handle.write("\n[sessions.cap_minutes]\nmin-a = 5\n")
         report = self.report()
-        self.assertEqual([(r["position"], r["reference_position"]) for r in report["positions"]], [("a", "a"), ("b", "b")])
+        self.assertEqual([(r["position"], r["reference_position"]) for r in report["positions"]],
+                         [("a", "a"), ("b", "b")])
         for position in ("a", "b"):
-            self.assertTrue(any(reason.startswith(position + ":") and "priority floor" in reason for reason in report["reasons"]))
-            self.assertTrue(any(reason.startswith(position + ":") and "min cap" in reason for reason in report["reasons"]))
+            for failure in ("priority floor", "min cap"):
+                self.assertTrue(any(reason.startswith(position + ":") and failure in reason
+                                    for reason in report["reasons"]), report["reasons"])
 
     def test_disjoint_rotating_labels_require_an_explicit_matching_schedule(self):
         self.rotation(("x", "y"))
@@ -192,6 +211,17 @@ class MinimumReferenceTest(MinimumCase):
         self.assertIn("a third of the corresponding ordinary week's planned dose", variant.help)
         self.assertNotIn("dose target", variant.help)
 
+    def test_optional_standby_sessions_add_no_planned_dose(self):
+        def optional(doc):
+            for session in doc["sessions"]:
+                if session["id"] == "min-b":
+                    session["tier"] = "optional"
+        self.edit_json("data/program.json", optional)
+        report = self.report()
+        self.assertEqual(report["positions"][0]["muscles"]["lats"], {
+            "ordinary": 6, "third": 2, "planned": 0, "met": False})
+        self.assertFalse(report["passed"])
+
     def test_v7_migration_preserves_minimum_and_does_not_invent_coach_work(self):
         doc = read_json(self.root / "data/program.json")
         doc["schema_version"] = 7
@@ -224,4 +254,4 @@ class MinimumReferenceTest(MinimumCase):
 
     def test_program_render_identifies_retained_coach_work(self):
         self.external(retained=True)
-        self.assertIn("Retained coach-led sessions: pt.", program.render_all(self.root)["routine/program.md"])
+        self.assertIn("Retained coach-led sessions: `pt`.", program.render_all(self.root)["routine/program.md"])

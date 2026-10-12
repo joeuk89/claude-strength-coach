@@ -946,15 +946,24 @@ def _ordinary_dose(inst, program_doc, planned, external):
     return dose
 
 
-def _minimum_reference(inst, program_doc, planned, external):
+def _minimum_reference(inst, program_doc, cycle, reference_position, external):
+    """The ordinary dose a minimum position is checked against, None when unmatched, and the fields naming its sources.
+
+    A fixed ordinary schedule's position is None, so only a null `reference_sessions` marks an unmatched position.
+    """
+    if reference_position not in cycle:
+        return None, {"reference_position": None, "reference_sessions": None, "reference_external": None}
+    planned = cycle[reference_position]
     rows = [{"date": day.isoformat(), "session_id": session_id} for day, session_id in planned
             if _is_core_lifting(inst.program_session(session_id, program_doc))]
-    return _ordinary_dose(inst, program_doc, planned, external), rows
+    return _ordinary_dose(inst, program_doc, planned, external), {
+        "reference_position": reference_position, "reference_sessions": rows, "reference_external": external}
 
 
-def _minimum_position(inst, program_doc, position, planned, external, *, ordinary, reference_position):
+def _minimum_position(inst, program_doc, position, planned, external, *, ordinary, reference):
     prefix = f"{position}: " if position else ""
-    dose_prefix = prefix or (f"against ordinary {reference_position}: " if reference_position else "")
+    named = reference["reference_position"]
+    dose_prefix = prefix or (f"against ordinary {named}: " if named else "")
     reasons = []
     if len(planned) > MINIMUM_MAX_SESSIONS:
         reasons.append(f"{prefix}the schedule plans {len(planned)} sessions in the week; a minimum week has at most "
@@ -969,7 +978,7 @@ def _minimum_position(inst, program_doc, position, planned, external, *, ordinar
                      "within_cap": within})
         if not within:
             reasons.append(f"{prefix}{session_id}: estimated {minutes} min, over its {cap} min cap")
-        if session["kind"] == "lifting":
+        if _is_core_lifting(session):
             _add(dose, session_dose(inst.library, session))
         for line in session["exercises"]:
             sets = _hard_sets(line)
@@ -999,8 +1008,8 @@ def _minimum_position(inst, program_doc, position, planned, external, *, ordinar
         if met is False:
             reasons.append(f"{dose_prefix}{muscle}: {_round(planned_sets)} fractional sets planned, below a third "
                            f"of its ordinary dose of {_round(ordinary[muscle])} ({_round(third)})")
-    return {"position": position, "reference_position": reference_position, "sessions": rows,
-            "external": external, "muscles": muscles, "priority": floors}, reasons
+    return {"position": position, **reference, "sessions": rows, "external": external, "muscles": muscles,
+            "priority": floors}, reasons
 
 
 def _minimum_balance(inst, program_doc, reference=None):
@@ -1022,14 +1031,10 @@ def _minimum_balance(inst, program_doc, reference=None):
     for position, planned in minimum_cycle.items():
         references = [ref for ref in ordinary_cycle if position is None or ref is None or position == ref]
         for reference_position in references or [None]:
-            ordinary, reference_sessions, paired_external = None, None, None
-            if reference_position in ordinary_cycle:
-                paired_external = reference_external
-                ordinary, reference_sessions = _minimum_reference(
-                    inst, program_doc, ordinary_cycle[reference_position], paired_external)
+            ordinary, fields = _minimum_reference(inst, program_doc, ordinary_cycle, reference_position,
+                                                  reference_external)
             row, found = _minimum_position(inst, program_doc, position, planned, external, ordinary=ordinary,
-                                           reference_position=reference_position)
-            row.update(reference_sessions=reference_sessions, reference_external=paired_external)
+                                           reference=fields)
             positions.append(row)
             reasons += [reason for reason in found if reason not in reasons]
     return {"variant": "minimum", "reference_week": reference.label(), "sessions": list(minimum["sessions"]),
