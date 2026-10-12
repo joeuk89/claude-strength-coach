@@ -10,6 +10,7 @@ until `coach.overlay.build` makes load objects through `coach.units`.
 
 import copy
 import json
+import math
 import re
 from dataclasses import replace
 from datetime import timedelta, timezone
@@ -613,36 +614,65 @@ def _ceiling_for(why, mode, evidence, source):
 
 
 def _under_ceiling(sets, ceiling, capped, mode, direction, unit):
-    """(sets, {index: load limit}, lowered indices, why the ceiling is unchecked or None) for a ceiling line.
+    """(sets, {index: load limit}, indices to report, words, why the ceiling is unchecked or None) for a ceiling line.
 
     With an e1RM the model accepts, each working set over the heaviest load its RPE allows for its fewest reps comes
-    down to it. Without one, a line under a recovery cap or the illness cap goes no further than the derived-from
-    load: the cap stays a limit the athlete applies, and the coach reviews the load.
+    down to it, and a set past the model's range that the model still shows too hard takes fewer reps (_fewer_reps).
+    Without one, a line under a recovery cap or the illness cap goes no further than the derived-from load: the cap
+    stays a limit the athlete applies, and the coach reviews the load.
     """
     limits, beyond = _ceiling_limits(sets, ceiling.estimate) if ceiling.estimate else ({}, {})
+    sets, fewer, words = _fewer_reps(sets, beyond, ceiling, mode, unit) if beyond else (sets, {}, [])
+    limits.update(fewer)
+    beyond = {i: v for i, v in beyond.items() if i not in fewer}
     lowered = {i for i, limit in limits.items() if _over_limit(sets[i].load, limit)}
     sets = tuple(replace(s, load=limits[i]) if i in lowered else s for i, s in enumerate(sets))
+    lowered |= set(fewer)
     if not capped:
-        return sets, limits, lowered, None
+        return sets, limits, lowered, words, None
     if ceiling.unchecked:
         why = ceiling.unchecked
     elif beyond:
         why = "; ".join(f"the e1RM model does not reach {reps} reps at RPE {units.json_number(rpe)}"
                         for reps, rpe in sorted(set(beyond.values())))
     else:
-        return sets, limits, lowered, None
+        return sets, limits, lowered, words, None
     lead = f"{ceiling.why} cannot be checked against an e1RM ({why})"
     if mode not in units.LOADED_MODES:
-        return sets, limits, lowered, f"{lead}; stop each set at the ceiling"
+        return sets, limits, lowered, words, f"{lead}; stop each set at the ceiling"
     if ceiling.hold is None:
-        return sets, limits, lowered, (f"{lead}, and no logged load to hold; stop each set at the ceiling and choose "
-                                       "the load with the athlete")
+        return sets, limits, lowered, words, (f"{lead}, and no logged load to hold; stop each set at the ceiling and "
+                                              "choose the load with the athlete")
     held, changed = _clip(sets, ceiling.hold, direction)
     changed = {i for i in changed if ceiling.unchecked or i in beyond}
     sets = tuple(held[i] if i in changed else s for i, s in enumerate(sets))
-    return sets, limits, lowered | changed, (
+    return sets, limits, lowered | changed, words, (
         f"{lead}, so the load goes no further than {_load_text(ceiling.hold, mode, unit)}, logged "
         f"{ceiling.hold_date}; stop each set at the ceiling and review the load with the athlete")
+
+
+def _fewer_reps(sets, beyond, ceiling, mode, unit):
+    """(sets, {index: load limit}, words) for the sets whose fewest reps at their RPE lie past the model's range.
+
+    The model cannot give such a set a load limit, but it can still show the set's load too hard for its ceiling, the
+    prescription check's verdict. Each such set drops to the most reps the model covers at its RPE, whose load limit
+    then applies; any other keeps its reps.
+    """
+    estimate, found, limits, words = ceiling.estimate, list(sets), {}, []
+    for index, (_, rpe) in sorted(beyond.items()):
+        s = found[index]
+        targets = validity.rep_targets(s.reps, s.rep_range)
+        verdict = validity.judge_set(estimate, s.load, targets, rpe, ceiling=True)
+        if not verdict.unearned and verdict.off != "hard":
+            continue
+        covered = math.floor(stats.MAX_REPS_TO_FAILURE - (10 - rpe))
+        found[index] = replace(s, reps=covered, rep_range=None)
+        limits[index] = stats.load_for(estimate["e1rm"], covered, rpe)
+        words.append(f"{validity.estimate_words(estimate)} puts {_load_text(s.load, mode, unit)} × "
+                     f"{validity.reps_words(verdict.reps, targets)} at {validity.implied_words(verdict.implied)}, over "
+                     f"the RPE {units.json_number(rpe)} ceiling, and the e1RM model reaches at most {covered} reps at "
+                     f"RPE {units.json_number(rpe)}, so {covered} reps")
+    return tuple(found), limits, list(dict.fromkeys(words))
 
 
 def _within_ceiling(sets, limits, lowered, ceiling, rounding, mode, unit):
@@ -821,9 +851,10 @@ def propose_line(run, session, day, exercise, ctx_extra):
                 words.append(f"{cap_source} caps the load at {units.json_number(cap)}{per_hand}")
         limits, lowered, unchecked = {}, set(), None
         if ceiling is not None:
-            sets, limits, lowered, unchecked = _under_ceiling(sets, ceiling, capped, mode, info.load_direction,
-                                                              run.unit)
+            sets, limits, lowered, ceiling_words, unchecked = _under_ceiling(sets, ceiling, capped, mode,
+                                                                             info.load_direction, run.unit)
             clipped.update(lowered)
+            words += ceiling_words
         sets, kit_changes, off_ladder = _rounded(sets, clipped, round_down, cut_from if load_cut else None, rounding)
         words += [f"no ladder rung fits within it, so the line leaves the ladder at "
                   f"{_load_text(v, mode, run.unit, run.show_hevy)}" for v in off_ladder]
@@ -833,7 +864,8 @@ def propose_line(run, session, day, exercise, ctx_extra):
             unchecked = over or unchecked
             final = {s.load for s in sets}
             for before, after in list(kit_changes.items()):
-                if after not in final or any(_same(before, limits[i]) for i in lowered & set(limits)):
+                if after not in final or any(_same(before, limits[i]) and _same(after, sets[i].load)
+                                             for i in lowered & set(limits)):
                     kit_changes.pop(before)
         return sets, words, kit_changes, unchecked
 

@@ -246,10 +246,11 @@ def _standing_from(row, day, constraints):
 def update(doc, niggle_id, on, status=None, note=None, mention=False, flare=None, **fields):
     """(doc, row) after a check-in report and any field changes.
 
-    A status, a note, a mention or flare limits add a history entry dated
-    `on`; a second report the same day replaces that day's entry, so
-    history holds one entry per check-in. A mention counts once per day.
-    `flare` (a list, [] to end them) sets the flare limits from `on`; a
+    A status, a note or a mention adds a history entry dated `on`; a
+    second report the same day replaces that day's entry, so history holds
+    one entry per check-in. A mention counts once per day. `flare` (a
+    list, [] to end them) sets the flare limits from `on` and goes with a
+    report, since escalation counts history entries as check-ins; a
     same-day entry keeps its flare limits only while its status holds.
     `constraints` sets the standing limits from `on`. `fields` replaces
     `area`, `notes`, `patterns`, `exercises`, `activity_kinds` or
@@ -270,7 +271,11 @@ def update(doc, niggle_id, on, status=None, note=None, mention=False, flare=None
         row["area"] = fields["area"].strip()
     if fields.get("notes") is not None:
         row["notes"] = _note(fields["notes"])
-    if status is not None or note is not None or mention or flare is not None:
+    reported = status is not None or note is not None or mention
+    if flare is not None and not reported:
+        raise ValidationError(f"Niggle {niggle_id}: a flare's limits go with a check-in report; give the status, a "
+                              "note or a mention with them")
+    if reported:
         if day < row["history"][-1]["date"]:
             raise ValidationError(f"Niggle {niggle_id} has a history entry after {day}")
         _check_flare(niggle_id, status or row["status"], flare)

@@ -183,9 +183,12 @@ class GeneratedLinesTest(GeneratedLinesCase):
             sets=[{"count": 3, "type": "normal", "reps": 10, "rpe": 8}]))
         self.log("session-a", "2026-10-12", "db_bench_press", "18x10@6,20x9@10*2")
         line, loads, _ = self.proposed("db_bench_press", "--kind", "deload")
-        self.assertEqual(loads, {20})
+        self.assertEqual(loads, {18})
         self.assertIn("the standard deload", line["rationale"])
         self.assertNotIn("model accepts", line["rationale"])
+        self.assertIn("the e1RM model reaches at most 8 reps at RPE 6, so 8 reps", line["rationale"])
+        self.assertNotIn("unearned_load", line["flags"])
+        self.assertNotIn("rpe_infeasible", line["flags"])
 
     def test_with_no_logged_load_the_model_accepts_the_scheme_load_stays_flagged(self):
         self.edit_slot("db_bench_press", lambda slot: slot.update(

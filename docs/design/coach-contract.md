@@ -2476,7 +2476,7 @@ Reserved codes:
 | `return_week` | info | R-23a | | Decay applied; names the band and days off. A lifting line's flag adds the load change (`loads × 0.9`, or `assistance held` on an `assisted` line), the set change and any RPE cap. |
 | `return_after_illness` | block | R-23a | | An `ill` miss or status day in the gap: the coach resolves it only once the athlete confirms `SYMPTOM_FREE_HOURS` (48) hours symptom-free, and ending the ill status day does not; first session capped at RPE `ILLNESS_RPE_CAP` (7). Overlays written before it blocked keep their `warn`. |
 | `ill_day_excluded` | info | R-23a | | An `ill` status day covers a session's date, so the proposal leaves the session out; the message names the session, date and row. |
-| `constraint_applied` | info | R-23a | | A cap, a slot constraint, a niggle constraint or an RPE ceiling the e1RM model turns into a load limit changed the proposal. |
+| `constraint_applied` | info | R-23a | | A cap, a slot constraint, a niggle constraint or an RPE ceiling the e1RM model turns into a load or rep limit changed the proposal. |
 | `override_standing` | info | R-23a | | A standing override was applied again instead of the scheme's proposal. |
 | `override_kept` | info | R-23a | | An override approved for this session in the overlay in force (a one-week override included) was kept instead of the scheme's proposal. |
 | `scheme_reset` | warn | R-23a | | A slot's scheme changed; its state restarted. |
@@ -3576,7 +3576,11 @@ niggle rows (C27):
   under it is never raised, and the ordinary line is untouched. This
   needs an estimate the model accepts: a `total`, `per_hand_x2` or
   `single_implement` line, an estimate that is not a lower bound, and
-  reps-to-failure within the model's 12. Otherwise, when an `rpe_cap` or
+  reps-to-failure within the model's 12. A set past those 12 reps that
+  `judge_set(..., ceiling=True)` still finds too hard or unearned (the
+  check's verdict) drops to the most reps the model covers at its RPE,
+  `floor(12 − (10 − RPE))`, whose load limit then applies; the words name
+  the implied RPE and the new reps. Otherwise, when an `rpe_cap` or
   the illness cap lowered the line's RPE, each load goes no further than
   the derived-from exposure's top load and `rpe_ceiling_unchecked`
   (warn) says why the ceiling cannot be checked and asks the coach to

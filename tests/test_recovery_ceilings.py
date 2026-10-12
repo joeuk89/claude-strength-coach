@@ -56,6 +56,9 @@ class CeilingCase(BlockCase):
     def propose(self, *extra):
         return self.data("propose", "week", "--week", WEEK, "--dry-run", *extra)["overlay"]
 
+    def propose_week(self, week):
+        return self.data("propose", "week", "--week", week, "--dry-run")["overlay"]
+
     def loads(self, doc, exercise_id):
         return {coaching(s["load"]) for s in working(find_line(doc, exercise_id))}
 
@@ -152,6 +155,57 @@ class ModelCeilingTest(CeilingCase):
         self.assertIn("override_standing", line_codes(doc, "bb_back_squat"))
         self.assertEqual((self.loads(doc, "bb_back_squat"), self.rpes(doc, "bb_back_squat")), ({92.5}, {6}))
         self.assertIn("allows at most 92.56", find_line(doc, "bb_back_squat")["provenance"]["rationale"])
+
+
+class OutOfRangeCeilingTest(CeilingCase):
+    """The row's 10 reps under a cap of 6 or 7 lie past the model's 12 reps to failure, but its e1RM of 42 (30 × 10
+    at RPE 8) still shows 30 × 10 too hard for the cap, so the proposal and the check agree on fewer reps."""
+
+    def assert_capped_row(self, cap, reps):
+        self.cap("db_single_arm_row", value=cap)
+        doc = self.propose()
+        row = working(find_line(doc, "db_single_arm_row"))
+        self.assertEqual({(s["reps"], s["rpe"], coaching(s["load"])) for s in row}, {(reps, cap, 30)})
+        self.assertLessEqual(30, stats.load_for(42, reps, cap) + 1e-9)
+        for code in MODEL_CODES + ("rpe_ceiling_unchecked",):
+            self.assertNotIn(code, line_codes(doc, "db_single_arm_row"))
+        message = line_flag(doc, "db_single_arm_row", "constraint_applied")["message"]
+        self.assertIn(f"the e1RM of 42 from 2026-10-08 puts 30 (Hevy: 30) × 10 at RPE 8, over the RPE {cap} ceiling, "
+                      f"and the e1RM model reaches at most {reps} reps at RPE {cap}, so {reps} reps", message)
+        self.assertIn(f"allows at most 30 (Hevy: 30) for {reps} reps, so 30 (Hevy: 30)", message)
+
+    def test_a_cap_of_6_cuts_the_row_to_8_reps(self):
+        self.assert_capped_row(6, 8)
+
+    def test_the_recovery_cap_of_7_cuts_the_row_to_9_reps(self):
+        self.assert_capped_row(7, 9)
+
+    def test_a_lighter_load_the_model_cannot_show_too_hard_keeps_its_reps_and_stays_unchecked(self):
+        self.cap("db_single_arm_row")
+        doc = self.propose("--kind", "deload")
+        row = working(find_line(doc, "db_single_arm_row"))
+        self.assertEqual({(s["reps"], s["rpe"], coaching(s["load"])) for s in row}, {(10, 6, 27.5)})
+        for code in MODEL_CODES:
+            self.assertNotIn(code, line_codes(doc, "db_single_arm_row"))
+        flag = line_flag(doc, "db_single_arm_row", "rpe_ceiling_unchecked")
+        self.assertIn("the e1RM model does not reach 10 reps at RPE 6", flag["message"])
+        self.assertNotIn("reaches at most", find_line(doc, "db_single_arm_row")["provenance"]["rationale"])
+
+
+class ReturnBandCeilingTest(CeilingCase):
+    def test_a_decayed_load_over_the_model_limit_comes_down_to_it(self):
+        self.edit_squat_sets(lambda logged: logged.update(rpe=9.5))
+        self.use_plugin("bb_back_squat")
+        doc = self.propose_week("2026-W43")
+        line = find_line(doc, "bb_back_squat")
+        self.assertEqual(line["provenance"]["decay"]["band"], "11-21")
+        self.assertEqual(self.rpes(doc, "bb_back_squat"), {7})
+        self.assertLessEqual(87.5, stats.load_for(112.42, 5, 7))
+        self.assertEqual(self.loads(doc, "bb_back_squat"), {87.5})
+        for code in MODEL_CODES + ("rpe_ceiling_unchecked",):
+            self.assertNotIn(code, line_codes(doc, "bb_back_squat"))
+        self.assertIn("at RPE 7 the e1RM of 112.42 from 2026-10-05 allows at most 88.75 for 5 reps, so 87.5",
+                      line["provenance"]["rationale"])
 
 
 class KitCeilingTest(CeilingCase):

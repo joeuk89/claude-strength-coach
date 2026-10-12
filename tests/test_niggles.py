@@ -243,8 +243,16 @@ class DatedLimitsTest(NiggleCase):
     def test_a_later_report_in_the_same_flare_keeps_its_limit(self):
         self.coach("niggles", "update", "n-0001", "--mention", "--note", "still sore", env=on("2026-10-08"))
         self.assertIn(("rpe_cap", 7, "flare", "2026-10-06", "n-0001"), self.squat_limits(day="2026-10-08"))
-        self.coach("niggles", "update", "n-0001", "--clear-flare-constraints", env=on("2026-10-10"))
+        self.coach("niggles", "update", "n-0001", "--clear-flare-constraints", "--note", "easing",
+                   env=on("2026-10-10"))
         self.assertEqual(self.squat_limits(), [("rpe_cap", 8, "standing", "2026-10-01", "n-0001")])
+
+    def test_a_flare_limit_without_a_report_is_refused_so_it_never_counts_as_a_check_in(self):
+        for change in (("--flare-constraint", "rpe_cap=6"), ("--clear-flare-constraints",)):
+            with self.subTest(change=change):
+                self.coach("niggles", "update", "n-0001", *change, env=on("2026-10-08"), expect=1)
+        row = self.coach("niggles", "list", env=on("2026-10-08"))["data"]["niggles"][0]
+        self.assertEqual([entry["date"] for entry in row["history"]], ["2026-10-01", "2026-10-06"])
 
     def test_an_explicit_standing_edit_persists_past_later_flares(self):
         self.settle()

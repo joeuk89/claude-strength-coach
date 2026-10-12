@@ -311,9 +311,10 @@ A recovery line's RPE read as a limit, not a target to reach: on a light
 or return week, a line decayed to a return band, the first session after
 illness, or a line under a recovery cap. The e1RM model check never calls
 work under it too easy; it flags only a load too hard for it. The
-proposal lowers a load the e1RM puts over the ceiling; with no e1RM the
-model accepts, a capped load goes no further than the last one logged
-and the coach reviews it.
+proposal lowers a load the e1RM puts over the ceiling, or cuts the reps
+when they lie past the model's range and the load is still too hard;
+with no e1RM the model accepts, a capped load goes no further than the
+last one logged and the coach reviews it.
 _Avoid_: recovery cap (one source of it), target RPE
 
 **Niggle**:
