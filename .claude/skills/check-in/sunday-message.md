@@ -131,10 +131,10 @@ status days: `python3 -m coach status-days add --kind ill|injured|travel
 out `--to` while it is still going on; `status-days end <id> --date D`
 closes it later, `status-days withdraw <id> --reason <text>` takes back
 a wrong one). An ill status day in the gap brings in the illness return
-rule, exactly as an `ill` miss tag does. Add `--no-training` when the
-athlete agrees not to train on those days: a planned break, whose
-sessions need no tag and whose weeks neither count nor reset. Leave it
-off when they will train while away. Add a goal event the reply names
+rule, exactly as an `ill` miss tag does, and no session is planned on its
+days. Add `--no-training` when the athlete agrees not to train on those
+days: a planned break, whose sessions need no tag and whose weeks neither
+count nor reset. Leave it off when they will train while away. Add a goal event the reply names
 with `python3 -m coach events add --id <slug> --title <name> --date D
 --priority A|B|C` (plus `--activity`, `--distance-km`, `--planned-id`
 for a planned activity). For each pending decision the Events field

@@ -689,13 +689,29 @@ def _is_lifting(exercise, library):
     return entry is not None and entry["pattern"] != "conditioning"
 
 
+def coach_led_lifting(root):
+    """Ids of the program's coach-led sessions that train any muscle besides cardio: lifting, not a cardio class."""
+    doc = load_optional(program, root)
+    if doc is None:
+        return set()
+    return {e["id"] for e in doc["external_sessions"]
+            if any(sets > 0 for muscle, sets in e["estimated_sets"].items() if muscle != "cardio")}
+
+
 def last_lifting_date(root, before, include_unsynced=False, now=None):
-    """The newest workout date before `before` with a lifting exercise, or None."""
+    """The newest date before `before` with a lifting workout or a coach-led lifting session marked done, or None.
+
+    The newest `external` annotation for a date and session decides whether it was done.
+    """
     library = Library.load(root)
     before = str(before)
     dated = [w["date"] for w in workouts(root, include_unsynced=include_unsynced, now=now)
              if w["date"] < before and not w["conditioning"]
              and any(_is_lifting(e, library) for e in w["exercises"])]
+    lifting = coach_led_lifting(root)
+    newest = {(a["date"], a["external_id"]): a["done"] for a in annotations(root, "external")
+              if a["external_id"] in lifting}
+    dated += [day for (day, _), done in newest.items() if done and day < before]
     return dates.parse_date(max(dated)) if dated else None
 
 

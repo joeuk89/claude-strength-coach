@@ -18,7 +18,7 @@ from typing import NamedTuple
 
 from coach import constraints as constraints_module
 from coach import dates, decisions, flags, followups, history, jsonio, niggles, overlay, paths, patterns, plugins
-from coach import cardio, conditioning, external, program, research, weekflags
+from coach import capacity, cardio, conditioning, external, program, research, statusdays, weekflags
 from coach import state as state_module
 from coach import stats, units, validity
 from coach.checks.instance import cap_for
@@ -173,6 +173,13 @@ class Run:
         self._exposures = None
         self._series = None
         self._research = None
+        self._recovery = None
+
+    def recovery(self):
+        """What each approved overlay line and logged exposure was for (`coach.capacity`)."""
+        if self._recovery is None:
+            self._recovery = capacity.Context(self.root)
+        return self._recovery
 
     def exposures(self):
         """Every exposure as a plugin sees it, newest first."""
@@ -190,10 +197,13 @@ class Run:
                                     duration_seconds=s.get("duration_seconds"),
                                     distance_meters=s.get("distance_meters"))
                      for s in raw["sets"] if not s.get("discounted"))
+        week_kind = doc["kind"] if doc else None
+        if self.recovery().for_exposure(dict(raw, overlay_id=overlay_id))["kind"] == "return":
+            week_kind = "return"
         return base.Exposure(
             date=dates.parse_date(raw["date"]), workout_id=raw["workout_id"], session_id=raw["session_id"],
             exercise_id=raw["exercise_id"], load_mode=raw["load_mode"], sets=sets, suspect=raw["suspect"],
-            excluded=raw["excluded"], prescribed=prescribed, week_kind=doc["kind"] if doc else None,
+            excluded=raw["excluded"], prescribed=prescribed, week_kind=week_kind,
         )
 
     def _prescribed(self, doc, session_id, exercise_id, day):
@@ -228,10 +238,11 @@ class Run:
         evidence = self.model_evidence(exercise_id, day)
         return evidence["estimate"]["e1rm"] if evidence["estimate"] else None
 
-    def last_prescription(self, session_id, exercise_id):
+    def last_prescription(self, session_id, exercise_id, ordinary=False):
         """This slot's line in the newest approved overlay that has it, loads as coaching numbers.
 
         Lines a missed-day rule folded in (`fold`, C37) last one week, so they never stand for the slot.
+        `recovery` names deload, light or return work, else None; `ordinary` skips such lines.
         """
         approved = sorted((doc for doc in self.overlays if overlay.is_approved(doc)),
                           key=lambda d: (d["created_at"], d["id"]), reverse=True)
@@ -241,12 +252,16 @@ class Run:
             for session in sessions:
                 line = next((e for e in session["exercises"]
                              if e["exercise_id"] == exercise_id and not e.get("fold")), None)
-                if line is not None:
-                    return {"overlay_id": doc["id"], "session_id": session_id, "date": session["date"],
-                            "exercise_id": exercise_id, "load_mode": line["load_mode"],
-                            "sets": tuple(base.SetSpec.from_dict(s, load=history.coaching_number(s.get("load")))
-                                          for s in line["sets"]),
-                            "override": line["override"]}
+                if line is None:
+                    continue
+                kind = self.recovery().line_kind(doc, session, line)
+                if ordinary and kind != "normal":
+                    continue
+                return {"overlay_id": doc["id"], "session_id": session_id, "date": session["date"],
+                        "exercise_id": exercise_id, "load_mode": line["load_mode"],
+                        "sets": tuple(base.SetSpec.from_dict(s, load=history.coaching_number(s.get("load")))
+                                      for s in line["sets"]),
+                        "override": line["override"], "recovery": None if kind == "normal" else kind}
         return None
 
     def increment(self, exercise_id, location):
@@ -363,11 +378,27 @@ def _illness(run, first):
     for annotation in history.annotations(run.root, "miss"):
         if annotation.get("tag") == "ill" and gap_start.isoformat() <= annotation["date"] <= gap_end.isoformat():
             return f"an ill miss on {annotation['date']}"
-    try:
-        from coach import statusdays
-    except ImportError:
-        return None
     return "an ill status day" if statusdays.ill_in(run.root, dates.Span(gap_start, gap_end)) else None
+
+
+def _without_ill_days(run, span, found):
+    """(plan without the sessions an ill status day covers, a flag per session left out) (C22 illness rule).
+
+    Raises RefusedError when illness covers every session: nothing is trainable until the athlete is better.
+    """
+    ill = statusdays.ill_days(run.root, span)
+    kept = tuple((day, sid) for day, sid in found.sessions if day not in ill)
+    if not kept:
+        rows = ", ".join(dict.fromkeys(ill[day] for day, _ in found.sessions))
+        raise RefusedError(
+            f"An ill status day ({rows}) covers every session in {span.start}..{span.end}, so none is planned: "
+            f"training waits until the athlete has been {validity.SYMPTOM_FREE_HOURS} hours symptom-free. End the "
+            "row with python3 -m coach status-days end <id> --date <last ill day>, then propose again; the first "
+            f"session back asks for that confirmation and caps every set at RPE {validity.ILLNESS_RPE_CAP}.")
+    left_out = [flags.make("ill_day_excluded", message=(
+        f"{run.sessions[sid]['title']} ({sid}) on {day} is left out: ill status day {ill[day]} covers it"))
+        for day, sid in found.sessions if day in ill]
+    return replace(found, sessions=kept), left_out
 
 
 def _scheme_state(plugin, stored, slot_key, scheme_name, line_flag):
@@ -424,7 +455,7 @@ def _gain(older, newer, direction=None):
 
 
 def _stalled(exposures, direction=None):
-    usable = [e for e in exposures if e.usable and e.week_kind != "deload"][:STALL_EXPOSURES]
+    usable = [e for e in exposures if e.usable and e.week_kind not in ("deload", "return")][:STALL_EXPOSURES]
     if len(usable) < STALL_EXPOSURES:
         return None
     newest, middle, oldest = usable
@@ -493,7 +524,7 @@ def propose_line(run, session, day, exercise, ctx_extra):
     state, line_flags = _scheme_state(plugin, ctx_extra["states"].get(slot_key), slot_key, scheme_name, line_flag)
     exposures = run.exposures_of(exercise_id, day, session_id=session_id, load_mode=mode)
     active = constraints_module.active(run.root, session_id, exercise_id, day)
-    days_off = validity.days_off(run.root, exercise_id, day) or 0
+    days_off = validity.days_off(run.root, exercise_id, day, ctx_extra["first_day"]) or 0
     info = _exercise_info(run, session, exercise)
     ctx = base.SchemeContext(
         today=run.today, session_date=day, unit=run.unit, week_kind=ctx_extra["kind"], exercise=info,
@@ -505,6 +536,7 @@ def propose_line(run, session, day, exercise, ctx_extra):
         last_override=decisions.last_override(run.decisions, session_id, exercise_id, day),
         days_off=days_off, constraints=tuple(active), scheme=scheme_name,
         scheme_deload=getattr(plugin.module, "deload", None),
+        last_ordinary_prescription=run.last_prescription(session_id, exercise_id, ordinary=True),
     )
     proposal = plugin.module.propose(ctx)
     _check_proposal(plugin, proposal)
@@ -1056,9 +1088,18 @@ def _transform(run, kind, name):
     return plugin, params
 
 
+def _week_label(kind, transform):
+    """What a deload-kind week is for: "Return" for the return transform, which the next week progresses from,
+    else "Deload"; None for other kinds."""
+    if kind != "deload":
+        return None
+    return "Return" if transform is not None and transform[0].name == "return" else "Deload"
+
+
 def _focus(kind, span, transform):
     if kind == "deload":
-        return f"Deload week of {span.start.isoformat()}: {transform[0].module.SUMMARY.rstrip('.')}."
+        return (f"{_week_label(kind, transform)} week of {span.start.isoformat()}: "
+                f"{transform[0].module.SUMMARY.rstrip('.')}.")
     if kind == "midweek":
         return f"Rest of the week from {span.start.isoformat()}, re-proposed."
     return f"Week of {span.start.isoformat()}: each lift as its progression scheme proposes."
@@ -1096,19 +1137,21 @@ def propose_week(root, config, today, now, span, kind="weekly", transform_name=N
     found = read_plan(run, plan_file, span) if plan_file else plan_schedule(run, span)
     if not found.sessions:
         raise ValidationError(f"The schedule plans no active session in {span.start}..{span.end}")
+    found, ill_flags = _without_ill_days(run, span, found)
     transform = _transform(run, kind, transform_name)
     first_day = found.sessions[0][0]
     ctx_extra = {"kind": kind, "transform": transform, "first_day": first_day, "illness": _illness(run, first_day),
                  "states": dict(settled_state["scheme_state"])}
 
-    draft_sessions, all_flags, scheme_state, session_keys = [], list(found.flags), {}, []
+    draft_sessions, all_flags, scheme_state, session_keys = [], list(found.flags) + ill_flags, {}, []
+    label = _week_label(kind, transform)
     for day, session_id in found.sessions:
         session = run.sessions[session_id]
         if ctx_extra["illness"] and day == first_day:
             all_flags.append(flags.make("return_after_illness", session_id=session_id, message=(
-                f"{ctx_extra['illness']} falls in the gap before this first session back: confirm "
-                f"{validity.SYMPTOM_FREE_HOURS} hours symptom-free; every set is capped at RPE "
-                f"{validity.ILLNESS_RPE_CAP}")))
+                f"{ctx_extra['illness']} falls in the gap before this first session back: resolve this only once "
+                f"the athlete confirms {validity.SYMPTOM_FREE_HOURS} hours symptom-free (ending the ill status day "
+                f"does not confirm it); every set is capped at RPE {validity.ILLNESS_RPE_CAP}")))
         if conditioning.has_scheme(session):
             repeat = session_id in {sid for _, sid in session_keys}
             results = [(conditioning.state_key(session_id),
@@ -1127,7 +1170,7 @@ def propose_week(root, config, today, now, span, kind="weekly", transform_name=N
         session_keys.append(([key for key, _ in results], session_id))
         draft_sessions.append({
             "session_id": session_id, "date": day.isoformat(),
-            "title": f"Deload — {session['title']}" if kind == "deload" else session["title"],
+            "title": f"{label} — {session['title']}" if label else session["title"],
             "temporary": kind == "deload", "location": session["location"], "focus": session["focus"],
             "exercises": lines,
         })

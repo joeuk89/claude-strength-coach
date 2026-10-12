@@ -18,10 +18,10 @@ from coach import cardio
 from coach import config as config_module
 from coach import constraints, dates, decisions, flags, history, jsonio, niggles, overlay, paths, patterns
 from coach import program as program_module
-from coach import render, stats, structure, validity
+from coach import render, stats, statusdays, structure, validity
 from coach import state as state_module
 from coach.config_tables import coaching
-from coach.errors import ValidationError
+from coach.errors import CoachError, ValidationError
 from coach.library import Library
 from coach.plugins import PluginError
 from coach.validate import Error
@@ -290,6 +290,31 @@ def _is_return(inst, span):
     return last is None or (first - last).days > LAYOFF_DAYS
 
 
+def _days_off_after(inst, span):
+    """Days from the last lifting to the first session back in the week after `span`; None when unknown.
+
+    The first session back is the first one the schedule plans that week from today on and no ill status day
+    covers; with none planned, or a program that cannot be planned, the later of that week's first day and today.
+    Unknown: no lifting on record, or illness covers every session left that week.
+    """
+    week = inst.week(span.end + timedelta(days=1))
+    earliest = max(week.start, inst.today)
+    first = earliest
+    if earliest <= week.end:
+        from coach import propose
+        try:
+            planned = [day for day, _ in propose.plan_schedule(inst.run(), week).sessions if day >= earliest]
+        except (CoachError, PluginError):
+            planned = []
+        ill = statusdays.ill_days(inst.root, week)
+        eligible = [day for day in planned if day not in ill]
+        if planned and not eligible:
+            return None
+        first = eligible[0] if eligible else earliest
+    last = history.last_lifting_date(inst.root, first, now=inst.now)
+    return (first - last).days if last is not None else None
+
+
 def _facts(inst, span):
     report = structure.week(inst.root, span, today=inst.today, now=inst.now)
     planned, trained = report["planned"], report["trained"]
@@ -383,9 +408,13 @@ def _signals(inst, span, readiness, sleep, target):
     return signals, fired, words
 
 
-def outcome_for(week_class, count, fired, ceiling, ill=False):
-    """(outcome, light-week type, reason) by R-02's rules for a closed week."""
-    if week_class == "low" and ill:
+def outcome_for(week_class, count, fired, ceiling, ill=False, days_off=None):
+    """(outcome, light-week type, reason) by R-02's rules for a closed week.
+
+    An illness week proposes a return week only when the days off to the first session back pass the first
+    return band: a short illness is covered by the first session's illness cap alone.
+    """
+    if week_class == "low" and ill and (days_off is None or days_off > LAYOFF_DAYS):
         return "due", "return", "illness"
     if count >= ceiling:
         return "due", "deload", "ceiling"
@@ -748,7 +777,8 @@ def close(root, week_start, readiness=None, sleep=None, deep=False, dry_run=Fals
         block = ledger["blocks"][-1]
         count = 0 if facts["class"] in ENDS_BLOCK else count_of(block) + (facts["class"] == "hard")
         signals, fired, words = _signals(inst, span, readiness, sleep, is_target)
-        outcome, week_type, reason = outcome_for(facts["class"], count, fired, ceiling, facts["ill"])
+        days_off = _days_off_after(inst, span) if facts["class"] == "low" and facts["ill"] else None
+        outcome, week_type, reason = outcome_for(facts["class"], count, fired, ceiling, facts["ill"], days_off)
         entry = {"week": span.start.isoformat(), "class": facts["class"], "planned": facts["planned"],
                  "trained": facts["trained"], "as_prescribed": facts["as_prescribed"],
                  "on_break": facts["on_break"], "signals": signals,

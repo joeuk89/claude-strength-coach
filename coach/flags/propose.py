@@ -28,9 +28,12 @@ register("range_effort_mismatch", owner=OWNER, severities=("warn",),
                  "or 2 or more RPE over its target; review the load or the range with the athlete.")
 register("return_week", owner=OWNER, severities=("info",),
          summary="Decay applied; names the band and days off.")
-register("return_after_illness", owner=OWNER, severities=("warn",),
-         summary=f"An ill miss or status day in the gap: confirm {validity.SYMPTOM_FREE_HOURS} hours symptom-free; "
-                 f"first session capped at RPE {validity.ILLNESS_RPE_CAP}.")
+register("return_after_illness", owner=OWNER, severities=("block",),
+         summary=f"An ill miss or status day in the gap: resolve it only once the athlete confirms "
+                 f"{validity.SYMPTOM_FREE_HOURS} hours symptom-free; first session capped at RPE "
+                 f"{validity.ILLNESS_RPE_CAP}.")
+register("ill_day_excluded", owner=OWNER, severities=("info",),
+         summary="An ill status day covers the session's date, so the proposal leaves the session out.")
 register("constraint_applied", owner=OWNER, severities=("info",),
          summary="A cap, a slot constraint or a niggle constraint changed the proposal.")
 register("override_standing", owner=OWNER, severities=("info",),

@@ -435,7 +435,7 @@ class AssistedReturnTest(AssistedLayoffCase):
         self.set_scheme("session-b", "pull_up", "double_progression")
         doc = self.propose("--dry-run")["overlay"]
         [message] = [f["message"] for f in doc["flags"] if f["code"] == "return_week" and f["exercise_id"] == "pull_up"]
-        self.assertEqual(message, "31 days off: return band 22-42 (assistance held, set change -1)")
+        self.assertEqual(message, "28 days off: return band 22-42 (assistance held, set change -1)")
 
     def test_a_double_progression_line_in_the_22_42_band_keeps_its_assistance(self):
         self.set_scheme("session-b", "pull_up", "double_progression")

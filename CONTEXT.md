@@ -177,7 +177,9 @@ A week of reduced training that ends a block: a **deload** (the
 program's deload rule), a **light** week (fewer sets at held loads) or a
 **return** week (one set fewer after a layoff or illness). It is proposed
 at the block's ceiling or on two fatigue triggers, and agreed or declined
-by the athlete.
+by the athlete. The next week progresses from a return week's logged
+loads with the program's sets back; a deload's or light week's loads are
+never its baseline.
 _Avoid_: rest week, recovery week, deload (one kind of light week)
 
 **Fatigue trigger**:
@@ -532,7 +534,8 @@ _Avoid_: hard run, hard session, workout (reserved for logged lifting)
 A day the athlete was ill, injured or travelling, recorded as a dated
 row that is withdrawn, never deleted, when wrong. An ill status day in
 the gap before a session brings in the illness return rule, exactly as
-an `ill` miss tag does; travel only explains the gap.
+an `ill` miss tag does, and no session is planned on its days; travel
+only explains the gap.
 _Avoid_: sick day, day off (a rest day is not a status day), miss tag
 
 **Goal event**:

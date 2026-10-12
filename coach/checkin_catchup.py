@@ -221,9 +221,20 @@ def _sessions(library, doc, lines, band, illness):
     return found
 
 
+def return_span(inst, today):
+    """The span the return week covers: the week holding tomorrow, from tomorrow on, or the week after when that
+    plans no session from tomorrow; nothing in it is in the past (C36)."""
+    week = propose.resolve_span(inst.config, today)
+    rest = dates.Span(max(week.start, today + timedelta(days=1)), week.end)
+    plan = schedule_plan(inst, rest, today)
+    if plan is None or plan.sessions:
+        return rest
+    return dates.week_span(week.end + timedelta(days=1), inst.config.athlete.week_starts)
+
+
 def return_week(inst, today, now):
-    """(return week, problem): `propose week --dry-run` for the week holding tomorrow, summarised (C36)."""
-    span = propose.resolve_span(inst.config, today)
+    """(return week, problem): `propose week --dry-run` for the return span, summarised (C36)."""
+    span = return_span(inst, today)
     try:
         data = propose.propose_week(inst.root, inst.config, today, now, span, dry_run=True)
     except CoachError as exc:
@@ -233,7 +244,8 @@ def return_week(inst, today, now):
     band = validity.band_for(days_off) if days_off is not None else None
     illness = any(f["code"] == "return_after_illness" for f in doc["flags"])
     return {
-        "proposal_id": data["id"], "overlay_id": doc["id"], "week": span.label(), "span": span.to_json(),
+        "proposal_id": data["id"], "overlay_id": doc["id"],
+        "week": dates.week_span(span.start, inst.config.athlete.week_starts).label(), "span": span.to_json(),
         "band": band.id if band else None, "days_off": days_off,
         "load_factor": band.load_factor if band else None, "set_delta": band.set_delta if band else None,
         "rpe_cap": band.rpe_cap if band else None,
@@ -388,7 +400,9 @@ def text_lines(card, first_line):
     lines.append("")
     if catch_up["write_line"]:
         lines.append(catch_up["write_line"])
-    lines.append(reply_line(len(catch_up["questions"]), bool(catch_up["write_line"])))
+    unconfirmed = week is not None and any(f["code"] == "return_after_illness" and not f["resolved"]
+                                           for f in week["flags"])
+    lines.append(reply_line(len(catch_up["questions"]), bool(catch_up["write_line"]) and not unconfirmed))
     return lines
 
 

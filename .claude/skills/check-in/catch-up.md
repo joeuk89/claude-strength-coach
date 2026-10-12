@@ -28,13 +28,17 @@ skeleton` as record.md says; its title says `(catch-up)`.
 - **"ok" alone** is a complete check-in: misses stay untagged, nothing
   new to report, the Food readings not supplied, and the return week as
   shown, written to Hevy (no Hevy: approved only). Run `python3 -m
-  coach propose week --week <return_week.week>` and compare its
+  coach propose week --span <return_week.span.start>..<return_week.span.end>`
+  (the return week starts tomorrow at the earliest) and compare its
   `data.lines_digest` with the card's `return_week.lines_digest`.
   Equal: run `python3 -m coach propose finalize --proposal <id>`, then
   `python3 -m coach overlay approve <id>` and `python3 -m coach routines
   push --overlay <id>` as program-week's write step describes, without
   asking again. Different: something changed since the card, so present
-  the new return week and wait for the reply.
+  the new return week and wait for the reply. A return week carrying
+  `return_after_illness` ends "Answer any of 1–4." instead: resolve
+  that flag only on the athlete's answer that they have been 48 hours
+  symptom-free.
 - **A reply that mentions illness, travel or no kit:** present `python3
   -m coach checkin return-brief` output as the coach's brief. Use
   `--proposal <id> --reason ill` (or `layoff`) for a proposed return
