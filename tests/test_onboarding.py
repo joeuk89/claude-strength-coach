@@ -171,8 +171,10 @@ class WorkedExampleTest(unittest.TestCase):
 
     def confirm_load_modes(self, root, env, adopted):
         self.assertTrue(adopted["unconfirmed"])
-        program = json.loads((root / "data" / "program.json").read_text(encoding="utf-8"))
-        modes = {line["exercise_id"]: line["load_mode"] for s in program["sessions"] for line in s["exercises"]}
+        self.assertFalse((root / "data" / "program.json").exists())
+        draft = json.loads((root / ".coach" / "drafts" / "program.json").read_text(encoding="utf-8"))
+        modes = {line["exercise_id"]: line["load_mode"]
+                 for session in draft["program"]["sessions"] for line in session["exercises"]}
         for row in adopted["unconfirmed"]:
             exercise_id = row["exercise_id"]
             code, envelope, stderr = run_cli(

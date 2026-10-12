@@ -20,8 +20,11 @@ from coach.validate import validate as validate_schema
 SCHEMA = "program"
 SCHEMA_PROBLEM = "schema"
 EXERCISE_PROBLEM = "exercise_ids"
+LOAD_MODE_PROBLEM = "load_mode"
 NO_E1RM_WARNING = "fixed_reps_no_e1rm"
 RENDER_COMMAND = "program render"
+RECONCILE_COMMAND = "program reconcile-mode"
+BASES = ("old", "confirmed")
 PROGRAM_PAGE = paths.ROUTINE_PROGRAM_PAGE.as_posix()
 
 _SESSION_DEFAULTS = {"location": None, "scheme": None}
@@ -85,10 +88,10 @@ def load(root):
 
 
 def problems(doc, config=None, library=None, root=None):
-    """Every problem with a program, as (kind, Error) pairs: SCHEMA_PROBLEM or EXERCISE_PROBLEM.
+    """Every problem with a program, as (kind, Error) pairs: SCHEMA_PROBLEM, EXERCISE_PROBLEM or LOAD_MODE_PROBLEM.
 
-    `config` resolves session locations and `library` checks exercise ids;
-    either may be None to skip that part. Schemes, schedule and deload
+    `config` resolves session locations and `library` checks exercise ids and
+    confirmed load modes; either may be None to skip that part. Schemes, schedule and deload
     rules are checked against the plugins of `root` (else the config's
     instance; with neither, the framework's plugins only).
     """
@@ -98,6 +101,8 @@ def problems(doc, config=None, library=None, root=None):
     schema_errors = validate_schema(doc, jsonio.load_schema(SCHEMA))
     found = [(SCHEMA_PROBLEM, error) for error in schema_errors]
     found += [(EXERCISE_PROBLEM, error) for error in exercise_id_errors(doc, library, load_modes=False)]
+    if library is not None:
+        found += [(LOAD_MODE_PROBLEM, error) for error in load_mode_errors(doc, library)]
     if schema_errors:
         return found
     doc = normalised(doc)
@@ -176,6 +181,110 @@ def exercise_id_errors(doc, library, load_modes=True):
         if load_modes and exercise.get("load_mode") is None:
             errors.append(Error(f"{path}.load_mode", f"{exercise_id or 'this exercise'} has no load_mode"))
     return errors
+
+
+def load_mode_mismatches(doc, library, exercise_id=None):
+    """Lines whose load_mode differs from the library's confirmed one, as dicts naming the slot.
+
+    An unconfirmed exercise is no mismatch. Works on a malformed program too.
+    """
+    found = []
+    for s_index, e_index, session, line in slots(doc):
+        line_id = line.get("exercise_id")
+        if not isinstance(line_id, str) or (exercise_id is not None and line_id != exercise_id):
+            continue
+        confirmed = library.effective_load_mode(line_id)
+        if confirmed is None or confirmed == line.get("load_mode"):
+            continue
+        found.append({"path": f"$.sessions[{s_index}].exercises[{e_index}].load_mode",
+                      "session_id": session.get("id"), "exercise_id": line_id, "load_mode": line.get("load_mode"),
+                      "confirmed": confirmed, "start_load": line.get("start_load")})
+    return found
+
+
+def mismatch_message(row):
+    command = f"python3 -m coach {RECONCILE_COMMAND} {row['exercise_id']}"
+    start = row["start_load"]
+    where = f"{row['exercise_id']} in session {row['session_id']} is {row['load_mode']}"
+    if _is_number(start) and row["confirmed"] in units.LOADED_MODES:
+        number = units.format_number(start)
+        return (f"{where} with start_load {number}, but the library's confirmed load mode is {row['confirmed']}. "
+                f"Ask whether {number} was meant as {row['load_mode']} or {row['confirmed']}, then run {command} "
+                f"--basis old (it was {row['load_mode']}) or --basis confirmed (it was {row['confirmed']}); "
+                "add --input FILE for a draft")
+    return (f"{where}, but the library's confirmed load mode is {row['confirmed']}; run {command} --basis confirmed "
+            "(add --input FILE for a draft)")
+
+
+def load_mode_errors(doc, library):
+    """An Error at each line whose load_mode differs from the library's confirmed one."""
+    return [Error(row["path"], mismatch_message(row)) for row in load_mode_mismatches(doc, library)]
+
+
+def reconciled(doc, exercise_id, confirmed, basis, unit):
+    """(a copy of `doc` with every `exercise_id` line in `confirmed` mode, the changes made, warnings).
+
+    With basis "old" a start load is converted from the line's mode by
+    `units.convert_mode`; with "confirmed" its number already meant the
+    confirmed mode and stays. A mode that carries no load takes no start load.
+    Scheme params keep their numbers; under basis "old" each load among them
+    that would convert to another number gets a warning.
+    """
+    if basis not in BASES:
+        raise ValueError(f"basis must be one of {', '.join(BASES)}, found {basis!r}")
+    doc = copy.deepcopy(doc)
+    changes, warnings = [], []
+    for s_index, e_index, session, line in slots(doc):
+        if line.get("exercise_id") != exercise_id or line.get("load_mode") == confirmed:
+            continue
+        before = {"load_mode": line.get("load_mode"), "start_load": line.get("start_load")}
+        start = before["start_load"]
+        if confirmed not in units.LOADED_MODES or start is None:
+            start = None
+        elif basis == "old" and before["load_mode"] in units.LOADED_MODES:
+            start = units.convert_mode(start, before["load_mode"], confirmed, unit)
+        line["load_mode"], line["start_load"] = confirmed, start
+        path = f"$.sessions[{s_index}].exercises[{e_index}]"
+        changes.append({"path": path, "session_id": session.get("id"),
+                        "from": before, "to": {"load_mode": confirmed, "start_load": start}})
+        if basis == "old":
+            warnings += _kept_scheme_loads(path, line, before["load_mode"], confirmed, unit)
+    return doc, changes, warnings
+
+
+_SCHEME_LOAD_PARAMS = ("increment", "training_max", "increment_upper", "increment_lower")
+
+
+def _scheme_loads(line):
+    """(JSONPath suffix, number) for each load among the line's scheme params."""
+    scheme = line.get("scheme")
+    params = scheme.get("params") if isinstance(scheme, dict) else None
+    if not isinstance(params, dict):
+        return []
+    found = [(f".scheme.params.{key}", params[key]) for key in _SCHEME_LOAD_PARAMS if _is_number(params.get(key))]
+    rungs = params.get("rungs")
+    for index, rung in enumerate(rungs if isinstance(rungs, list) else []):
+        if isinstance(rung, dict) and _is_number(rung.get("load")):
+            found.append((f".scheme.params.rungs[{index}].load", rung["load"]))
+    return found
+
+
+def _kept_scheme_loads(path, line, from_mode, to_mode, unit):
+    if from_mode not in units.LOADED_MODES or to_mode not in units.LOADED_MODES:
+        return []
+    warnings = []
+    for suffix, value in _scheme_loads(line):
+        converted = units.convert_mode(value, from_mode, to_mode, unit)
+        if converted != value:
+            warnings.append(f"{path}{suffix} keeps the number {units.format_number(value)}, which now reads as "
+                            f"{to_mode}; the same load in its old mode, {from_mode}, is "
+                            f"{units.format_number(converted)} {to_mode}. Ask the athlete which they meant and edit "
+                            "the param to match")
+    return warnings
+
+
+def _is_number(value):
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
 def _structure(doc):

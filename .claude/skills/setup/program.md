@@ -44,14 +44,31 @@ draft's `program.external_sessions` (the shape is in
 `coach/schemas/program.schema.json`). Then run `python3 -m coach program
 adopt --input .coach/drafts/program.json --dry-run` and show, in one
 message, the draft's report as one table and the load-mode table below,
-and ask to adopt. On a yes, run it without `--dry-run`. Never write
-`data/program.json` yourself.
+and ask to adopt. On a yes, settle the load modes as below first, then
+run `python3 -m coach program adopt --input .coach/drafts/program.json`
+without `--dry-run`. Never write `data/program.json` yourself.
 
-**Confirm the load-mode table once.** Adopt's `unconfirmed` lists every
-exercise without a confirmed load mode. Show it as one table (exercise,
-load mode, and how the athlete sets the weight: one total, per hand, or
-one dumbbell) in the adopt message. With their yes, record every row
-with `python3 -m coach library set-mode <id> <mode>`, changing any row
-they correct. The import path confirmed its load modes before the
-import, so its table holds only exercises added while finishing the
-draft. Never ask about it again.
+**Confirm the load-mode table once, before adopting.** Adopt's
+`unconfirmed` lists every exercise without a confirmed load mode. Show
+it as one table (exercise, load mode, and how the athlete sets the
+weight: one total, per hand, or one dumbbell) in the adopt message. With
+their yes, record every row with `python3 -m coach library set-mode
+<id> <mode>`, changing any row they correct. The import path confirmed
+its load modes before the import, so its table holds only exercises
+added while finishing the draft. Never ask about the table again.
+
+**A corrected row needs its start load's basis.** A row set to a
+different mode from its draft line makes adopt exit 1, naming the slot.
+For each such row with a start load, ask what its number meant: in the line's
+old mode or the corrected one ("was 20 the total, or 20 per hand?").
+Run `python3 -m coach program reconcile-mode <id> --input
+.coach/drafts/program.json` with `--basis old` (the number was in the
+old mode: the command converts it) or `--basis confirmed` (it already
+meant the corrected mode: the number stays). The athlete's answer picks
+the basis, every time; a row without a start load takes `--basis
+confirmed`. Then adopt.
+
+A correction after adoption works the same way: `library set-mode`
+lists the `program_slots` of `data/program.json` it leaves in the old
+mode, and `program validate` fails on each. Ask the same question, then
+run `reconcile-mode` without `--input`; it re-renders the pages.

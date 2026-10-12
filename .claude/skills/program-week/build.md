@@ -30,8 +30,10 @@ from `overlay build --input <draft>`.
      load the kit at the session's location makes. Snap it with `units
      round` to a load that is.
    - `load_mode_mismatch` (block): the line's load mode or load
-     arithmetic disagrees with the library. Fix the line, or settle the
-     load mode with the athlete (`library set-mode`).
+     arithmetic disagrees with the library. Match the line to the
+     library. If the athlete corrects the mode itself, record it with
+     `library set-mode`, ask whether the number meant the old or new
+     mode, and run `program reconcile-mode <id> --basis old|confirmed`.
    - `load_mode_unconfirmed` (block): the exercise has no confirmed
      load mode. Ask the athlete, then run the command the flag names.
      Only confirming the mode clears it; a `resolution` never does.

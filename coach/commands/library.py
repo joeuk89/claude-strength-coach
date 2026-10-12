@@ -2,7 +2,7 @@ import copy
 import json
 from pathlib import Path
 
-from coach import jsonio, library, paths, units
+from coach import jsonio, library, paths, program, units
 from coach.commands import arg, command
 from coach.errors import ConfigError, UsageError, ValidationError
 from coach.hevy.cache import HevyCache
@@ -59,6 +59,20 @@ def _write(lib, doc, args):
     Library(doc, lib.path)
     jsonio.write_doc(lib.path, _sorted(doc), args.dry_run)
     return not args.dry_run
+
+
+def _program_slots(ctx, lib, ids):
+    """Lines of data/program.json in a different mode from the one `lib` confirms for `ids`, each with a warning."""
+    if not program.exists(ctx.root):
+        return []
+    try:
+        doc = program.read_json(program.path_for(ctx.root))
+    except ValidationError:
+        return []
+    found = [row for exercise_id in ids for row in program.load_mode_mismatches(doc, lib, exercise_id)]
+    for row in found:
+        ctx.warn(f"{paths.PROGRAM.as_posix()}: {program.mismatch_message(row)}")
+    return found
 
 
 def _sorted(doc):
@@ -182,7 +196,8 @@ def confirm(args, ctx):
         confirmed.append({"id": exercise_id, "load_mode": own[exercise_id]["load_mode"], "previous": previous})
     unconfirmed = sorted(i for i in own if own[i].get("load_mode") is None)
     written = _write(lib, doc, args) if confirmed else False
-    return {"confirmed": confirmed, "still_unconfirmed": unconfirmed, "written": written}
+    slots = _program_slots(ctx, Library(doc, lib.path), [row["id"] for row in confirmed])
+    return {"confirmed": confirmed, "still_unconfirmed": unconfirmed, "written": written, "program_slots": slots}
 
 
 @command(
@@ -201,7 +216,8 @@ def set_mode(args, ctx):
     previous = own.get("load_mode")
     own["load_mode"] = args.mode
     written = _write(lib, doc, args) if previous != args.mode else False
-    return {"id": args.id, "load_mode": args.mode, "previous": previous, "written": written}
+    slots = _program_slots(ctx, Library(doc, lib.path), [args.id])
+    return {"id": args.id, "load_mode": args.mode, "previous": previous, "written": written, "program_slots": slots}
 
 
 @command(

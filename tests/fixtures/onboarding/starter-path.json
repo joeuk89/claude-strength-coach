@@ -71,8 +71,8 @@
       "athlete": "Looks good. Adopt it; the load modes are right.",
       "config": {},
       "commands": [
-        ["program", "adopt", "--input", "{root}/.coach/drafts/program.json"],
         "confirm load modes",
+        ["program", "adopt", "--input", "{root}/.coach/drafts/program.json"],
         ["propose", "week", "--week", "{week}"]
       ],
       "coach_also": "/program-week: build, validate and render the overlay, diff the routines, present the coach's brief and wait."

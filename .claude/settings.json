@@ -36,6 +36,7 @@
       "Bash(python3 -m coach program render:*)",
       "Bash(python3 -m coach program import-hevy:*)",
       "Bash(python3 -m coach program adopt:*)",
+      "Bash(python3 -m coach program reconcile-mode:*)",
       "Bash(python3 -m coach starters list:*)",
       "Bash(python3 -m coach starters show:*)",
       "Bash(python3 -m coach starters draft:*)",

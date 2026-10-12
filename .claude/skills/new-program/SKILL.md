@@ -68,10 +68,13 @@ redesign), offer the three paths in one message and recommend one from
   from the draft), renders `routine/program.md` and one page per
   session, and stages the files without committing. Never write a new
   `data/program.json` or `data/state.json` yourself.
-- Adopt's output lists what still needs the athlete:
+- The `--dry-run` output lists what still needs the athlete:
   - `unconfirmed` — exercises without a confirmed load mode: ask how
     each is performed, then `python3 -m coach library set-mode <id>
-    <mode>` or `python3 -m coach library confirm <ids>`.
+    <mode>` or `python3 -m coach library confirm <ids>`, then adopt. A
+    line in another mode fails at its slot: ask whether its start load
+    meant the old or the confirmed mode, then run `python3 -m coach
+    program reconcile-mode <id> --input <draft> --basis old|confirmed`.
   - `avoided` — exercises the athlete avoids, with the reason. Adopt
     keeps them; propose a swap from `python3 -m coach library show <id>`
     (its `substitutes`) and agree it with the athlete.
@@ -108,8 +111,7 @@ build one only when the athlete asks for it.
 
 ## 4. Close out
 
-- Recap the program in one paragraph: structure, rotation, progression,
-  deload.
+- Recap structure, rotation, progression and deload in one paragraph.
 - **Offer to program the opening week**, on every path: invoke the
   **program-week** skill (`/program-week`) to set concrete starting
   loads, rep targets, RPE and notes for week one. It writes the first
