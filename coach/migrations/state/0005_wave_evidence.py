@@ -34,12 +34,20 @@ def migrate(doc):
 
 
 def notes(before, after):
+    """One note per wave slot, naming the pending week when there is one: approving its overlay settles it."""
     found = []
     for slot, entry in before["scheme_state"].items():
-        if not _wave(entry.get("data")) or not entry["data"]["wave_week"]:
+        pending = entry.get("pending")
+        if pending and _wave(pending.get("data")):
+            old, new = pending["data"], after["scheme_state"][slot]["pending"]["data"]
+            week = f"pending wave week {old['wave_week']} (overlay {pending['overlay_id']})"
+        elif _wave(entry.get("data")):
+            old, new = entry["data"], after["scheme_state"][slot]["data"]
+            week = f"wave week {old['wave_week']}"
+        else:
             continue
-        through = after["scheme_state"][slot]["data"]["through"]
-        since = f"logged after {through['date']}" if through else "logged"
-        found.append(f"data/state.json: {slot}'s wave week {entry['data']['wave_week']} counts as done only once a "
-                     f"session {since} trained it")
+        if not old["wave_week"]:
+            continue
+        since = f"logged after {new['through']['date']}" if new["through"] else "logged"
+        found.append(f"data/state.json: {slot}'s {week} counts as done only once a session {since} trained it")
     return found

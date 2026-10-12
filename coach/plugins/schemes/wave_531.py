@@ -261,9 +261,6 @@ def propose(ctx):
     percents = "/".join(base.number(pct * 100) for pct, _ in WEEKS[week])
     lead = (f"5/3/1 wave: week {week} of 3 at {percents} % of the training max of "
             f"{base.load_words(ctx, training_max)}")
-    if cap is not None:
-        words.append(f"the {WEEKS[week][-1][1]}+ set takes as many reps as the athlete can before RPE "
-                     f"{base.number(cap)} (a coaching heuristic)")
     backoffs = _backoff_words(ctx, sets)
     if backoffs:
         words.append(backoffs)
@@ -308,12 +305,14 @@ def deload(ctx, proposal):
 def decay(ctx, proposal, days_off):
     """A temporary return week: the week's percentages of the lower of the stored and the proposed training max
     times the band's load factor, with no rep-out set, the band's set cut and RPE cap, and no load past the
-    derived-from load times that factor. The stored training max is kept, so the next ordinary week resumes it."""
+    derived-from load times that factor. The stored training max is kept, so the next ordinary week resumes it.
+    A kept override carries no wave state, so it takes the standard return band."""
     maxes = _maxes(ctx, proposal)
-    if not maxes:
+    if not maxes or "completed_weeks" not in proposal.state:
         return base.default_decay(ctx, proposal, days_off)
     band = base.return_band(days_off)
-    lowered = round(min(maxes) * band.load_factor, 2)
+    training_max = min(maxes)
+    lowered = round(training_max * band.load_factor, 2)
     week = proposal.state["completed_weeks"] + 1
     sets = _sets(ctx, lowered, WEEKS[week], None)
     if band.set_delta:
@@ -324,6 +323,10 @@ def decay(ctx, proposal, days_off):
         sets = tuple(replace(s, load=min(s.load, ceiling)) if s.working and s.load is not None else s for s in sets)
     if band.rpe_cap is not None:
         sets = base.rpe_capped(sets, band.rpe_cap)
-    return replace(proposal, sets=sets, load_cut=True,
+    rationale = (f"{proposal.rationale.rstrip('. ')}, taken as a return week at "
+                 f"{base.number(band.load_factor * 100)} % of the training max of "
+                 f"{base.load_words(ctx, training_max)} with no + set, and the next ordinary week resumes the training "
+                 f"max of {base.load_words(ctx, proposal.state['training_max'])}")
+    return replace(proposal, sets=sets, load_cut=True, rationale=rationale,
                    target_note=(f"Wave week {week} of 3, return week at {base.number(band.load_factor * 100)} % of "
                                 "the training max: no + set"))

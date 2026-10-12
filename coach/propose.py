@@ -553,6 +553,8 @@ def propose_line(run, session, day, exercise, ctx_extra):
     scheme_sets = proposal.sets
     cut_from = _cut_from(proposal)
     clauses = [proposal.rationale.rstrip(". ")]
+    scheme_clause = clauses[0]
+    scheme_rep_out = any(s.rep_out for s in proposal.sets)
     evidence = run.model_evidence(exercise_id, day)
     if evidence["reason"] == "over_rep_cap":
         clauses.append(evidence["message"].rstrip(". "))
@@ -563,7 +565,10 @@ def propose_line(run, session, day, exercise, ctx_extra):
     decay = None
     if days_off > DECAY_AFTER_DAYS:
         band = validity.band_for(days_off)
+        before = proposal.rationale
         proposal = plugin.module.decay(ctx, proposal, days_off)
+        if proposal.rationale != before:
+            clauses[0] = proposal.rationale.rstrip(". ")
         decay = {"days_off": days_off, "band": band.id, "load_factor": band.load_factor, "set_delta": band.set_delta,
                  "rpe_cap": band.rpe_cap}
         adjusted.append(f"return band {band.id} after {days_off} days off")
@@ -692,6 +697,13 @@ def propose_line(run, session, day, exercise, ctx_extra):
 
     if constraint_words:
         line_flags.append(line_flag("constraint_applied", "; ".join(constraint_words)))
+
+    rep_out_words = _rep_out_words(sets)
+    if rep_out_words:
+        clauses.insert(1, rep_out_words)
+    elif scheme_rep_out and override is None and clauses[0] == scheme_clause:
+        clauses.insert(1, "no + set this week")
+
     line_flags += _core_flags(ctx, entry, exercise, sets, exposures, active, line_flag, mode)
     evidence_clause, evidence_flags = _evidence(run, plugin, transform, line_flag)
     line_flags += evidence_flags
@@ -715,6 +727,20 @@ def propose_line(run, session, day, exercise, ctx_extra):
         "sets": [s.to_dict() for s in sets],
     }
     return LineResult(draft_line, line_flags, proposal.state, scheme_name)
+
+
+def _rep_out_words(sets):
+    """What the line's rep-out sets ask for, from the final sets, so caps a week or a constraint lowered are named."""
+    found = []
+    for s in base.working(sets):
+        if not s.rep_out:
+            continue
+        cap = "" if s.rpe is None else f" before RPE {units.json_number(s.rpe)}"
+        heuristic = " (a coaching heuristic)" if s.rpe == base.REP_OUT_RPE_CAP else ""
+        words = f"the {s.reps}+ set takes as many reps as the athlete can{cap}{heuristic}"
+        if words not in found:
+            found.append(words)
+    return ", ".join(found)
 
 
 def _exercise_info(run, session, exercise):
@@ -1603,6 +1629,9 @@ def set_training_max(root, session_id, exercise_id, value, reason, now, today, d
     if not dry_run:
         jsonio.write_doc(state_module.path_for(root), state_doc, False)
         jsonio.write_doc(decisions.path_for(root), decision_doc, False)
+    waiting = pending["overlay_id"] if pending else None
+    note = (f"{waiting} still prescribes the old training max's loads, and a session trained from them can miss "
+            f"the new one's: propose that week again before approving {waiting}") if waiting else None
     return {"slot": slot, "scheme": name, "from": before, "to": value, "state": data, "decision": decision,
-            "written": not dry_run}
+            "pending_overlay": waiting, "note": note, "written": not dry_run}
 

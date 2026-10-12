@@ -71,7 +71,6 @@ class WaveWeeksTest(unittest.TestCase):
                                  + [(expected[2][0], expected[2][1], True, 9)])
                 self.assertEqual({s.type for s in proposal.sets if s.working}, {"normal"})
                 self.assertIn(f"week {week} of 3", proposal.rationale)
-                self.assertIn("RPE 9 (a coaching heuristic)", proposal.rationale)
                 self.assertEqual(proposal.target_note, f"Wave week {week} of 3")
 
     def test_amrap_false_prescribes_no_rep_out_set(self):
@@ -261,12 +260,21 @@ class DeloadAndReturnTest(unittest.TestCase):
         self.assertEqual(decayed.state["training_max"], 100)
         self.assertIn("no + set", decayed.target_note)
         self.assertTrue(decayed.load_cut)
+        self.assertIn("week 1 of 3 at 65/75/85 % of the training max of 100", decayed.rationale)
+        self.assertIn("taken as a return week at 90 % of the training max of 100 with no + set, and the next "
+                      "ordinary week resumes the training max of 100", decayed.rationale)
 
         logged = trained(date(2026, 10, 12), 1, training_max=90, decayed=True)
         after = run(wave(decayed.state, exposures=(source, logged)))
         self.assertEqual(shape(after), [(65, 5, False, None), (75, 5, False, None), (85, 5, True, 9)])
         self.assertEqual(after.state["training_max"], 100)
         self.assertIn("week 1 again after the return week on 2026-10-12", after.rationale)
+
+    def test_a_return_week_of_a_kept_override_takes_the_standard_return_band(self):
+        ctx = wave(state(0, 100, None), exposures=(trained(date(2026, 9, 14), 1),), days_off=28)
+        kept = base.Proposal(sets=(base.SetSpec(reps=5, load=60),) * 3, rationale="kept", derived_from=None, state={})
+        decayed = scheme("wave_531").module.decay(ctx, kept, 28)
+        self.assertEqual(shape(decayed), [(54, 5, False, None)] * 2)
 
     def test_a_retest_band_caps_rpe_and_the_derived_from_load(self):
         source = base.Exposure(date=date(2026, 8, 1), workout_id="w", session_id="session-a", exercise_id=SQUAT.id,
@@ -343,6 +351,20 @@ class MigrationTest(unittest.TestCase):
         self.assertEqual(after["scheme_state"]["session-a/db_bench_press"]["data"], {"misses": 0, "through": None})
         self.assertFalse(plugins.state_errors(scheme("wave_531"), expected))
         self.assertIn("2026-10-11", step.notes(before, after)[0])
+
+    def test_state_notes_name_the_pending_week_the_approval_will_settle(self):
+        step = self.step("state.0005_wave_evidence")
+        stored = {"wave_week": 3, "training_max": 80, "proposed_for": "2026-10-01", "proposed_on": "2026-09-27"}
+        pending = {"wave_week": 1, "training_max": 82.5, "proposed_for": "2026-10-08", "proposed_on": "2026-10-04"}
+        doc = {"schema_version": 5, "scheme_state": {
+            SLOT: {"scheme": "wave_531", "data": stored, "pending": {"overlay_id": "2026-10-05-weekly",
+                                                                     "data": pending}}}}
+        before = copy.deepcopy(doc)
+        notes = step.notes(before, step.migrate(doc))
+        self.assertEqual(len(notes), 1)
+        self.assertIn("pending wave week 1 (overlay 2026-10-05-weekly)", notes[0])
+        self.assertIn("after 2026-10-04", notes[0])
+        self.assertNotIn("week 3", notes[0])
 
     def test_overlay_turns_an_unoverridden_wave_failure_set_into_a_rep_out_set(self):
         step = self.step("overlay.0004_rep_out_sets")
@@ -449,6 +471,29 @@ class WavePipelineTest(WavePipelineCase):
         self.assertEqual([coaching(s["load"]) for s in working(squat(data["overlay"]))], [65, 75, 85])
         self.assertIn("wave_review", codes(data["overlay"], "bb_back_squat"))
 
+    def test_the_rationale_names_the_rep_out_set_and_its_cap(self):
+        rationale = squat(self.propose("--dry-run")["overlay"])["provenance"]["rationale"]
+        self.assertIn("the 5+ set takes as many reps as the athlete can before RPE 9 (a coaching heuristic)",
+                      rationale)
+
+    def test_a_light_week_that_drops_the_rep_out_set_stops_promising_it(self):
+        line = squat(self.propose("--kind", "deload", "--transform", "light")["overlay"])
+        self.assertEqual(len(working(line)), 2)
+        self.assertFalse(any(s.get("rep_out") for s in line["sets"]))
+        rationale = line["provenance"]["rationale"]
+        self.assertNotIn("as many reps", rationale)
+        self.assertIn("no + set this week", rationale)
+
+    def test_a_light_week_that_keeps_the_rep_out_set_names_its_lower_cap(self):
+        self.edit_program(lambda doc: self.slot(doc, "session-a", "bb_back_squat").update(
+            sets=[WAVE_GROUP, BACK_OFFS]))
+        line = squat(self.propose("--kind", "deload", "--transform", "light")["overlay"])
+        self.assertEqual([(s.get("rep_out", False), s["rpe"]) for s in working(line)],
+                         [(False, 8), (False, 8), (True, 8), (False, 7)])
+        rationale = line["provenance"]["rationale"]
+        self.assertIn("the 5+ set takes as many reps as the athlete can before RPE 8", rationale)
+        self.assertNotIn("RPE 9", rationale)
+
     def test_a_scheme_deload_names_its_percentages_and_moves_nothing_on(self):
         self.edit_program(lambda doc: doc["blocks"].update(deload_rule={"name": "scheme", "params": {}}))
         data = self.propose("--kind", "deload")
@@ -505,6 +550,8 @@ class WaveOverrideTest(WavePipelineCase):
             constraints=[{"kind": "rpe_cap", "value": 8, "reason": "synthetic knee"}]))
         line = squat(self.propose()["overlay"])
         self.assertEqual(working(line)[-1]["rpe"], 8)
+        self.assertIn("the 5+ set takes as many reps as the athlete can before RPE 8",
+                      line["provenance"]["rationale"])
         self.override("1x5@65, 1x5@75, 1x5+@85")
         self.assertEqual(working(squat(read_json(self.draft_path())))[-1]["rpe"], 8)
 
@@ -533,8 +580,10 @@ class TrainingMaxCommandTest(WavePipelineCase):
     def test_a_pending_state_still_waiting_for_approval_takes_the_change(self):
         self.propose()
         self.coach("propose", "finalize", "--proposal", FIRST_ID)
-        self.set_max()
+        data = self.set_max()["data"]
         self.assertEqual(self.state()["pending"]["data"]["training_max"], 95)
+        self.assertEqual(data["pending_overlay"], FIRST_ID)
+        self.assertIn(f"propose that week again before approving {FIRST_ID}", data["note"])
         self.coach("overlay", "approve", FIRST_ID)
         line = squat(self.propose("--dry-run", week="2026-W43", env={"COACH_NOW": "2026-10-18T18:00:00Z"})["overlay"])
         self.assertIn("training max of 95", line["provenance"]["rationale"])
@@ -545,6 +594,7 @@ class TrainingMaxCommandTest(WavePipelineCase):
         stored = self.state()
         self.assertEqual(stored["data"]["training_max"], 95)
         self.assertIsNone(stored["pending"])
+        self.assertEqual((data["pending_overlay"], data["note"]), (None, None))
         decision = data["decision"]
         self.assertEqual((decision["kind"], decision["details"], decision["scope"]),
                          ("training_max", {"scheme": "wave_531", "from": 100, "to": 95},
@@ -567,6 +617,10 @@ class WaveReturnWeekTest(LayoffCase):
         self.assertEqual(line["provenance"]["decay"]["band"], "22-42")
         self.assertEqual(len(working(line)), 2)
         self.assertFalse(any(s.get("rep_out") for s in line["sets"]))
+        rationale = line["provenance"]["rationale"]
+        self.assertIn("taken as a return week at 90 % of the training max", rationale)
+        self.assertIn("with no + set", rationale)
+        self.assertNotIn("as many reps", rationale)
         meta = read_json(self.root / ".coach" / "proposals" / f"{data['id']}.meta.json")
         stored = meta["scheme_state"][SLOT]["data"]
         self.assertAlmostEqual(stored["training_max"], best * 0.9, delta=0.02)

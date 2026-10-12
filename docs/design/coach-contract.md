@@ -2772,6 +2772,12 @@ the derived-from exposure's least assistance instead. A scheme
 overrides `decay` only when load is the wrong lever (a ladder steps back
 rungs; a wave lowers its training max).
 
+The core, not the scheme, names a line's rep-out sets: after the
+scheme's clause the rationale says what each rep-out set of the final
+line asks for and its cap, after every decay, transform and cap. When
+the scheme prescribed one, the final line has none and the scheme's
+clause still stands, it says "no + set this week" instead.
+
 R-23a also exposes its drift rule as `coach.patterns.rpe_drift(sets,
 prescribed_sets, capped) -> bool`, so R-31 calls the same function the
 `rpe_drift` flag uses.
@@ -3112,7 +3118,11 @@ and `plugins test` runs them. Loaded with
   each load capped at the derived-from load × `load_factor` and the
   band's RPE cap, so the line passes R-24's decay check. The stored
   training max is kept, so the next ordinary week resumes it; the
-  return week's exposure is `decayed` and completes nothing. With no
+  return week's exposure is `decayed` and completes nothing. Its
+  rationale adds the band's percentage, the training max it lowered,
+  no + set and the training max the next ordinary week resumes; the
+  core keeps it over the scheme's own. A kept override, which carries
+  no wave state, takes `base.default_decay`. With no
   training max and no e1RM it holds the program's sets at the last or
   start load. Only `state set-training-max` (C24) changes a stored
   training max by hand; an override never does. `LOAD_MODES` is
@@ -3273,8 +3283,9 @@ constrained mode) stay coach-built through `overlay build`.
   there. A standing override's decision is appended when the command
   runs.
 - With `--transform`, a transform that returns a new rationale (a
-  scheme's `deload`) replaces the scheme's own clause, so the line never
-  explains the week it no longer prescribes.
+  scheme's `deload`) replaces the scheme's own clause, and so does a
+  scheme `decay` that returns one, so the line never explains the week
+  it no longer prescribes.
 - `state set-training-max --session S --exercise E --value N --reason
   TEXT [--dry-run]` sets the training max of a slot whose scheme keeps
   one (`wave_531`), in athlete units (per hand for per-hand modes). A
@@ -3284,7 +3295,11 @@ constrained mode) stay coach-built through `overlay build`.
   becomes today, so no earlier history is judged. It appends a
   `training_max` decision (C25) with the reason, after the athlete has
   agreed it from the dry run's preview. A slot whose scheme keeps no
-  training max exits 1; `--dry-run` writes nothing.
+  training max exits 1; `--dry-run` writes nothing. When a pending
+  state still waits for approval, the result names its overlay
+  (`pending_overlay`) and a `note` asks for that week to be proposed
+  again before approval, since its sets hold the old training max's
+  loads; both are null otherwise.
 - `propose finalize` also appends a one-week override decision
   (`standing: false`, `until` the overlay's span end) for each line whose
   `override` no decision yet records: neither one made for this proposal
