@@ -60,6 +60,8 @@ def content_hash(record):
 def upsert_line(record, recorded_at, kind):
     """The full C30 line for a normalised record of `kind`: version, op, recorded_at and content_hash added."""
     body = {key: value for key, value in record.items() if key not in BOOKKEEPING}
+    if kind == "planned":
+        body.setdefault("start", None)
     line = {"schema_version": VERSIONS[kind], "op": "upsert", "id": body.pop("id"), "source": body.pop("source"),
             "recorded_at": recorded_at, **body}
     line["content_hash"] = content_hash(line)

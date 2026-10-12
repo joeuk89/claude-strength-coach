@@ -10,7 +10,7 @@ from coach.errors import CoachError, ConfigError, UsageError, ValidationError
 def file_kind(record):
     if "span" in record:
         return "wellness"
-    if "date" in record and "start" not in record:
+    if "date" in record and "local_date" not in record:
         return "planned"
     return "activity"
 

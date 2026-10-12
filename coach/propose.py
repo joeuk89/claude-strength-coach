@@ -22,6 +22,7 @@ from coach import capacity, cardio, conditioning, external, first_loads, interfe
 from coach import timing, weekflags
 from coach import state as state_module
 from coach import stats, units, validity
+from coach.activity.records import utc_text
 from coach.checks.instance import cap_for
 from coach.errors import ConfigError, RefusedError, UsageError, ValidationError
 from coach.library import Library, e1rm_supported
@@ -1647,7 +1648,7 @@ def set_time(root, config, proposal_id, session_id, day, start, minutes, today, 
         session.update(start=None, duration_minutes=None)
     else:
         try:
-            session["start"] = timing.utc_text(timing.parse_start(start, session["date"], zone))
+            session["start"] = utc_text(timing.parse_start(start, session["date"], zone))
         except ValueError as exc:
             raise ValidationError(f"--start: {exc}") from None
         session["duration_minutes"] = minutes

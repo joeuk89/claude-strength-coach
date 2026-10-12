@@ -4098,7 +4098,8 @@ def normalise(item, ctx) -> list[dict]: ...
   adapter's `CONFIG`, so a new adapter is one new file: its config table,
   sync and status come with it.
 - A normalised record goes to the file its shape names: `span` is
-  wellness, `date` is planned, anything else is an activity. A void goes
+  wellness, `date` without `local_date` is planned (a missing `start` is
+  stored as `null`), anything else is an activity. A void goes
   to whichever of the adapter's `KINDS` files holds the id. Every line is
   validated before anything is appended; an invalid record, or a file
   outside `KINDS`, fails that adapter.
@@ -7557,10 +7558,11 @@ times are known (Built with R-44a, Timing).
   order and gap are unknown, naming what is missing. The 6-hour and
   24-hour policies and the heavy-session definition are unchanged; the
   24-hour rule is labelled a cautious coaching heuristic in its message.
-- **Every proposed week.** `propose week` (every kind), `propose time`,
-  `propose finalize`, `propose rebuild`, a missed-day rule's copy and
-  `overlay build` (a constrained or reshuffled one-off week) judge the
-  rules on the overlay's sessions before approval, through
+- **Every proposed week.** `propose week` (every kind) judges the rules
+  through the weekflags provider (`coach.interference.flags`). `propose
+  time`, `propose finalize`, `propose rebuild`, a missed-day rule's copy
+  and `overlay build` (a constrained or reshuffled one-off week) judge
+  them on the overlay's sessions before approval, through
   `coach.interference.refresh(root, config, doc, today)`: it replaces
   every earlier interference flag (`collision` and each instance rule's
   codes, `coach.interference.codes(root)`) with the rules' judgement now,

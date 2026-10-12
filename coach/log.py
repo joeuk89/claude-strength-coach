@@ -13,7 +13,7 @@ from datetime import timezone
 from pathlib import Path
 
 from coach import dates, history, jsonio, overlay, paths, program, render, timing, units
-from coach.activity.records import append_lines
+from coach.activity.records import append_lines, utc_text
 from coach.errors import CoachError, RefusedError, ValidationError
 from coach.validate import Error, validate
 
@@ -450,7 +450,7 @@ def add(root, config, library, draft, today, now, again=False, dry_run=False):
     if isinstance(line["start_time"], str) and isinstance(line.get("date"), str):
         zone = dates.zone(config.athlete.timezone) if config.athlete.timezone else None
         try:
-            line["start_time"] = timing.utc_text(timing.parse_start(line["start_time"], line["date"], zone))
+            line["start_time"] = utc_text(timing.parse_start(line["start_time"], line["date"], zone))
         except ValueError as exc:
             raise ValidationError(f"The workout is not valid: $.start_time: {exc}",
                                   details=[{"path": "$.start_time", "message": str(exc)}]) from None

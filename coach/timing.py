@@ -42,10 +42,6 @@ def _names_offset(text):
     return datetime.fromisoformat(text.strip().replace("Z", "+00:00")).tzinfo is not None
 
 
-def utc_text(moment):
-    return records.utc_text(moment)
-
-
 def end_of(start, minutes):
     """`start` plus `minutes` of elapsed time, whatever daylight-saving change lies between."""
     if start is None or minutes is None:

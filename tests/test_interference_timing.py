@@ -10,6 +10,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from coach import overlay, timing
+from coach.activity.records import utc_text
 from coach.cardio import Bout
 from coach.dates import Span
 from coach.plugins import base
@@ -145,10 +146,10 @@ class SameDayTimingTest(unittest.TestCase):
 class ParseStartTest(unittest.TestCase):
     def test_a_clock_time_is_local_in_the_zone_and_must_stay_on_the_date(self):
         start = timing.parse_start("07:00", "2026-10-11", LONDON)
-        self.assertEqual(timing.utc_text(start), "2026-10-11T06:00:00Z")
-        self.assertEqual(timing.utc_text(timing.parse_start("2026-10-11T07:00+02:00", "2026-10-11", LONDON)),
+        self.assertEqual(utc_text(start), "2026-10-11T06:00:00Z")
+        self.assertEqual(utc_text(timing.parse_start("2026-10-11T07:00+02:00", "2026-10-11", LONDON)),
                          "2026-10-11T05:00:00Z")
-        self.assertEqual(timing.utc_text(timing.parse_start("2026-10-11T23:30:00Z", "2026-10-12", LONDON)),
+        self.assertEqual(utc_text(timing.parse_start("2026-10-11T23:30:00Z", "2026-10-12", LONDON)),
                          "2026-10-11T23:30:00Z")
         for text, day in (("2026-10-12T07:00", "2026-10-11"), ("25:00", "2026-10-11"), ("soon", "2026-10-11")):
             with self.subTest(text=text), self.assertRaises(ValueError):
@@ -368,9 +369,13 @@ class ManualWorkoutStartTest(Case):
         self.assertNotIn("unknown", messages)
 
     def test_a_legacy_line_without_a_start_still_reads(self):
+        legacy = "manual:2026-09-28-session-a-1"
         self.data("history", "sync")
-        listed = self.data("log", "list", "--since", "2026-09-01")
-        self.assertTrue(listed)
+        listed = self.data("log", "list", "--since", "2026-09-01")["workouts"]
+        self.assertIn(legacy, [w["id"] for w in listed])
+        month = json.loads((self.root / "data" / "history" / "2026-09.json").read_text(encoding="utf-8"))
+        workout = next(w for w in month["workouts"] if w["workout_id"] == legacy)
+        self.assertEqual((workout["start_time"], workout["end_time"]), (None, None))
 
 
 if __name__ == "__main__":

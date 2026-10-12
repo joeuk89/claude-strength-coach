@@ -3,6 +3,7 @@
 from dataclasses import asdict
 
 from coach import dates, jsonio, log, timing
+from coach.activity.records import utc_text
 from coach.history_sources import SourceWorkout
 from coach.library import Library
 
@@ -35,7 +36,7 @@ def _source_workout(line, title, library):
     end = timing.end_of(dates.parse_timestamp(start), line["duration_minutes"]) if start else None
     return SourceWorkout(
         source="manual", workout_id=line["id"], date=line["date"], start_time=start,
-        end_time=timing.utc_text(end) if end else None, duration_minutes=line["duration_minutes"],
+        end_time=utc_text(end) if end else None, duration_minutes=line["duration_minutes"],
         title=title, description=line["notes"], session_id=line["session_id"], overlay_id=line["overlay_id"],
         exercises=exercises,
     )

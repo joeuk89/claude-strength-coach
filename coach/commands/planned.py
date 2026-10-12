@@ -44,7 +44,7 @@ def add(args, ctx):
     start = None
     if args.start is not None:
         try:
-            start = timing.utc_text(timing.parse_start(args.start, parsed, ctx.timezone()))
+            start = records.utc_text(timing.parse_start(args.start, parsed, ctx.timezone()))
         except ValueError as exc:
             raise ValidationError(f"--start: {exc}") from None
     target = {"distance_meters": actions.distance_meters(args),

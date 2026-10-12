@@ -14,6 +14,7 @@ from pathlib import Path
 
 from coach import config as config_module
 from coach import dates, jsonio, paths, timing, units
+from coach.activity.records import utc_text
 from coach.errors import ConfigError, ValidationError
 from coach.validate import Error
 from coach.validate import validate as validate_schema
@@ -383,7 +384,7 @@ def _start(draft_session, where, zone, errors):
     if text is None:
         return None
     try:
-        return timing.utc_text(timing.parse_start(text, draft_session["date"], zone))
+        return utc_text(timing.parse_start(text, draft_session["date"], zone))
     except ValueError as exc:
         errors.append(Error(where, str(exc)))
         return None
