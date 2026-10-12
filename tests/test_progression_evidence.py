@@ -160,7 +160,7 @@ class ProgressMetricTest(unittest.TestCase):
         for load, stalled in ((72.5, False), (70, True)):
             found = propose._core_flags(ctx, {}, {"sets": THREE_FIVES},
                                         (base.SetSpec(reps=8, load=load),) * 3,
-                                        exposures, (), line_flag, "total")
+                                        exposures, (), line_flag, "total", date(2026, 10, 12))
             self.assertEqual("stalled" in [f["code"] for f in found], stalled)
             if stalled:
                 warning = next(f for f in found if f["code"] == "stalled")
