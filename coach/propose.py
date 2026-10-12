@@ -619,7 +619,7 @@ def _ceiling_for(mode, evidence, source):
                     source.date.isoformat() if source is not None else None)
 
 
-def _under_ceiling(sets, ceiling, bound, capped, mode, direction, unit):
+def _under_ceiling(sets, ceiling, bound, capped, mode, direction, unit, show_hevy):
     """(sets, {index: load limit}, indices to report, words, why the ceiling is unchecked or None) for the `bound`
     sets, whose RPE is a ceiling; `capped` are those a recovery cap or the illness cap lowered.
 
@@ -629,7 +629,7 @@ def _under_ceiling(sets, ceiling, bound, capped, mode, direction, unit):
     athlete applies, and the coach reviews the load.
     """
     limits, beyond = _ceiling_limits(sets, ceiling.estimate, bound) if ceiling.estimate else ({}, {})
-    sets, fewer, words = _fewer_reps(sets, beyond, ceiling, mode, unit) if beyond else (sets, {}, [])
+    sets, fewer, words = _fewer_reps(sets, beyond, ceiling, mode, unit, show_hevy) if beyond else (sets, {}, [])
     limits.update(fewer)
     beyond = {i: v for i, v in beyond.items() if i not in fewer}
     lowered = {i for i, limit in limits.items() if _over_limit(sets[i].load, limit)}
@@ -655,11 +655,11 @@ def _under_ceiling(sets, ceiling, bound, capped, mode, direction, unit):
     changed = {i for i in changed if i in capped and (ceiling.unchecked or i in beyond)}
     sets = tuple(held[i] if i in changed else s for i, s in enumerate(sets))
     return sets, limits, lowered | changed, words, (
-        f"{lead}, so the load goes no further than {_load_text(ceiling.hold, mode, unit)}, logged "
+        f"{lead}, so the load goes no further than {_load_text(ceiling.hold, mode, unit, show_hevy)}, logged "
         f"{ceiling.hold_date}; stop each set at the ceiling and review the load with the athlete")
 
 
-def _fewer_reps(sets, beyond, ceiling, mode, unit):
+def _fewer_reps(sets, beyond, ceiling, mode, unit, show_hevy):
     """(sets, {index: load limit}, words) for the sets whose fewest reps at their RPE lie past the model's range.
 
     The model cannot give such a set a load limit, but it can still show the set's load too hard for its ceiling, the
@@ -676,14 +676,14 @@ def _fewer_reps(sets, beyond, ceiling, mode, unit):
         covered = math.floor(stats.MAX_REPS_TO_FAILURE - (10 - rpe))
         found[index] = replace(s, reps=covered, rep_range=None)
         limits[index] = _load_limit(estimate, covered, rpe)
-        words.append(f"{validity.estimate_words(estimate)} puts {_load_text(s.load, mode, unit)} × "
+        words.append(f"{validity.estimate_words(estimate)} puts {_load_text(s.load, mode, unit, show_hevy)} × "
                      f"{validity.reps_words(verdict.reps, targets)} at {validity.implied_words(verdict.implied)}, over "
                      f"the RPE {units.json_number(rpe)} ceiling, and the e1RM model reaches at most {covered} reps at "
                      f"RPE {units.json_number(rpe)}, so {covered} reps")
     return tuple(found), limits, list(dict.fromkeys(words))
 
 
-def _within_ceiling(sets, limits, lowered, ceiling, rounding, mode, unit):
+def _within_ceiling(sets, limits, lowered, ceiling, rounding, mode, unit, show_hevy):
     """(sets, words, why the kit cannot meet the ceiling or None) after rounding: a set the kit rounded over its limit
     takes the kit's load under it, and a set nothing fits under keeps the kit's lightest load, flagged."""
     found, words, over = list(sets), [], []
@@ -712,15 +712,17 @@ def _within_ceiling(sets, limits, lowered, ceiling, rounding, mode, unit):
         reported.add(key)
         reps = min(validity.rep_targets(s.reps, s.rep_range))
         words.append(f"at RPE {units.json_number(s.rpe)} {validity.estimate_words(ceiling.estimate)} allows at most "
-                     f"{_load_text(limit, mode, unit)} for {reps} reps, so {_load_text(s.load, mode, unit)}")
+                     f"{_load_text(limit, mode, unit, show_hevy)} for {reps} reps, so "
+                     f"{_load_text(s.load, mode, unit, show_hevy)}")
     if not over:
         return tuple(found), words, None
     s, limit = over[0]
     return tuple(found), words, (
-        f"{ceiling.why}: {validity.estimate_words(ceiling.estimate)} allows at most {_load_text(limit, mode, unit)} "
-        f"for {min(validity.rep_targets(s.reps, s.rep_range))} reps at RPE {units.json_number(s.rpe)}, but the kit "
-        f"makes nothing that light, so {_load_text(s.load, mode, unit)} is too heavy for the ceiling; choose the "
-        "load, a lighter variation or fewer reps with the athlete")
+        f"{ceiling.why}: {validity.estimate_words(ceiling.estimate)} allows at most "
+        f"{_load_text(limit, mode, unit, show_hevy)} for {min(validity.rep_targets(s.reps, s.rep_range))} reps at RPE "
+        f"{units.json_number(s.rpe)}, but the kit makes nothing that light, so "
+        f"{_load_text(s.load, mode, unit, show_hevy)} is too heavy for the ceiling; choose the load, a lighter "
+        "variation or fewer reps with the athlete")
 
 
 def _over_limit(load, limit):
@@ -873,14 +875,15 @@ def propose_line(run, session, day, exercise, ctx_extra):
         limits, lowered, unchecked = {}, set(), None
         if why is not None:
             sets, limits, lowered, ceiling_words, unchecked = _under_ceiling(
-                sets, ceiling._replace(why=why), bound, capped, mode, info.load_direction, run.unit)
+                sets, ceiling._replace(why=why), bound, capped, mode, info.load_direction, run.unit, run.show_hevy)
             clipped.update(lowered)
             words += ceiling_words
         sets, kit_changes, off_ladder = _rounded(sets, clipped, round_down, cut_from if load_cut else None, rounding)
         words += [f"no ladder rung fits within it, so the line leaves the ladder at "
                   f"{_load_text(v, mode, run.unit, run.show_hevy)}" for v in off_ladder]
         if limits:
-            sets, ceiling_words, over = _within_ceiling(sets, limits, lowered, ceiling, rounding, mode, run.unit)
+            sets, ceiling_words, over = _within_ceiling(sets, limits, lowered, ceiling, rounding, mode, run.unit,
+                                                     run.show_hevy)
             words += ceiling_words
             unchecked = over or unchecked
             final = {s.load for s in sets}
@@ -1123,9 +1126,10 @@ def _conditioning_line(run, session, day, exercise, proposal, first, rationale, 
 
     found = [line_flag("constraint_applied", "; ".join(words))] if words else []
     if why is not None:
+        held = _load_text(load, mode, run.unit, run.show_hevy) if mode in units.LOADED_MODES else "no load"
         found.append(line_flag("rpe_ceiling_unchecked", (
             f"{entry.get('name', exercise_id)}: {why} cannot be checked against an e1RM on a conditioning line, whose "
-            f"load holds as written ({_load_text(load, mode, run.unit) if mode in units.LOADED_MODES else 'no load'});"
+            f"load holds as written ({held});"
             " stop each set at the ceiling and review the load with the athlete")))
     if mode in units.LOADED_MODES and load is None:
         found.append(line_flag(first_loads.CODE, first_loads.message(entry.get("name", exercise_id), day.isoformat(),

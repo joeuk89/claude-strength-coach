@@ -237,9 +237,9 @@ class OutOfRangeCeilingTest(CeilingCase):
         for code in MODEL_CODES + ("rpe_ceiling_unchecked",):
             self.assertNotIn(code, line_codes(doc, "db_single_arm_row"))
         message = line_flag(doc, "db_single_arm_row", "constraint_applied")["message"]
-        self.assertIn(f"the e1RM of 42 from 2026-10-08 puts 30 (Hevy: 30) × 10 at RPE 8, over the RPE {cap} ceiling, "
+        self.assertIn(f"the e1RM of 42 from 2026-10-08 puts 30 × 10 at RPE 8, over the RPE {cap} ceiling, "
                       f"and the e1RM model reaches at most {reps} reps at RPE {cap}, so {reps} reps", message)
-        self.assertIn(f"allows at most 30 (Hevy: 30) for {reps} reps, so 30 (Hevy: 30)", message)
+        self.assertIn(f"allows at most 30 for {reps} reps, so 30", message)
 
     def test_a_cap_of_6_cuts_the_row_to_8_reps(self):
         self.assert_capped_row(6, 8)
@@ -303,6 +303,23 @@ class KitCeilingTest(CeilingCase):
         self.assertIn("allows at most 22.5/hand (Hevy: 45) for 8 reps at RPE 6, but the kit makes nothing that light",
                       flag["message"])
         self.assertIn("choose the load", flag["message"])
+
+    def test_without_hevy_the_ceiling_words_name_no_hevy_total(self):
+        self.edit_config("[hevy]\nenabled = true", "[hevy]\nenabled = false")
+        self.cap("db_bench_press", value=5)
+        lowered = self.propose()
+        self.assertRegex(find_line(lowered, "db_bench_press")["provenance"]["rationale"],
+                         r"allows at most [\d.]+/hand for \d+ reps, so [\d.]+/hand")
+        self.data("niggles", "update", "n-0001", "--constraint", "rpe_cap=6", "--status", "aggravated")
+        self.edit_config("dumbbells = []", "dumbbells = [25, 30]")
+        unmet = self.propose()
+        message = line_flag(unmet, "db_bench_press", "rpe_ceiling_unchecked")["message"]
+        self.assertIn("allows at most 22.5/hand for 8 reps at RPE 6", message)
+        for doc in (lowered, unmet):
+            line = find_line(doc, "db_bench_press")
+            words = [line["provenance"]["rationale"]] + [f["message"] for f in doc["flags"]
+                                                         if f["exercise_id"] == "db_bench_press"]
+            self.assertFalse([w for w in words if "Hevy:" in w], words)
 
 
 class UncheckedCeilingTest(CeilingCase):
