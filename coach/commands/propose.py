@@ -49,6 +49,7 @@ def show(args, ctx):
           arg("--load", type=float, metavar="N", help="one load for every working set (athlete units, per hand for "
                                                       "per-hand modes)"),
           arg("--reason", required=True, metavar="TEXT", help="why the line changes"),
+          arg("--date", metavar="D", help="change the line on this date only (default: every date of the slot)"),
           arg("--standing", action="store_true", help="keep this choice in later weeks until --until"),
           arg("--until", metavar="D", help="end date of a standing override (default four weeks; eight at most)")),
     writes=True,
@@ -62,8 +63,9 @@ def override(args, ctx):
     until = _date(args.until, "--until") if args.until else None
     if until is not None and not args.standing:
         raise UsageError("--until goes with --standing")
+    day = _date(args.date, "--date").isoformat() if args.date else None
     return propose.override(ctx.root, ctx.config, args.proposal, args.session, args.exercise, new_sets, args.load,
-                            args.reason, args.standing, until, ctx.now(), ctx.today(), args.dry_run)
+                            args.reason, args.standing, until, ctx.now(), ctx.today(), args.dry_run, day)
 
 
 @command(

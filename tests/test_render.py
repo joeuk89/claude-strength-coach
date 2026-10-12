@@ -109,6 +109,19 @@ class WeekAheadTest(unittest.TestCase):
         self.assertIn("no_data", text)
         self.assertIn("No history.", text)
 
+    def test_resolved_flags_show_their_resolution_apart_from_the_open_ones(self):
+        doc = valid_overlay()
+        flag = {"code": "no_data", "severity": "warn", "session_id": "session-a", "exercise_id": "bb_back_squat",
+                "message": "Back Squat on 2026-10-12: the load is left for the coach to set", "resolved": True,
+                "resolution": "first load set: 60 on 2026-10-12, not yet trained"}
+        doc["flags"] = [flag, dict(flag, code="stalled", message="No gain.", resolved=False, resolution=None)]
+        lines = render.render_week_ahead(doc).splitlines()
+        self.assertEqual(lines[lines.index("**Flags**") + 2:lines.index("**Resolved flags**")],
+                         ["- warn · `stalled` · session-a / bb_back_squat: No gain.", ""])
+        self.assertIn("- warn · `no_data` · session-a / bb_back_squat: first load set: 60 on 2026-10-12, not yet "
+                      "trained", lines)
+        self.assertNotIn("left for the coach", "\n".join(lines))
+
     def test_cells_escape_pipes(self):
         doc = valid_overlay()
         doc["sessions"][0]["exercises"][0]["target_note"] = "a | b"

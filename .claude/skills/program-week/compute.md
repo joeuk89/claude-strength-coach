@@ -90,23 +90,23 @@ rotation position, and settle its flags:
   and the training max holds; review it. To change it, show `python3 -m coach
   state set-training-max --session <s> --exercise <e> --value <n> --reason
   "<why>" --dry-run`; once agreed, drop `--dry-run` and run step 1 again.
-- `no_data` (set the first load with the athlete), `stalled`,
-  `constraint_applied`, `override_standing`, `override_kept`, `scheme_reset`,
-  `rotation_unconfirmed` (state the position for confirmation, as context.md
-  says); build.md's check settles its own flags.
+- `no_data` (set the first load with the athlete in step 3; it retires once
+  that day's line has loads), `stalled`, `constraint_applied`, `override_standing`,
+  `override_kept`, `scheme_reset`, `rotation_unconfirmed` (state the position
+  for confirmation, as context.md says); build.md's check settles its own flags.
 
 ## 3. Change a line
 
 Run `python3 -m coach propose override --proposal <id> --session <session>
 --exercise <exercise> (--sets "3x5@95 rpe7" | --load <n>) --reason "<why>"`; a
 timed hold takes seconds, `--sets "2x35s rpe7"`, and a wave's rep-out set keeps
-its `+`, `--sets "1x5+@120"`. Add `--standing` (and `--until <date>`, eight
-weeks at most; four by default) when the change should hold in later weeks — a
-niggle, an agreed hold — so the scheme stops proposing it away; it covers
-sessions to that date, and a deload or light week still cuts it. A per-exercise
-**focus** from check-in findings ("slow the eccentric") may go into the draft
-line, with an `override` reason; a line changed without a reason is refused. An
-approved override onto a rung moves the ladder to that rung.
+its `+`, `--sets "1x5+@120"`; `--date <day>` changes only that day's line. Add
+`--standing` (and `--until <date>`, eight weeks at most; four by default) when
+the change should hold in later weeks (a niggle, an agreed hold) so the scheme
+stops proposing it away; it covers sessions to that date, and a deload or light
+week still cuts it. A per-exercise **focus** from check-in findings ("slow the
+eccentric") may go into the draft line; every changed line needs an `override`
+reason. An approved override onto a rung moves the ladder to that rung.
 
 Each active niggle's constraints are already on every matching line, named in
 `constraint_applied`; `python3 -m coach niggles constraints` lists them. A

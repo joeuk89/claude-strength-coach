@@ -12,7 +12,7 @@ from collections import namedtuple
 from datetime import timedelta
 
 from coach import config as config_module
-from coach import constraints, dates, flags, history, overlay, state, stats, units
+from coach import constraints, dates, first_loads, flags, history, overlay, state, stats, units
 from coach.checks.instance import _capped_value as capped_value
 from coach.checks.instance import cap_for
 from coach.config_tables.sessions import cap_minutes
@@ -397,7 +397,7 @@ class _Checker:
             "feasibility": _feasibility("not_judged", ceiling, "No load check: the line has no data."),
         }
         self.lines.append(row)
-        if (session["session_id"], line["exercise_id"]) in self.no_data:
+        if (session["session_id"], line["exercise_id"]) in self.no_data and first_loads.missing_load(line):
             return
         working = [s for s in line["sets"] if overlay.is_working(s)]
         self.stale(session, line, working, facts, band, derived, illness)

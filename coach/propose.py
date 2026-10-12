@@ -18,7 +18,7 @@ from typing import NamedTuple
 
 from coach import constraints as constraints_module
 from coach import dates, decisions, flags, followups, history, jsonio, niggles, overlay, paths, patterns, plugins
-from coach import capacity, cardio, conditioning, external, program, research, statusdays, weekflags
+from coach import capacity, cardio, conditioning, external, first_loads, program, research, statusdays, weekflags
 from coach import state as state_module
 from coach import stats, units, validity
 from coach.checks.instance import cap_for
@@ -745,7 +745,7 @@ def propose_line(run, session, day, exercise, ctx_extra):
     elif scheme_rep_out and override is None and clauses[0] == scheme_clause:
         clauses.insert(1, "no + set this week")
 
-    line_flags += _core_flags(ctx, entry, exercise, sets, exposures, active, line_flag, mode)
+    line_flags += _core_flags(ctx, entry, exercise, sets, exposures, active, line_flag, mode, day)
     evidence_clause, evidence_flags = _evidence(run, plugin, transform, line_flag)
     line_flags += evidence_flags
     if evidence_clause:
@@ -892,8 +892,8 @@ def _conditioning_line(run, session, day, exercise, proposal, first, rationale, 
 
     found = [line_flag("constraint_applied", "; ".join(words))] if words else []
     if mode in units.LOADED_MODES and load is None:
-        found.append(line_flag("no_data", f"{entry.get('name', exercise_id)}: no approved load and no start load, so "
-                                          "the load is left for the coach to set"))
+        found.append(line_flag(first_loads.CODE, first_loads.message(entry.get("name", exercise_id), day.isoformat(),
+                                                                     "no approved load and no start load")))
     line = {
         "exercise_id": exercise_id, "hevy_template_id": _template_id(entry), "load_mode": mode,
         "rest_seconds": exercise["rest_seconds"], "superset_id": exercise["superset_id"], "cues": exercise["cues"],
@@ -1127,11 +1127,11 @@ def change_text(before_sets, after_sets, mode, unit, show_hevy=True):
     return ", ".join(parts) or None
 
 
-def _core_flags(ctx, entry, exercise, sets, exposures, active, line_flag, mode):
+def _core_flags(ctx, entry, exercise, sets, exposures, active, line_flag, mode, day):
     found = []
     if mode in units.LOADED_MODES and any(s.working and s.load is None for s in sets):
-        found.append(line_flag("no_data", f"{ctx.exercise.name}: no usable exposure and no start load, so the load "
-                                          "is left for the coach to set"))
+        found.append(line_flag(first_loads.CODE, first_loads.message(ctx.exercise.name, day.isoformat(),
+                                                                     "no usable exposure and no start load")))
     source = base.baseline(exposures)
     if source is not None and not source.prescribed and ctx.scheme in (
             "double_progression", "linear", "assistance_ladder"):
@@ -1240,7 +1240,7 @@ def lines_of(doc, unit, show_hevy=True):
                 "text": sets_text(sets, line["load_mode"], unit, show_hevy), "change": line["change"],
                 "rationale": (line.get("provenance") or {}).get("rationale"),
                 "flags": [f["code"] for f in doc["flags"]
-                          if f["session_id"] == session["session_id"] and f["exercise_id"] == line["exercise_id"]],
+                          if not f["resolved"] and first_loads.belongs(f, session, line, doc["sessions"])],
             })
     return rows
 
@@ -1321,7 +1321,7 @@ def _build_week(root, config, today, now, span, kind, transform_name, plan_file=
     if proposal_id is not None:
         draft["id"] = proposal_id
     doc = overlay.build(draft, config, root=root, now=now)
-    doc["flags"] = validity.merge_flags(doc, validity.check_overlay(root, doc))
+    doc["flags"] = _checked_flags(root, doc)
     doc["flags"] += _week_flags(root, config, today, span, doc) + drop_flags
     doc["flags"] += external.requirement_flags(root, doc, config.hevy.enabled)
     draft = dict(draft, id=doc["id"], flags=doc["flags"])
@@ -1478,11 +1478,12 @@ def unexplained_changes(draft, proposed):
             for (session_id, day, exercise_id), message in found]
 
 
-def _locate(draft, session_id, exercise_id):
+def _locate(draft, session_id, exercise_id, day=None):
     found = [(session, line) for session in draft["sessions"] if session["session_id"] == session_id
-             for line in session["exercises"] if line["exercise_id"] == exercise_id]
+             and day in (None, session["date"]) for line in session["exercises"] if line["exercise_id"] == exercise_id]
     if not found:
-        message = f"The proposal has no line for {exercise_id} in session {session_id}"
+        on = f" on {day}" if day else ""
+        message = f"The proposal has no line for {exercise_id} in session {session_id}{on}"
         span = draft.get("span") or {}
         if span and not any(line["exercise_id"] == exercise_id
                             for session in draft["sessions"] for line in session["exercises"]):
@@ -1493,13 +1494,21 @@ def _locate(draft, session_id, exercise_id):
     return found
 
 
+def _checked_flags(root, doc):
+    """The built overlay's flags with the R-24 findings judged afresh and each first-load flag settled by its line."""
+    return first_loads.settle(validity.merge_flags(doc, validity.check_overlay(root, doc)), doc["sessions"])
+
+
 def override(root, config, proposal_id, session_id, exercise_id, new_sets, load, reason, standing, until, now,
-             today, dry_run):
-    """Change one slot's line(s) in a draft, keeping the proposal in `override.proposed_sets` (C24, C25)."""
+             today, dry_run, day=None):
+    """Change one slot's line(s) in a draft, or its line on `day` only, keeping the proposal in
+    `override.proposed_sets` (C24, C25)."""
     if not reason or not reason.strip():
         raise UsageError("--reason must say why the line is overridden")
+    if day is not None and standing:
+        raise UsageError("--date changes one day's line; a standing override covers the slot on every date")
     draft, proposed, _ = load_proposal(root, proposal_id)
-    selected = _locate(draft, session_id, exercise_id)
+    selected = _locate(draft, session_id, exercise_id, day)
     figures = bare_figures(reason)
     if figures and any(line["load_mode"] == PER_HAND_X2 for _, line in selected):
         raise ValidationError(bare_message("override", "reason", figures, exercise_id, reason, config.hevy.enabled))
@@ -1529,7 +1538,7 @@ def override(root, config, proposal_id, session_id, exercise_id, new_sets, load,
     if until is not None and not standing:
         raise UsageError("--until goes with --standing")
     doc = overlay.build(draft, config, root=root, now=now)
-    draft["flags"] = validity.merge_flags(doc, validity.check_overlay(root, doc))
+    draft["flags"] = _checked_flags(root, doc)
     decision = None
     if standing:
         until_date = decisions.standing_until(today, until)
@@ -1602,7 +1611,7 @@ def restore(root, config, proposal_id, session_id, reason, now, today, dry_run):
             if flag["code"] == "conditioning_dropped" and flag["message"] == entry["message"] and not flag["resolved"]:
                 flag.update(resolved=True, resolution=reason)
     doc = overlay.build(draft, config, root=root, now=now)
-    doc["flags"] = validity.merge_flags(doc, validity.check_overlay(root, doc))
+    doc["flags"] = _checked_flags(root, doc)
     span = dates.Span(dates.parse_date(meta["span"]["start"]), dates.parse_date(meta["span"]["end"]))
     known = {validity.flag_key(f) for f in doc["flags"]}
     doc["flags"] += [f for f in _week_flags(root, config, today, span, doc) if validity.flag_key(f) not in known]
@@ -1642,8 +1651,9 @@ def rebuild(root, config, proposal_id, today, now, dry_run):
     kept, lost = _carry_edits(root, proposal_id, draft, proposed, new_draft, config.athlete.units,
                               config.hevy.enabled)
     doc = overlay.build(new_draft, config, root=root, now=now)
-    doc["flags"] = validity.merge_flags(doc, validity.check_overlay(root, doc))
-    resolved = {_flag_identity(f): f for f in draft.get("flags", []) if f.get("resolved")}
+    doc["flags"] = _checked_flags(root, doc)
+    resolved = {_flag_identity(f): f for f in draft.get("flags", [])
+                if f.get("resolved") and not first_loads.is_automatic(f)}
     carried_resolutions = 0
     for flag in doc["flags"]:
         earlier = resolved.get(_flag_identity(flag))
@@ -1736,6 +1746,7 @@ def discard(root, proposal_id, today, dry_run):
 def show(root, config, proposal_id, now):
     draft, proposed, meta = load_proposal(root, proposal_id)
     doc = overlay.build(draft, config, root=root, now=now)
+    doc["flags"] = first_loads.settle(doc["flags"], doc["sessions"])
     lines = lines_of(doc, config.athlete.units, config.hevy.enabled)
     return {"id": proposal_id, "kind": meta["kind"], "span": meta["span"], "overlay": doc, "lines": lines,
             "lines_digest": jsonio.canonical_hash(lines), "unexplained": unexplained_changes(draft, proposed),
@@ -1816,7 +1827,7 @@ def finalize(root, config, proposal_id, now, dry_run, today=None):
                               "reason; use propose override, or give the line's override a reason",
                               details=unexplained)
     doc = overlay.build(draft, config, root=root, now=now)
-    doc["flags"] = validity.merge_flags(doc, validity.check_overlay(root, doc))
+    doc["flags"] = _checked_flags(root, doc)
     blocks = overlay.unresolved_blocks(doc)
     if blocks:
         raise RefusedError(

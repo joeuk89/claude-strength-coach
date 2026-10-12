@@ -2444,7 +2444,7 @@ Reserved codes:
 | `session_over_cap` | warn | R-24 | | Estimated session duration above its cap. |
 | `hevy_template_unresolved` | block | R-14 | | A Hevy exercise template must be mapped before approval. |
 | `hevy_routine_unmapped` | info | R-14 | | A session needs an explicit create or reuse action in the write brief. |
-| `no_data` | warn | R-23a | | No usable exposure and no start load; load left empty for the coach. |
+| `no_data` | warn | R-23a | | No usable exposure and no start load; load left empty for the coach. The message names the session date; the flag retires once that line's working sets have loads (C24). |
 | `stalled` | warn | R-23a | | No metric or matched-work effort gain over three comparable slot exposures; a coaching heuristic, not a diagnosis. Suppressed when the final proposal advances load. |
 | `prescription_unknown` | warn | R-23a | | Historical prescription unknown; no prescribed hit or miss inferred. Prescription validation still runs. |
 | `incomplete_exposure` | warn | R-23a | | Fewer working sets logged than prescribed and none fell short: linear counts no miss and holds the load, or still resets it when the misses already counted reach the limit (a coaching heuristic); below the limit, confirm whether the sets were skipped or failed. |
@@ -2589,8 +2589,10 @@ coach.validity.estimate_minutes(root, session) -> int
   working sets, and every working set at or under `rpe_cap` when the
   band has one. Loads compared are the coaching number (C18), the top
   working load on each side (the least assistance for `assisted`).
-- A line with a `no_data` flag (C10) gets no R-24 flag but
-  `load_mode_mismatch` and `load_mode_unconfirmed`.
+- A line with a `no_data` flag (C10) and a working set still without a
+  load gets no R-24 flag but `load_mode_mismatch` and
+  `load_mode_unconfirmed`. Once all its working sets have loads it is
+  checked like any other line.
 - Illness (R-02, rn:detraining-return.4, a heuristic for mild illness
   above the neck): when an `ill` miss annotation or an `ill` status day
   (C50; `coach.statusdays.ill_in(root, span)`, added by R-43) falls in the
@@ -3277,13 +3279,17 @@ propose week  ──►  .coach/proposals/<id>.json (+ .proposed.json)  ──�
 
 Output: `data.overlay` is the complete C10 overlay (approval null,
 flags filled, every line's `provenance` filled), and `data.lines` is a
-compact list `{session_id, exercise_id, text, change, rationale, flags}`
-with `text` from `units.format_load` for the coach's brief. The overlay
+compact list `{session_id, date, exercise_id, text, change, rationale,
+flags}` with `text` from `units.format_load` for the coach's brief and
+`flags` the codes of the line's open flags (a first-load flag only on its
+own date). The overlay
 id follows C10. `data.lines_digest` (R-21b) is the C7 canonical hash of
 `data.lines`; `propose show` returns it too.
 
-- `propose override --proposal ID --session S --exercise E (--sets SPEC | --load N) --reason TEXT [--standing [--until D]]`
-  changes one line, keeps the original in the line's C10 `override.proposed_sets`,
+- `propose override --proposal ID --session S --exercise E (--sets SPEC | --load N) --reason TEXT [--date D | --standing [--until D]]`
+  changes the slot's line on every date, or with `--date` only that
+  date's (exit 1 when the slot has no line that day; a standing override
+  covers every date, so it takes no `--date`), keeps the original in the line's C10 `override.proposed_sets`,
   sets its `change` against the prior agreed prescription (step 3), never
   the proposal it replaces, and records a C25 decision when standing. For a `per_hand_x2` line,
   its reason must pass C13 load-statement validation before any proposal
@@ -3291,6 +3297,18 @@ id follows C10. `data.lines_digest` (R-21b) is the C7 canonical hash of
 - `propose resolve --proposal ID --flag INDEX --resolution TEXT` resolves
   one flag on the draft. It refuses (exit 3) a `load_mode_unconfirmed`
   flag, which only a confirmed load mode clears.
+- **First-load warnings** (`coach.first_loads`). A `no_data` line flag's
+  message names its session date, `<exercise> on YYYY-MM-DD: …`, which
+  ties it to that occurrence of its slot; a message naming no date the
+  slot has (an older flag, or one a missed-day rule moved) stands for
+  every line of the slot. Each command that judges a draft's flags again
+  (`propose week`, `override`, `restore`, `rebuild`, `finalize`, and
+  `show` for its output) settles each one against its lines: once every
+  working set has a load, the flag is resolved with `first load set:
+  <loads> on <date>, not yet trained`; when a working set loses its load,
+  that automatic resolution is withdrawn and the flag is open again. A
+  resolution written with `propose resolve` stays. `propose rebuild`
+  never carries an automatic resolution over: it judges the new lines.
 - `propose restore --proposal ID --session S --reason TEXT [--dry-run]` (R-44b) puts
   a dropped conditioning session back and resolves its flag with the
   reason; finalize accepts it.
@@ -4991,7 +5009,9 @@ as it was):
   `include_unsynced`), leaves out the Hevy routine list and card parts,
   and takes its tier from the record's title, so a fresh render needs
   nothing gitignored. The skeleton warns when the window holds workouts
-  not yet synced. The overlay region is R-13's `overlay render`.
+  not yet synced. The overlay region is R-13's `overlay render`: the
+  sessions, then the open flags under **Flags** with their messages, then
+  resolved ones under **Resolved flags** with their resolutions.
 - `--refresh` refuses an `unrecognised` record (exit 1, file unchanged).
   It re-renders the week-review region only on the newest review (an
   older one is archive, C11), and every `overlay` region in the file; with `--overlay ID` it adds the collapsed prescription when
