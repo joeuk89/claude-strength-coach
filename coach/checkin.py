@@ -46,7 +46,8 @@ LABELS = {
 MISS_TAG_TEXT = " / ".join(history.MISS_TAGS)
 WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 
-SLEEP_ASK = "One line: average hours a night (from your watch or phone if it tracks sleep), and how it felt."
+SLEEP_ASK = ("One line: average hours a night, dates covered and source "
+             "(manual diary, self-reported period mean or tracker), and how it felt.")
 NUTRITION_ASK = (
     "MacroFactor: trend weight · expenditure · targets (kcal/protein) · 7-day average (kcal/protein). "
     "A screenshot works.\n"

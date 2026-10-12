@@ -403,6 +403,13 @@ such as a week's average sleep, and fills only the days no daily reading
 covers.
 _Avoid_: readiness (nothing computes a readiness score), health day
 
+**Period mean**:
+A wellness record entered by hand for a span, such as "about 6.5 h a
+night over the last two weeks". It stays self-report and keeps its
+original span. When whole, it counts toward the sleep gate's average;
+it never counts as individual nights, so it cannot show short nights.
+_Avoid_: weekly average (ambiguous with a computed average), sleep estimate
+
 **Planned activity**:
 A dated, planned bout of non-lifting training from a run plan, the coach
 or the athlete. Its record says whether it is intervals, tempo,
@@ -533,8 +540,10 @@ _Avoid_: weigh-in (one scale reading), nutrition log (the app is the log), check
 
 **Sleep gate**:
 The check `/goals` runs before agreeing a deficit: a trailing 14-day
-sleep average under ~7 h means recomp at maintenance instead. With no
-sleep source it is recorded as `pending measurement` (short sleep
-reported, recomp by default) or `not evaluated`; `/check-in` re-checks it
-during a deficit once a source exists.
+sleep average under ~7 h means recomp at maintenance instead. Dated
+hours asleep from the athlete or a tracker settle it once all 14 dates
+are covered (`reference/nutrition-sleep.md`). With no hours source it is
+recorded as `pending measurement` (short sleep reported, recomp by
+default) or `not evaluated`; `/check-in` re-checks it during a deficit
+once hours exist.
 _Avoid_: sleep check, sleep rule, recovery gate

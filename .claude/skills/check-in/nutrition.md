@@ -22,20 +22,31 @@ The numbers on file (phase, target trend rate, protein floor, target and
 stretch, anchors, any override) are in `config.toml`'s `[nutrition]`
 table; `nutrition status` returns them.
 
-**Weight trend.** `data.trend` gives the rate per week over the latest
-span of 14 days or more, next to `target_rate_per_week`; it is a number,
-not a verdict. One odd week is noise; a **2–3-week trend** off target is
-a flag. **With MacroFactor**, the app auto-adjusts targets weekly:
-usually the right response is "let it work and keep logging", not a
-manual override. **Without MacroFactor**, when a 2–3-week trend misses
-the target rate, propose moving `[nutrition] kcal_target` by ~100–150
-kcal/day in the direction the trend needs. With the athlete's yes, edit
-it in `config.toml` and note the reason in Nutrition & goals in
-`profile.md`. Never re-derive it from an equation; a fresh estimate
-comes only from `/goals` with a new phase. If the **phase itself** looks
-wrong (trend says cut while the plan says bulk, a phase trigger arrived,
-or the goal has changed), point the athlete at `/goals` rather than
-tweaking numbers here.
+**Weight trend.** Read `data.trend.basis`, `span`, `days`, rate and
+`target_rate_per_week` from `nutrition status`. Confirm the observation:
+source, dates, comparable weigh-ins, logging and temporary weight shifts.
+The endpoint trend is not proof that every intervening day was measured.
+One odd week does not automatically change calories; use a supported
+**2–3-week trend** and the athlete's agreed phase intent.
+
+**Maintenance recomp targets zero**, whether chosen voluntarily or by
+the sleep gate. For example, a confirmed -0.45 kg/week over 14 days is a
+review of the maintenance estimate, not automatically desirable cut progress. Sustained
+positive drift gets the converse review. Ask whether continued loss is
+intended: if so, route to `/goals` to review the goal/phase and sleep gate.
+For any phase, a changed goal, reached phase trigger or trend contradicting
+the plan also goes to `/goals` before changing the phase.
+
+**With MacroFactor**, the app owns calorie adjustments: review its trend,
+confirm complete logging and let it work. Never supply a competing target
+or calorie adjustment. **Without an app**, after confirming a sustained
+miss of the agreed rate, propose the existing ~100–150 kcal/day adjustment
+in the direction the trend needs (at maintenance: upward for maintenance
+loss, downward for maintenance gain). This small
+step is a coaching heuristic, not a new weight-noise cutoff. Obtain the
+athlete's yes before editing `[nutrition] kcal_target` and recording why
+in `profile.md`. Never re-derive an equation here; a fresh estimate or
+phase change belongs in `/goals`.
 
 **Act on each flag** in `data.flags`:
 
@@ -77,14 +88,11 @@ tweaking numbers here.
 running is a cue to revisit the anchors in `/goals`, not to lower the
 floor.
 
-**Sleep gate.** Once the athlete has a sleep source (a watch or phone
-that tracks sleep), take the trailing 14-day average: the tracker's own
-figure, or the mean of this and the last check-in's tracked Sleep
-fields. During a **deficit**, re-check the gate: under ~7 h fails it and
-sends the athlete to `/goals` to move to recomp at maintenance. A gate
-recorded as `pending measurement` gets its first measurement the same
-way: under ~7 h confirms recomp; at or over it, offer `/goals` to
-reconsider the deficit. Update the gate status in `profile.md`.
+**Sleep gate.** During a deficit or while `pending measurement`, follow
+`reference/nutrition-sleep.md` for manual/tracker evidence, activity setup,
+trailing 14-day coverage, the retained heuristic and profile provenance.
+Complete manual coverage resolves pending to the actual result; a period
+mean stays self-report and supplies no individual short-night count.
 
 If `nutrition status` says `enabled: false`, just note the scale weight
 in the record and prompt `/goals` to get set up.

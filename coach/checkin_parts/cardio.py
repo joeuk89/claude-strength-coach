@@ -44,7 +44,7 @@ def _runs(numbers, missed):
 
 
 def _sleep(ctx, config):
-    """The tracked nights stated for confirmation, or None (the builtin ask) when too few nights have data."""
+    """The nightly observations stated for confirmation, or None (the builtin ask) when too few nights have data."""
     settings = config["cardio"]
     nights = dates.Span(ctx.today - timedelta(days=cardio.NIGHTS - 1), ctx.today)
     store = ActivityStore(ctx.root, config)
@@ -52,5 +52,6 @@ def _sleep(ctx, config):
     if summary["nights"] < settings["sleep_min_nights"]:
         return None
     short, _, _ = cardio.sleep_judgement(store, settings, ctx.today)
-    return Field(prefill=(f"Tracked: {summary['avg_asleep_hours']:g} h a night over {summary['nights']} nights, "
+    return Field(prefill=(f"Recorded: {summary['nightly_avg_asleep_hours']:g} h a night "
+                          f"over {summary['nights']} nights, "
                           f"{short} under {settings['sleep_short_hours']:g} h."), ask=SLEEP_ASK)

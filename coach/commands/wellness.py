@@ -1,10 +1,14 @@
 """`wellness` commands: sleep and daily health readings (contract C29, C30)."""
 
-from coach import units
+from datetime import timedelta
+
+from coach import dates, units
 from coach.activity import actions
 from coach.commands import arg, command
 from coach.commands.activity import SPAN_ARGS
 from coach.errors import ValidationError
+
+SLEEP_GATE_HOURS = 7
 
 FIELDS = ("sleep_hours", "in_bed_hours", "resting_hr", "steps", "body_mass", "body_fat_pct")
 
@@ -16,14 +20,24 @@ def list_days(args, ctx):
     return {"span": span.to_json(), "days": store.wellness_days(span)}
 
 
-@command("wellness summary", help="Average sleep over the span and each night's hours and source", args=SPAN_ARGS)
+@command("wellness summary", help="Sleep average with nightly and period-mean provenance", args=SPAN_ARGS)
 def summary(args, ctx):
     store = actions.store_for(ctx)
     span = actions.span(args, ctx)
-    nights = [{"date": day["date"], "asleep_hours": day["sleep"].get("asleep_hours"),
-               "in_bed_hours": day["sleep"].get("in_bed_hours"), "source": day["field_sources"]["sleep"]}
-              for day in store.wellness_days(span) if day["sleep"] is not None]
-    return {"span": span.to_json(), "sleep": store.sleep_summary(span), "nights": nights}
+    sleep = store.sleep_summary(span)
+    nights = [dict(day, source=day["provenance"]["source"])
+              for day in store.asleep_days(span) if day["provenance"]["kind"] == "nightly"]
+    trailing = dates.Span(ctx.today() - timedelta(days=13), ctx.today())
+    gate = {"status": "pending measurement", "span": trailing.to_json(),
+            "basis": "low-confidence coaching heuristic", "claim": "rn:sleep-dieting.3"}
+    if span != trailing:
+        gate["reason"] = "request the trailing 14-day span shown here"
+    elif not sleep["complete"]:
+        gate["reason"] = "incomplete hours coverage; retain the missing dates and original source spans"
+    else:
+        gate["status"] = "recomp" if sleep["avg_asleep_hours"] < SLEEP_GATE_HOURS else "passed"
+        gate["reason"] = "maintenance" if gate["status"] == "recomp" else "offer goals review before a deficit"
+    return {"span": span.to_json(), "sleep": sleep, "nights": nights, "sleep_gate": gate}
 
 
 @command(

@@ -501,7 +501,7 @@ covers the rest of the profile):
 | anchors: name, slot, days, macros or card | how the anchors were chosen; what the athlete likes |
 | the active override: dates, what, reason, exit condition, renewal count | — |
 | staples, office days, standing coverage, plan style (R-33c) | food likes, dislikes, allergies/intolerances, cooking appetite, shopping pattern |
-| — | sleep-gate status and reasoning (until an activity source, C29) |
+| — | sleep-gate status, reasoning and source/period coverage (C29; reference/nutrition-sleep.md) |
 | — | the MacroFactor setup summary and revision notes |
 
 Before the first `/meal-plan` setup, the athlete's answers for the R-33c
@@ -3093,7 +3093,9 @@ R-32 and is registered in `coach/flags/research.py`.
   source the newest `recorded_at` wins. Wellness resolves per day and per
   field by the same precedence; `sleep` is one field (an object with
   either hours set counts as a value); a span record fills only days with
-  no daily value.
+  no daily value. Hours asleep alone resolve by the same order among the
+  records that have them, so a record with only time in bed never hides
+  them (`asleep_days`).
 - Readers never parse the files themselves. They use
   `coach.activity.store.ActivityStore(root, config)`:
   - `activities(span, kinds=None) -> list[dict]`: resolved Activities
@@ -3101,9 +3103,29 @@ R-32 and is registered in `coach/flags/research.py`.
   - `planned(span, kinds=None) -> list[dict]`: resolved planned activities.
   - `wellness_days(span) -> list[dict]`: one resolved day per date in the
     span that has any value.
+  - `asleep_days(span) -> list[{date, asleep_hours, in_bed_hours,
+    provenance}]`: one entry per date with hours asleep, `provenance` as
+    in `field_provenance`. `sleep_summary`, `wellness summary` `nights`
+    and `sleep_debt` read hours asleep from it.
   - `sleep_summary(span) -> {"avg_asleep_hours": float|null, "nights": int,
-    "nights_in_span": int, "sources": [str]}`, averaged over nights with a
-    value (a span record counts once per covered day without a daily value).
+    "nights_in_span": int, "sources": [str], ...}`: `nights` counts actual
+    nightly observations. `nightly_avg_asleep_hours` uses those only.
+    The overall average weights whole, non-overlapping source periods
+    by their days. Both averages are summed exactly from the recorded
+    decimal hours and rounded down to 0.01 h, so a shown 7.0 is never
+    under 7 h and the two agree on the same nights; a
+    clipped or partially superseded period is excluded,
+    never used to infer its missing nights. `evidence` retains id, source,
+    original span, kind (`nightly`/`period_mean`), hours, `self_report`,
+    resolved dates and `included_in_average`. `covered_dates`,
+    `missing_dates` and `complete` describe eligible average coverage.
+    `wellness summary` returns actual `nights` separately and a read-only
+    `sleep_gate` for the trailing 14 dates ending today: complete
+    coverage whose overall average is under 7 h is `recomp`, otherwise
+    `passed`; incomplete or non-trailing coverage is `pending
+    measurement`. Profile status and
+    approved phase edits remain the coach's job. The gate is a
+    low-confidence coaching heuristic (rn:sleep-dieting.3).
   - `records(kind, include_void=False)`: the last raw line per id, voided
     ids left out unless `include_void`; `lines(kind)` gives every line
     in file order and `history(kind, id)` one id's lines, for audits and
@@ -3175,7 +3197,10 @@ Wellness record (`wellness_record.schema.json`):
   bump.
 
 Resolved wellness day: `{"date", "sleep", "resting_hr_bpm", "hrv_ms",
-"steps", "body_mass_kg", "body_fat_pct", "field_sources": {field: source}}`.
+"steps", "body_mass_kg", "body_fat_pct", "field_sources": {field: source},
+"field_provenance": {field: {id, source, span, kind}}}`. Each field retains
+its original record span; a period mean never establishes individual
+short nights for the separate seven-day fatigue decision.
 
 - Readers get records without `schema_version`, `op`, `recorded_at` and
   `content_hash`; resolved Activities and wellness days are built from
@@ -5796,7 +5821,7 @@ week-flag provider in `propose week`; registered in
 | `cap_breach` | Logged week, and planned week at `review`/`program`: run distance or minutes above the weekly cap; any single run above the single-run cap; quality activities above `weekly_quality`. One flag per cap broken, naming value, cap and unit. A planned record with only a duration target is checked on minutes only. |
 | `run_volume_spike` | A run whose distance (else minutes) exceeds `spike_ratio` × the longest logged run in the `spike_lookback_days` before its date. Warn logged, info planned. No reference run, or store history shorter than the lookback (the store's first logged Activity, any kind, is fewer than `spike_min_history_days` before the run): listed in `data.skipped` with the reason, not flagged (rn:running-load.1, rn:running-load.4). |
 | `quality_stack` | Two quality bouts on the same or consecutive local dates, logged or planned. Lifting is not part of it; lifting against runs is `collision` (C51). |
-| `sleep_debt` | Over the 7 nights ending on the evaluation date (C30 wellness, resolved): at least `sleep_min_nights` with a value and at least `sleep_debt_nights` below `sleep_short_hours`. Evaluation date: the span's last day for `--week` and `--span`, or today when the span ends later; today for proposals. |
+| `sleep_debt` | Over the 7 nights ending on the evaluation date (C30 `asleep_days`): at least `sleep_min_nights` nightly observations of hours asleep (a period mean counts for none) and at least `sleep_debt_nights` of them below `sleep_short_hours`. Evaluation date: the span's last day for `--week` and `--span`, or today when the span ends later; today for proposals. |
 | `status_active` | A status day overlaps the span or today. Warn `ill`/`injured` (`injured` adds "check with a qualified professional"), info `travel`. |
 | `niggle_link` | An active niggle's `applies_to.activity_kinds` holds the kind of a logged or planned activity in the span. The message gives the count and distance of those activities. |
 

@@ -127,7 +127,8 @@ The numbers (phase, trend rate, protein, anchors, any override) are in `config.t
 - **Protein basis:** <why this reference mass: the body-fat reading, its method and date>
 - **Anchors:** <how they were chosen; what the athlete likes>
 - **Override:** <the story behind an active one, if any>
-- **Sleep gate:** passed (<14-day avg>, <date>) | recomp (<14-day avg>, <date>) | pending measurement (<what was reported>) | not evaluated
+- **Sleep gate:** passed | recomp | pending measurement | not evaluated
+  — <assessment date; supported 14-day average; covered dates; source; nightly / self-reported period mean; missing coverage>
 
 _Revised: YYYY-MM-DD_
 ```

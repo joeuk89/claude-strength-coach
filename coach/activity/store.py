@@ -5,7 +5,9 @@ removes the record from every view. Dedup and precedence happen here, at
 read time, and never rewrite a file.
 """
 
+import math
 from datetime import timedelta
+from fractions import Fraction
 from pathlib import Path
 
 from coach import dates, jsonio, paths
@@ -29,6 +31,17 @@ def _has(field, value):
         return isinstance(value, dict) and (value.get("asleep_hours") is not None
                                             or value.get("in_bed_hours") is not None)
     return value is not None
+
+
+def _provenance(record):
+    span = record["span"]
+    return {"id": record["id"], "source": record["source"], "span": span,
+            "kind": "nightly" if span["start"] == span["end"] else "period_mean"}
+
+
+def _floor_hundredths(value):
+    # Rounding down keeps a shown 7.0 from hiding a mean just under a 7-hour threshold.
+    return math.floor(value * 100) / 100
 
 
 class ActivityStore:
@@ -114,7 +127,8 @@ class ActivityStore:
                  if span.contains(dates.parse_date(r["date"])) and (kinds is None or r["kind"] in kinds)]
         return sorted(found, key=lambda r: (r["date"], self.rank(r["source"]), r["id"]))
 
-    def wellness_days(self, span):
+    def _wellness_candidates(self, span):
+        """(day, records covering it): daily records first, then span records, each by precedence."""
         daily, spans = {}, []
         for record in self.records("wellness"):
             start, end = (dates.parse_date(record["span"][key]) for key in ("start", "end"))
@@ -122,30 +136,66 @@ class ActivityStore:
                 daily.setdefault(start, []).append(record)
             else:
                 spans.append((dates.Span(start, end), record))
-        days = []
         for day in span.days():
-            candidates = (self._by_precedence(daily.get(day, []))
-                          + self._by_precedence([r for s, r in spans if s.contains(day)]))
-            resolved, sources = {"date": day.isoformat()}, {}
+            yield day, (self._by_precedence(daily.get(day, []))
+                        + self._by_precedence([r for s, r in spans if s.contains(day)]))
+
+    def wellness_days(self, span):
+        days = []
+        for day, candidates in self._wellness_candidates(span):
+            resolved, sources, provenance = {"date": day.isoformat()}, {}, {}
             for field in WELLNESS_FIELDS:
                 resolved[field] = None
                 for record in candidates:
                     if _has(field, record.get(field)):
                         resolved[field] = record[field]
                         sources[field] = record["source"]
+                        provenance[field] = _provenance(record)
                         break
             if sources:
                 resolved["field_sources"] = sources
+                resolved["field_provenance"] = provenance
                 days.append(resolved)
         return days
 
+    def asleep_days(self, span):
+        """One entry per date with hours asleep, from the highest-ranked record that has them."""
+        found = []
+        for day, candidates in self._wellness_candidates(span):
+            record = next((r for r in candidates if (r.get("sleep") or {}).get("asleep_hours") is not None), None)
+            if record is not None:
+                found.append({"date": day.isoformat(), "asleep_hours": record["sleep"]["asleep_hours"],
+                              "in_bed_hours": record["sleep"].get("in_bed_hours"),
+                              "provenance": _provenance(record)})
+        return found
+
     def sleep_summary(self, span):
-        nights = [(day["sleep"]["asleep_hours"], day["field_sources"]["sleep"])
-                  for day in self.wellness_days(span)
-                  if day["sleep"] is not None and day["sleep"].get("asleep_hours") is not None]
-        average = round(sum(hours for hours, _ in nights) / len(nights), 2) if nights else None
-        return {"avg_asleep_hours": average, "nights": len(nights), "nights_in_span": len(span.days()),
-                "sources": sorted({source for _, source in nights})}
+        evidence = {}
+        for day in self.asleep_days(span):
+            provenance = day["provenance"]
+            item = evidence.setdefault(provenance["id"], dict(
+                provenance, asleep_hours=day["asleep_hours"],
+                self_report=provenance["source"] == "manual", resolved_dates=[]))
+            item["resolved_dates"].append(day["date"])
+        covered, weighted_hours, nightly_hours = [], Fraction(0), []
+        for item in evidence.values():
+            original = dates.Span(*(dates.parse_date(item["span"][key]) for key in ("start", "end")))
+            original_dates = [day.isoformat() for day in original.days()]
+            # A period mean cannot recover the average of only its unobserved or clipped nights.
+            item["included_in_average"] = item["resolved_dates"] == original_dates
+            if item["included_in_average"]:
+                covered.extend(original_dates)
+                weighted_hours += Fraction(str(item["asleep_hours"])) * len(original_dates)
+            if item["kind"] == "nightly":
+                nightly_hours.append(Fraction(str(item["asleep_hours"])))
+        missing = sorted({day.isoformat() for day in span.days()} - set(covered))
+        return {"avg_asleep_hours": _floor_hundredths(weighted_hours / len(covered)) if covered else None,
+                "nightly_avg_asleep_hours": (_floor_hundredths(sum(nightly_hours) / len(nightly_hours))
+                                             if nightly_hours else None),
+                "nights": len(nightly_hours), "nights_in_span": len(span.days()),
+                "covered_dates": sorted(covered), "missing_dates": missing, "complete": not missing,
+                "sources": sorted({item["source"] for item in evidence.values()}),
+                "evidence": list(evidence.values())}
 
     def change(self, kind, line):
         """Whether appending `line` changes anything: a new or changed record, or a void of a live one."""

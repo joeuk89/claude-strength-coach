@@ -13,7 +13,9 @@ STATUS_DAYS = 14
 
 def store_for(ctx):
     if not ctx.config.activity.enabled:
-        raise ConfigError("[activity] enabled is false in config.toml; set it to true to use activity sources")
+        raise ConfigError("[activity] enabled is false in config.toml: with the athlete's approval, set "
+                          "[activity] enabled = true through /setup, then run config validate. "
+                          "Manual entries need no watch or tracker")
     return ActivityStore(ctx.root, ctx.config)
 
 
