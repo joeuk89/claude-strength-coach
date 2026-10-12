@@ -5,7 +5,8 @@ and the same hard-set rule), so the two compare like for like. The 70 % and
 80 % adherence thresholds and the three-of-four undershoot rule are coaching
 heuristics (R-02), not research cut-offs. `DEFAULT_TARGET` is the low end
 of the weekly range (rn:volume-frequency.1); `SESSION_CEILING` is the
-per-session ceiling (rn:volume-frequency.3).
+per-session ceiling (rn:volume-frequency.3). `MINIMUM_SHARE` compares ordinary
+programmed dose as application policy (rn:minimum-effective-dose.6).
 """
 
 from dataclasses import dataclass, field
@@ -565,16 +566,12 @@ def _new_sessions(current, candidate):
 
 def _balance(inst, program_doc, candidate):
     reference = inst.week(inst.today + timedelta(days=1))
+    external = _week_external(program_doc, reference)
     positions, totals = [], {}
     for position, planned in _cycle(inst, program_doc, reference):
-        dose, rows = {}, []
-        for day, session_id in planned:
-            session = inst.program_session(session_id, program_doc)
-            rows.append({"date": day.isoformat(), "session_id": session_id, "tier": session["tier"]})
-            if session["tier"] == "core" and session["kind"] == "lifting":
-                _add(dose, session_dose(inst.library, session))
-        for external in program_doc["external_sessions"]:
-            _add(dose, external["estimated_sets"])
+        rows = [{"date": day.isoformat(), "session_id": session_id,
+                 "tier": inst.program_session(session_id, program_doc)["tier"]} for day, session_id in planned]
+        dose = _ordinary_dose(inst, program_doc, planned, external)
         _add(totals, dose)
         positions.append({"position": position, "sessions": rows,
                           "external": [e["id"] for e in program_doc["external_sessions"]], "muscles": _rounded(dose)})
@@ -920,9 +917,53 @@ def _hard_sets(line):
     return sum(s.get("count", 1) for s in line["sets"] if _is_hard(s))
 
 
-def _minimum_position(inst, program_doc, position, planned, target):
-    """One position's sessions, dose against a third of each target, priority floors, and its reasons."""
+def _week_external(program_doc, span, retained=None):
+    """Each coach-led session once in the week: on its weekday's date, or with no date when it has no weekday."""
+    rows = []
+    for external in program_doc["external_sessions"]:
+        if retained is not None and external["id"] not in retained:
+            continue
+        days = [day for day in span.days() if base.WEEKDAYS[day.weekday()] == external["weekday"]]
+        rows.append({"external_id": external["id"], "title": external["title"],
+                     "date": days[0].isoformat() if days else None,
+                     "estimated_sets": dict(external["estimated_sets"])})
+    return rows
+
+
+def _is_core_lifting(session):
+    return session["tier"] == "core" and session["kind"] == "lifting"
+
+
+def _ordinary_dose(inst, program_doc, planned, external):
+    """One ordinary week's planned dose: its core lifting sessions plus the coach-led estimates."""
+    dose = {}
+    for _, session_id in planned:
+        session = inst.program_session(session_id, program_doc)
+        if _is_core_lifting(session):
+            _add(dose, session_dose(inst.library, session))
+    for row in external:
+        _add(dose, row["estimated_sets"])
+    return dose
+
+
+def _minimum_reference(inst, program_doc, cycle, reference_position, external):
+    """The ordinary dose a minimum position is checked against, None when unmatched, and the fields naming its sources.
+
+    A fixed ordinary schedule's position is None, so only a null `reference_sessions` marks an unmatched position.
+    """
+    if reference_position not in cycle:
+        return None, {"reference_position": None, "reference_sessions": None, "reference_external": None}
+    planned = cycle[reference_position]
+    rows = [{"date": day.isoformat(), "session_id": session_id} for day, session_id in planned
+            if _is_core_lifting(inst.program_session(session_id, program_doc))]
+    return _ordinary_dose(inst, program_doc, planned, external), {
+        "reference_position": reference_position, "reference_sessions": rows, "reference_external": external}
+
+
+def _minimum_position(inst, program_doc, position, planned, external, *, ordinary, reference):
     prefix = f"{position}: " if position else ""
+    named = reference["reference_position"]
+    dose_prefix = prefix or (f"against ordinary {named}: " if named else "")
     reasons = []
     if len(planned) > MINIMUM_MAX_SESSIONS:
         reasons.append(f"{prefix}the schedule plans {len(planned)} sessions in the week; a minimum week has at most "
@@ -937,12 +978,14 @@ def _minimum_position(inst, program_doc, position, planned, target):
                      "within_cap": within})
         if not within:
             reasons.append(f"{prefix}{session_id}: estimated {minutes} min, over its {cap} min cap")
-        if session["kind"] == "lifting":
+        if _is_core_lifting(session):
             _add(dose, session_dose(inst.library, session))
         for line in session["exercises"]:
             sets = _hard_sets(line)
             if sets > carried.get(line["exercise_id"], (0, None))[0]:
                 carried[line["exercise_id"]] = (sets, session_id)
+    for session in external:
+        _add(dose, session["estimated_sets"])
     floors = []
     for lift in program_doc["priority"]:
         sets, session_id = carried.get(lift["exercise_id"], (0, None))
@@ -954,31 +997,46 @@ def _minimum_position(inst, program_doc, position, planned, target):
             reasons.append(f"{prefix}no session carries the priority floor of {needed} working sets of "
                            f"{_name(inst, lift['exercise_id'])}{held}")
     muscles = {}
-    for muscle in sorted(target):
-        third = target[muscle] * MINIMUM_SHARE
+    for muscle in sorted(set(ordinary or {}) | set(dose)):
+        ordinary_sets = ordinary.get(muscle, 0.0) if ordinary is not None else None
+        third = ordinary_sets * MINIMUM_SHARE if ordinary_sets is not None else None
         planned_sets = dose.get(muscle, 0.0)
-        met = planned_sets >= third - 1e-9
-        muscles[muscle] = {"target": target[muscle], "third": _round(third), "planned": _round(planned_sets),
-                           "met": met}
-        if not met:
-            reasons.append(f"{prefix}{muscle}: {_round(planned_sets)} fractional sets planned, below a third of its "
-                           f"target of {_round(target[muscle])} ({_round(third)})")
-    return {"position": position, "sessions": rows, "muscles": muscles, "priority": floors}, reasons
+        met = planned_sets >= third - 1e-9 if third is not None else None
+        muscles[muscle] = {"ordinary": _round(ordinary_sets) if ordinary_sets is not None else None,
+                           "third": _round(third) if third is not None else None,
+                           "planned": _round(planned_sets), "met": met}
+        if met is False:
+            reasons.append(f"{dose_prefix}{muscle}: {_round(planned_sets)} fractional sets planned, below a third "
+                           f"of its ordinary dose of {_round(ordinary[muscle])} ({_round(third)})")
+    return {"position": position, **reference, "sessions": rows, "external": external, "muscles": muscles,
+            "priority": floors}, reasons
 
 
-def _minimum_balance(inst, program_doc):
+def _minimum_balance(inst, program_doc, reference=None):
     minimum = _minimum_week(program_doc)
-    reference = inst.week(inst.today + timedelta(days=1))
+    reference = reference or inst.week(inst.today + timedelta(days=1))
     target = targets(program_doc, inst.library)
     reasons = []
     if len(minimum["sessions"]) > MINIMUM_MAX_SESSIONS:
         reasons.append(f"it lists {len(minimum['sessions'])} sessions; a minimum week has at most "
                        f"{MINIMUM_MAX_SESSIONS}")
     positions = []
-    for position, planned in _cycle(inst, program_doc, reference, minimum["schedule"], set(minimum["sessions"])):
-        row, found = _minimum_position(inst, program_doc, position, planned, target)
-        positions.append(row)
-        reasons += [reason for reason in found if reason not in reasons]
+    ordinary_cycle = dict(_cycle(inst, program_doc, reference))
+    minimum_cycle = dict(_cycle(inst, program_doc, reference, minimum["schedule"], set(minimum["sessions"])))
+    reference_external = _week_external(program_doc, reference)
+    external = _week_external(program_doc, reference, set(minimum.get("external_sessions", [])))
+    if None not in ordinary_cycle and None not in minimum_cycle and ordinary_cycle.keys() != minimum_cycle.keys():
+        reasons.append("ordinary and minimum rotating schedules must use the same position names; "
+                       "use matching names or a fixed minimum schedule")
+    for position, planned in minimum_cycle.items():
+        references = [ref for ref in ordinary_cycle if position is None or ref is None or position == ref]
+        for reference_position in references or [None]:
+            ordinary, fields = _minimum_reference(inst, program_doc, ordinary_cycle, reference_position,
+                                                  reference_external)
+            row, found = _minimum_position(inst, program_doc, position, planned, external, ordinary=ordinary,
+                                           reference=fields)
+            positions.append(row)
+            reasons += [reason for reason in found if reason not in reasons]
     return {"variant": "minimum", "reference_week": reference.label(), "sessions": list(minimum["sessions"]),
             "schedule": minimum["schedule"], "positions": positions, "targets": target, "passed": not reasons,
             "reasons": reasons, "flags": []}
@@ -1004,10 +1062,11 @@ def minimum(root, week_start, *, write=False, dry_run=False, today=None, now=Non
                 "span": span.to_json(),
                 "sessions": [{"date": day.isoformat(), "session_id": session_id,
                               "title": inst.program_session(session_id)["title"]} for day, session_id in planned],
+                "external_sessions": _week_external(inst.program, span, set(minimum_week.get("external_sessions", []))),
                 "rotation": None, "flags": []}
     path = minimum_plan_path(span.start)
     if write:
         jsonio.write_doc(inst.root / path, plan_doc, dry_run)
-    report = _minimum_balance(inst, inst.program)
+    report = _minimum_balance(inst, inst.program, span)
     return {"week": span.label(), "span": span.to_json(), "plan": plan_doc, "path": path.as_posix(),
             "written": write and not dry_run, "balance": {"passed": report["passed"], "reasons": report["reasons"]}}

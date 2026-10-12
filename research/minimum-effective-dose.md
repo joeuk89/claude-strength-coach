@@ -32,7 +32,7 @@ year = 2020
 
 [[claims]]
 n = 1
-text = "Cutting weekly sets to about one third while keeping the load and effort the same maintains size and strength for several months."
+text = "In younger adults, reducing the preceding training dose to about one third while maintaining intensity can preserve size and strength for several months; this is not a universal maintenance guarantee."
 basis = "evidence"
 sources = ["bickel-2011", "spiering-2021"]
 status = "current"
@@ -65,6 +65,13 @@ text = "An exercise folded into another session after a missed day carries 2 wor
 basis = "heuristic"
 sources = ["spiering-2021", "androulakis-korakakis-2020"]
 status = "current"
+
+[[claims]]
+n = 6
+text = "The minimum-week check uses one third of the corresponding ordinary programmed weekly fractional-muscle dose, including every coach-led estimate the ordinary week counts, as application policy rather than a research-validated threshold."
+basis = "heuristic"
+sources = ["bickel-2011"]
+status = "current"
 -->
 <!-- coach:begin research minimum-effective-dose -->
 
@@ -72,11 +79,12 @@ status = "current"
 
 | # | Claim | Basis | Sources | Status |
 | --- | --- | --- | --- | --- |
-| 1 | Cutting weekly sets to about one third while keeping the load and effort the same maintains size and strength for several months. | evidence | bickel-2011, spiering-2021 | current |
+| 1 | In younger adults, reducing the preceding training dose to about one third while maintaining intensity can preserve size and strength for several months; this is not a universal maintenance guarantee. | evidence | bickel-2011, spiering-2021 | current |
 | 2 | Lifters aged about 60 and over need more than one third of their usual weekly sets to keep muscle size, so their maintenance dose stays nearer their normal training. | evidence | bickel-2011, spiering-2021 | current |
 | 3 | One hard set per exercise of 6–12 reps at about 70–85 % of 1RM, done 2–3 times a week, still builds 1RM strength in trained lifters. | evidence (low confidence) | androulakis-korakakis-2020 | current |
 | 4 | A priority lift keeps a floor of 2 hard sets at its prescribed load in a disrupted week, a margin above the single set that still builds strength. | heuristic | androulakis-korakakis-2020, spiering-2021 | current |
 | 5 | An exercise folded into another session after a missed day carries 2 working sets by default, one above the single-set floor. | heuristic | spiering-2021, androulakis-korakakis-2020 | current |
+| 6 | The minimum-week check uses one third of the corresponding ordinary programmed weekly fractional-muscle dose, including every coach-led estimate the ordinary week counts, as application policy rather than a research-validated threshold. | heuristic | bickel-2011 | current |
 
 | Source | Citation | Type | Year |
 | --- | --- | --- | --- |
@@ -88,10 +96,10 @@ status = "current"
 
 ## Answer
 
-Keeping the load and effort the same while cutting weekly sets to about a
-third holds size and strength for months; older lifters need more. Even
-one hard set per exercise, 2–3 times a week, still builds strength in
-trained lifters. Intensity is what must not drop.
+A reduced dose can maintain adaptations when intensity stays high, but
+retention depends on age and the preceding training dose. The app compares
+minimum weeks with ordinary programmed weeks as a coaching policy, not a
+universal guarantee; older lifters may need substantially more work.
 
 ## Evidence
 
@@ -105,7 +113,8 @@ et al. (2021), a narrative review, concludes that strength and size can
 be kept "for up to 32 weeks with as little as 1 session of strength
 training per week and 1 set per exercise, as long as exercise intensity"
 is maintained, and that intensity "seems to be the key variable". One
-third is therefore a conservative figure for young lifters.
+third describes a reduction from prior training, not a fraction of a generic
+hypertrophy target; it is not a guarantee for every lifter.
 
 **Claim 2.** In Bickel et al., neither maintenance dose kept the
 hypertrophy of the 60–75-year-olds, who "require a higher dose of weekly
@@ -130,10 +139,19 @@ Androulakis-Korakakis et al. support 1 set per exercise as the floor;
 the second set is a margin, chosen so the session it lands in stays
 short. It is not a tested figure.
 
+**Claim 6.** The app applies an approximate one-third comparison to each
+muscle's fractional hard sets in the corresponding ordinary program week.
+Every coach-led estimate the ordinary week counts enters the reference; only
+sessions explicitly retained in the minimum week enter its planned dose. Bickel studied reductions
+from prior exercise dose, not this fractional-muscle calculation. The check
+is application policy and passing it does not prove maintenance, especially
+for older lifters.
+
 ## Applying it
 
 - In a disrupted stretch, cut sets before load: keep each lift at its
-  prescribed load and RPE, and cut weekly sets to about a third.
+  prescribed load and RPE. Compare reduced sets with the ordinary program's
+  dose, keeping the age and evidence limits above visible.
 - For an athlete in their 60s or older, keep maintenance nearer normal
   training: about 2 sessions a week and 2–3 sets per exercise.
 - When time is very short, one hard set per main lift, 2–3 times a week,

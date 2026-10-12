@@ -64,6 +64,8 @@ def normalised(doc):
     doc.setdefault("dose_targets", {})
     doc.setdefault("priority", [])
     doc.setdefault("minimum_week", None)
+    if doc["minimum_week"] is not None:
+        doc["minimum_week"].setdefault("external_sessions", [])
     for lift in doc["priority"]:
         lift["kpi"].setdefault("target", None)
         lift["kpi"].setdefault("by", None)
@@ -256,6 +258,15 @@ def _minimum_week_errors(doc):
         elif status[session_id] != MINIMUM_WEEK_STATUS:
             errors.append(Error(path, f"{session_id} is {status[session_id]}; a minimum-week session is "
                                       f"{MINIMUM_WEEK_STATUS}"))
+    externals = {external["id"] for external in doc["external_sessions"]}
+    seen = set()
+    for index, external_id in enumerate(minimum.get("external_sessions", [])):
+        path = f"$.minimum_week.external_sessions[{index}]"
+        if external_id in seen:
+            errors.append(Error(path, f"{external_id} is listed twice"))
+        seen.add(external_id)
+        if external_id not in externals:
+            errors.append(Error(path, f"no external session {external_id}"))
     return errors
 
 
@@ -616,6 +627,9 @@ def _priority_lines(doc, library):
         lines += ["", "## Minimum week", "",
                   f"Sessions: {', '.join(f'`{session_id}`' for session_id in minimum['sessions'])}. "
                   f"Schedule rule: {_named(minimum['schedule']['rule'], minimum['schedule']['params'])}."]
+        if minimum.get("external_sessions"):
+            retained = ', '.join(f'`{external_id}`' for external_id in minimum['external_sessions'])
+            lines.append(f"Retained coach-led sessions: {retained}.")
     return lines
 
 

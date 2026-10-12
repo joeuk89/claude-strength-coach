@@ -1673,11 +1673,13 @@ program to v4 and overlay (and its draft) to v3 (C37). R-44a took
 program to v5 (`interference`, C51). R-30b took program to v6
 (`priority`, `minimum_week`, C40) and overlay (and its draft) to v4 (a
 fold's `rule_id` may be a priority floor rule's id, C40). R-44b took
-program to v7 (session `scheme`, C51). Every later
-bump takes the next free version when it merges and adds one step to the
-R-17a migration chain, so the chain stays linear.
+program to v7 (session `scheme`, C51), and program v8 adds the minimum
+week's retained coach-led sessions (`minimum_week.external_sessions`, C40).
+Every later bump takes the next free version when it merges and adds one
+step to the R-17a migration chain, so the chain stays linear.
 Program bumps: R-22 (executable `missed_day_rules`, C37), R-30b (`priority`, `minimum_week`, C40), R-44a
-(`interference`, C51), R-44b (session `scheme`, C51). State bump: R-31
+(`interference`, C51), R-44b (session `scheme`, C51), v8
+(`minimum_week.external_sessions`, C40). State bump: R-31
 took state to v4 (`block`, C42). Overlay: R-24 takes it to v2 (C21), R-22 to v3 (C37) and R-30b to v4 (C40). A
 brief or section that names a version number means the next free one.
 
@@ -4633,8 +4635,11 @@ null`:
   inserted; the next week's own session carries the lift.
 - `minimum_week.sessions` are session ids with `status: standby`.
   `structure balance --variant minimum` checks: at most two sessions, each
-  within its C19 cap, every priority floor present, every target at least
-  one third met. `structure minimum --week W --write` writes the plan file
+  within its C19 cap, every priority floor present, and at least one third
+  of the corresponding ordinary programmed dose (rn:minimum-effective-dose.6).
+  This fractional-muscle check is application policy, not a maintenance
+  guarantee; retain the older-lifter caveat (rn:minimum-effective-dose.2).
+  `structure minimum --week W --write` writes the plan file
   `.coach/plans/<week start>-minimum.json` (C6), a C23 `SchedulePlan` for
   `propose week --plan`. The overlay stays kind `weekly`; the plan file
   makes the week kind `minimum` (C41), which adherence skips and the
@@ -4651,7 +4656,7 @@ null`:
   listed twice or unknown, and the minimum week's schedule rule and
   params as it does `$.schedule`, at `$.minimum_week.schedule`. The two
   limits `structure balance --variant minimum` checks (two sessions, a
-  third of each target) are not schema rules, so a program can hold a
+  third of ordinary dose) are not schema rules, so a program can hold a
   minimum week that fails them and the check names why.
 - **Synthetic rule id.** One rule covers every priority lift the missed
   session carried (alongside a program fold, only those the fold leaves
@@ -4710,26 +4715,66 @@ null`:
   session moved from it, was trained), `pending` (that make-up is still
   upcoming) and `unreplaced`. Each week with `unreplaced` raises one
   `priority_exposures_missed`, naming the misses.
+- **Program v8.** Optional `minimum_week.external_sessions` lists retained
+  coach-led ids, default `[]`; migration `0007_minimum_external_sessions`
+  adds the empty list to configured minimums and preserves null minimums.
+  Validation rejects unknown or duplicate external ids. A retained session
+  keeps its ordinary `weekday`, or stays undated when it has none; the
+  minimum plan records it separately from the self-programmed sessions.
 - `structure balance --variant minimum` returns `variant`,
   `reference_week` (the week holding tomorrow), `sessions`, `schedule`,
-  `targets`, `positions` (per position of the minimum week's schedule:
-  `sessions` with `minutes`, `cap_minutes`, `within_cap`; `muscles` with
-  `target`, `third`, `planned`, `met`; `priority` with `floor_sets`,
-  `sets`, `session_id`, `met`), `passed`, `reasons` and `flags` (empty).
-  Coach-led sessions are not counted: the minimum week stands on its own
-  sessions. Session minutes are R-24's estimate
-  (`coach.validity.estimate_minutes`). A floor is met by one session
-  holding at least `floor.sets` hard working sets of the lift. On a
-  failure it exits 1 with each reason as a detail at `$.minimum_week`
-  and the report kept in `data` (C3).
+  `targets` (general dose targets, informational only), `positions`,
+  `passed`, `reasons` and `flags` (empty). Each comparison gives `position`
+  (minimum schedule), `reference_position` (ordinary schedule),
+  `reference_sessions` and `reference_external` (ordinary dose sources),
+  `sessions` with `minutes`, `cap_minutes`, `within_cap`, and retained
+  `external` rows with `date`, `external_id`, `title`, `estimated_sets`.
+  `muscles` gives `ordinary`, `third`, `planned`, `met`; `priority` gives
+  `floor_sets`, `sets`, `session_id`, `met`. The ordinary planned dose is
+  the one the ordinary balance counts for that position: its scheduled
+  active core lifting sessions plus every coach-led session once a week,
+  with or without a `weekday` (`date` null when it has none). The
+  minimum's planned dose counts its scheduled standby core lifting sessions
+  plus each explicitly retained coach-led session once; an omitted one, or
+  an optional standby session, adds nothing. Every muscle in either dose is visible, independently of
+  hypertrophy targets; zero ordinary dose means zero required dose.
+- A fixed minimum is checked against each ordinary rotation position; a
+  fixed ordinary schedule supplies the reference for each minimum position.
+  Two rotating schedules compare matching position names. Different name
+  sets fail with guidance to configure matching names or a fixed minimum.
+  Every minimum position still reports session-count, duration and priority
+  checks. A reason carries its minimum position's name when the minimum
+  rotates; a fixed minimum names the ordinary position only on dose reasons
+  (`against ordinary <position>: `), so its other reasons appear once.
+  Matching positions retain dose comparisons; an unmatched position
+  reports its planned dose but sets `reference_position`, `reference_sessions`,
+  `reference_external`, and each muscle's `ordinary`, `third`, `met` to null.
+  A fixed ordinary schedule has no position name, so its matched references
+  also have a null `reference_position`; a null `reference_sessions` alone
+  marks an unmatched position.
+  The check never silently pairs unrelated positions or averages them away.
+- The two-session limit and R-24 time caps apply to self-programmed minimum
+  sessions; retained coach-led work is reported separately. Session minutes
+  use `coach.validity.estimate_minutes`. A priority floor needs one minimum
+  lifting session with at least `floor.sets` hard working sets of that lift;
+  a muscle-level coach-led estimate cannot establish a lift's floor.
+  Dose, floor and duration failures are reported independently. Exit 1
+  reports every reason at `$.minimum_week` and keeps the report in `data`.
 - `structure minimum [--week W] [--write]` (default: the week holding
   tomorrow) returns `week`, `span`, `plan`, `path`, `written` and
-  `balance` (`passed`, `reasons`); it plans the minimum week's schedule
-  over its sessions only, refuses (exit 1) when the program has no
-  minimum week or it plans no session that week, and writes only with
-  `--write` (not with `--dry-run`). The plan is `{variant: "minimum",
-  rule, week, span, sessions: [{date, session_id, title}], rotation:
-  null, flags: []}`.
+  `balance` (`passed`, `reasons`); it plans the minimum schedule over its
+  standby sessions, refuses when no minimum exists or no session is planned,
+  and writes only with `--write` (not `--dry-run`). The plan is
+  `{variant: "minimum", rule, week, span, sessions: [{date, session_id,
+  title}], external_sessions: [{date (null without a weekday), external_id,
+  title, estimated_sets}],
+  rotation: null, flags: []}`. `propose week --plan` consumes its lifting
+  sessions; the external rows document the coach-led work retained.
+- `/program-week`'s short-week workflow explains how to create standby
+  copies, configure their minimum schedule and retained coach-led ids, then
+  validate, render and run the minimum balance check before use. It offers
+  constrained one-off planning immediately when no suitable minimum exists;
+  programs are not required to have a minimum variant.
 - `routine/program.md` gains `## Priority lifts` and `## Minimum week`
   sections only when the program has them, so existing pages stay fresh.
 - A session dated today is not yet missed for `priority_exposures_missed`,

@@ -7,7 +7,7 @@ from coach import dates, flags, jsonio, missed, overlay, program, structure
 from coach.library import Library
 from tests.support import INSTANCES, REPO_ROOT
 from tests.support.history import HistoryCase, read_json, write_json
-from tests.support.skills import skill_text
+from tests.support.skills import flat, skill_text, step_text
 
 WEEKLY = "2026-10-12-weekly"
 SQUAT = "bb_back_squat"
@@ -462,7 +462,7 @@ class MinimumBalanceTest(MinimumCase):
         position = data["positions"][0]
         self.assertEqual([(s["date"], s["session_id"]) for s in position["sessions"]],
                          [("2026-10-13", "min-a"), ("2026-10-16", "min-b")])
-        self.assertEqual(position["muscles"]["chest"], {"target": 10, "third": 3.33, "planned": 4, "met": True})
+        self.assertEqual(position["muscles"]["chest"], {"ordinary": 3, "third": 1, "planned": 4, "met": True})
         self.assertEqual(position["priority"], [{"exercise_id": SQUAT, "floor_sets": 2, "sets": 4,
                                                  "session_id": "min-a", "met": True}])
 
@@ -480,11 +480,12 @@ class MinimumBalanceTest(MinimumCase):
         self.assertEqual(envelope["data"]["reasons"],
                          ["no session carries the priority floor of 2 working sets of Pull Up"])
 
-    def test_chest_below_a_third_of_its_target_fails(self):
-        self.set_minimum(sessions=minimum_sessions(bench_sets=2))
+    def test_chest_below_a_third_of_its_ordinary_dose_fails(self):
+        self.set_minimum(sessions=minimum_sessions(bench_sets=1))
+        self.edit_json("data/program.json", lambda doc: doc["sessions"][0]["exercises"][1]["sets"][0].update(count=6))
         envelope = self.balance(expect=1)
-        self.assertEqual(envelope["data"]["reasons"],
-                         ["chest: 2 fractional sets planned, below a third of its target of 10 (3.33)"])
+        self.assertIn("chest: 1 fractional sets planned, below a third of its ordinary dose of 6 (2)",
+                      envelope["data"]["reasons"])
         self.assertEqual(envelope["error"]["details"][0]["path"], "$.minimum_week")
 
     def test_a_session_over_its_cap_fails(self):
@@ -636,4 +637,12 @@ class RegistrationTest(PriorityCase):
     def test_program_week_offers_the_minimum_week(self):
         text = " ".join(skill_text("program-week").split())
         self.assertIn("python3 -m coach structure minimum", text)
-        self.assertIn("--plan", text)
+        self.assertIn("python3 -m coach propose week --week <label> --plan",
+                      flat(step_text("program-week", "compute.md")))
+
+    def test_short_week_workflow_explains_creation_validation_and_fallback(self):
+        text = " ".join(skill_text("program-week").split())
+        for instruction in ("status: standby", "minimum_week.external_sessions", "program validate",
+                            "program render", "constrained mode", "application policy",
+                            "Older lifters", "not a universal maintenance guarantee"):
+            self.assertIn(instruction, text)

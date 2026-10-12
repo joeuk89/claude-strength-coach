@@ -518,7 +518,7 @@
             "load_mode": "total",
             "sets": [
               {
-                "count": 2,
+                "count": 4,
                 "type": "normal",
                 "rep_range": {
                   "start": 6,
@@ -542,7 +542,7 @@
             "load_mode": "total",
             "sets": [
               {
-                "count": 2,
+                "count": 3,
                 "type": "normal",
                 "rep_range": {
                   "start": 8,
@@ -674,7 +674,7 @@
             "load_mode": "total",
             "sets": [
               {
-                "count": 2,
+                "count": 4,
                 "type": "normal",
                 "rep_range": {
                   "start": 6,
@@ -818,7 +818,7 @@
             "load_mode": "total",
             "sets": [
               {
-                "count": 2,
+                "count": 1,
                 "type": "normal",
                 "rep_range": {
                   "start": 10,
@@ -842,7 +842,7 @@
             "load_mode": "per_hand_x2",
             "sets": [
               {
-                "count": 2,
+                "count": 4,
                 "type": "normal",
                 "rep_range": {
                   "start": 10,

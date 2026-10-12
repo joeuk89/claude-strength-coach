@@ -6,7 +6,7 @@ import unittest
 from datetime import date
 from unittest import mock
 
-from coach import history, jsonio, overlay, render, state
+from coach import history, jsonio, migrate, overlay, render, state
 from coach.plugins import base
 from coach.plugins.conditioning import circuit_rounds, emom_density
 from tests.support import FIXTURES, INSTANCES, REPO_ROOT
@@ -289,17 +289,18 @@ class ProgramTest(CircuitCase):
 
 
 class MigrationTest(HistoryCase):
-    def test_migrate_run_takes_the_previous_program_version_to_the_next(self):
+    def test_migrate_run_gives_every_session_an_empty_scheme(self):
         current = jsonio.current_version(jsonio.load_schema("program"))
+        [step] = [s for s in migrate.registry().documents["program"].steps if s.name.endswith("_session_scheme")]
 
         def older(doc):
-            doc["schema_version"] = current - 1
+            doc["schema_version"] = step.from_version
             for session in doc["sessions"]:
                 session.pop("scheme")
         self.edit_json("data/program.json", older)
         dry = self.coach("migrate", "run", "--dry-run")["data"]
         self.assertEqual([(f["path"], f["from"], f["to"]) for f in dry["files"]],
-                         [("data/program.json", current - 1, current)])
+                         [("data/program.json", step.from_version, current)])
         self.coach("migrate", "run")
         migrated = json.loads((self.root / "data" / "program.json").read_text(encoding="utf-8"))
         self.assertEqual([s["scheme"] for s in migrated["sessions"]], [None, None])

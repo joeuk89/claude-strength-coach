@@ -685,6 +685,30 @@
               "params": {}
             },
             "start_load": null
+          },
+          {
+            "exercise_id": "machine_seated_leg_curl",
+            "load_mode": "total",
+            "sets": [
+              {
+                "count": 2,
+                "type": "normal",
+                "rep_range": {
+                  "start": 10,
+                  "end": 12
+                },
+                "rpe": 8
+              }
+            ],
+            "rest_seconds": 60,
+            "superset_id": null,
+            "cues": "hips down on the seat · full range · control the return",
+            "constraints": [],
+            "scheme": {
+              "name": "double_progression",
+              "params": {}
+            },
+            "start_load": null
           }
         ],
         "scheme": null
