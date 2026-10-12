@@ -149,11 +149,16 @@ class TrainedWorkTest(unittest.TestCase):
                 self.assertIn("week 1 again", proposal.rationale)
 
     def test_a_deload_or_return_week_session_earns_nothing(self):
-        for fields in ({"week_kind": "deload"}, {"decayed": True}):
+        for fields in ({"week_kind": "deload"}, {"decayed": True}, {"week_kind": "return"}):
             with self.subTest(fields=fields):
                 proposal = run(wave(exposures=(trained(date(2026, 10, 5), 1, **fields),)))
                 self.assertEqual(proposal.state["completed_weeks"], 0)
                 self.assertEqual(proposal.state["training_max"], 100)
+
+    def test_a_week_agreed_as_a_return_week_repeats_after_it(self):
+        logged = trained(date(2026, 10, 5), 1, week_kind="return")
+        proposal = run(wave(exposures=(logged,)))
+        self.assertIn("week 1 again after the return week on 2026-10-05", proposal.rationale)
 
     def test_a_rep_out_set_short_of_its_reps_repeats_the_week_for_review(self):
         short = trained(date(2026, 10, 5), 1, reps=[5, 5, 4])

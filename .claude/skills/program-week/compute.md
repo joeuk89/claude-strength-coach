@@ -63,17 +63,15 @@ rotation position, and settle its flags:
   the flag with the reason the load stands (step 4).
 - `convention_slip`: an exact 2× jump at unchanged reps and RPE is a convention
   slip, not progress. Raise it with the athlete.
-- `return_week`, `return_after_illness`, `ill_day_excluded`: in a return week
-  the matching return band sets this week's loads, set counts and any RPE cap
-  instead of the progression scheme, measured from the pre-layoff working loads;
-  with illness, the first session back carries the illness cap. Name the band in
-  the week focus; with illness, ask whether the symptoms stayed above the neck
-  and confirm 48 hours symptom-free (rn:detraining-return.4); whole-body
-  symptoms mean a qualified professional first; resolve the
-  `return_after_illness` block (step 4) only on that confirmation, never on the
-  ill status day ending. Ill days plan no session (exit 3 while an open row
-  covers them all). The next pass progresses from the return week; a wave keeps
-  its training max.
+- `return_week`, `return_after_illness`, `ill_day_excluded`: in a return week the matching
+  return band sets this week's loads, set counts and any RPE cap instead of the
+  progression scheme, measured from the pre-layoff working loads; with illness, the first
+  session back carries the illness cap. Name the band in the week focus; with illness, ask
+  whether the symptoms stayed above the neck and confirm 48 hours symptom-free
+  (rn:detraining-return.4); whole-body symptoms mean a qualified professional first;
+  resolve the `return_after_illness` block (step 4) only on that confirmation, never on
+  the ill status day ending. Ill days plan no session (exit 3 while an open row covers
+  them all). The next pass progresses from the return week; a wave keeps its training max.
 - `collision` (an interference rule: a quality activity on a lifting day, or in
   the 24 hours before a heavy squat or hinge session; the message names the
   rule, both bouts and the gap): the script never moves anything. Agree with
@@ -134,20 +132,19 @@ load the exercise, then run the command its message names.
 
 ## 5. Structural changes (normal and midweek)
 
-Swaps or additions agreed at the check-in, or proposed now with
-rationale, are plan changes: mark them separately in the brief; they
-land in `data/program.json` too. Under 80 % adherence (as `/check-in`
-step 4 defines it), propose no new recurring session — no new session
-or weekly slot, conditioning and optional ones included — and push back
-if the athlete asks; exercise swaps within a session are fine. An
-override goes in the next check-in's adherence decision line.
+Swaps or additions agreed at the check-in, or proposed now with rationale, are
+plan changes: mark them separately in the brief; they land in
+`data/program.json` too. Under 80 % adherence (as `/check-in` step 4 defines
+it), propose no new recurring session — no new session or weekly slot,
+conditioning and optional ones included — and push back if the athlete asks;
+exercise swaps within a session are fine. An override goes in the next
+check-in's adherence decision line.
 
 ## 6. Finalize
 
 `python3 -m coach propose finalize --proposal <id>` writes
-`data/overlays/<id>.json`. Exit 1 names each line changed without an
-override reason; exit 3 names each unresolved `block` flag. A refused
-finalize writes nothing: fix what it names and run it again. Then go to
-build.md with that id, starting at "Where it renders". A tweak to the
-coach's brief later means: override or resolve in the draft, finalize
-again, then check and render again.
+`data/overlays/<id>.json`. Exit 1 names each line changed without an override
+reason; exit 3 names each unresolved `block` flag. A refused finalize writes
+nothing: fix what it names and run it again. Then go to build.md with that id,
+starting at "Where it renders". A tweak to the coach's brief later means:
+override or resolve in the draft, finalize again, then check and render again.

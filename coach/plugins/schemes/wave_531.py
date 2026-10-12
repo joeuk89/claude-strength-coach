@@ -162,9 +162,13 @@ def _tolerance(ctx, training_max):
     return max(ctx.exercise.increment or 0, LOAD_TOLERANCE * training_max)
 
 
+def _return_work(exposure):
+    return exposure.decayed or exposure.week_kind == "return"
+
+
 def _trains_week(ctx, exposure, week, training_max):
     """True when the exposure's prescription was this wave week's sets at this training max."""
-    if exposure.decayed or exposure.week_kind == "deload":
+    if _return_work(exposure) or exposure.week_kind == "deload":
         return False
     main = base.working(exposure.prescribed)[:WAVE_SETS]
     if len(main) < WAVE_SETS:
@@ -242,7 +246,7 @@ def _judge(ctx, completed, training_max, through):
                      f"{region}-body increment of {base.number(step)}")
     if not words and through is not None:
         week = completed + 1
-        if unmatched is not None and unmatched.decayed:
+        if unmatched is not None and _return_work(unmatched):
             words.append(f"week {week} again after the return week on {unmatched.date.isoformat()}")
         elif unmatched is not None:
             words.append(f"week {week} again: the session on {unmatched.date.isoformat()} was not prescribed "

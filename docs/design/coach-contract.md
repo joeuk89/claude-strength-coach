@@ -3098,7 +3098,7 @@ and `plugins test` runs them. Loaded with
   week's three wave sets at this training max (each `reps` equal and
   each load within one increment or 2.5 % of the training max of its
   target, a matching tolerance) and it is neither a `deload` week's nor
-  `decayed`. Its first three logged working sets must each reach their
+  return work (`decayed`, or `week_kind` `return`). Its first three logged working sets must each reach their
   reps at a load no lighter than their prescribed load by more than that
   tolerance (a heavier or unrecorded load passes), with no logged RPE
   over a set's cap. A short set (reps or load) or a passed cap repeats
