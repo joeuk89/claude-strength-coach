@@ -2117,10 +2117,13 @@ coach.history.annotations(root, kind=None) -> list[dict]
 ```
 
 `include_unsynced=True` (on `workouts` and every `coach.stats` function)
-resolves source workouts not yet in a month file in memory, by the same
-rules as `history sync`, and returns them with `unsynced: true`; nothing is
-written. `checkin prepare` uses it to read fresh data
-without touching committed files.
+applies the sources in memory by the same rules as `history sync`
+(without its reinterpretation pass): new and changed source workouts come
+back with `unsynced: true`, and a stored workout its source no longer
+holds, such as a voided manual entry, is left out. Nothing is written.
+`checkin prepare` uses it to read fresh data without touching committed
+files. `as_of` still bounds these reads by start (date for manual
+workouts) and annotation creation.
 
 ## C18. Derived stats (R-20; R-21a, R-23a, R-24, R-25, R-30a, R-31, R-43 read)
 
@@ -6764,7 +6767,17 @@ corrections are a `void` line plus a new entry:
   overlay, or none with S, exits 1).
   Fixed reps and loads are filled as prescribed; a `rep_range` leaves
   `reps` null; `rpe` and `duration_minutes` are null. Warm-up sets are
-  left out.
+  left out. The draft records observations only: an RPE target is never
+  a logged RPE, and a range is never a count.
+  `data.ask` keeps the prescription beside the draft, one item per
+  exercise, field and prescribed value: `{"exercise_id", "field",
+  "sets", "prescribed", "message"}`, `sets` one-based over working sets.
+  `field` is `reps` for ranged sets (`prescribed` the `rep_range`: ask
+  for the reps done), `as_written` for sets whose reps and load are
+  prefilled (`prescribed` null: keep them only when the athlete confirms
+  them, as "as written" does), and `rpe` for every working set
+  (`prescribed` the target or null: ask for the RPE, and leave it null
+  when the athlete cannot say).
 - `log add --input FILE [--again] [--dry-run]` validates and appends one
   line. Exit 1 for: an input carrying `id` or `logged_at` (`log add`
   assigns both); a schema problem; an unknown exercise id; a load mode
@@ -6774,18 +6787,35 @@ corrections are a `void` line plus a new entry:
   `reps` on a set of any mode but `duration` and `distance`; a date
   after today; a `value` on a null-load mode; a `unit` other than
   `[athlete] units`; a session id in neither the program nor any
-  overlay; an overlay that does not exist or lacks the session. Exit 3
+  overlay; an overlay that does not exist or lacks the session. A null
+  `reps` where the overlay set had a `rep_range` names the range, so an
+  unchanged ranged draft is never recorded as measured work. Exit 3
   when the date and session already have a live entry, unless `--again`
   (a workout with no session is never refused). Warning
   `looks_like_total` when a `per_hand_x2` `value` equals the `hevy_total`
   of a prescribed working set (and no prescribed per-hand load), so the
-  athlete gave the pair as one number. Warnings in the envelope start
-  with their code (`looks_like_total: ...`, `hevy_enabled: ...`).
-  Returns `id`, `line`, and `summary`, one line printed with
-  `units.format_load(..., show_hevy=False)`.
-- `log void ID --reason TEXT [--dry-run]` appends a void line; an
-  unknown or already void id, or an empty reason, exits 1. `log list
-  [--since D]` returns live entries as `data.workouts`, oldest first.
+  athlete gave the pair as one number. Warning `rpe_unknown`, one per
+  exercise, when working sets carry a null `rpe`: the workout is still
+  accepted, its effort stays unknown, and the prescribed target is named
+  as not assumed. Warnings in the envelope start with their code
+  (`looks_like_total: ...`, `rpe_unknown: ...`, `hevy_enabled: ...`).
+  Returns `id`, `line`, `summary` (one line printed with
+  `units.format_load(..., show_hevy=False)`) and `history`.
+- After appending, `log add` and `log void` run `history sync` (C17), so
+  pages (C38), `block close` (dry run included) and `checkin prepare`
+  read the change with no separate sync step; a later `history sync`
+  finds nothing new. `data.history` is `{"synced": true, "added",
+  "updated", "removed", "reinterpreted", "unresolved"}` from that sync.
+  When the sync fails, the line stays written, the command exits 0,
+  `data.history` is `{"synced": false, "error", "next_step"}` and
+  warning `history_not_synced` names the workout, the error, and the
+  next step: fix it, run `history sync`, never repeat the log command.
+  A dry run or a refused input writes neither the log nor history, and
+  `data.history` is null.
+- `log void ID --reason TEXT [--dry-run]` appends a void line and syncs
+  as above; an unknown or already void id, or an empty reason, exits 1.
+  `log list [--since D]` returns live entries as `data.workouts`, oldest
+  first.
 - The `manual` history source reads the live entries; no log file means
   `None` (C17). Its `version(workout)` is the C7 canonical hash of the
   `SourceWorkout`. A workout's `title` is its overlay session's title,
@@ -6818,8 +6848,10 @@ prints "choose the load". An unapproved overlay renders with a "Not
 approved yet" line and a warning. A rep-out set prints `N×5+` with
 `stop at 9` in its RPE cell (C12), and the footer then first explains
 the `+` set: at least those reps, more until the next would pass its
-RPE stop, not a set to failure. A footer says how to log ("reply to
-the coach with what you did; differences only"). Check
+RPE stop, not a set to failure. A footer says how to log: reply with
+the reps of every ranged set, the RPE when the athlete can say, and
+anything else that differed; "as written" covers fixed reps and loads
+only. Check
 `sheets_render_fresh`: skip when Hevy is enabled or there is neither a
 file nor an overlay; warn when there is no file yet, or when the file
 shows another overlay than the current one; fail when the file has no

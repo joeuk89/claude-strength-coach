@@ -45,9 +45,11 @@ temporary routines for it.
 
 **Without Hevy:** the workouts are in the manual log, one `log add` per
 workout the athlete reported. Log any they report now the same way
-(`CLAUDE.md` "Hevy" → "No Hevy?"), then run `python3 -m coach history
-sync` so `checkin prepare` pre-fills the Sunday message from them. Read
-each logged workout's `notes` as you would a Hevy description.
+(`CLAUDE.md` "Hevy" → "No Hevy?"). Each `log add` resolves its workout
+into history, so pages, `block close` and `checkin prepare` read it at
+once; if it warns `history_not_synced`, follow that warning's next step
+before going on, and never log the workout again. Read each logged
+workout's `notes` as you would a Hevy description.
 
 **Coach-led sessions (PT, classes) are often logged worse than solo
 sessions**: the Coach-led field of the Sunday message confirms which

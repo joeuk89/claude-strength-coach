@@ -59,10 +59,10 @@ The weekly schedule lives in `profile.md`: **never assume a shape**. Always:
 - **Dumbbell loads have two numbers.** Hevy stores the total across both arms, so state both,
   `25/hand (Hevy: 50)`; single-arm work is the exception (`reference/hevy-api.md`).
 - **No Hevy?** (`[hevy] enabled = false`, Hevy free too; no `/hevy-sync`.) The athlete trains from
-  `this-week-sheets.md` and reports workouts in chat: run `python3 -m coach log prefill --session
-  <id> --date <date>`, apply only the differences they name, save it in `.coach/drafts/`, run
-  `python3 -m coach log add --input <file>` and show its summary line. A correction is `log void
-  <id> --reason <text>` plus a new entry.
+  `this-week-sheets.md` and reports workouts in chat: run `python3 -m coach log prefill --session <id> --date
+  <date>` and get every item its `ask` lists: actual reps for a range, and RPE (one they can't give stays null,
+  never the target); "as written" confirms fixed reps and loads only. Save it in `.coach/drafts/`, run `python3 -m
+  coach log add --input <file>`, show its summary and warnings. Correct: `log void <id> --reason <text>`, then add.
 
 ## Nutrition
 

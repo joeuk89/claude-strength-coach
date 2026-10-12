@@ -70,12 +70,14 @@ class NoHevyCase(unittest.TestCase):
         return str(path)
 
     def filled(self, edit=None, day="2026-10-12"):
-        """The Session A prefill with every rep range filled at its top, optionally edited."""
+        """The Session A prefill with every rep range filled at its top and an RPE the athlete gave, optionally edited."""
         draft = self.prefill(day=day)
         for exercise in draft["exercises"]:
             for set_ in exercise["sets"]:
                 if set_["reps"] is None:
                     set_["reps"] = 10
+                if set_["rpe"] is None:
+                    set_["rpe"] = 8
         if edit:
             edit(draft)
         return draft
@@ -305,13 +307,13 @@ class HistoryFromTheLogTest(NoHevyCase):
         self.assertEqual((data["added"], data["updated"], data["removed"]), ([], [], []))
         self.assertEqual({p.name: p.read_bytes() for p in directory.glob("*.json")}, before)
 
-    def test_a_voided_entry_is_removed_on_the_next_sync(self):
+    def test_a_void_removes_the_entry_from_history(self):
         self.coach("history", "sync")
-        self.coach("log", "void", "manual:2026-09-28-session-a-1", "--reason", "never happened")
-        data = self.coach("history", "sync")["data"]
-        self.assertEqual(data["removed"], ["manual:2026-09-28-session-a-1"])
+        data = self.coach("log", "void", "manual:2026-09-28-session-a-1", "--reason", "never happened")["data"]
+        self.assertEqual(data["history"]["removed"], ["manual:2026-09-28-session-a-1"])
         doc = read_json(self.root / "data" / "history" / "2026-09.json")
         self.assertEqual(doc["workouts"], [])
+        self.assertEqual(self.coach("history", "sync")["data"]["removed"], [])
 
     def test_e1rm_reads_the_manual_history(self):
         self.coach("history", "sync")
@@ -329,10 +331,17 @@ class HistoryFromTheLogTest(NoHevyCase):
                          {"bb_back_squat": "hit", "db_bench_press": "hit"})
 
     def test_adherence_reads_an_unsynced_manual_workout(self):
-        self.add_monday()
+        self.append_monday_without_sync()
+        stored = self.coach("stats", "adherence", "--overlay", WEEKLY)["data"]
+        self.assertNotEqual(next(s for s in stored["sessions"] if s["session_id"] == "session-a")["status"], "trained")
         data = self.coach("stats", "adherence", "--overlay", WEEKLY, "--include-unsynced")["data"]
         row = next(s for s in data["sessions"] if s["session_id"] == "session-a")
         self.assertEqual(row["status"], "trained")
+
+    def append_monday_without_sync(self):
+        line = dict(self.log_lines()[1], id="manual:2026-10-12-session-a-1", date="2026-10-12", overlay_id=WEEKLY)
+        with open(self.root / LOG, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(line) + "\n")
 
     def add_monday(self):
         draft = self.coach("log", "prefill", "--session", "session-a", "--date", "2026-10-12")["data"]["draft"]
@@ -349,6 +358,198 @@ class HistoryFromTheLogTest(NoHevyCase):
         (self.root / LOG).unlink()
         data = self.coach("history", "sync")["data"]
         self.assertEqual(data["removed"], [])
+
+
+class ObservedNotPrescribedTest(NoHevyCase):
+    """Squat is fixed 3×5 @ 100 RPE 7; DB bench is 3×8–10 @ 25/hand RPE 8."""
+
+    def prefill_data(self):
+        return self.coach("log", "prefill", "--session", "session-a", "--date", "2026-10-12")["data"]
+
+    def squat(self, draft):
+        return next(e for e in draft["exercises"] if e["exercise_id"] == "bb_back_squat")
+
+    def asks(self, data, exercise_id, field):
+        return [a for a in data["ask"] if a["exercise_id"] == exercise_id and a["field"] == field]
+
+    def test_prefill_keeps_the_prescription_beside_a_draft_that_invents_nothing(self):
+        data = self.prefill_data()
+        draft = data["draft"]
+        self.assertEqual([(s["reps"], s["rpe"]) for s in self.bench(draft)["sets"]], [(None, None)] * 3)
+        self.assertEqual([(s["reps"], s["value"], s["rpe"]) for s in self.squat(draft)["sets"]], [(5, 100, None)] * 3)
+        [reps] = self.asks(data, "db_bench_press", "reps")
+        self.assertEqual((reps["sets"], reps["prescribed"]), ([1, 2, 3], {"start": 8, "end": 10}))
+        self.assertIn("8–10", reps["message"])
+        [effort] = self.asks(data, "db_bench_press", "rpe")
+        self.assertEqual((effort["sets"], effort["prescribed"]), ([1, 2, 3], 8))
+        [squat_effort] = self.asks(data, "bb_back_squat", "rpe")
+        self.assertEqual(squat_effort["prescribed"], 7)
+        self.assertIn("never the target", squat_effort["message"])
+        [as_written] = self.asks(data, "bb_back_squat", "as_written")
+        self.assertEqual(as_written["sets"], [1, 2, 3])
+        self.assertEqual(self.asks(data, "db_bench_press", "as_written"), [])
+        self.assertEqual(self.asks(data, "bb_back_squat", "reps"), [])
+
+    def test_an_unchanged_ranged_draft_cannot_be_recorded(self):
+        before = (self.root / LOG).read_bytes()
+        envelope = self.add(self.prefill(), expect=1)
+        self.assertIn("8–10", envelope["error"]["message"])
+        self.assertEqual((self.root / LOG).read_bytes(), before)
+        self.assertFalse((self.root / "data" / "history").exists())
+
+    def test_squat_as_written_with_unknown_effort_stays_null_and_warns(self):
+        def bench_reported(draft):
+            for set_, reps, rpe in zip(self.bench(draft)["sets"], (10, 9, 8), (8, 8.5, 9)):
+                set_.update(reps=reps, rpe=rpe)
+
+        draft = self.prefill()
+        bench_reported(draft)
+        envelope = self.add(draft)
+        line = self.log_lines()[-1]
+        squat, bench = self.squat(line), self.bench(line)
+        self.assertEqual([(s["reps"], s["value"], s["rpe"]) for s in squat["sets"]], [(5, 100, None)] * 3)
+        self.assertEqual([(s["reps"], s["value"], s["rpe"]) for s in bench["sets"]],
+                         [(10, 25, 8), (9, 25, 8.5), (8, 25, 9)])
+        [warning] = [w for w in envelope["warnings"] if w.startswith("rpe_unknown")]
+        self.assertIn("Back Squat", warning)
+        self.assertIn("sets 1–3", warning)
+        self.assertNotIn("Bench", warning)
+
+    def test_valid_reps_and_loads_without_any_effort_are_accepted_with_a_warning(self):
+        draft = self.prefill()
+        for set_, reps in zip(self.bench(draft)["sets"], (10, 9, 8)):
+            set_["reps"] = reps
+        envelope = self.add(draft)
+        self.assertTrue(envelope["data"]["written"])
+        warnings = [w for w in envelope["warnings"] if w.startswith("rpe_unknown")]
+        self.assertEqual(len(warnings), 2, warnings)
+        self.assertTrue(all(s["rpe"] is None for e in self.log_lines()[-1]["exercises"] for s in e["sets"]))
+
+
+TUESDAY = "2026-10-13T18:00:00Z"
+SUNDAY = "2026-10-18T18:00:00Z"
+MONDAY_A = "manual:2026-10-12-session-a-1"
+
+
+class ImmediateStatusTest(NoHevyCase):
+    """A fresh nohevy copy: no data/history yet, and the log holds two earlier weeks."""
+
+    now = TUESDAY
+
+    def log_monday(self, *extra, now=None, expect=0):
+        draft = self.filled()
+        return self.coach("log", "add", "--input", self.write_input(draft), *extra, now=now, expect=expect)
+
+    def dashboard_row(self):
+        self.coach("pages", "render")
+        text = (self.root / "README.md").read_text(encoding="utf-8")
+        return next(line for line in text.splitlines() if line.startswith("| Mon 12 | Session A"))
+
+    def block_week(self):
+        data = self.coach("block", "close", "--week", "2026-W42", "--dry-run", now=SUNDAY)["data"]
+        return data["weeks"][0], data["deep_review"]
+
+    def history_files(self):
+        directory = self.root / "data" / "history"
+        return {p.name: p.read_bytes() for p in directory.glob("*.json")} if directory.exists() else {}
+
+    def test_a_logged_session_shows_as_completed_without_a_separate_sync(self):
+        self.assertTrue(self.dashboard_row().endswith("| ✗ |"))
+        data = self.log_monday()["data"]
+        self.assertTrue(data["history"]["synced"])
+        self.assertIn(MONDAY_A, data["history"]["added"])
+        self.assertTrue(self.dashboard_row().endswith("| ✔ |"))
+        week, _ = self.block_week()
+        self.assertEqual((week["planned"], week["trained"]), (2, 1))
+
+    def test_the_live_check_in_read_agrees_with_the_stored_read(self):
+        self.log_monday()
+        stored = self.coach("stats", "adherence", "--overlay", WEEKLY)["data"]["sessions"]
+        live = self.coach("stats", "adherence", "--overlay", WEEKLY, "--include-unsynced")["data"]["sessions"]
+        self.assertEqual([(s["session_id"], s["status"], s["workout_id"]) for s in stored],
+                         [(s["session_id"], s["status"], s["workout_id"]) for s in live])
+
+    def test_a_later_sync_and_rerender_credit_the_workout_once(self):
+        self.log_monday()
+        self.dashboard_row()
+        pages = {name: (self.root / name).read_bytes() for name in ("README.md", "this-week.md")}
+        data = self.coach("history", "sync")["data"]
+        self.assertEqual((data["added"], data["updated"], data["removed"]), ([], [], []))
+        report = self.coach("pages", "render")["data"]["pages"]
+        self.assertFalse(any(p["changed"] for p in report), report)
+        self.assertEqual({name: (self.root / name).read_bytes() for name in pages}, pages)
+        rows = self.coach("stats", "adherence", "--overlay", WEEKLY, "--include-unsynced")["data"]
+        self.assertEqual([w["workout_id"] for w in rows["extra"]], [])
+        week, _ = self.block_week()
+        self.assertEqual(week["trained"], 1)
+
+    def test_a_void_shows_the_session_missed_again(self):
+        self.log_monday()
+        data = self.coach("log", "void", MONDAY_A, "--reason", "wrong day")["data"]
+        self.assertEqual(data["history"]["removed"], [MONDAY_A])
+        self.assertTrue(self.dashboard_row().endswith("| ✗ |"))
+        week, _ = self.block_week()
+        self.assertEqual(week["trained"], 0)
+
+    def test_a_correction_replaces_the_credit(self):
+        self.log_monday()
+        self.coach("log", "void", MONDAY_A, "--reason", "bench reps were wrong")
+        self.log_monday()
+        workouts = self.coach("history", "show", "--since", "2026-10-12")["data"]["workouts"]
+        self.assertEqual([w["workout_id"] for w in workouts], ["manual:2026-10-12-session-a-2"])
+        self.assertTrue(self.dashboard_row().endswith("| ✔ |"))
+
+    def test_a_stale_stored_copy_does_not_resurrect_a_voided_workout(self):
+        self.log_monday()
+        void = {"schema_version": 1, "kind": "void", "id": MONDAY_A, "logged_at": TUESDAY, "reason": "stale copy"}
+        with open(self.root / LOG, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(void) + "\n")
+        live = self.coach("history", "show", "--since", "2026-10-12", "--include-unsynced")["data"]["workouts"]
+        self.assertEqual(live, [])
+        rows = self.coach("stats", "adherence", "--overlay", WEEKLY, "--include-unsynced")["data"]["sessions"]
+        self.assertNotEqual(next(s for s in rows if s["session_id"] == "session-a")["status"], "trained")
+
+    def test_dry_run_and_invalid_input_write_no_log_history_or_pages(self):
+        log_before, history_before = (self.root / LOG).read_bytes(), self.history_files()
+        data = self.log_monday("--dry-run")["data"]
+        self.assertIsNone(data["history"])
+
+        def null_reps(draft):
+            self.bench(draft)["sets"][0]["reps"] = None
+
+        self.add(self.filled(null_reps), expect=1)
+        self.assertEqual((self.root / LOG).read_bytes(), log_before)
+        self.assertEqual(self.history_files(), history_before)
+        self.assertFalse((self.root / "README.md").exists())
+
+    def test_a_failed_sync_reports_the_incomplete_state_and_the_next_step(self):
+        history_dir = self.root / "data" / "history"
+        history_dir.mkdir(parents=True)
+        (history_dir / "2026-09.json").write_text("{not json", encoding="utf-8")
+        envelope = self.log_monday()
+        data = envelope["data"]
+        self.assertTrue(data["written"])
+        self.assertEqual(self.log_lines()[-1]["id"], MONDAY_A)
+        self.assertFalse(data["history"]["synced"])
+        self.assertIn("history sync", data["history"]["next_step"])
+        [warning] = [w for w in envelope["warnings"] if w.startswith("history_not_synced")]
+        self.assertIn(MONDAY_A, warning)
+        self.assertIn("python3 -m coach history sync", warning)
+        self.assertIn("do not repeat", warning)
+
+    def test_an_as_of_read_keeps_its_cutoff(self):
+        self.log_monday()
+        from coach import history, stats
+        from datetime import datetime, timezone
+
+        sunday_before = datetime(2026, 10, 11, 18, tzinfo=timezone.utc)
+        for unsynced in (False, True):
+            with self.subTest(include_unsynced=unsynced):
+                found = history.workouts(self.root, include_unsynced=unsynced, as_of=sunday_before)
+                self.assertNotIn(MONDAY_A, [w["workout_id"] for w in found])
+                rows = stats.adherence(self.root, span=("2026-10-12", "2026-10-18"), include_unsynced=unsynced,
+                                       as_of=sunday_before)["sessions"]
+                self.assertTrue(all(r["status"] != "trained" for r in rows), rows)
 
 
 class ManualLogCheckTest(NoHevyCase):

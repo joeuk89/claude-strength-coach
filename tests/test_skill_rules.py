@@ -217,6 +217,17 @@ class ClaudeMdTest(unittest.TestCase):
         self.assertIn(SCRIPT_RULE, text)
         self.assertLess(text.index(SCRIPT_RULE), text.index("- **3** —"))
 
+    def test_manual_logging_asks_for_observations_and_needs_no_separate_sync(self):
+        text = flat(self.text)
+        for needle in ("`ask` lists", "actual reps for a range", "stays null, never the target",
+                       '"as written" confirms fixed reps and loads only', "show its summary and warnings"):
+            with self.subTest(needle=needle):
+                self.assertIn(needle, text)
+        self.assertNotIn("apply only the differences", text)
+        pull = flat(step_text("check-in", "pull.md"))
+        self.assertIn("Each `log add` resolves its workout into history", pull)
+        self.assertIn("`history_not_synced`", pull)
+
     def test_line_caps(self):
         self.assertLessEqual(len(self.lines), 230)
         rest = without_sections(self.lines, ("Coaching principles", "Researching current best practice"))

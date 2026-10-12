@@ -22,14 +22,15 @@ def list_workouts(args, ctx):
     return {"workouts": found, "count": len(found), "path": log.label()}
 
 
-@command("log prefill", help="A workout draft for one session as prescribed; fill in what differed, then log add",
+@command("log prefill", help="A workout draft for one session as prescribed, and what to ask the athlete before log add",
          args=(arg("--session", required=True, metavar="ID", help="session id, e.g. session-a"),
                arg("--date", required=True, metavar="DATE", help="the day it was trained")))
 def prefill(args, ctx):
-    return {"draft": log.prefill(ctx.root, ctx.config, args.session, _date(args.date, "--date"))}
+    draft, ask = log.prefill(ctx.root, ctx.config, args.session, _date(args.date, "--date"), Library.load(ctx.root))
+    return {"draft": draft, "ask": ask}
 
 
-@command("log add", help="Validate a drafted workout and append it to the manual log",
+@command("log add", help="Validate a drafted workout, append it to the manual log and sync history",
          args=(arg("--input", required=True, metavar="FILE",
                    help="JSON workout line without id and logged_at, as log prefill gives it"),
                arg("--again", action="store_true", help="a second workout for the same date and session")),
@@ -42,9 +43,12 @@ def add(args, ctx):
     return data
 
 
-@command("log void", help="Remove a logged workout; its line stays in the log",
+@command("log void", help="Remove a logged workout and sync history; its line stays in the log",
          args=(arg("id", help="workout id, e.g. manual:2026-10-12-session-a-1"),
                arg("--reason", required=True, metavar="TEXT")),
          writes=True)
 def void(args, ctx):
-    return log.void(ctx.root, args.id, args.reason, ctx.now(), dry_run=args.dry_run)
+    data, warnings = log.void(ctx.root, args.id, args.reason, ctx.now(), dry_run=args.dry_run)
+    for warning in warnings:
+        ctx.warn(warning)
+    return data
