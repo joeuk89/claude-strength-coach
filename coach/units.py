@@ -301,3 +301,49 @@ def plate_breakdown(total, bar_weight, plates):
         chosen.append(json_number(size * step / _PLATE_SCALE))
         remaining -= size
     return chosen
+
+
+def select_available(value, available, direction="nearest", cap=None):
+    """Select a physical load without crossing a directional bound or cap; None when none fits."""
+    candidates = [w for w in available if cap is None or w <= cap + 1e-9]
+    if direction == "down":
+        candidates = [w for w in candidates if w <= value + 1e-9]
+        return max(candidates, default=None)
+    if direction == "up":
+        candidates = [w for w in candidates if w >= value - 1e-9]
+        return min(candidates, default=None)
+    return min(candidates, key=lambda w: (abs(w - value), -w), default=None)
+
+
+def round_plate_load(value, base_weight, plates, direction="nearest", cap=None, pairs=True):
+    """Select a buildable total using unlimited pairs (or, unpaired, single plates) of the declared sizes."""
+    sizes = sorted({_scaled(p) for p in plates if p > 0} - {None})
+    if not sizes:
+        return select_available(value, [base_weight], direction, cap)
+    per_size = 2 if pairs else 1
+    upper = max(value, base_weight) + per_size * min(plates)
+    if cap is not None:
+        upper = min(upper, cap)
+    if upper < base_weight:
+        return None
+    step = math.gcd(*sizes)
+    limit = math.floor(round((upper - base_weight) * _PLATE_SCALE / (per_size * step), 9))
+    reachable = [True] + [False] * limit
+    sizes = [s // step for s in sizes]
+    for amount in range(1, limit + 1):
+        reachable[amount] = any(amount >= size and reachable[amount - size] for size in sizes)
+    available = [json_number(round(base_weight + amount * step * per_size / _PLATE_SCALE, 6))
+                 for amount, possible in enumerate(reachable) if possible]
+    return select_available(value, available, direction, cap)
+
+
+def round_grid_load(value, increment, direction="nearest", cap=None, anchor=0):
+    """Round on a physical grid from its base, respecting the cap and directional bound."""
+    if value < anchor:
+        return select_available(value, [anchor], direction, cap)
+    chosen = anchor + round_to_increment(value - anchor, increment, direction)
+    if cap is not None and chosen > cap + 1e-9:
+        if cap < anchor or direction == "up":
+            return None
+        chosen = anchor + round_to_increment(cap - anchor, increment, "down")
+    return json_number(round(chosen, 6))

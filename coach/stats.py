@@ -27,11 +27,14 @@ LOAD_BASIS = "load"
 TOTAL_SYSTEM_LABEL = "total system mass"
 PRIMARY_WEIGHT = 1.0
 SECONDARY_WEIGHT = 0.5
-_EQUIPMENT_INCREMENT = {
-    "dumbbell": "dumbbell_increment", "kettlebell": "dumbbell_increment", "barbell": "barbell_increment",
+EQUIPMENT_INCREMENT = {
+    "dumbbell": "dumbbell_increment", "barbell": "barbell_increment",
     "ez_bar": "barbell_increment", "trap_bar": "barbell_increment", "smith_machine": "barbell_increment",
     "plate": "barbell_increment", "machine": "machine_increment", "cable": "cable_increment",
 }
+
+# The catalogue's kettlebell step, a progression request only: real bell sizes come from equipment.kettlebells.
+_KETTLEBELL_STEP = {"kg": 4, "lb": 10}
 
 
 def _round(value, places=2):
@@ -271,19 +274,28 @@ def _half(increment):
 
 
 def load_increment(library, config, exercise_id, location):
-    """The load step for an exercise at a location: its library increment, else its equipment's, else 0."""
+    """The declared location step, then the library fallback, then the equipment default.
+
+    A kettlebell skips the declared step: the library step, else the catalogue's. A location the config no longer
+    names falls back to the main table, as a historical session may.
+    """
+    entry = library.get(exercise_id)
+    equipment = entry["equipment"] if entry else None
     unit = config.athlete.units
     step = library.increment(exercise_id, unit)
-    if step is not None:
-        return step
-    entry = library.get(exercise_id)
-    key = _EQUIPMENT_INCREMENT.get(entry["equipment"]) if entry else None
+    if equipment == "kettlebell":
+        return step if step is not None else _KETTLEBELL_STEP[unit]
+    key = EQUIPMENT_INCREMENT.get(equipment)
     if key is None:
-        return 0
+        return step if step is not None else 0
     try:
-        return config_module.equipment_for(config, location).get(key, 0)
+        kit = config_module.equipment_for(config, location)
     except ConfigError:
-        return config_module.equipment_for(config).get(key, 0)
+        location = None
+        kit = config_module.equipment_for(config)
+    if key in config_module.declared_equipment_for(config, location):
+        return kit[key]
+    return step if step is not None else kit.get(key, 0)
 
 
 def _target_reps(prescribed):

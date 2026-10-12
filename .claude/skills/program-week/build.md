@@ -27,8 +27,10 @@ from `overlay build --input <draft>`.
    - `unearned_load` (block): the load is beyond failure for those reps
      at the recent e1RM. Lower it.
    - `load_cap`, `load_unrepresentable` (block): over a cap, or not a
-     load the kit at the session's location makes. Snap it with `units
-     round` to a load that is.
+     load the session's kit makes. Correct the load or equipment declaration;
+     explicit ladder rungs need an agreed rung edit, never silent snapping.
+   - `load_geometry_unknown` (warn): confirm the unloaded mass of the Smith,
+     EZ or trap bar and set the key the flag names at that location, then recheck.
    - `load_mode_mismatch` (block): the line's load mode or load
      arithmetic disagrees with the library. Match the line to the
      library. If the athlete corrects the mode itself, record it with

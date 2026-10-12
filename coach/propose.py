@@ -14,8 +14,8 @@ import re
 from dataclasses import replace
 from datetime import timedelta, timezone
 from pathlib import Path
+from typing import NamedTuple
 
-from coach import config as config_module
 from coach import constraints as constraints_module
 from coach import dates, decisions, flags, followups, history, jsonio, niggles, overlay, paths, patterns, plugins
 from coach import cardio, conditioning, external, program, research, weekflags
@@ -25,6 +25,7 @@ from coach.checks.instance import cap_for
 from coach.errors import ConfigError, RefusedError, UsageError, ValidationError
 from coach.library import Library, e1rm_supported
 from coach.load_statements import PER_HAND_X2, bare_figures, bare_message
+from coach.loads import AvailableLoads, available_loads
 from coach.plugins import base
 
 KINDS = ("weekly", "midweek", "deload")
@@ -147,22 +148,6 @@ def _metric_problem(exercise_id, mode, sets):
     return None
 
 
-def _on_grid(value, increment, direction, anchor):
-    """`value` rounded to a whole number of increments from `anchor`, in `direction`."""
-    if value >= anchor:
-        return units.json_number(round(anchor + units.round_to_increment(value - anchor, increment, direction), 6))
-    flipped = {"down": "up", "up": "down"}.get(direction, direction)
-    return units.json_number(round(anchor - units.round_to_increment(anchor - value, increment, flipped), 6))
-
-
-def _from_list(value, available, direction):
-    available = sorted(available)
-    if direction == "down":
-        lower = [w for w in available if w <= value + 1e-9]
-        return lower[-1] if lower else available[0]
-    return min(available, key=lambda w: (abs(w - value), -w))
-
-
 class Run:
     """One propose run: everything read once and shared by every line."""
 
@@ -263,9 +248,6 @@ class Run:
                                           for s in line["sets"]),
                             "override": line["override"]}
         return None
-
-    def kit(self, location):
-        return config_module.equipment_for(self.config, location)
 
     def increment(self, exercise_id, location):
         return stats.load_increment(self.library, self.config, exercise_id, location) or 0
@@ -556,8 +538,21 @@ def propose_line(run, session, day, exercise, ctx_extra):
         cap, cap_source = cap_for(run.config, exercise_id, mode, location) if mode in units.LOADED_MODES else (None, None)
     except ConfigError:
         cap, cap_source = None, None
-    references = _reference_loads(source, ctx, exercise)
-    rounding = (run, entry, exercise_id, location, mode, cap, references, source, info.load_direction)
+    ceilings = [c["value"] for c in active if c["kind"] == "load_cap"]
+    if cap is not None:
+        ceilings.append(cap)
+    floor = None
+    if newest is not None and newest.top_load is not None and any(c["kind"] == "no_added_load" for c in active):
+        if info.load_direction > 0:
+            ceilings.append(newest.top_load)
+        else:
+            floor = newest.top_load
+    rungs = tuple(r["load"] for r in params["rungs"] if r.get("load") is not None) \
+        if scheme_name == "assistance_ladder" else ()
+    rounding = _Rounding(
+        available_loads(run.library, run.config, exercise_id, mode, location) if mode in units.LOADED_MODES else None,
+        min(ceilings, default=None), floor, source.top_load if source is not None else None, info.load_direction,
+        rungs)
 
     def limited(sets, round_down):
         """Constraints, the illness cap, caps and rounding: what every load passes after its scheme."""
@@ -571,9 +566,14 @@ def propose_line(run, session, day, exercise, ctx_extra):
                 clipped.update(changed)
                 per_hand = "/hand" if mode in units.PER_HAND_MODES else ""
                 words.append(f"{cap_source} caps the load at {units.json_number(cap)}{per_hand}")
-        return _rounded(sets, clipped, round_down, rounding), words
+        sets, kit_changes, off_ladder = _rounded(sets, clipped, round_down, rounding)
+        words += [f"no ladder rung fits within it, so the line leaves the ladder at {_load_text(v, mode, run.unit)}"
+                  for v in off_ladder]
+        kit_words = [f"the kit makes {_load_text(after, mode, run.unit)}, not {_load_text(before, mode, run.unit)}"
+                     for before, after in kit_changes.items()]
+        return sets, words, kit_words
 
-    sets, constraint_words = limited(proposal.sets, proposal.round_down)
+    sets, constraint_words, kit_words = limited(proposal.sets, proposal.round_down)
     if first_after_illness:
         adjusted.append(f"an RPE {validity.ILLNESS_RPE_CAP} cap on the first session after illness")
     if constraint_words:
@@ -581,6 +581,7 @@ def propose_line(run, session, day, exercise, ctx_extra):
         adjusted += constraint_words
     if adjusted:
         clauses.append(f"adjusted for {', '.join(adjusted)}: {sets_text(sets, mode, run.unit)}")
+    clauses += kit_words
 
     override = None
     last = ctx.last_override
@@ -589,7 +590,7 @@ def propose_line(run, session, day, exercise, ctx_extra):
                                derived_from=source, state={})
         if decay is not None:
             chosen = plugin.module.decay(ctx, chosen, days_off)
-        chosen_sets, _ = limited(chosen.sets, chosen.round_down)
+        chosen_sets, _, _ = limited(chosen.sets, chosen.round_down)
         override = {"reason": last["reason"], "proposed_sets": [s.to_dict() for s in sets]}
         scheme_text = sets_text(sets, mode, run.unit)
         clauses = [f"standing override until {last['until']} ({last['reason'].rstrip('. ')}) kept as "
@@ -754,50 +755,65 @@ def _check_proposal(plugin, proposal):
         raise ValidationError(f"Scheme {plugin.name} gave no rationale")
 
 
-def _reference_loads(source, ctx, exercise):
-    """Loads already real for this slot: the derived-from load, the last approved loads, the start load."""
-    found = []
-    if source is not None and source.top_load is not None:
-        found.append(source.top_load)
-    if ctx.last_prescription:
-        found += [s.load for s in ctx.last_prescription["sets"] if s.load is not None]
-    if exercise["start_load"] is not None:
-        found.append(exercise["start_load"])
-    return found
+class _Rounding(NamedTuple):
+    available: AvailableLoads | None
+    cap: float | None
+    floor: float | None
+    derived: float | None
+    load_direction: int
+    rungs: tuple[float, ...]
 
 
 def _rounded(sets, clipped, round_down, rounding):
-    """Each load snapped to the kit: lighter below the derived-from load, nearest otherwise; never past a cap (C23).
+    """(sets, {requested: selected}, off-ladder loads): each load snapped to the kit, never past a cap (C23).
 
-    More assistance is a lighter lift, so assistance rounds up where other loads round down.
+    A load no heavier than the derived-from load rounds toward the lighter lift: down, or up for assistance,
+    where more assistance is a lighter lift. An explicit ladder rung stays exact; a clipped rung moves to the
+    nearest rung inside the bounds, else leaves the ladder.
     """
-    run, entry, exercise_id, location, mode, cap, references, source, load_direction = rounding
-    if mode not in units.LOADED_MODES:
-        return tuple(replace(s, load=None) for s in sets)
-    kit = run.kit(location)
-    dumbbells = kit.get("dumbbells") or []
-    by_list = entry.get("equipment") == "dumbbell" and mode in units.PER_HAND_MODES and bool(dumbbells)
-    increment = run.increment(exercise_id, location)
-    anchor = references[0] if references else 0
-    derived = source.top_load if source is not None else None
-    found = []
+    if rounding.available is None:
+        return tuple(replace(s, load=None) for s in sets), {}, []
+    found, changes, off_ladder = [], {}, []
     for index, s in enumerate(sets):
         if s.load is None:
             found.append(s)
             continue
         value = max(0, s.load)
-        lighter = round_down or (derived is not None and value < derived - 1e-9) or index in clipped
-        direction = ("down" if load_direction > 0 else "up") if lighter else "nearest"
-        if by_list:
-            value = _from_list(value, dumbbells, direction)
-            if cap is not None and value > cap + 1e-9:
-                value = _from_list(cap, dumbbells, "down")
-        elif index not in clipped and increment and not any(_same(value, r) for r in references):
-            value = _on_grid(value, increment, direction, anchor)
-            if cap is not None and value > cap + 1e-9:
-                value = _on_grid(cap, increment, "down", anchor)
+        leaves_ladder = False
+        if rounding.rungs:
+            rung = _bounded_rung(value, rounding) if index in clipped else next(
+                (r for r in rounding.rungs if _same(value, r)), None)
+            if rung is not None:
+                found.append(replace(s, load=units.json_number(rung)))
+                continue
+            leaves_ladder = index in clipped
+        derived = rounding.derived
+        lighter = (round_down or index in clipped
+                   or (derived is not None and (value - derived) * rounding.load_direction <= 1e-9))
+        direction = ("down" if rounding.load_direction > 0 else "up") if lighter else "nearest"
+        floor, cap = rounding.floor, rounding.cap
+        selected = rounding.available.select(value, direction, cap)
+        if selected is None and direction != "nearest":
+            # Nothing on the lighter side (below the lightest dumbbell, the bare bar): the nearest load in the cap.
+            selected = rounding.available.select(value, "nearest", cap)
+        if selected is not None and floor is not None and selected < floor and (cap is None or cap >= floor):
+            raised = rounding.available.select(floor, "up", cap)
+            selected = raised if raised is not None else rounding.available.select(cap, "down", cap)
+        if selected is not None and not _same(selected, value):
+            changes[value] = selected
+            value = selected
+        if leaves_ladder and value not in off_ladder:
+            off_ladder.append(value)
         found.append(replace(s, load=units.json_number(max(0, value))))
-    return tuple(found)
+    return tuple(found), changes, off_ladder
+
+
+def _bounded_rung(value, rounding):
+    """The rung nearest a clipped load inside the cap and floor, ties to the lighter lift; None when none fits."""
+    fits = [r for r in rounding.rungs
+            if (rounding.cap is None or r <= rounding.cap + 1e-9)
+            and (rounding.floor is None or r >= rounding.floor - 1e-9)]
+    return min(fits, key=lambda r: (abs(r - value), r * rounding.load_direction), default=None)
 
 
 def change_text(before_sets, after_sets, mode, unit):

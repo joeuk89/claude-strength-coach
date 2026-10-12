@@ -18,6 +18,7 @@ from coach.checks.instance import cap_for
 from coach.config_tables.sessions import cap_minutes
 from coach.errors import ConfigError, ValidationError
 from coach.library import Library, e1rm_supported
+from coach.loads import available_loads
 
 OWNER = "R-24"
 
@@ -413,7 +414,8 @@ class _Checker:
             return
         try:
             cap, source = cap_for(self.config, line["exercise_id"], line["load_mode"], session["location"])
-            kit = config_module.equipment_for(self.config, session["location"])
+            available = available_loads(self.library, self.config, line["exercise_id"], line["load_mode"],
+                                        session["location"])
         except ConfigError:
             return
         per_hand = " per hand" if line["load_mode"] in units.PER_HAND_MODES else ""
@@ -424,27 +426,21 @@ class _Checker:
                       f"{self.where(session, line)}: {units.format_load(heaviest)} is above the {source} cap of "
                       f"{units.json_number(cap)} {self.unit}{per_hand}")
         within = [load for load in loads if load not in over]
-        missing = self.unbuildable(line, within, kit)
+        if available.geometry_warning:
+            self.flag("load_geometry_unknown", session, line,
+                      f"{self.where(session, line)}: {available.geometry_warning}")
+        missing = self.unbuildable(line, within, available)
         if missing:
             self.flag("load_unrepresentable", session, line,
                       f"{self.where(session, line)}: {', '.join(missing)} cannot be built from "
-                      f"{_kit_name(session)}")
+                      f"{_kit_name(session)}; correct the load, explicit ladder rung or equipment configuration")
 
-    def unbuildable(self, line, loads, kit):
-        entry = self.library.get(line["exercise_id"]) if self.library else None
-        equipment = entry["equipment"] if entry else None
+    def unbuildable(self, line, loads, available):
         missing = []
-        if equipment == "dumbbell" and line["load_mode"] in units.PER_HAND_MODES and kit.get("dumbbells"):
-            have = {units.json_number(round(w, 4)) for w in kit["dumbbells"]}
-            for load in loads:
-                if units.json_number(round(load["per_hand"], 4)) not in have:
-                    missing.append(f"{units.format_load(load)} (no {units.json_number(load['per_hand'])} "
-                                   f"{self.unit} dumbbell)")
-        elif equipment == "barbell" and line["load_mode"] == "total":
-            for load in loads:
-                if units.plate_breakdown(load["hevy_total"], kit["bar_weight"], kit["plates"]) is None:
-                    missing.append(f"{units.format_load(load)} (no plate breakdown on a "
-                                   f"{units.json_number(kit['bar_weight'])} {self.unit} bar)")
+        for load in loads:
+            problem = available.problem(history.coaching_number(load))
+            if problem:
+                missing.append(f"{units.format_load(load)} ({problem})")
         return list(dict.fromkeys(missing))
 
     def feasibility(self, session, line, working, facts, evidence):

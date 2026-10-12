@@ -32,8 +32,10 @@ The answers that scripts read go into config and data, not prose:
   `apparatus` (the benches, bars and supports there: `flat_bench`,
   `incline_bench`, `pull_up_bar`, `dip_station`, `nordic_anchor`, `box`;
   once `available` lists the kit, an unlisted one is missing),
-  `dumbbells` (per-hand weights, when the set is limited), `dumbbell_max`
-  and `plates`. If the main place is a home gym, run `python3 -m coach
+  `dumbbells` (per-hand weights, when the set is limited), `kettlebells`
+  (the bells there, if any), `dumbbell_max`, `plates`, and the unloaded
+  mass of any Smith machine, EZ bar or trap bar there (`smith_base_weight`,
+  `ez_bar_weight`, `trap_bar_weight`). If the main place is a home gym, run `python3 -m coach
   config suggest --unit <kg|lb> --gym home` and use its values instead.
   Each other place gets one `[equipment.locations.<name>]` table
   (lowercase letters, digits and hyphens) holding only the keys that

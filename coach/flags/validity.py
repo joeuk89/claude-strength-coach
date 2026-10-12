@@ -12,7 +12,7 @@ register("unearned_load", owner="R-24", severities=("block",),
 register("load_cap", owner="R-24", severities=("block",),
          summary="Load above [caps] or dumbbell_max.")
 register("load_unrepresentable", owner="R-24", severities=("block",),
-         summary="Load cannot be built from the available increments, dumbbells or plates.")
+         summary="Load cannot be built from the available increments, dumbbells, kettlebells or plates.")
 register("load_mode_mismatch", owner="R-24", severities=("block",),
          summary="Line's load mode or load arithmetic disagrees with the library or C5.")
 register("load_mode_unconfirmed", owner="R-24", severities=("block",),
@@ -21,3 +21,6 @@ register("rpe_infeasible", owner="R-24", severities=("warn",),
          summary="RPE target more than 1 away from the RPE implied by load, reps and current e1RM.")
 register("session_over_cap", owner="R-24", severities=("warn",),
          summary="Estimated session duration above its cap.")
+
+register("load_geometry_unknown", owner="R-24", severities=("warn",),
+         summary="Physical load feasibility is unknown because the equipment base mass is not configured.")

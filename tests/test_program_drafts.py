@@ -372,7 +372,7 @@ class ImportRulesTest(ImportCase):
         self.assertEqual(exercise(draft, "session-a", "db_bench_press")["start_load"], 25)
         self.assertEqual(exercise(draft, "session-a", "bb_back_squat")["start_load"], 45)
         message = rows(draft, "converted_load", "bb_back_squat")[0]["message"]
-        self.assertEqual(message, "Hevy 44.09 → 45, rounded to the 5 lb step")
+        self.assertEqual(message, "Hevy 44.09 → 45, rounded to the 2.5 lb step")
 
     def test_the_draft_validates_and_its_program_has_only_the_schedule_to_fill(self):
         draft = self.draft_of([routine("Session A", [hevy_exercise("F0000001", "Squat (Barbell)",

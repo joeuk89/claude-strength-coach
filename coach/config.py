@@ -99,9 +99,10 @@ class Section(dict):
 class Config(Section):
     """The validated config: every known table, defaults filled in."""
 
-    def __init__(self, data, path):
+    def __init__(self, data, path, declared_equipment=None):
         super().__init__(data)
         self.path = Path(path)
+        self.declared_equipment = declared_equipment or {}
 
 
 def _sectioned(value):
@@ -361,7 +362,7 @@ def parse(raw, path, today=None):
         message = first if not more else f"{first} (and {more} more problem(s))"
         raise ConfigError(message, details=details)
 
-    return Config({name: _sectioned(value) for name, value in data.items()}, path)
+    return Config({name: _sectioned(value) for name, value in data.items()}, path, raw.get("equipment"))
 
 
 def parse_file(path, today=None):
@@ -400,6 +401,15 @@ def equipment_for(config, location=None):
     if "available" in place and "apparatus" not in place:
         main["apparatus"] = []
     return main
+
+
+def declared_equipment_for(config, location=None):
+    """The equipment keys the athlete wrote, main table then the named location's, without defaults."""
+    declared = getattr(config, "declared_equipment", None) or {}
+    found = {k: v for k, v in declared.items() if k != "locations"}
+    if location is not None:
+        found.update(declared.get("locations", {}).get(location, {}))
+    return found
 
 
 def approximate_age(config, today):

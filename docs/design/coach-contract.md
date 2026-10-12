@@ -318,6 +318,8 @@ stderr carries human-readable diagnostics and progress, each line prefixed
   `bar_weight` and `plates` have no default and must be set. Absent
   `[caps]` and `[equipment.locations]` are empty. Keys inside a location
   table have no defaults: a key left out keeps the main table's value.
+  `smith_base_weight`, `ez_bar_weight` and `trap_bar_weight` are optional
+  and have no default in either unit.
 - **Declaring a table** (R-10): each top-level table is declared in a
   module under `coach/config_tables/` that exports `TABLES = {"name":
   Table(...)}`, built from `coach.config.Key` and `Table`. An item that
@@ -336,6 +338,8 @@ stderr carries human-readable diagnostics and progress, each line prefixed
   `[nutrition]` cross-key rules (C4).
 - `coach.config.load(root, today=None) -> Config`. `Config` is a dict with attribute
   access (`config.athlete.units`, `config["equipment"]`) and a `path`.
+  `declared_equipment` retains the supplied equipment keys separately from
+  defaults so explicit location increments can precede library fallbacks.
 - `plates` lists the plate sizes the athlete has in pairs, one per side;
   `units.plate_breakdown` uses any number of each size and returns the
   fewest plates, heaviest first.
@@ -365,12 +369,16 @@ cache_max_age_hours = 24  # coach check warns past this
 [equipment]               # the main place the athlete trains; all in athlete units
 available = []            # R-11 equipment enum values; empty = every piece assumed
 apparatus = []            # R-11 apparatus enum values; empty with available empty = every piece assumed
-dumbbells = []            # per-hand dumbbell weights available; empty = not checked
+dumbbells = []            # per-hand rack; empty = use the physical increment grid
+kettlebells = []          # bell sizes; empty = kettlebell loads are not matched or checked
 dumbbell_increment = 2.0  # per hand
 dumbbell_max = 40.0       # per hand; a cap
 barbell_increment = 2.5   # smallest total jump
 bar_weight = 20.0
-plates = [25, 20, 15, 10, 5, 2.5, 1.25]   # per side, pairs available
+# smith_base_weight = 15.0 # explicitly known effective unloaded mass; no default
+# ez_bar_weight = 10.0     # the EZ bar's own mass; no default
+# trap_bar_weight = 25.0   # the trap bar's own mass; no default
+plates = [25, 20, 15, 10, 5, 2.5, 1.25]   # per side, pairs available; singly on a dip belt
 machine_increment = 5.0
 cable_increment = 2.5
 
@@ -611,8 +619,12 @@ merges them; with no instance file the catalogue stands alone.
 - `increment` is the entry's progression step in each unit: per hand for
   the per-hand modes, the total otherwise, null for `band`, `duration`
   and `distance`. `Library.increment(id, unit)` returns null when the
-  entry has none; the caller then uses the equipment increment from
-  `equipment_for` (C54).
+  entry has none. A declared equipment increment from `equipment_for`
+  (C54) takes precedence over this fallback (not for a kettlebell, which
+  has no step key: its step is this one, else 4 kg or 10 lb, the
+  catalogue's kettlebell step, and is a progression request only); scheme
+  parameters request a progression step but never define physically
+  available loads.
 - Optional `e1rm: "unsupported"` marks a lift whose external load is too
   small a share of the mass moved for any e1RM: the dumbbell split squat,
   lunge, walking lunge and step-up. No body-mass fraction is estimated
@@ -1432,6 +1444,7 @@ files to it; nobody edits another item's files.
 | Thing | Value |
 |---|---|
 | units | kg |
+| equipment | empty dumbbell rack, declared 2.5 kg per-hand grid matching the approved loads |
 | exercises (`id`, mode, Hevy template id) | `bb_back_squat` total `F0000001`; `db_bench_press` per_hand_x2 `F0000002`; `db_single_arm_row` single_implement `F0000003`; `pull_up` bodyweight `F0000004` |
 | routines | `00000000-0000-4000-8000-000000000001` "Session A" (squat, DB bench); `...0002` "Session B" (row, pull-up) |
 | sessions | `session-a`, `session-b` |
@@ -2217,8 +2230,8 @@ progression: return-week logs remain the next week's baseline.
   Every exercise of a `trained_unlogged` session is `unknown`.
 - Each exercise also carries `rpe_delta` (mean logged minus target over
   sets with both) and `sets_prescribed`, `sets_logged`.
-- "Half the increment" uses `Library.increment`, else the equipment
-  increment for the session's location (`equipment_for`, C54).
+- "Half the increment" uses the declared location equipment increment,
+  else `Library.increment`, else the equipment default (`equipment_for`, C54).
 - Each session row: `session_id`, `date`, `title`, `overlay_id`,
   `status`, `workout_id`, `workout_date`, `moved`, `unlogged`, `tag` and
   `exercises`. A matching `miss` or `trained_unlogged` annotation names
@@ -2344,7 +2357,8 @@ Reserved codes:
 | `stale_prescription` | block | R-24 | | Line derived from an exposure outside the validity window and not decayed to its band, or above the `ILLNESS_RPE_CAP` (7) cap on the first session after an illness. |
 | `unearned_load` | block | R-24 | | Load predicted beyond failure for the prescribed reps, or, with no e1RM, more than two increments above the last exposure. |
 | `load_cap` | block | R-24 | | Load above `[caps]` or `dumbbell_max`. |
-| `load_unrepresentable` | block | R-24 | | Load cannot be built from the available increments, dumbbells or plates. |
+| `load_unrepresentable` | block | R-24 | | Load cannot be built from the available increments, dumbbells, kettlebells or plates. |
+| `load_geometry_unknown` | warn | R-24 | | Physical feasibility unknown: configure the known Smith, EZ-bar or trap-bar base mass. |
 | `load_mode_mismatch` | block | R-24 | | Line's load mode or load arithmetic disagrees with the library or C5. |
 | `load_mode_unconfirmed` | block | R-24 | | Line's exercise has no confirmed load mode in the library; only confirming it clears the flag. |
 | `rpe_infeasible` | warn | R-24 | | RPE target more than 1 away from the RPE implied by load, reps and current e1RM. |
@@ -2505,8 +2519,8 @@ coach.validity.estimate_minutes(root, session) -> int
   this way; a rep range is judged at its start. With no e1RM point (and for
   `bodyweight` lines, whose added load has no e1RM, and for lifts with no
   e1RM at all, C5, whose message says body mass dominates), a top working load
-  more than two increments (`Library.increment`, else the equipment
-  increment) above the newest exposure neither excluded nor `suspect`
+  more than two increments (declared location equipment step, else
+  `Library.increment`, else the equipment default) above the newest exposure neither excluded nor `suspect`
   is `unearned_load`. `assisted`
   lines are not judged.
 - **Duration estimate** per session: Σ over sets of (reps × 4 s, or
@@ -2524,13 +2538,37 @@ coach.validity.estimate_minutes(root, session) -> int
   location)` (C54) with the overlay session's `location`.
 - **Caps** follow the R-16 `load_caps` rule exactly: `[caps]` id first,
   else `dumbbell_max` per hand for per-hand modes.
-- **Representable**: barbell totals have a `units.plate_breakdown`;
-  per-hand loads are in `dumbbells` when that list is non-empty (C4;
-  empty means not checked, since racks are not regular multiples of one
-  increment). Which applies follows the library entry's `equipment`:
-  `barbell` with `total`, `dumbbell` with a per-hand mode. Other
-  equipment (machine, cable, kettlebell, other bars) is not checked. A
-  load already over its cap is flagged `load_cap` only.
+- **Representable**: proposal generation and validation share
+  `coach.loads.AvailableLoads`. Explicit per-hand dumbbell racks,
+  declared kettlebells and plate combinations on a bar total take
+  precedence over an increment.
+  Plates name sizes available in pairs, with unlimited pairs of each size
+  as in C5. Barbell totals use `bar_weight`. Smith, EZ-bar and trap-bar
+  totals require `smith_base_weight`, `ez_bar_weight` and
+  `trap_bar_weight`: the explicitly known effective unloaded mass in
+  athlete units, each optional, nonnegative and inherited/overridden by
+  location. A missing one raises `load_geometry_unknown` (warn) and leaves
+  representability unknown; neither an ordinary bar nor zero is inferred.
+  Plates filled from the unit default never override a declared
+  `barbell_increment`. Without an enumerated rack or plates, the declared
+  location equipment increment defines the physical grid; the library
+  increment is fallback, then the equipment default. A location the config
+  no longer names (a historical session's) falls back to the main table.
+  Kettlebells have no grid: a declared `kettlebells` list (main table or
+  location) names the bells, and without one a kettlebell load is neither
+  selected nor checked. Added load on a bodyweight lift (`bodyweight`
+  mode on equipment with no step key) comes from single declared plates,
+  unlimited of each size, as on a dip belt; with no plates it is neither
+  selected nor checked. Other equipment with no step key (`bodyweight`
+  assistance, `band`, `suspension`, `cardio_machine`, `other`) has no
+  declarable kit: its step is a progression request only, and its load is
+  neither selected nor checked beyond its cap. A bar total's grid starts at
+  its known base mass. Machine and cable totals use their increment from
+  zero: a machine total is the load added to it. Historical off-grid loads
+  are checked too. A load
+  already over its cap is flagged `load_cap` only for representability.
+  Impossible loads and explicit rungs raise `load_unrepresentable` with
+  instructions to correct the load/rung or equipment configuration.
 - `load_mode_mismatch` reuses R-13's `overlay.validate` and R-11's
   `effective_load_mode`; R-24 adds no new arithmetic.
 - `load_mode_unconfirmed`: the line's exercise has no
@@ -2829,19 +2867,29 @@ and `plugins test` runs them. Loaded with
   assistance and applies no factor.
   `base.standard_deload(proposal, set_factor, load_factor, rpe,
   load_direction=1)` takes the line's direction the same way.
-- **Rounding** (step 3 of C24): a load equal to one the slot already
-  knows (the derived-from load, a load of the last approved line, the
-  start load) stays as it is. Otherwise a per-hand dumbbell load snaps to
-  the location's `dumbbells` when that list is set; any other load
-  rounds to the increment (`Library.increment`, else the equipment
-  increment) on a grid anchored at the derived-from load (else the last
-  approved load, else the start load, else 0). A load below the
-  derived-from load, or one the proposal marks `round_down`, rounds
-  toward the lighter lift: down, or up for `assisted`, where more
-  assistance is a lighter lift. A load clipped by a cap or a load
-  constraint is not rounded toward the heavier lift. No rounding goes
-  past the cap, even when that leaves assistance below the derived-from
-  least assistance.
+- **Rounding** (step 3 of C24): a scheme's increment requests a step;
+  the shared available-load resolver selects the actual load. Explicit
+  racks and plate combinations (single plates for bodyweight added load)
+  win, otherwise the physical increment grid applies as above; a load
+  with no declarable kit stays as requested, within its cap. Historical loads never anchor that grid or
+  bypass it. A load no heavier than the derived-from load (a hold
+  included), or marked `round_down`, rounds toward the lighter lift: down,
+  or up for assistance. When selection changes a load, the rationale says
+  so ("the kit makes 25/hand, not 24.5/hand"). Caps and
+  clipped constraints remain upper numeric bounds, with a buildable load
+  below the cap taking precedence when assistance cannot round up within
+  it. A load with nothing on its lighter side (under the lightest
+  dumbbell or the bare bar) takes the nearest load within the cap. If no
+  physical load fits, retain the bounded request and flag it as
+  unrepresentable instead of crossing the cap. Explicit assistance-ladder
+  rungs remain exact; an incompatible rung is flagged without snapping.
+  A cap or constraint that clips a rung moves it to the nearest rung
+  within the bounds (ties to the lighter lift); when none fits, the line
+  leaves the ladder at the bounded load, selected from the kit, and its
+  `constraint_applied` flag says so. Other loads on a ladder slot (a
+  deload's raised assistance) go through the resolver. No kg/lb conversion
+  occurs during selection: all kit facts and requests use athlete units;
+  C5 builds the Hevy load object afterwards.
 
 **Built with R-23b** (the remaining schemes and schedule rules):
 
@@ -5912,6 +5960,13 @@ values:
   `dumbbell_max` out, so an lb home config fails validation until the
   athlete's answer is written. `notes` is `[{key, message}]`, `key` a
   dotted config path such as `equipment.dumbbell_max`.
+- `notes` always asks the athlete to confirm `dumbbell_increment`,
+  `machine_increment` and `cable_increment`: each is a physical grid (C22
+  Representable), the dumbbell one when there is no `dumbbells` list. An
+  existing instance whose approved loads sit off a step gets a
+  `load_unrepresentable` flag naming it; the fix is the confirmed step or
+  a `dumbbells` list. `notes` also asks for the `kettlebells` the place
+  has; `values` never suggests them.
 - `/setup` writes Hevy free as `[hevy] enabled = false`. It writes
   `[nutrition]` only as `enabled = false`, when the athlete declines
   nutrition coaching. On a yes it writes nothing and `/goals` sets the

@@ -131,8 +131,8 @@ class ValidWeekTest(ProposeCase):
     def test_lines_quote_loads_through_units(self):
         data = self.propose("--dry-run")
         bench = next(row for row in data["lines"] if row["exercise_id"] == "db_bench_press")
-        self.assertEqual(bench["text"], "3×8–10 @ 24.5/hand (Hevy: 49) RPE 8")
-        self.assertEqual(bench["change"], "25/hand (Hevy: 50) → 24.5/hand (Hevy: 49)")
+        self.assertEqual(bench["text"], "3×8–10 @ 25/hand (Hevy: 50) RPE 8")
+        self.assertIsNone(bench["change"])
         self.assertEqual(set(bench), {"session_id", "date", "exercise_id", "text", "change", "rationale", "flags"})
 
     def test_overlay_sessions_copy_the_program_location(self):
@@ -173,6 +173,7 @@ class DoubleProgressionTest(ProposeCase):
     workouts = staticmethod(edit_sets(BENCH, lambda wid, i, s: s.update(weight_kg=48.0)))
 
     def test_top_of_the_range_adds_the_increment_and_keeps_the_program_range_and_rpe(self):
+        self.set_config("dumbbell_increment = 2.5", "dumbbell_increment = 2.0")
         line = find_line(self.propose("--dry-run")["overlay"], "db_bench_press")
         for set_ in working(line):
             self.assertIsNone(set_.get("reps"))
@@ -190,6 +191,7 @@ class DoubleProgressionShortTest(ProposeCase):
         edit_sets(BENCH, change)(found)
 
     def test_one_set_short_holds_the_load_at_the_program_range(self):
+        self.set_config("dumbbell_increment = 2.5", "dumbbell_increment = 2.0")
         line = find_line(self.propose("--dry-run")["overlay"], "db_bench_press")
         self.assertEqual({(s["rep_range"]["start"], s["rep_range"]["end"], s["rpe"], coaching(s["load"]))
                           for s in working(line)}, {(8, 10, 8, 24)})
@@ -202,6 +204,7 @@ class DoubleProgressionAfterOwnOverlayTest(ProposeCase):
 
     def setUp(self):
         super().setUp()
+        self.set_config("dumbbell_increment = 2.5", "dumbbell_increment = 2.0")
         weekly = read_json(self.root / "data" / "overlays" / "2026-10-12-weekly.json")
         weekly.pop("approval")
         weekly.update(id="2026-10-05-weekly", created_at="2026-10-04T18:00:00Z",
@@ -225,7 +228,8 @@ class DoubleProgressionAfterOwnOverlayTest(ProposeCase):
 
 
 class DoubleProgressionEffortCase(ProposeCase):
-    """The 8–10 @8 bench slot as `exercise_id`, last logged 3×10 at 24/hand and RPE 8, 9 and 9.5.
+    """The 8–10 @8 bench slot as `exercise_id` on a 2 kg dumbbell step, last logged 3×10 at 24/hand
+    and RPE 8, 9 and 9.5.
 
     `db_curl` matches `db_bench_press` in load mode and increment, so only
     the library pattern separates the two outcomes.
@@ -236,6 +240,7 @@ class DoubleProgressionEffortCase(ProposeCase):
 
     def setUp(self):
         super().setUp()
+        self.set_config("dumbbell_increment = 2.5", "dumbbell_increment = 2.0")
         for path in (self.root / "data").rglob("*.json"):
             text = path.read_text(encoding="utf-8")
             path.write_text(text.replace('"db_bench_press"', f'"{self.exercise_id}"'), encoding="utf-8")
@@ -397,7 +402,12 @@ class AssistedLayoffCase(LayoffCase):
 
 
 class AssistedReturnTest(AssistedLayoffCase):
+    def on_an_assistance_machine(self):
+        self.edit_json("data/exercises.json", lambda doc: doc["exercises"]["pull_up"].update(equipment="machine"))
+        self.set_config("machine_increment = 5.0", "machine_increment = 2.5")
+
     def test_mixed_assistance_rounds_up_to_keep_the_least_logged_assistance(self):
+        self.on_an_assistance_machine()
         self.log_pull_up_loads("assisted", (20, 18.75, 18.75))
         self.set_scheme("session-b", "pull_up", "double_progression")
         data = self.propose()
@@ -405,7 +415,16 @@ class AssistedReturnTest(AssistedLayoffCase):
         self.assertEqual([coaching(s["load"]) for s in working(line)], [20, 20])
         self.assertEqual(self.pull_up_check(data), [])
 
+    def test_assistance_with_no_declarable_kit_holds_the_least_logged_assistance(self):
+        self.log_pull_up_loads("assisted", (20, 18.75, 18.75))
+        self.set_scheme("session-b", "pull_up", "double_progression")
+        data = self.propose()
+        line = find_line(data["overlay"], "pull_up")
+        self.assertEqual([coaching(s["load"]) for s in working(line)], [18.75, 18.75])
+        self.assertEqual(self.pull_up_check(data), [])
+
     def test_a_cap_still_wins_over_rounding_assistance_up(self):
+        self.on_an_assistance_machine()
         self.log_pull_up_loads("assisted", (20, 18.75, 18.75))
         self.set_scheme("session-b", "pull_up", "double_progression")
         self.set_config("[caps]", "[caps]\npull_up = 19")
@@ -492,7 +511,7 @@ class CapsAndConstraintsTest(ProposeCase):
         self.set_config("[caps]", "[caps]\ndb_bench_press = 24")
         doc = self.propose("--dry-run")["overlay"]
         line = find_line(doc, "db_bench_press")
-        self.assertEqual({coaching(s["load"]) for s in working(line)}, {24})
+        self.assertEqual({coaching(s["load"]) for s in working(line)}, {22.5})
         self.assertIn("constraint_applied", codes(doc, "db_bench_press"))
         self.assertNotIn("load_cap", codes(doc))
 
@@ -581,7 +600,7 @@ class ConventionSlipTest(ProposeCase):
         bench = find_line(doc, "db_bench_press")
         self.assertEqual(bench["provenance"]["derived_from"], {"date": "2026-09-28", "workout_id": W[1]})
         self.assertIn("convention_slip", codes(doc, "db_bench_press"))
-        self.assertEqual({coaching(s["load"]) for s in working(bench)}, {24.5})
+        self.assertEqual({coaching(s["load"]) for s in working(bench)}, {25})
 
 
 class DeloadTest(ProposeCase):
@@ -685,7 +704,7 @@ class OverrideTest(ProposeCase):
 
     def test_corrected_per_hand_reason_can_be_approved_and_checked(self):
         self.coach("propose", "override", "--proposal", FIRST_ID, "--session", "session-a",
-                   "--exercise", "db_bench_press", "--load", "8", "--reason", "move to 8 kg per hand",
+                   "--exercise", "db_bench_press", "--load", "7.5", "--reason", "move to 7.5 kg per hand",
                    "--standing")
         self.coach("propose", "finalize", "--proposal", FIRST_ID)
         self.coach("overlay", "approve", FIRST_ID)

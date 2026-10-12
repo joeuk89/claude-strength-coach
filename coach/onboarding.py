@@ -62,6 +62,23 @@ def _notes(unit, gym, equipment):
                        "a home gym, and prescriptions are capped there.",
         })
     notes.append({
+        "key": "equipment.dumbbell_increment",
+        "message": f"Confirm the jump between the dumbbells, per hand; {equipment['dumbbell_increment']} {unit} is "
+                   "only a guess, and with no dumbbells list every per-hand load is held to that step. If the "
+                   "jumps vary, list the per-hand weights in dumbbells instead.",
+    })
+    for key, kit in (("machine_increment", "machine stacks"), ("cable_increment", "cable stacks")):
+        notes.append({
+            "key": f"equipment.{key}",
+            "message": f"Confirm the jump between plates on the {kit}; {equipment[key]} {unit} is only a guess, "
+                       "and every load on them is held to that step.",
+        })
+    notes.append({
+        "key": "equipment.kettlebells",
+        "message": f"Ask which kettlebells the place has, in {unit}, and list them in kettlebells. Without the "
+                   "list, kettlebell loads are not matched to real bells or checked.",
+    })
+    notes.append({
         "key": "equipment.apparatus",
         "message": "Ask which of a flat bench, an incline bench, a pull-up bar, a dip station, somewhere to anchor "
                    "the heels for Nordic curls, and a sturdy box or step the place has; list them in apparatus. Once "

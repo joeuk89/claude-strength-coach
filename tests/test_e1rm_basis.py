@@ -91,12 +91,12 @@ class NoHevyCase(unittest.TestCase):
 
 
 class SplitSquatTest(NoHevyCase):
-    """Split squat 2/hand × 10 @ 9, then 4/hand × 8 prescribed: the dumbbells are a small share of the mass moved."""
+    """Split squat 2.5/hand × 10 @ 9, then 5/hand × 8 prescribed: the dumbbells are a small share of the mass moved."""
 
     def setUp(self):
         super().setUp()
         self.log(manual_workout("2026-10-08", "session-b", "db_bulgarian_split_squat", "per_hand_x2",
-                                [(2, 10, 9)] * 3))
+                                [(2.5, 10, 9)] * 3))
 
     def prescribe(self, per_hand):
         doc = read_json(self.root / OVERLAY)
@@ -109,7 +109,7 @@ class SplitSquatTest(NoHevyCase):
         return [f for f in flags if f["exercise_id"] == "db_bulgarian_split_squat"]
 
     def test_the_next_step_gets_no_model_block(self):
-        found = self.prescribe(4)
+        found = self.prescribe(5)
         self.assertEqual(found, [])
 
     def test_the_estimate_is_unavailable_and_the_observation_is_kept(self):
@@ -119,11 +119,11 @@ class SplitSquatTest(NoHevyCase):
         gone = data["unavailable"]["db_bulgarian_split_squat"]
         self.assertEqual((gone["reason"], gone["date"]), ("unsupported_exercise", "2026-10-08"))
         self.assertIn("body mass", gone["message"])
-        self.assertEqual([(s["load"], s["reps"], s["rpe"]) for s in gone["sets"]], [(2, 10, 9)] * 3)
+        self.assertEqual([(s["load"], s["reps"], s["rpe"]) for s in gone["sets"]], [(2.5, 10, 9)] * 3)
         observed = data["observations"]["db_bulgarian_split_squat"][-1]
         self.assertEqual(observed["reason"], "unsupported_exercise")
         self.assertEqual({s["reason"] for s in observed["sets"]}, {"unsupported_exercise"})
-        self.assertEqual([(s["load"], s["e1rm"]) for s in observed["sets"]], [(2, None)] * 3)
+        self.assertEqual([(s["load"], s["e1rm"]) for s in observed["sets"]], [(2.5, None)] * 3)
 
     def test_the_load_step_guard_still_applies(self):
         found = self.prescribe(10)
