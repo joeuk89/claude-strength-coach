@@ -448,6 +448,7 @@ class AdoptOnEmptyTest(AdoptCase):
         code, envelope, _ = self.adopt(self.root, self.draft())
         self.assertEqual(code, 0, envelope)
         state = read(self.root, "data/state.json")
+        self.assertEqual(state["program_adopted"], "2026-10-11")
         self.assertEqual(state["block"], {"id": "b-0001", "started": "2026-10-11", "hard_weeks_completed": 0,
                                           "last_closed_week": None, "last_deep_review": None,
                                           "light_week": {"status": "not_due", "type": None, "reason": None,
@@ -627,6 +628,7 @@ class AdoptReplaceTest(AdoptCase):
         self.assertEqual(envelope["data"]["scheme_state"], {"kept": ["session-a/bb_back_squat"],
                                                             "dropped": ["session-a/db_bench_press"]})
         self.assertEqual(state["block"], old_state["block"])
+        self.assertEqual((old_state["program_adopted"], state["program_adopted"]), ("2026-09-28", "2026-10-11"))
 
     def test_a_second_adoption_the_same_day_archives_beside_the_first(self):
         for _ in range(2):

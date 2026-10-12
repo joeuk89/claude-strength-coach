@@ -1621,12 +1621,16 @@ version bump (below).
 
 ```json
 {
-  "schema_version": 3,
+  "schema_version": 5,
+  "program_adopted": "2026-09-01",
   "rotation": {"position": "week-a", "confirmed": true, "confirmed_at": "2026-10-11", "week": "2026-10-12"},
   "block": {
+    "id": "b-0001",
     "started": "2026-09-01",
     "hard_weeks_completed": 3,
-    "deload": {"status": "not_due", "since": null}
+    "last_closed_week": "2026-10-05",
+    "last_deep_review": null,
+    "light_week": {"status": "not_due", "type": null, "reason": null, "week": null, "decision_id": null}
   },
   "one_off": null,
   "scheme_state": {"session-a/bb_back_squat": {"scheme": "double_progression", "data": {}, "pending": null}},
@@ -1641,10 +1645,19 @@ version bump (below).
 }
 ```
 
+- `program_adopted` (v5) is the date `program adopt` made the current
+  program the program, null when unknown. The schedule rule plans
+  sessions from it (C41). The migration from v4 sets it null;
+  `program adopt` sets it, including on `--replace`, while the block
+  carries over. `coach.state.adopted` reads a null as the newest
+  `data/archive/programs/<date>/` (a replace archives the old program
+  that day), else the earliest of `block.started` and the first
+  overlay's start, else unknown. `block close` and `block init` write
+  that reading into a null field, the earliest of it before and after
+  the new block, so a new block never moves the adoption forward.
 - `rotation.position` is null when the schedule has no rotation
   (`fixed_weekdays`); `confirmed_at` is a date or null.
-- `deload.status`: `not_due`, `due`, `in_progress`, `done`, `skipped`.
-  R-31 replaces `block` with the C42 shape.
+- `block` has the C42 shape (R-31, v4).
 - `one_off`: null or `{"overlay_id": id, "span": span}`.
 - `scheme_state` keys are `<session_id>/<exercise_id>` and name a slot the
   program has, or `<session_id>/_session` for a `conditioning` session's
@@ -1814,7 +1827,8 @@ step to the R-17a migration chain, so the chain stays linear.
 Program bumps: R-22 (executable `missed_day_rules`, C37), R-30b (`priority`, `minimum_week`, C40), R-44a
 (`interference`, C51), R-44b (session `scheme`, C51), v8
 (`minimum_week.external_sessions`, C40), v9 (`dose_intent`, C40). State bump: R-31
-took state to v4 (`block`, C42). Overlay: R-24 takes it to v2 (C21), R-22 to v3 (C37) and R-30b to v4 (C40). A
+took state to v4 (`block`, C42); the adoption date took it to v5
+(`program_adopted`, C41). Overlay: R-24 takes it to v2 (C21), R-22 to v3 (C37) and R-30b to v4 (C40). A
 brief or section that names a version number means the next free one.
 
 ## C17. History cache (R-20 writes; R-21a, R-23a, R-24, R-25, R-30a, R-31, R-43 read)
@@ -2123,8 +2137,8 @@ progression: return-week logs remain the next week's baseline.
   or for a manual workout its `session_id`, inside the overlay span,
   matched once, nearest date first; `moved: true` when the date differs;
   or a `trained_unlogged` annotation, with `unlogged: true`), `missed`
-  (with `tag` from a `miss` annotation for that session inside the
-  overlay span, each matched once, nearest date first; else `untagged`),
+  (with `tag` from a `miss` annotation, each matched once, nearest date
+  first; else `untagged`),
   `upcoming`.
   Workouts matching no planned session are listed as `extra`.
 - Exercise `status` for a trained session, comparing working sets in order:
@@ -2141,7 +2155,8 @@ progression: return-week logs remain the next week's baseline.
 - Each session row: `session_id`, `date`, `title`, `overlay_id`,
   `status`, `workout_id`, `workout_date`, `moved`, `unlogged`, `tag` and
   `exercises`. A matching `miss` or `trained_unlogged` annotation names
-  the session and a date inside its overlay's span. A conditioning
+  the session and a date inside its overlay's span or, for a moved
+  session, its original date (`moved_from`). A conditioning
   session (C17) has `conditioning: true` and no exercises.
 - `data.summary`: `planned` (sessions dated today or earlier),
   `trained`, `missed` (counts by tag), `missed_total`, `upcoming`, and
@@ -4399,8 +4414,8 @@ as it was):
 - `summary`: one row per week in the window (C7 weeks; `week` is the
   label, `start` the week's first day; the first and last rows may cover
   part of a week). Planned sessions come from the overlay in force (the
-  card's C18 rows), else from `schedule plan` for those days, each
-  matched to a workout of its session (its `session_id`, or the routine
+  card's C18 rows), else from `schedule plan` for those days on or
+  after the program's adoption (C41), each matched to a workout of its session (its `session_id`, or the routine
   `state.hevy.routines` maps to it) in the same week, a
   `trained_unlogged` annotation, or a `miss` annotation for its tag.
   `planned_from` is `overlay` when an overlay is in force on every day of
@@ -5086,14 +5101,16 @@ null`:
   without a target; for an `assisted` lift's `top_load`, lower is met.
   `unavailable` is the C18 `unavailable` entry for an `e1rm` KPI
   (`{reason, message, date}`), else null, so a KPI with no value says why.
-- `weeks` rows, one per week from the week holding `since` to the week
-  holding today: `planned` (core sessions holding the lift as their own
-  line, not a fold and not a moved session), `trained` (workouts with a
-  working set of it), `missed` (planned, dated before today, C18 status
-  `missed`), `replaced` (a fold of the lift from that miss, or the
-  session moved from it, was trained), `pending` (that make-up is still
+- `weeks` rows, one per program week (C41) from the week holding `since`
+  to the week holding today: `planned` (core sessions holding the lift
+  as their own line, not a fold; a moved session counts once, on its new
+  date), `trained` (workouts with a working set of it), `missed`
+  (planned, dated before today, C18 status `missed`), `replaced` (a fold
+  of the lift from that miss was trained), `pending` (that fold is still
   upcoming) and `unreplaced`. Each week with `unreplaced` raises one
-  `priority_exposures_missed`, naming the misses.
+  `priority_exposures_missed`, naming the misses. The `kpi` reads every
+  workout since `since`, including those before the program's adoption;
+  only the `weeks` rows are limited to program weeks.
 - **Program v8.** Optional `minimum_week.external_sessions` lists retained
   coach-led ids, default `[]`; migration `0007_minimum_external_sessions`
   adds the empty list to configured minimums and preserves null minimums.
@@ -5173,6 +5190,31 @@ coach.structure.ordinary_weeks(root, until, n=4, reach=12) -> list[str]
   (`coach.stats.set_weights`, C18). Planned dose for a date comes from the
   overlay in force; with no overlay, from `schedule plan` on the program.
   Working sets only.
+- **Planned sessions** come from the overlay in force each day, else
+  from the schedule rule on the program. The schedule rule and coach-led
+  sessions plan only from the program's adoption date (C16
+  `program_adopted`, read by `coach.state.adopted`). An overlay plans a
+  day before that date only when it was made before it, so it belongs
+  to an earlier program: a replaced program's weeks keep counting, and
+  an opening week's overlay made at adoption plans nothing on the days
+  before it. Workouts on days that plan nothing are training evidence
+  only (KPIs, e1RM, validity), never misses. A session an overlay moved
+  (`moved_from`, C37) is one planned session, on its new date, when the
+  overlay holding the moved copy is in force there; its original date
+  plans nothing. A `miss` or `trained_unlogged` annotation on that date
+  is not counted on its own: a `trained_unlogged` one marks the moved
+  copy trained (unlogged), and a `miss` one tags the moved copy when
+  that is missed too. A session
+  for the same id that moves nothing is a separate planned session.
+  `coach.overlay.planned` applies the overlay rules for both
+  `structure` and `stats adherence --span` (so the check-in card), and
+  `coach.state.plans_on` the adoption bound for `structure`, the card's
+  coach-led sessions and the catch-up card's schedule rows (C36).
+- A **program week** is a week wholly on or after the adoption date, or
+  an earlier week that still plans a session. Adherence,
+  `ordinary_weeks` and the priority rows scan the program weeks among
+  the weeks they reach. Block starts (C42) move nothing here: a new
+  block keeps every earlier program week.
 - Coach-led sessions: planned from `program.external_sessions` placed by
   the schedule's weekday; delivered when an `external` annotation for that
   date says `done: true`, using `estimated_sets` as fractional sets. No
@@ -5283,7 +5325,8 @@ static balance alone. The command only reads: it never adopts FILE.
   whose `id` is null (the row's `overlay_id` is null).
 - `structure week` rows: core and optional sessions carry `session_id`,
   `date`, `tier`, `status`, `moved`, `workout_id`, `overlay_id`, plus
-  `tag` when missed and `unlogged: true` when trained unlogged. Coach-led
+  `tag` when missed, `unlogged: true` when trained unlogged and
+  `moved_from` (the original date) for a moved session. Coach-led
   rows carry `external_id`, `title`, `date`, `status` and
   `estimated_sets`. A coach-led session dated after today is `upcoming`.
   A coach-led session with `weekday` null is placed on the dates of its
@@ -5300,8 +5343,8 @@ static balance alone. The command only reads: it never adopts FILE.
   session done in the week, and more than 10 days (the first C22 return
   band) from the last training before it to the first after it (or to
   the day after `until` when none follows yet). A week with no training
-  before it at all is a layoff week. Weeks ending before the earliest
-  overlay or workout are never scanned.
+  before it at all is a layoff week; workouts before the program's
+  adoption count as training here. Only program weeks are scanned.
 - A light week by decision: an adopted `light_week` decision, not
   withdrawn, whose `details.week` falls in the week.
 - `structure adherence` returns `until`, `weeks` (`{week, label,
@@ -5728,8 +5771,9 @@ writes `data/program.json` directly.
 2. With an existing program: exit 3 without `--replace` (under
    `--dry-run` too); with it, copy both files to
    `data/archive/programs/<today>/` (`<today>-2`, `-3` when that exists).
-3. Write `data/program.json` and `data/state.json` (block started
-   today, zero hard weeks, deload not due; rotation position from
+3. Write `data/program.json` and `data/state.json` (`program_adopted`
+   today; block started today, zero hard weeks, light week not due, or the
+   old state's block kept under `--replace`; rotation position from
    `--position`, else the draft's `position`, else the schedule rule's
    first position, confirmed today for the week holding tomorrow, or
    null with `confirmed_at` and `week` null for a rule without positions;

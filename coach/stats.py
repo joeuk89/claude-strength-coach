@@ -352,12 +352,8 @@ def _planned(root, overlays, overlay_id, span):
             if found and found[0]["id"] == doc["id"]:
                 planned.append((doc, session))
         return planned, dates.Span(dates.parse_date(doc["span"]["start"]), dates.parse_date(doc["span"]["end"]))
-    planned = []
-    for day in span.days():
-        found = overlay.pick_in_force(overlays, day)
-        if found:
-            planned += [(found[0], s) for s in overlay.sessions_on(found[0], day)]
-    return planned, span
+    adopted = state.adopted(root, history.load_optional(state, root), overlays)
+    return overlay.planned(overlays, span.days(), adopted, config_module.load(root).athlete.timezone), span
 
 
 def _nearest(items, day, key):
@@ -413,8 +409,8 @@ def adherence_of(root, planned, window, include_unsynced=False, today=None, now=
     sessions, used_notes, miss_pairs = [], set(), []
     for position, (doc, session) in enumerate(planned):
         day = dates.parse_date(session["date"])
-        in_span = (lambda a, d=doc: d["span"]["start"] <= a["date"] <= d["span"]["end"]
-                   and a["session_id"] == session["session_id"])
+        in_span = (lambda a, d=doc, s=session: a["session_id"] == s["session_id"]
+                   and (d["span"]["start"] <= a["date"] <= d["span"]["end"] or a["date"] == s.get("moved_from")))
         row = {"session_id": session["session_id"], "date": session["date"], "title": session["title"],
                "overlay_id": doc["id"], "status": None, "workout_id": None, "workout_date": None, "moved": False,
                "unlogged": False, "tag": None, "exercises": []}

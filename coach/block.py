@@ -538,6 +538,18 @@ def _render_program(root, dry_run):
     return [page]
 
 
+def _with_block(inst, block_state):
+    """The state with `block_state`; a null `program_adopted` is fixed at its earliest reading, because the
+    fallback reads `block.started` and a new block must not move the adoption forward (C16)."""
+    new_state = dict(inst.state, block=block_state)
+    if not new_state.get("program_adopted"):
+        found = [day for day in (state_module.adopted(inst.root, doc, inst.overlays) for doc in (inst.state, new_state))
+                 if day is not None]
+        if found:
+            new_state["program_adopted"] = min(found).isoformat()
+    return new_state
+
+
 def _save(inst, ledger, block_state, dry_run):
     errors = validate_schema(ledger, jsonio.load_schema(SCHEMA)) + problems(ledger)
     new_state = dict(inst.state, block=block_state)
@@ -598,7 +610,7 @@ def close(root, week_start, readiness=None, sleep=None, deep=False, dry_run=Fals
     last_deep = inst.today.isoformat() if deep else previous["last_deep_review"]
     light_week = _light_week_after(previous["light_week"], outcome, week_type, reason, target, replaced)
     block_state = _block_state(ledger, light_week, target.start.isoformat(), last_deep)
-    inst.state = dict(inst.state, block=block_state)
+    inst.state = _with_block(inst, block_state)
     deep_report = deep_review(inst, block_state)
     rendered = _save(inst, ledger, block_state, dry_run)
     return {"weeks": entries, "replaced": replaced, "ended": ended, "block": block_state,
@@ -735,7 +747,7 @@ def init(root, hard_weeks, started=None, through=None, reason=None, dry_run=Fals
                    "last_closed_week": last.start.isoformat(), "last_deep_review": previous["last_deep_review"],
                    "light_week": dict(previous["light_week"]) if previous["light_week"]["status"] == "agreed"
                    else dict(_NOT_DUE)}
-    inst.state = dict(inst.state, block=block_state)
+    inst.state = _with_block(inst, block_state)
     rendered = _save(inst, ledger, block_state, dry_run)
     return {"ledger": ledger, "block": block_state, "next_close": inst.week(last.end + timedelta(days=1)).label(),
             "status_line": status_line_for(block_state, ceiling_of(inst.program), ledger, inst.decisions),
