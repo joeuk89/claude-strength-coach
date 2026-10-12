@@ -124,7 +124,7 @@ def _unavailable(exposure, reason):
                    "mislead; judge it by its logged reps and load")
     else:
         message = (f"no e1RM on {exposure['date']}: a total-system e1RM counts body mass, and no bodyweight "
-                   f"reading lies within {BODYWEIGHT_WINDOW_DAYS} days of it; record one with bodyweight record, "
+                   f"observation lies within {BODYWEIGHT_WINDOW_DAYS} days of it; record one with bodyweight record, "
                    "as a Hevy body measurement or as a nutrition reading")
     sets = [{"set_index": s["index"], "load": history.coaching_number(s["load"]), "reps": s["reps"], "rpe": s["rpe"]}
             for s in exposure["sets"] if not s["discounted"] and not s["convention_unknown"]]
