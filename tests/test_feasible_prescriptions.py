@@ -115,8 +115,8 @@ class GeneratedLinesCase(NoHevyCase):
         self.add(draft)
         self.coach("history", "sync")
 
-    def proposed(self, exercise_id):
-        data = self.coach("propose", "week", "--week", "2026-W43", "--dry-run")["data"]
+    def proposed(self, exercise_id, *extra):
+        data = self.coach("propose", "week", "--week", "2026-W43", "--dry-run", *extra)["data"]
         line = next(row for row in data["lines"] if row["exercise_id"] == exercise_id)
         overlay_line = next(e for s in data["overlay"]["sessions"] for e in s["exercises"]
                             if e["exercise_id"] == exercise_id)
@@ -174,6 +174,28 @@ class GeneratedLinesTest(GeneratedLinesCase):
         self.assertIn("e1RM unavailable", line["rationale"])
         self.assertNotIn("model accepts", line["rationale"])
 
+    def test_a_deload_line_is_not_held_by_the_model(self):
+        path = self.root / "data/program.json"
+        doc = read_json(path)
+        doc["blocks"]["deload_rule"]["params"] = {"load_factor": 1}
+        write_json(path, doc)
+        self.edit_slot("db_bench_press", lambda slot: slot.update(
+            sets=[{"count": 3, "type": "normal", "reps": 10, "rpe": 8}]))
+        self.log("session-a", "2026-10-12", "db_bench_press", "18x10@6,20x9@10*2")
+        line, loads, _ = self.proposed("db_bench_press", "--kind", "deload")
+        self.assertEqual(loads, {20})
+        self.assertIn("the standard deload", line["rationale"])
+        self.assertNotIn("model accepts", line["rationale"])
+
+    def test_with_no_logged_load_the_model_accepts_the_scheme_load_stays_flagged(self):
+        self.edit_slot("db_bench_press", lambda slot: slot.update(
+            sets=[{"count": 3, "type": "normal", "reps": 15, "rpe": 8}]))
+        self.log("session-a", "2026-10-12", "db_bench_press", "20x5@10*3")
+        line, loads, _ = self.proposed("db_bench_press")
+        self.assertEqual(loads, {20})
+        self.assertIn("unearned_load", line["flags"])
+        self.assertNotIn("model accepts", line["rationale"])
+
 
 class CheckCase(NoHevyCase):
     """The no-Hevy instance with an empty log, checking a bench line of the next week against the model's flags."""
@@ -199,7 +221,7 @@ class CheckCase(NoHevyCase):
         self.add(draft)
         self.coach("history", "sync")
 
-    def check(self, sets, kind="weekly"):
+    def check(self, sets, kind="weekly", provenance=None):
         source = self.root / "data/overlays/2026-10-12-weekly.json"
         doc = read_json(source)
         doc.update(approval=None, kind=kind, id=f"2026-10-19-{kind}", span={"start": "2026-10-19", "end": "2026-10-25"})
@@ -208,6 +230,7 @@ class CheckCase(NoHevyCase):
             for line in session["exercises"]:
                 if line["exercise_id"] == "db_bench_press":
                     line["sets"] = sets
+                    line["provenance"] = provenance
         write_json(self.root / f"data/overlays/{doc['id']}.json", doc)
         data = self.coach("prescription", "check", "--overlay", doc["id"])["data"]
         flags = [f for f in data["flags"] if f["exercise_id"] == "db_bench_press" and f["code"] in MODEL_CODES]
@@ -238,6 +261,27 @@ class CheckTest(CheckCase):
         self.assertEqual(flags, [])
         self.assertEqual(row["feasibility"]["rpe"], "ceiling")
         self.assertIn("ceiling", row["feasibility"]["message"])
+
+    def test_a_return_band_line_is_not_flagged_as_too_easy(self):
+        self.log_bench("2026-10-12", 22.5, 10, 8)
+        decay = {"days_off": 14, "band": "11-21", "load_factor": 0.95, "set_delta": -1, "rpe_cap": None}
+        provenance = {"scheme": "double_progression", "derived_from": None, "inferred": False, "decay": decay,
+                      "rationale": None}
+        flags, row = self.check(self.bench_sets(2, 18.5, 8, reps=8), provenance=provenance)
+        self.assertEqual(flags, [])
+        self.assertEqual(row["feasibility"]["rpe"], "ceiling")
+        self.assertIn("a return-band line", row["feasibility"]["message"])
+        flags, _ = self.check(self.bench_sets(2, 18.5, 8, reps=8))
+        self.assertEqual([f["code"] for f in flags], ["rpe_infeasible"])
+
+    def test_the_first_session_after_illness_is_not_flagged_as_too_easy(self):
+        self.log_bench("2026-10-12", 22.5, 10, 8)
+        self.coach("history", "annotate", "--kind", "miss", "--date", "2026-10-15", "--session", "session-b",
+                   "--tag", "ill")
+        flags, row = self.check(self.bench_sets(2, 18.5, 6, reps=8))
+        self.assertEqual(flags, [])
+        self.assertEqual(row["feasibility"]["rpe"], "ceiling")
+        self.assertIn("the first session after illness", row["feasibility"]["message"])
 
     def test_an_rpe_cap_constraint_makes_the_rpe_a_ceiling(self):
         self.log_bench("2026-10-12", 22.5, 10, 8)
