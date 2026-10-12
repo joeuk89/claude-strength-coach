@@ -26,11 +26,13 @@ with `python3 -m coach wellness add --date YYYY-MM-DD --sleep-hours H`.
 Record a period mean once with `wellness add --from START --to END
 --sleep-hours H`; never expand it into invented nightly entries.
 Run `python3 -m coach wellness summary --from START --to END` for the
-14 calendar dates ending on the assessment date. Read `sleep_gate`
+14 calendar dates ending today; any other span stays `pending measurement`. Read `sleep_gate`
 and `sleep.evidence`, `covered_dates`, `missing_dates` and `nights`.
 
 A complete diary or complete non-overlapping period means can settle
-the average gate. `nights` counts actual nightly observations only;
+the average gate. A record with only time in bed never hides hours
+asleep recorded for the same date. `nights` counts actual nightly
+observations only;
 period means retain their original span. A clipped period mean, or one
 partly replaced by daily observations, cannot supply the missing
 nightly hours: the summary excludes it from the average and shows its

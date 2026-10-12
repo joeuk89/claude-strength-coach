@@ -8,6 +8,8 @@ from coach.commands import arg, command
 from coach.commands.activity import SPAN_ARGS
 from coach.errors import ValidationError
 
+SLEEP_GATE_HOURS = 7
+
 FIELDS = ("sleep_hours", "in_bed_hours", "resting_hr", "steps", "body_mass", "body_fat_pct")
 
 
@@ -23,11 +25,8 @@ def summary(args, ctx):
     store = actions.store_for(ctx)
     span = actions.span(args, ctx)
     sleep = store.sleep_summary(span)
-    nights = [{"date": day["date"], "asleep_hours": day["sleep"].get("asleep_hours"),
-               "in_bed_hours": day["sleep"].get("in_bed_hours"), "source": day["field_sources"]["sleep"],
-               "provenance": day["field_provenance"]["sleep"]}
-              for day in store.wellness_days(span) if day["sleep"] is not None
-              and day["field_provenance"]["sleep"]["kind"] == "nightly"]
+    nights = [dict(day, source=day["provenance"]["source"])
+              for day in store.asleep_days(span) if day["provenance"]["kind"] == "nightly"]
     trailing = dates.Span(ctx.today() - timedelta(days=13), ctx.today())
     gate = {"status": "pending measurement", "span": trailing.to_json(),
             "basis": "low-confidence coaching heuristic", "claim": "rn:sleep-dieting.3"}
@@ -36,7 +35,7 @@ def summary(args, ctx):
     elif not sleep["complete"]:
         gate["reason"] = "incomplete hours coverage; retain the missing dates and original source spans"
     else:
-        gate["status"] = "recomp" if sleep["avg_asleep_hours"] < 7 else "passed"
+        gate["status"] = "recomp" if sleep["avg_asleep_hours"] < SLEEP_GATE_HOURS else "passed"
         gate["reason"] = "maintenance" if gate["status"] == "recomp" else "offer goals review before a deficit"
     return {"span": span.to_json(), "sleep": sleep, "nights": nights, "sleep_gate": gate}
 

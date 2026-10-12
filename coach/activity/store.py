@@ -33,6 +33,12 @@ def _has(field, value):
     return value is not None
 
 
+def _provenance(record):
+    span = record["span"]
+    return {"id": record["id"], "source": record["source"], "span": span,
+            "kind": "nightly" if span["start"] == span["end"] else "period_mean"}
+
+
 def _floor_hundredths(value):
     # Rounding down keeps a shown 7.0 from hiding a mean just under a 7-hour threshold.
     return math.floor(value * 100) / 100
@@ -121,7 +127,8 @@ class ActivityStore:
                  if span.contains(dates.parse_date(r["date"])) and (kinds is None or r["kind"] in kinds)]
         return sorted(found, key=lambda r: (r["date"], self.rank(r["source"]), r["id"]))
 
-    def wellness_days(self, span):
+    def _wellness_candidates(self, span):
+        """(day, records covering it): daily records first, then span records, each by precedence."""
         daily, spans = {}, []
         for record in self.records("wellness"):
             start, end = (dates.parse_date(record["span"][key]) for key in ("start", "end"))
@@ -129,10 +136,13 @@ class ActivityStore:
                 daily.setdefault(start, []).append(record)
             else:
                 spans.append((dates.Span(start, end), record))
-        days = []
         for day in span.days():
-            candidates = (self._by_precedence(daily.get(day, []))
-                          + self._by_precedence([r for s, r in spans if s.contains(day)]))
+            yield day, (self._by_precedence(daily.get(day, []))
+                        + self._by_precedence([r for s, r in spans if s.contains(day)]))
+
+    def wellness_days(self, span):
+        days = []
+        for day, candidates in self._wellness_candidates(span):
             resolved, sources, provenance = {"date": day.isoformat()}, {}, {}
             for field in WELLNESS_FIELDS:
                 resolved[field] = None
@@ -140,10 +150,7 @@ class ActivityStore:
                     if _has(field, record.get(field)):
                         resolved[field] = record[field]
                         sources[field] = record["source"]
-                        provenance[field] = {"id": record["id"], "source": record["source"],
-                                             "span": record["span"],
-                                             "kind": ("nightly" if record["span"]["start"] == record["span"]["end"]
-                                                      else "period_mean")}
+                        provenance[field] = _provenance(record)
                         break
             if sources:
                 resolved["field_sources"] = sources
@@ -151,14 +158,23 @@ class ActivityStore:
                 days.append(resolved)
         return days
 
+    def asleep_days(self, span):
+        """One entry per date with hours asleep, from the highest-ranked record that has them."""
+        found = []
+        for day, candidates in self._wellness_candidates(span):
+            record = next((r for r in candidates if (r.get("sleep") or {}).get("asleep_hours") is not None), None)
+            if record is not None:
+                found.append({"date": day.isoformat(), "asleep_hours": record["sleep"]["asleep_hours"],
+                              "in_bed_hours": record["sleep"].get("in_bed_hours"),
+                              "provenance": _provenance(record)})
+        return found
+
     def sleep_summary(self, span):
         evidence = {}
-        for day in self.wellness_days(span):
-            if day["sleep"] is None or day["sleep"].get("asleep_hours") is None:
-                continue
-            provenance = day["field_provenance"]["sleep"]
+        for day in self.asleep_days(span):
+            provenance = day["provenance"]
             item = evidence.setdefault(provenance["id"], dict(
-                provenance, asleep_hours=day["sleep"]["asleep_hours"],
+                provenance, asleep_hours=day["asleep_hours"],
                 self_report=provenance["source"] == "manual", resolved_dates=[]))
             item["resolved_dates"].append(day["date"])
         covered, weighted_hours, nightly_hours = [], Fraction(0), []

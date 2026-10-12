@@ -30,8 +30,8 @@ One odd week does not automatically change calories; use a supported
 **2–3-week trend** and the athlete's agreed phase intent.
 
 **Maintenance recomp targets zero**, whether chosen voluntarily or by
-the sleep gate. Confirmed -0.45 kg/week over 14 days is a review of the
-maintenance estimate, not automatically desirable cut progress. Sustained
+the sleep gate. For example, a confirmed -0.45 kg/week over 14 days is a
+review of the maintenance estimate, not automatically desirable cut progress. Sustained
 positive drift gets the converse review. Ask whether continued loss is
 intended: if so, route to `/goals` to review the goal/phase and sleep gate.
 For any phase, a changed goal, reached phase trigger or trend contradicting
@@ -40,8 +40,9 @@ the plan also goes to `/goals` before changing the phase.
 **With MacroFactor**, the app owns calorie adjustments: review its trend,
 confirm complete logging and let it work. Never supply a competing target
 or calorie adjustment. **Without an app**, after confirming a sustained
-miss of the agreed rate, propose the existing ~100–150 kcal/day adjustment:
-upward for maintenance loss, downward for maintenance gain. This small
+miss of the agreed rate, propose the existing ~100–150 kcal/day adjustment
+in the direction the trend needs (at maintenance: upward for maintenance
+loss, downward for maintenance gain). This small
 step is a coaching heuristic, not a new weight-noise cutoff. Obtain the
 athlete's yes before editing `[nutrition] kcal_target` and recording why
 in `profile.md`. Never re-derive an equation here; a fresh estimate or

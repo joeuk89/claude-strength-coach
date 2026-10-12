@@ -25,10 +25,10 @@ Fixed points that must survive any research:
 **Sleep gate on deficits.** Before agreeing any deficit, follow
 `reference/nutrition-sleep.md`: manual/tracker eligibility, activity
 setup, complete trailing coverage, the low-confidence under-7-hour
-maintenance heuristic and no-source fallback (rn:sleep-dieting.3;
+maintenance heuristic and no-source fallback (rn:sleep-dieting.3,
 rn:sleep-dieting.4). The adult health consensus and small dieting trials
 support caution, not a medically proven dieting boundary
-(rn:sleep-dieting.1; rn:sleep-dieting.2).
+(rn:sleep-dieting.1, rn:sleep-dieting.2).
 
 Agree with the athlete: **goal weight** (or body-comp outcome), **phase
 sequence** with rough dates, **target trend rate per phase**, and **what

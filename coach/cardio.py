@@ -391,9 +391,7 @@ def reconcile(root, week_value, today):
 def sleep_judgement(store, settings, end):
     """(short nights, nights with data, debt: True | False | None) over the 7 nights ending on `end`."""
     nights = dates.Span(end - timedelta(days=NIGHTS - 1), end)
-    hours = [day["sleep"]["asleep_hours"] for day in store.wellness_days(nights)
-             if day["sleep"] is not None and day["sleep"].get("asleep_hours") is not None
-             and day["field_provenance"]["sleep"]["kind"] == "nightly"]
+    hours = [day["asleep_hours"] for day in store.asleep_days(nights) if day["provenance"]["kind"] == "nightly"]
     short = sum(1 for value in hours if value < settings["sleep_short_hours"])
     if len(hours) < settings["sleep_min_nights"]:
         return short, len(hours), None

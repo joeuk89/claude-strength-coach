@@ -46,6 +46,7 @@ class MaintenanceTrendTest(CliMixin, unittest.TestCase):
             "if so, route to `/goals`",
             "the app owns calorie adjustments",
             "Never supply a competing target or calorie adjustment",
+            "in the direction the trend needs",
             "upward for maintenance loss, downward for maintenance gain",
             "Obtain the athlete's yes before editing",
         ):

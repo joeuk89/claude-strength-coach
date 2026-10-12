@@ -110,6 +110,35 @@ class SleepEvidenceTest(ActivityCase):
         self.assertEqual(data["sleep_gate"]["status"], "pending measurement")
         self.assertIsNone(data["sleep"]["avg_asleep_hours"])
 
+    def test_time_in_bed_only_nights_leave_a_complete_period_mean_to_settle_the_gate(self):
+        records.append_lines(self.root / LOCAL_WELLNESS, [
+            wellness(f"apple_health:{day}", day.isoformat(),
+                     sleep={"asleep_hours": None, "in_bed_hours": 8, "start": None, "end": None})
+            for day in self.span.days()])
+        self.ok("wellness", "add", "--from", "2026-09-28", "--to", "2026-10-11", "--sleep-hours", "6.4")
+        data = self.summary()
+        self.assertEqual(data["sleep_gate"]["status"], "recomp")
+        evidence, = data["sleep"]["evidence"]
+        self.assertEqual((evidence["kind"], evidence["span"]), ("period_mean", self.span.to_json()))
+        self.assertTrue(evidence["included_in_average"])
+        self.assertEqual(data["sleep"]["nights"], 0)
+        store = ActivityStore(self.root, config_module.load(self.root))
+        settings = {"sleep_short_hours": 7, "sleep_min_nights": 4, "sleep_debt_nights": 3}
+        self.assertEqual(cardio.sleep_judgement(store, settings, self.span.end), (0, 0, None))
+
+    def test_a_lower_ranked_night_with_hours_asleep_beats_time_in_bed_only(self):
+        self.ok("wellness", "add", "--date", "2026-10-11", "--in-bed-hours", "8")
+        records.append_lines(self.root / LOCAL_WELLNESS,
+                             [wellness("apple_health:2026-10-11", "2026-10-11", asleep=6.5)])
+        data = self.summary(start="2026-10-11")
+        self.assertEqual(data["sleep"]["avg_asleep_hours"], 6.5)
+        self.assertEqual(data["sleep"]["nights"], 1)
+        self.assertEqual([(night["asleep_hours"], night["source"]) for night in data["nights"]],
+                         [(6.5, "apple_health")])
+        store = ActivityStore(self.root, config_module.load(self.root))
+        settings = {"sleep_short_hours": 7, "sleep_min_nights": 1, "sleep_debt_nights": 1}
+        self.assertEqual(cardio.sleep_judgement(store, settings, date(2026, 10, 11)), (1, 1, True))
+
     def test_clipped_or_partly_replaced_mean_cannot_fill_unknown_nights(self):
         self.ok("wellness", "add", "--from", "2026-09-28", "--to", "2026-10-11", "--sleep-hours", "6.4")
         clipped = self.summary(start="2026-10-01")

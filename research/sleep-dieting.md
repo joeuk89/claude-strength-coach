@@ -149,6 +149,8 @@ against control. This does not test a seven-hour dieting boundary.
   and maintenance estimate; intentional continued loss requires `/goals`.
 - No-app calorie changes remain the existing consent-based 100–150 kcal
   heuristic after sustained trend review; apps own their calorie changes.
+- When sleep is the limiter, coach sleep first (claim 5); the deficit
+  can start once the trailing average reaches ~7 h.
 
 ## Open questions
 
