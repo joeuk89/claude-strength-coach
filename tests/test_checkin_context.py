@@ -73,12 +73,12 @@ class ReviewContextTest(HistoryCase):
                 config_path.write_text(config + f"\n[checkin]\ncadence_days = {cadence}\n", encoding="utf-8")
                 before = self.status(due_day)
                 self.assertEqual((before["level"], before["data"]["due_date"]), ("attention", due_day))
-                setup = self.record("2026-10-12", "# Program start — 2026-10-12")
+                program_start = self.record("2026-10-12", "# Program start — 2026-10-12")
                 after = self.status(due_day)
                 self.assertEqual(after, before)
                 self.assertEqual(checkin.due(self.root, dates.parse_date(due_day)).due_date.isoformat(), due_day)
                 self.assertEqual(self.status("2026-10-11")["level"], "info")
-                setup.unlink()
+                program_start.unlink()
 
     def test_program_start_anchor_survives_a_later_block_start(self):
         self.record("2026-10-11", "# Program start — 2026-10-11")
@@ -223,7 +223,7 @@ class ReviewContextTest(HistoryCase):
         self.coach("overlay", "render", overlay_id, "--into", str(path))
         self.assertEqual({r["status"] for r in self.checks("overlay_render_fresh")}, {"pass"})
 
-    def test_block_reasons_reach_the_card_without_being_labelled_an_explicit_request(self):
+    def test_block_reasons_alone_make_the_card_deep_without_being_labelled_an_explicit_request(self):
         self.record("2026-10-11", "# Check-in — 2026-10-11 (deep)")
         self.edit_json("data/state.json", lambda doc: doc["block"]["light_week"].update(
             status="proposed", type="deload", reason="ceiling", week="2026-10-19"))
@@ -231,7 +231,9 @@ class ReviewContextTest(HistoryCase):
         reasons = report["deep_review"]["reasons"]
         self.assertIn("light_week_proposed", reasons)
         args = [part for reason in reasons for part in ("--deep-reason", reason)]
-        result = self.coach("checkin", "prepare", "--until", "2026-10-18", "--tier", "deep", *args)["data"]
+        result = self.coach("checkin", "prepare", "--until", "2026-10-18", *args)["data"]
+        self.assertEqual(result["card"]["mode"], "deep")
+        self.assertIn("a light week is being proposed", result["card"]["tier_reasons"])
         self.assertIn("a light week is being proposed", result["text"])
         self.assertNotIn("asked for", result["text"])
         weekly = self.coach("checkin", "prepare", "--until", "2026-10-18", "--tier", "weekly", *args)["data"]["card"]

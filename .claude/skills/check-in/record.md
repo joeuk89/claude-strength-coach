@@ -1,9 +1,10 @@
 # Write the record
 
 Run `python3 -m coach history sync`, then `python3 -m coach checkin
-skeleton --date <today> --tier <tier>`, and pass `--tier` with the tier
-of the card you sent (`weekly`, `deep`, or `catch-up` for mode
-`catch_up`): the skeleton can't see the block's deep reasons. It writes
+skeleton --date <today> --tier <tier>`. Pass `--tier` with the tier of
+the card you sent (`weekly`, `deep`, or `catch-up` for mode
+`catch_up`), or `deep` when step 4 switched the check-in to deep: the
+skeleton can't see the block's deep reasons. It writes
 `check-ins/<today>.md`, titled with that tier, holding:
 
 - **Week in review:** a rendered region: the window, sessions n of m

@@ -40,9 +40,9 @@ newest is weekly).
 Run a **deep** check-in when any of these is true, otherwise run
 **weekly**:
 
-- **6+ weeks** since the last deep check-in (rn:deloads.12). Records
-  with a valid Check-in title but no tier count as deep; Program start
-  records are setup only. The first check-in ever runs deep.
+- **6+ weeks** since the last deep check-in (rn:deloads.12). A review
+  whose title has no tier counts as deep; a Program start record is not
+  a review. The first check-in ever runs deep.
 - **A light week is being proposed** (the hard-week count reached the
   ceiling, or two fatigue triggers fired).
 - **The adherence trigger fires** (under 70 %).

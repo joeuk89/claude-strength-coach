@@ -636,7 +636,8 @@ class CheckInSkillTest(unittest.TestCase):
         self.assertIn("one `--deep-reason <code>` for each `deep_review.reasons` code and no `--tier`", step)
         self.assertIn("Pass `--tier deep` only when the athlete asks for a deep review", step)
         record = " ".join(step_text("check-in", "record.md").split())
-        self.assertIn("pass `--tier` with the tier of the card you sent", record)
+        self.assertIn("Pass `--tier` with the tier of the card you sent", record)
+        self.assertIn("or `deep` when step 4 switched the check-in to deep", record)
 
     def test_deep_tier_reads_misses(self):
         self.assertIn("python3 -m coach checkin misses", self.text)

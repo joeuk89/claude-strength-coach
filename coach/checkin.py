@@ -102,6 +102,10 @@ class Record:
     path: Path
     kind: str = CHECK_IN
 
+    @property
+    def is_review(self):
+        return self.kind == CHECK_IN
+
     def to_json(self):
         return {"date": self.date.isoformat(), "tier": self.tier, "path": self.path.as_posix()}
 
@@ -163,7 +167,7 @@ def records(root):
 
 def reviews(root):
     """The completed check-ins among `records`: the only records review timing counts."""
-    return [record for record in records(root) if record.kind == CHECK_IN]
+    return [record for record in records(root) if record.is_review]
 
 
 @dataclass(frozen=True)
@@ -1017,7 +1021,7 @@ def render_week_review(root, record_date):
     root, day = Path(root), _as_date(record_date)
     dated = [r for r in records(root) if r.date == day]
     found = reviews(root)
-    record = next((r for r in dated if r.kind == CHECK_IN), None)
+    record = next((r for r in dated if r.is_review), None)
     archive = next((r for r in dated if r.kind == UNRECOGNISED), None)
     if record is not None and found[-1].date != day:
         archive = record
@@ -1078,7 +1082,7 @@ def skeleton(root, record_date, tier=None, overlay_id=None, refresh=False, dry_r
         record = next(r for r in records(root) if r.date == day)
         if record.kind == UNRECOGNISED:
             raise ValidationError(f"{rel.as_posix()} has an invalid record title; fix it before refreshing")
-        if tier is None and record.kind == CHECK_IN:
+        if tier is None and record.is_review:
             tier = record.tier
         found_reviews = reviews(root)
         newest = bool(found_reviews and found_reviews[-1].date == day)
