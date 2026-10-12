@@ -113,6 +113,13 @@ text = "A deep check-in runs when the last deep check-in is 42 days old or more,
 basis = "heuristic"
 sources = []
 status = "current"
+
+[[claims]]
+n = 13
+text = "A one-off week for travel or limited kit, a minimum week, and a planned no-training break week, in which every planned core and coach-led session falls on days the athlete agreed not to train, neither count as a completed hard week nor reset the count."
+basis = "heuristic"
+sources = []
+status = "current"
 -->
 <!-- coach:begin research deloads -->
 
@@ -132,6 +139,7 @@ status = "current"
 | 10 | A light week for poor readiness or sleep keeps two thirds of the working sets and the loads, with no set above RPE 8. | heuristic | none | current |
 | 11 | A trained session counts as trained as prescribed when at least two thirds of its prescribed working sets were logged and its mean logged RPE was no more than 1.5 below target; a coach-led session counts when it happened. | heuristic | none | current |
 | 12 | A deep check-in runs when the last deep check-in is 42 days old or more, which matches the default ceiling of 6 completed hard weeks (rn:deloads.3). | heuristic | none | current |
+| 13 | A one-off week for travel or limited kit, a minimum week, and a planned no-training break week, in which every planned core and coach-led session falls on days the athlete agreed not to train, neither count as a completed hard week nor reset the count. | heuristic | none | current |
 
 | Source | Citation | Type | Year |
 | --- | --- | --- | --- |
@@ -213,6 +221,14 @@ claim 3's default ceiling, so a block that runs to its ceiling with no
 missed weeks gets one deep review. A block that counts fewer hard weeks
 than calendar weeks still gets one every six weeks.
 
+**Claim 13.** This is bookkeeping, not a research finding. Claim 2's
+50 % reset is for a normal program week that went badly; a week the
+athlete and coach planned as different, or agreed to take off, is not
+evidence about the block either way. Pausing the count keeps one agreed
+break from ending one block per week it lasts, and the same break counts
+the same whether or not an overlay was written for it. The days off still
+count in full for the return bands (rn:detraining-return.3).
+
 ## Applying it
 
 - `/check-in` keeps the hard-week count, checks the four triggers and
@@ -225,7 +241,9 @@ than calendar weeks still gets one every six weeks.
   rather than RPE drift or a niggle: the loads stay, so strength is kept,
   and the reduced sets and RPE ceiling let recovery catch up.
 - `/check-in` schedules a deep review by claim 12.
-- Treat claims 2 to 7 and 9 to 12 as rules of thumb. If the athlete's history
+- `block close` pauses the count for the weeks claim 13 names; a planned
+  break is a status day added with `--no-training`.
+- Treat claims 2 to 7 and 9 to 13 as rules of thumb. If the athlete's history
   shows they do not fit, write a local note that supersedes them.
 
 ## Open questions

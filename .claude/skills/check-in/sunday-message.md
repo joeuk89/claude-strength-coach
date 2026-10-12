@@ -8,22 +8,21 @@ Run `python3 -m coach checkin prepare` and send its `data.text` as the
 Sunday message. You may tighten the wording, and drop a field that
 cannot apply or that the athlete's opening message already answers,
 renumbering the rest. Never change the card's figures or the order of
-the fields. `data.card` holds the same week as data: the window (the
-day after the newest review to today; before the first review, from the
-program's start), each planned session trained,
-missed (with any tag on file) or trained but not logged, with durations
-against the session cap; each exercise's result against the
-prescription; e1RM changes; flags (`convention_slip`,
-`duration_over_cap`, `stale_routine`); and each Hevy routine's state
-(`edited_in_app` routines end the card with a keep-or-replace field,
-settled in program-week). The card picks the tier (`mode`, with
-`tier_reasons`: no review yet, or the last deep review 42 or more days
-old, rn:deloads.12). When the block preview requires deep, pass one
-`--deep-reason <code>` for each `deep_review.reasons` code and no
-`--tier`: the card runs deep, or a catch-up card defers the deep review.
-Pass `--tier deep` only when the athlete asks for a deep review; `--tier
-weekly` overrides a due deep review. Mode `catch_up` means more than 10
-days since the last check-in: send the catch-up card instead
+the fields. `data.card` holds the same week as data: the window (the day
+after the newest review to today; before the first review, from the
+program's start), each planned session trained, missed (with any tag on
+file) or trained but not logged, with durations against the session cap;
+each exercise's result against the prescription; e1RM changes; flags
+(`convention_slip`, `duration_over_cap`, `stale_routine`); and each Hevy
+routine's state (`edited_in_app` routines end the card with a
+keep-or-replace field, settled in program-week). The card picks the tier
+(`mode`, with `tier_reasons`: no review yet, or the last deep review 42
+or more days old, rn:deloads.12). When the block preview requires deep,
+pass one `--deep-reason <code>` for each `deep_review.reasons` code and
+no `--tier`: the card runs deep, or a catch-up card defers the deep
+review. Pass `--tier deep` only when the athlete asks for a deep review;
+`--tier weekly` overrides a due deep review. Mode `catch_up` means more
+than 10 days since the last check-in: send the catch-up card instead
 ([catch-up.md](catch-up.md)).
 
 The first line names the window and the tier with its reason. Then the
@@ -106,9 +105,8 @@ the Coach-led field, or in the Next week field when there is no
 Coach-led field. If the sources disagree, state the first one and name
 the disagreement.
 
-**Missed sessions** get the one-word tag and nothing more: no follow-up
-on the reason. A miss the reply leaves untagged is recorded as
-`untagged`.
+**Missed sessions** get the one-word tag, with no follow-up on the
+reason. A miss the reply leaves untagged is recorded as `untagged`.
 
 ## Record the reply
 
@@ -133,15 +131,18 @@ status days: `python3 -m coach status-days add --kind ill|injured|travel
 out `--to` while it is still going on; `status-days end <id> --date D`
 closes it later, `status-days withdraw <id> --reason <text>` takes back
 a wrong one). An ill status day in the gap brings in the illness return
-rule, exactly as an `ill` miss tag does. A race or other goal event the
-reply names goes in with `python3 -m coach events add --id <slug> --title
-<name> --date D --priority A|B|C` (`--activity`, `--distance-km`,
-`--planned-id` when it is a planned activity). The Events field asks for
-each pending decision: record the window the athlete agrees with `events
-window <id> --from D --to D --rationale <why>` (or `--none`), and a result
-with `python3 -m coach events complete <id> --result <text>`. An event's
-window is always one the athlete agreed, with its reason. Then run
-`checkin prepare` again: the card now carries the reply.
+rule, exactly as an `ill` miss tag does. Add `--no-training` when the
+athlete agrees not to train on those days: a planned break, whose
+sessions need no tag and whose weeks neither count nor reset. Leave it
+off when they will train while away. Add a goal event the reply names
+with `python3 -m coach events add --id <slug> --title <name> --date D
+--priority A|B|C` (plus `--activity`, `--distance-km`, `--planned-id`
+for a planned activity). For each pending decision the Events field
+asks, record the agreed window with `events window <id> --from D --to D
+--rationale <why>` (or `--none`), and a result with `python3 -m coach
+events complete <id> --result <text>`. An event's window is always one
+the athlete agreed, with its reason. Then run `checkin prepare` again:
+the card now carries the reply.
 
 **At most one follow-up turn**, and only for a gap that blocks
 programming: an unresolved rotation position, a new niggle's severity,

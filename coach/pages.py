@@ -19,7 +19,8 @@ from pathlib import Path
 
 from coach import block as block_module
 from coach import bodyweight
-from coach import checkin, closeout, dates, history, overlay, page_parts, paths, program, render, sheets, state, stats, units
+from coach import checkin, closeout, dates, history, overlay, page_parts, paths, program, render, sheets, state, stats
+from coach import statusdays, structure, units
 from coach import config as config_module
 from coach import flags as flags_module
 from coach.config_tables import coaching
@@ -219,6 +220,31 @@ class _View:
         """The overlay in force for the brief's week: the latest created of those in force on its days."""
         found = [hit[0] for hit in (overlay.pick_in_force(self.overlays, day) for day in self.week.days()) if hit]
         return max(found, key=lambda d: (dates.parse_timestamp(d["created_at"]), d["id"]), default=None)
+
+    @cached_property
+    def breaks(self):
+        """Planned breaks (C50) overlapping the brief's week."""
+        return statusdays.breaks(self.root, self.week)
+
+    @cached_property
+    def is_break_week(self):
+        """Every planned session of the week on a break day (C41 kind `break`), so no day of it needs an overlay."""
+        try:
+            return structure.is_break_week(self.root, self.week.start, today=self.today)
+        except ValidationError:
+            return False
+
+    def break_focus(self):
+        lines = []
+        for row in self.breaks:
+            start = render.day_label(row["span"]["start"])
+            if row["span"]["end"] is None:
+                lines.append(f"Planned break from {start} ({row['note']}): no training until it ends.")
+                continue
+            end = dates.parse_date(row["span"]["end"])
+            lines.append(f"Planned break {start} to {render.day_label(end)} ({row['note']}): no training. "
+                         f"Training resumes {render.day_label(end + timedelta(days=1))}.")
+        return lines
 
     @cached_property
     def facts(self):
@@ -509,8 +535,15 @@ def _brief_source(view):
 def render_brief(root, as_of, view=None):
     """`this-week.md`: the brief for the week holding the day after `as_of`, at most 60 lines."""
     view = view or _View(root, as_of)
-    focus = [view.week_overlay["focus"] if view.week_overlay else
-             "No overlay covers this week yet; the next programming pass writes one."]
+    breaks = view.break_focus()
+    if view.week_overlay:
+        focus = [view.week_overlay["focus"]] + breaks
+    elif breaks and view.is_break_week:
+        focus = breaks
+    elif breaks:
+        focus = breaks + ["No overlay covers the rest of this week yet; the next programming pass writes one."]
+    else:
+        focus = ["No overlay covers this week yet; the next programming pass writes one."]
     extra = [item.text for item in view.slot("brief.lines")]
     if extra:
         focus += [""] + _bullets(extra)

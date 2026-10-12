@@ -5,7 +5,8 @@ prose copy (rn:deloads.1). The 75 % and 50 % lines (rn:deloads.2), the
 hard-week ceiling (rn:deloads.3), the three-week skip rule (rn:deloads.4),
 the two-of-four trigger rule (rn:deloads.5), the trained-as-prescribed rule
 (rn:deloads.11) and the `light` and `return` transform numbers are coaching
-heuristics, not research cut-offs.
+heuristics, not research cut-offs. A planned no-training break week neither
+counts nor resets (rn:deloads.13): bookkeeping, not a research finding.
 """
 
 import re
@@ -27,7 +28,8 @@ from coach.validate import Error
 from coach.validate import validate as validate_schema
 
 SCHEMA = "blocks"
-CLASSES = ("hard", "partial", "low", "light", "return", "one_off", "minimum")
+CLASSES = ("hard", "partial", "low", "light", "return", "one_off", "minimum", "break")
+PAUSED = ("one_off", "minimum", "break")
 ENDS_BLOCK = ("light", "return", "low")
 TRIGGERS = ("readiness", "rpe_drift", "niggle", "sleep")
 TRIGGER_NAMES = {"readiness": "readiness", "rpe_drift": "RPE drift", "niggle": "niggle", "sleep": "sleep"}
@@ -249,7 +251,7 @@ def _facts(inst, span):
     planned, trained = report["planned"], report["trained"]
     as_prescribed = sum(1 for row in report["sessions"] if _row_as_prescribed(inst, row))
     ill = any(row.get("status") == "missed" and row.get("tag") == "ill" for row in report["sessions"])
-    if report["kind"] in ("light", "one_off", "minimum"):
+    if report["kind"] in ("light",) + PAUSED:
         found = report["kind"]
     elif _is_return(inst, span):
         found = "return"
@@ -259,11 +261,12 @@ def _facts(inst, span):
         found = "hard"
     else:
         found = "partial"
-    return {"class": found, "planned": planned, "trained": trained, "as_prescribed": as_prescribed, "ill": ill}
+    return {"class": found, "planned": planned, "trained": trained, "as_prescribed": as_prescribed,
+            "on_break": sum(1 for row in report["on_break"] if row.get("tier", "core") == "core"), "ill": ill}
 
 
 def classify(root, week_start, *, today=None, now=None):
-    """The week's class (C42): hard, partial, low, light, return, one_off or minimum. Reads only."""
+    """The week's class (C42): hard, partial, low, light, return, one_off, minimum or break. Reads only."""
     inst = _Instance.load(root, today, now)
     return _facts(inst, inst.week(_as_date(week_start)))["class"]
 
@@ -597,7 +600,8 @@ def close(root, week_start, readiness=None, sleep=None, deep=False, dry_run=Fals
         signals, fired, words = _signals(inst, span, readiness, sleep, is_target)
         outcome, week_type, reason = outcome_for(facts["class"], count, fired, ceiling, facts["ill"])
         entry = {"week": span.start.isoformat(), "class": facts["class"], "planned": facts["planned"],
-                 "trained": facts["trained"], "as_prescribed": facts["as_prescribed"], "signals": signals,
+                 "trained": facts["trained"], "as_prescribed": facts["as_prescribed"],
+                 "on_break": facts["on_break"], "signals": signals,
                  "triggers": fired, "count_after": count, "outcome": outcome, "deep": bool(deep and is_target),
                  "closed_at": closed_at}
         block["weeks"].append(entry)

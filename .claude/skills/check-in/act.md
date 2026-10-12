@@ -56,9 +56,11 @@ coming week: on a normal week in normal mode; when a light week is
 agreed, invoke the **program-week** skill in light mode, which builds it
 with the `command` that `block decide` printed; for travel or limited
 kit named in the Next week field, in constrained mode (reshuffle when
-only the days move). Either way it fills this record's "The week ahead"
-section and handles the Hevy writes; after a light week the count
-resets when the next check-in closes that week.
+only the days move); for agreed days with no training at all, record
+the planned break instead (sunday-message.md, status days). Either way
+it fills this record's "The week ahead" section and handles the Hevy
+writes; after a light week the count resets when the next check-in
+closes that week.
 
 **Decisions agreed at this check-in don't pre-approve the week**:
 program-week still presents its coach's brief and waits for the

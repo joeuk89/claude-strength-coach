@@ -1,11 +1,11 @@
 {
-  "title": "Status days, data/status-days.json: days the athlete was ill, injured or travelling (contract C50)",
-  "description": "Rows are never deleted; a wrong one is withdrawn. A null span end means ongoing. Cross-checks (unique ids, start on or before end, one open-ended row per kind) are in coach.statusdays.problems.",
+  "title": "Status days, data/status-days.json: days the athlete was ill, injured or travelling, and planned breaks (contract C50)",
+  "description": "Rows are never deleted; a wrong one is withdrawn. A null span end means ongoing. no_training marks a planned break with no training on those days. Cross-checks (unique ids, start on or before end, one open-ended row per kind, no planned break on an ill row) are in coach.statusdays.problems.",
   "type": "object",
   "required": ["schema_version", "days"],
   "additionalProperties": false,
   "properties": {
-    "schema_version": {"const": 1},
+    "schema_version": {"const": 2},
     "days": {"type": "array", "items": {"$ref": "#/$defs/day"}}
   },
   "$defs": {
@@ -14,7 +14,7 @@
     "text": {"type": "string", "pattern": "\\S"},
     "day": {
       "type": "object",
-      "required": ["id", "kind", "span", "note", "created_at", "source", "withdrawn"],
+      "required": ["id", "kind", "span", "note", "no_training", "created_at", "source", "withdrawn"],
       "additionalProperties": false,
       "properties": {
         "id": {"type": "string", "pattern": "^s-\\d{4,}$"},
@@ -29,6 +29,7 @@
           }
         },
         "note": {"$ref": "#/$defs/text"},
+        "no_training": {"type": "boolean"},
         "created_at": {"$ref": "#/$defs/timestamp"},
         "source": {"$ref": "#/$defs/text"},
         "withdrawn": {

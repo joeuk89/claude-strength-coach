@@ -6,7 +6,8 @@ root). Its steps are modules `NNNN_<slug>.py` defining `DOC`, `FROM`, `TO`
 (= FROM + 1) and `migrate(doc) -> doc`, and optionally
 `notes(before, after) -> list[str]` for the run's report and
 `creates(before, after) -> {path: doc}` for documents the step brings into
-being (written only where no file exists yet). The target
+being (written only where no file exists yet, after their own steps bring
+them to their current version). The target
 version is the `schema_version` const in `coach/schemas/<schema name>.schema.json`.
 """
 
@@ -211,6 +212,18 @@ def _owner(reg, relative):
                  if any(fnmatch.fnmatchcase(relative, pattern) for pattern in document.files)), None)
 
 
+def _forward(document, doc):
+    """A document a step created at the version that step knew, migrated on to the document's current version."""
+    version = doc.get("schema_version")
+    while isinstance(version, int) and version < document.target:
+        step = document.step_from(version)
+        if step is None:
+            break
+        doc = step.migrate(copy.deepcopy(doc))
+        doc["schema_version"] = version = step.to_version
+    return doc
+
+
 def _created_errors(reg, relative, doc):
     document = _owner(reg, relative)
     if document is None:
@@ -284,8 +297,11 @@ def run(root, dry_run, now=None, reg=None):
         report["notes"] += notes
         errors += doc_errors
         created.update({relative: new for relative, new in new_files.items() if not (root / relative).exists()})
-    for relative, doc in sorted(created.items()):
-        errors += _created_errors(reg, relative, doc)
+    for relative in sorted(created):
+        document = _owner(reg, relative)
+        if document is not None:
+            created[relative] = _forward(document, created[relative])
+        errors += _created_errors(reg, relative, created[relative])
     report["created"] = sorted(created)
     if errors:
         where = f"; the originals are unchanged and backed up in {report['backup']}" if backup else ""

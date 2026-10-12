@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from coach import checkin_catchup, checkin_parts, dates, flags, history, overlay, paths, program, render, routines
-from coach import state, stats, units, validity
+from coach import state, stats, statusdays, units, validity
 from coach import config as config_module
 from coach.config_tables import coaching
 from coach.config_tables.sessions import cap_minutes
@@ -33,7 +33,7 @@ from coach.library import Library
 DEEP_AFTER_DAYS = 42
 E1RM_ROW_LIMIT = 8          # a heuristic: as many lifts as a message reads at a glance
 WORD_CEILINGS = {"weekly": 600, "deep": 1000, "catch-up": 600}    # heuristics, prose words outside regions
-CARD_VERSION = 6
+CARD_VERSION = 7
 TIERS = ("weekly", "deep", "catch-up")
 CARD_TIERS = ("weekly", "deep")
 CHECK_IN = "check-in"
@@ -411,18 +411,27 @@ def _sessions(inst, window, adherence, workouts):
         })
         kept.append(row)
     core = [r for r in rows if r["tier"] == "core"]
+    on_break = []
+    for row in adherence["on_break"]:
+        planned = inst.program_session(row["session_id"])
+        tier = planned["tier"] if planned else "core"
+        if tier == "core":
+            on_break.append({"date": row["date"], "session_id": row["session_id"], "title": row["title"],
+                             "tier": tier, "break_id": row["break_id"]})
     extra = [{"workout_id": w["workout_id"], "date": w["date"], "title": w["title"], "session_id": w["session_id"],
               "minutes": workouts[w["workout_id"]]["duration_minutes"] if w["workout_id"] in workouts else None,
               "unsynced": w["unsynced"]} for w in adherence["extra"]]
     return {
         "planned_core": len(core), "trained_core": sum(1 for r in core if r["status"] == "trained"),
         "optional_trained": sum(1 for r in rows if r["tier"] == "optional"),
-        "rows": rows, "external": _external(inst, window), "extra": extra,
+        "rows": rows, "on_break": on_break, "external": _external(inst, window), "extra": extra,
     }, kept
 
 
 def _external(inst, window):
+    """Coach-led weekday sessions in the window; one with no annotation on a planned-break day (C50) is left out."""
     notes = history.annotations(inst.root, "external")
+    off = statusdays.break_days(inst.root, window)
     found = []
     for external in inst.program["external_sessions"] if inst.program else []:
         if not external.get("weekday"):
@@ -432,6 +441,8 @@ def _external(inst, window):
                 continue
             matching = [a for a in notes if a["date"] == day.isoformat() and a["external_id"] == external["id"]]
             note = matching[-1] if matching else None
+            if note is None and day in off:
+                continue
             found.append({"date": day.isoformat(), "external_id": external["id"], "title": external["title"],
                           "done": note["done"] if note else None, "note": note.get("note") if note else None})
     return sorted(found, key=lambda e: (e["date"], e["external_id"]))
@@ -627,7 +638,7 @@ def _hevy(inst, end):
 
 def misses(root, since, until, now=None, include_unsynced=True):
     """Missed sessions by tag and by session: `miss` annotations plus untagged missed planned sessions (C18).
-    An optional session skipped is not a miss, so it is never counted."""
+    An optional session skipped, or a session on a planned break (C50), is not a miss, so it is never counted."""
     since, until = _as_date(since), _as_date(until)
     by_tag = {tag: 0 for tag in history.MISS_TAGS + ("untagged",)}
     by_session = {}
@@ -641,13 +652,15 @@ def misses(root, since, until, now=None, include_unsynced=True):
     adherence = stats.adherence(root, span=(since, until), include_unsynced=include_unsynced, today=until, now=now)
     docs = overlay.list(root)
     spans = {doc["id"]: doc["span"] for doc in docs}
-    planned = [(row["session_id"], spans[row["overlay_id"]]) for row in adherence["sessions"]]
+    planned = [(row["session_id"], spans[row["overlay_id"]]) for row in adherence["sessions"] + adherence["on_break"]]
     moved = overlay.moved_away(docs)
+    off = {day.isoformat() for day in statusdays.break_days(root, dates.Span(since, until))}
     for row in adherence["sessions"]:
         if row["status"] == "missed" and row["session_id"] not in optional:
             count(row["tag"], row["session_id"])
     for note in history.annotations(root, "miss"):
-        if not since.isoformat() <= note["date"] <= until.isoformat() or note["session_id"] in optional:
+        in_span = since.isoformat() <= note["date"] <= until.isoformat()
+        if not in_span or note["session_id"] in optional or note["date"] in off:
             continue
         if (note["date"], note["session_id"]) in moved or any(
                 sid == note["session_id"] and span["start"] <= note["date"] <= span["end"] for sid, span in planned):
@@ -808,6 +821,9 @@ def _sessions_field(inst, card):
     if sessions["extra"]:
         lines.append("Also logged: " + ", ".join(f"{render.day_label(w['date'])} {w['title']}"
                                                  for w in sessions["extra"]) + ".")
+    if sessions["on_break"]:
+        lines.append("Planned break, so not misses: " + ", ".join(f"{render.day_label(r['date'])} {r['title']}"
+                                                                    for r in sessions["on_break"]) + ".")
     ask = None
     if untagged:
         lines.append("Not logged: " + ", ".join(f"{render.day_label(r['date'])} {r['title']}" for r in untagged) + ".")

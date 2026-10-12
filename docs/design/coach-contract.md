@@ -1868,7 +1868,9 @@ skip when there is no `data/program.json` (`state_schema`: no
   report should carry (R-24 lists the overlays that lose their approval)
   and `creates(before, after) -> {path: doc}` for documents the step
   brings into being (R-31's state step seeds `data/blocks.json`). A
-  created file is validated against the owned document whose `FILES`
+  created file is first migrated from the version its step wrote to the
+  owned document's current version by that document's own steps, then
+  validated against the owned document whose `FILES`
   match its path, written with the migrated files only where no file
   exists yet, staged with them, and listed in the report's `created`.
   The runner sets `schema_version` to `TO` after each step. The target
@@ -2236,7 +2238,11 @@ progression: return-week logs remain the next week's baseline.
   (with `tag` from a `miss` annotation, each matched once, nearest date
   first; else `untagged`),
   `upcoming`.
-  Workouts matching no planned session are listed as `extra`.
+  Workouts matching no planned session are listed as `extra`. A session
+  not trained on a day a planned break covers (C50) is neither missed nor
+  upcoming: it leaves `sessions` and is listed in `data.on_break`
+  (`session_id`, `date`, `title`, `overlay_id`, `break_id`). A session
+  trained on such a day stays `trained`.
 - Exercise `status` for a trained session, comparing working sets in order:
   `missing` (no logged working set of that exercise), `under` (any
   prescribed set absent, reps below the target or the range's start, or
@@ -2255,8 +2261,8 @@ progression: return-week logs remain the next week's baseline.
   session, its original date (`moved_from`). A conditioning
   session (C17) has `conditioning: true` and no exercises.
 - `data.summary`: `planned` (sessions dated today or earlier),
-  `trained`, `missed` (counts by tag), `missed_total`, `upcoming`, and
-  `exercises` (counts by status). `data.extra` lists workouts in the
+  `trained`, `missed` (counts by tag), `missed_total`, `upcoming`,
+  `on_break`, and `exercises` (counts by status). `data.extra` lists workouts in the
   window that matched no planned session.
 
 **Delivered sets per muscle (dose).** `stats dose (--week W | --span A..B)`:
@@ -4487,7 +4493,7 @@ earliest overlay, else at the first-review anchor, else on the end day:
 
 ```json
 {
-  "schema_version": 6,
+  "schema_version": 7,
   "date": "2026-10-11",
   "window": {"start": "2026-10-05", "end": "2026-10-11"},
   "mode": "weekly", "tier_reasons": [], "deep_deferred": false,
@@ -4498,7 +4504,8 @@ earliest overlay, else at the first-review anchor, else on the end day:
               "status": "trained", "moved": false, "unlogged": false, "tag": null,
               "workout_id": "…", "workout_date": "2026-10-05", "minutes": 58, "cap_minutes": 45}],
     "external": [{"date": "2026-10-06", "external_id": "pt-tue", "title": "PT", "done": null, "note": null}],
-    "extra": []
+    "extra": [],
+    "on_break": []
   },
   "exercises": [{"date": "2026-10-05", "session_id": "session-a", "exercise_id": "bb_back_squat",
                  "name": "Back Squat (Barbell)", "prescribed": "3×5 @ 97.5 @ RPE 7.5",
@@ -4523,9 +4530,11 @@ earliest overlay, else at the first-review anchor, else on the end day:
 
 - `sessions`: C18 adherence over the window (span form), the overlay in
   force per date. `planned_core` counts core sessions; optional sessions
-  appear only when trained and are never a miss. `external` lists
+  appear only when trained and are never a miss. `on_break` lists the
+  core sessions C18 put on a planned break (C50); the Sessions field
+  names them as not misses. `external` lists
   `program.external_sessions` dates in the window with any `external`
-  annotation. Durations and caps from C18/C19.
+  annotation, leaving out a date on a planned break with none. Durations and caps from C18/C19.
 - `exercises`: one row per prescribed exercise of a trained session.
   `prescribed` and `logged` text use `units.format_load`; status and
   `rpe_delta` from C18. `logged` groups consecutive sets of equal load and
@@ -4585,7 +4594,9 @@ earliest overlay, else at the first-review anchor, else on the end day:
   and `until`. Counts each missed planned session (C18 adherence over the
   span, by its tag or `untagged`) and each `miss` annotation in the span
   that no planned session's overlay span could match, so a tagged miss is
-  counted once. A session the program marks `optional` is never counted.
+  counted once. A session the program marks `optional` is never counted,
+  nor a `miss` annotation dated on a planned-break day (C50), with or
+  without an overlay over it.
 - `facts` collects the parts' contributions; facts print above the fields.
 
 **Fields.** Ids and order are R-01's Sunday message: `sessions`,
@@ -4714,12 +4725,13 @@ as it was):
 {
   "layoff_days": 28,
   "summary": [{"week": "2026-W38", "planned_core": 3, "trained_core": 0, "missed_by_tag": {"untagged": 3},
-               "optional_trained": 0, "external_done": null, "workouts": 0, "planned_from": "schedule"}],
+               "on_break": 0, "optional_trained": 0, "external_done": null, "workouts": 0, "planned_from": "schedule"}],
   "questions": [{"id": "gap", "n": 1, "label": "The gap", "prefill": null, "ask": "…"},
                 {"id": "now", "n": 2, "label": "Now", "prefill": null, "ask": "…"},
                 {"id": "nutrition", "n": 3, "label": "Food", "prefill": "Readings for the last 7 days …", "ask": "a. …"},
                 {"id": "next_week", "n": 4, "label": "Next week", "prefill": null, "ask": "…"}],
   "missed": [{"date": "2026-09-17", "session_id": "session-b", "title": "Session B", "tag": "untagged"}],
+  "on_break": [],
   "return_week": {"proposal_id": "2026-10-12-weekly", "overlay_id": "2026-10-12-weekly", "week": "2026-W42",
                   "span": {"start": "2026-10-12", "end": "2026-10-18"}, "band": "22-42", "days_off": 28,
                   "load_factor": 0.9, "set_delta": -1, "rpe_cap": null,
@@ -4744,7 +4756,13 @@ as it was):
   `workouts` counts every logged workout in the row.
 - `missed`: every missed planned core session in the window, with its
   tag or `untagged`; `checkin tag-gap` and the record's `Missed:` line
-  read it.
+  read it. A core session not trained on a planned-break day (C50) is
+  never in it: it is in `on_break` (`date`, `session_id`, `title`,
+  `break_id`), each `summary` row counts it in `on_break` (out of
+  `planned_core`), and the table adds a "Planned break" column. When
+  nothing untagged is left and a break covered sessions, the gap
+  question says no tag is needed; otherwise it adds that sessions on the
+  break need none.
 - `return_week`: `propose week --dry-run` for the week holding tomorrow
   (R-23a's default span; `week` names it), which applies C22 decay.
   `days_off` = first session date − last lifting workout; `band` and its
@@ -5029,6 +5047,13 @@ these headings:
 - Header: week start; `state.rotation` position and whether confirmed;
   phase (from a part; omitted until R-33a); next check-in date and tier
   (C36 `due`).
+- Focus: the overlay's `focus`, then one line per planned break (C50)
+  overlapping the week: its days, note and the day training resumes.
+  With no overlay, a break week (C41 kind `break`: every core and
+  coach-led session the week plans falls on the break) is the Focus on
+  its own; a break covering only some of the week's sessions adds "No
+  overlay covers the rest of this week yet; the next programming pass
+  writes one."
 - Sessions: every session of the overlay in force on each day of the
   week, by date (C18 adherence over the week's span, as of); Tier from
   the program (`core` for a session the program lacks); Key = first
@@ -5560,9 +5585,9 @@ coach.structure.ordinary_weeks(root, until, n=4, reach=12) -> list[str]
   trailing four ordinary weeks, coach-led included, optional excluded, any
   logged workout matching the session counted as trained (shortened
   sessions count).
-- **Ordinary week**: not a light week (overlay kind `deload`, or an
-  adopted `light_week` decision covering it), not a `minimum` or
-  `one_off` week, not inside a layoff gap of 11+ days. The window reaches
+- **Ordinary week**: not a planned break week, not a light week (overlay
+  kind `deload`, or an adopted `light_week` decision covering it), not a
+  `minimum` or `one_off` week, not inside a layoff gap of 11+ days. The window reaches
   back at most 12 weeks; with fewer than four ordinary weeks it reports
   `insufficient_weeks` and raises no adherence flag.
 
@@ -5575,16 +5600,30 @@ coach.structure.ordinary_weeks(root, until, n=4, reach=12) -> list[str]
    {"session_id": "session-b", "date": "2026-10-08", "tier": "core", "status": "missed", "tag": "sleep"},
    {"external_id": "pt-tue", "date": "2026-10-06", "status": "done"}
  ],
- "planned": 3, "trained": 2,
+ "planned": 3, "trained": 2, "on_break": [],
  "muscles": {"chest": {"target": 10, "planned": 6.0, "delivered": 6.0, "bonus": 0.0}},
  "by_session": {"session-a": {"quadriceps": 3.0, "chest": 3.0}},
  "flags": []}
 ```
 
-- `kind`: `ordinary`, `light`, `minimum`, `one_off`, `layoff`, the first
-  that applies in the order `light`, `minimum` (a minimum plan file for
-  the week, C40), `one_off`, `layoff`. Session `status` from C18
-  adherence; external `status` `done`, `not_done`, `unconfirmed`.
+- `kind`: `ordinary`, `break`, `light`, `minimum`, `one_off`, `layoff`,
+  the first that applies in the order `break`, `light`, `minimum` (a
+  minimum plan file for the week, C40), `one_off`, `layoff`. A **break
+  week** has a day a planned break covers (C50) and every core and
+  coach-led session it plans on such a day, whatever overlay is or is not
+  in force, so the same break classes the same with or without one. A
+  `one_off` overlay counts toward kind `one_off` only on days no planned
+  break covers: one in force only on break days represents the break, so
+  a partly covered week keeps ordinary accounting for the sessions left,
+  while one that also plans the days left still makes the week `one_off`.
+  Session `status` from C18 adherence; external `status` `done`,
+  `not_done`, `unconfirmed`.
+- `on_break` lists the sessions a planned break takes out of the week:
+  core and optional ones from C18 `on_break` (`session_id`, `date`,
+  `tier`, `break_id`) and coach-led ones with no annotation on a break
+  day (`external_id`, `date`, `break_id`). They count in neither
+  `planned` nor `trained`, nor in planned dose; the sessions left are
+  counted as usual. That is the week's accounting basis.
 - `planned` counts core and external sessions, `unconfirmed` excluded.
   `trained` counts core sessions with status `trained` and external
   sessions `done`. Optional sessions appear with `tier: optional` and count
@@ -5757,12 +5796,12 @@ static balance alone. The command only reads: it never adopts FILE.
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "blocks": [
     {"id": "b-0001", "started": "2026-08-31", "seed_hard_weeks": 0, "seed_reason": null,
      "ended": null, "end_reason": null,
      "weeks": [
-       {"week": "2026-08-31", "class": "hard", "planned": 3, "trained": 3, "as_prescribed": 3,
+       {"week": "2026-08-31", "class": "hard", "planned": 3, "trained": 3, "as_prescribed": 3, "on_break": 0,
         "signals": {"readiness": "ok", "sleep": "ok", "sleep_source": "athlete",
                     "rpe_drift": false, "niggle": false},
         "triggers": [], "count_after": 1,
@@ -5774,8 +5813,13 @@ static balance alone. The command only reads: it never adopts FILE.
 
 - Block ids `b-NNNN`, never reused. `end_reason`: `light`, `return`, `low`.
 - `class`: `hard`, `partial`, `low`, `light`, `return`, `one_off`,
-  `minimum`. Version 1 holds `minimum` too: widening the enum leaves every
-  ledger valid, so it bumps no version.
+  `minimum`, `break`. `on_break`: the core and coach-led sessions a planned
+  break (C50) took out of the week (C41 `structure week` `on_break`).
+  Version 2 adds `break` and `on_break`; its migration
+  (`coach/migrations/blocks/0001_break_weeks.py`) sets `on_break` 0 on
+  every closed week, since no earlier week had a planned break. A
+  migration step that creates a ledger at version 1 (state v3 → v4) has it
+  brought to the current version by the runner before it is written.
 - `signals.readiness` and `signals.sleep`: `poor`, `ok`, `unknown`;
   `sleep_source`: `athlete`, `sleep_debt`, `none`.
 - `triggers`: the fired subset of `readiness`, `rpe_drift`, `niggle`,
@@ -5829,9 +5873,13 @@ Rules (R-02's prose, scripted; the prose stays the human copy):
   below target; sets without a logged RPE count as on target. A coach-led
   session counts when its `external` annotation says done. Session counts
   come from `coach.structure.week` (C41).
-- **Hard week**: not light, return, one-off or minimum; at least 75 % of
-  planned core and coach-led sessions trained as prescribed. Under 50 %
-  trained ends the block.
+- **Hard week**: not light, return, one-off, minimum or break; at least
+  75 % of planned core and coach-led sessions trained as prescribed.
+  Under 50 % trained ends the block (rn:deloads.2).
+- **Paused weeks**: a one-off, minimum or planned break week neither
+  counts nor resets (rn:deloads.13). This is bookkeeping, separate from
+  the ordinary under-50 % reset, and it never shortens the days off the
+  return bands count (C22 reads the last lifting workout).
 - **Ceiling**: `program.blocks.hard_weeks_ceiling`, default 6, allowed 4–8.
 - **Triggers** (four): athlete-reported readiness, compound RPE drift two
   sessions running (`coach.patterns.rpe_drift`), an `aggravated` niggle
@@ -5895,19 +5943,23 @@ Flags (registered in `coach/flags/block.py`; rows in C20):
 - A block that ends records `ended` as the last day of the week that
   ended it; the next block starts the day after, at zero. Every reset
   week ends a block, even one with no hard week.
-- **Classes**, in order: `light`, `minimum` and `one_off` from
-  `coach.structure.week` `kind` (`minimum` and `one_off` neither count
-  nor reset); `return` when a session of the overlay in force carries a
-  line decay past `0-10` and the last lifting workout before the first such
-  session is more than 10 days back (R-02: a return week follows a
-  layoff of 11+ days, so one stale lift rotated back in never ends a
-  block); `low` when trained is under half of planned; `hard` when
-  trained as prescribed is at least three quarters of planned; else
-  `partial` (also with nothing planned). Trained as prescribed counts
-  coach-led sessions `done` and core sessions logged against the overlay
-  line (or the program session when no overlay covered the day),
-  comparing `min(logged, prescribed)` working sets per line; a
-  `trained_unlogged` session has no logged sets, so it is not.
+- **Classes**, in order: `break`, `light`, `minimum` and `one_off` from
+  `coach.structure.week` `kind` (`break`, `minimum` and `one_off` neither
+  count nor reset; a break week is judged on planned-break coverage alone,
+  never on whether an overlay was written for it, and a one-off in force
+  only on break days leaves a partly covered week to the classes below);
+  `return` when a session of the overlay in force carries a line decay past
+  `0-10` and the last lifting workout before the first such session is more
+  than 10 days back (R-02: a return week follows a layoff of 11+ days, so
+  one stale lift rotated back in never ends a block); `low` when trained is
+  under half of planned; `hard` when trained as prescribed is at least three
+  quarters of planned; else `partial` (also with nothing planned). A partial
+  break's covered sessions leave `planned` (C41 `on_break`), so the sessions
+  left are classed as usual. Trained as prescribed counts coach-led sessions
+  `done` and core sessions logged against the overlay line (or the program
+  session when no overlay covered the day), comparing
+  `min(logged, prescribed)` working sets per line; a `trained_unlogged`
+  session has no logged sets, so it is not.
 - **Triggers**: readiness and sleep only for the week `--week` names
   (earlier weeks of a catch-up close read sleep from
   `coach.cardio.sleep_debt` only, else `unknown`). RPE drift: a compound
@@ -6727,34 +6779,56 @@ absent. No freshness check: the block is a snapshot.
 `data/status-days.json`:
 
 ```json
-{"schema_version": 1,
+{"schema_version": 2,
  "days": [
    {"id": "s-0001", "kind": "ill", "span": {"start": "2026-10-01", "end": "2026-10-02"},
-    "note": "head cold", "created_at": "2026-10-11T18:00:00Z", "source": "check-in 2026-10-11",
-    "withdrawn": null}
+    "note": "head cold", "no_training": false, "created_at": "2026-10-11T18:00:00Z",
+    "source": "check-in 2026-10-11", "withdrawn": null}
  ]}
 ```
 
 - `kind`: `ill`, `injured`, `travel`. `span.end` null means ongoing until
   `status-days end`. `withdrawn`: null or `{"at": ts, "reason": "..."}`.
+- `no_training`: true marks a **planned break**, the athlete's explicit
+  agreement not to train on those days; only `travel` and `injured` rows
+  carry it (an `ill` row is refused: illness keeps its own return rule).
+  Travel alone is not a break: a `travel` row without it still plans and
+  counts every session. Version 2 adds the field; its migration
+  (`coach/migrations/status_days/0001_no_training.py`) sets it false on
+  every row.
 - Ids `s-NNNN`, never reused. Rows are never deleted; a wrong one is
   withdrawn.
-- `status-days add --kind K --from D [--to D] --note TEXT [--source TEXT]`
-  (`--source` defaults to `coach`; a second ongoing row of one kind is
+- `status-days add --kind K --from D [--to D] --note TEXT [--source TEXT]
+  [--no-training]` (`--source` defaults to `coach`; a second ongoing row of one kind is
   refused, exit 1), `status-days end ID --date D`, `status-days withdraw
   ID --reason TEXT`, `status-days list [--active]` (`--active`: rows not
   withdrawn).
 - `coach.statusdays.active(root, span) -> list[dict]` (rows not
-  withdrawn whose days overlap the span; an ongoing row runs on) and
-  `coach.statusdays.ill_in(root, span) -> bool` are the only readers
-  other items call. The file is a migration-runner document (C16,
+  withdrawn whose days overlap the span; an ongoing row runs on),
+  `coach.statusdays.ill_in(root, span) -> bool`,
+  `coach.statusdays.breaks(root, span) -> list[dict]` (live `no_training`
+  rows overlapping the span) and `coach.statusdays.break_days(root, span)
+  -> {date: row id}` are the readers other items call.
+- **A planned break** takes the sessions on its days out of planned work
+  wherever planned work is read: C18 adherence (`on_break`), C41 `structure
+  week` (`on_break`, kind `break`), C42/C43 block close (class `break`,
+  which neither counts nor resets, rn:deloads.13), the C36 card and
+  catch-up (no miss, no tag asked), C37 missed-day rules (not a miss),
+  the C38 brief's Focus and the C52 `overlay` provider (no programming
+  asked for its days; the break and the day training resumes are shown).
+  Withdrawing the row, or ending an ongoing one, puts the days after it
+  back to ordinary planning. A session trained on a break day still
+  counts as trained.
+- Days off are unchanged by a break: C22 and the return week count from
+  the last lifting workout, so a break of 11+ days still brings a return
+  week (which ends the block as usual). The file is a migration-runner document (C16,
   `coach/migrations/status_days/`).
 - Return rule: an `ill` status day overlapping the gap before a session
   counts exactly like an `ill` miss annotation for C22 and
   `return_after_illness`. Travel only explains the gap. Days off stay days
   off.
 - Check `status_days_valid`: schema, unique ids, `start ≤ end`, at most one
-  open-ended row per kind.
+  open-ended row per kind, no `no_training` on an `ill` row.
 
 **Fixture instance `cardio/`** (R-43): a copy of `valid/` with its
 activity, wellness and planned records and its sync map removed, plus
@@ -7066,7 +7140,7 @@ Providers R-26b ships:
 | `instance` | uninitialised (no `config.toml` or no `profile.md`): "run /setup"; files behind their schema version: "run python3 -m coach migrate run" |
 | `checks` | the `coach check` summary and the ids of any `fail` or `warn` |
 | `hevy` | cache age against `[hevy] cache_max_age_hours`; skipped when Hevy is disabled |
-| `overlay` | the overlay in force today (id, kind, span), else the next to start with its first session; whether it is approved, pushed and verified (a routine counts as verified when its latest `verify` line for the overlay's id and approval hash says so; Hevy off: approved only); the next one or two planned sessions; and the days of the coming week no overlay covers. The coming week is the week holding tomorrow (`[athlete] week_starts`), from today on: the rest of this week, or all of next week on its last day. Invalid overlays are skipped (`checks` names them) |
+| `overlay` | the overlay in force today (id, kind, span), else the next to start with its first session not on a planned-break day; whether it is approved, pushed and verified (a routine counts as verified when its latest `verify` line for the overlay's id and approval hash says so; Hevy off: approved only); the next one or two planned sessions (none on a planned-break day); each planned break (C50) overlapping today to the end of the coming week, with the day training resumes; and the days of the coming week neither an overlay nor a planned break covers, none when the coming week is a break week (C41 kind `break`), whose other days plan no session. With no overlay, a day on a break (today, or a coming week with no uncovered day) says none is needed rather than asking for /program-week. The coming week is the week holding tomorrow (`[athlete] week_starts`), from today on: the rest of this week, or all of next week on its last day. Invalid overlays are skipped (`checks` names them) |
 | `program` | rotation position and whether it is confirmed (R-25's `header_facts`), the confirmation date (`state.json`); the block status line (`coach.block.status_line`, C43) and `light_week` (`state.json`); `attention` when the position is unconfirmed or the light week is `proposed` or `agreed` |
 | `checkin` | last check-in, days since, due date, tier and mode (`first`, `weekly`, `deep`, `catch_up`) from R-25's `header_facts` (its `data` is `header_facts`' `checkin`); `attention` when the due date is today or past, including the first review |
 

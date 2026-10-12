@@ -65,6 +65,13 @@ it in the brief's first line:
 A span can mix a reshuffle and a constrained week (two days moved, two
 on hotel kit): one overlay, one brief.
 
+**A planned break.** If the athlete agrees not to train at all for some
+days (a trip with no gym), program nothing for them: record the break
+with `python3 -m coach status-days add --kind travel --from D --to D
+--note "<one line>" --no-training` and program only the days around it.
+Travel alone is not a break: if they will train while away, use
+constrained mode.
+
 **An active one-off week.** When `state.one_off` in `state show` covers
 the span, continue in that one-off's mode rather than starting a normal
 week: `overlay current` shows its kind, `deload` for light mode and

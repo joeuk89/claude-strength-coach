@@ -11,7 +11,7 @@ overlay.
 
 from datetime import timedelta
 
-from coach import checkin_parts, dates, history, overlay, propose, render, validity
+from coach import checkin_parts, dates, history, overlay, propose, render, stats, statusdays, validity
 from coach.errors import CoachError, UsageError
 from coach.library import Library
 
@@ -58,12 +58,15 @@ def _covered(inst, window):
     return {day for day in window.days() if overlay.pick_in_force(inst.overlays, day)}
 
 
-def planned(inst, window, overlay_rows, workouts, today):
+def planned(inst, window, overlay_rows, workouts, today, overlay_breaks=()):
     """Every planned session in the window: the card's C18 rows where an overlay is in force, else the
     schedule rule's plan from the program's adoption (C41), each matched to a workout of its session in the
-    same week."""
+    same week. A session not trained on a planned-break day (C50) has status `on_break`, never `missed`."""
     covered = _covered(inst, window)
+    off = statusdays.break_days(inst.root, window)
     rows = [dict(row, planned_from="overlay") for row in overlay_rows]
+    rows += [dict(row, status=stats.ON_BREAK, tag=None, workout_id=None, planned_from="overlay")
+             for row in overlay_breaks]
     open_days = {day for day in window.days() if day not in covered and inst.schedules_on(day)}
     plan = schedule_plan(inst, window, today) if open_days else None
     if plan is None:
@@ -106,6 +109,8 @@ def planned(inst, window, overlay_rows, workouts, today):
             row["status"] = "trained"
         elif session["tier"] == "optional":
             continue
+        elif day in off:
+            row.update(status=stats.ON_BREAK, break_id=off[day])
         else:
             note = nearest(misses, day, sid)
             row["tag"] = (note.get("tag") if note else None) or "untagged"
@@ -123,7 +128,7 @@ def summary(inst, window, rows, covered, workouts, external):
         week = dates.week_span(start, week_starts)
         span = dates.Span(max(week.start, window.start), min(week.end, window.end))
         inside = [r for r in rows if span.contains(_day(r["date"]))]
-        core = [r for r in inside if r["tier"] == "core"]
+        core = [r for r in inside if r["tier"] == "core" and r["status"] != stats.ON_BREAK]
         missed = {}
         for tag in history.MISS_TAGS + ("untagged",):
             count = sum(1 for r in core if r["status"] == "missed" and (r["tag"] or "untagged") == tag)
@@ -136,6 +141,7 @@ def summary(inst, window, rows, covered, workouts, external):
             "week": week.label(), "start": week.start.isoformat(),
             "planned_core": len(core), "trained_core": sum(1 for r in core if r["status"] == "trained"),
             "missed_by_tag": missed,
+            "on_break": sum(1 for r in inside if r["tier"] == "core" and r["status"] == stats.ON_BREAK),
             "optional_trained": sum(1 for r in inside if r["tier"] == "optional" and r["status"] == "trained"),
             "external_done": sum(1 for e in recorded if e["done"]) if recorded else None,
             "workouts": sum(1 for w in workouts if span.contains(_day(w["date"]))),
@@ -145,10 +151,15 @@ def summary(inst, window, rows, covered, workouts, external):
     return found
 
 
-def questions(rotation, food):
+def questions(rotation, food, untagged=True, on_break=False):
     """The numbered questions: the gap, now, `food` (the card's nutrition Field) unless None, then next week."""
-    gap = (f"One tag for the whole gap ({_MISS_TAG_TEXT}), or one per session if it was mixed. If you were ill: "
-           f"have you been {validity.SYMPTOM_FREE_HOURS} hours symptom-free?")
+    ill = f"If you were ill: have you been {validity.SYMPTOM_FREE_HOURS} hours symptom-free?"
+    if untagged or not on_break:
+        gap = f"One tag for the whole gap ({_MISS_TAG_TEXT}), or one per session if it was mixed. {ill}"
+        if on_break:
+            gap += " Sessions on the planned break need no tag."
+    else:
+        gap = f"The planned break covers the remaining sessions not trained, so none needs a tag. {ill}"
     now = "Anything hurting, or different about kit, travel or schedule?"
     next_week = "Which days can you train next week?" + (f" {rotation}" if rotation else "")
     found = [("gap", QUESTION_LABELS["gap"], None, gap), ("now", QUESTION_LABELS["now"], None, now)]
@@ -234,13 +245,18 @@ def return_week(inst, today, now):
 
 def build(inst, card, window, end, today, now, live, workouts, food):
     """The card's `catch_up` object; the return week only on a live card (the record region has none)."""
-    rows, covered = planned(inst, window, card["sessions"]["rows"], workouts, today)
+    rows, covered = planned(inst, window, card["sessions"]["rows"], workouts, today, card["sessions"]["on_break"])
+    missed = [{"date": r["date"], "session_id": r["session_id"], "title": r["title"], "tag": r["tag"]}
+              for r in rows if r["tier"] == "core" and r["status"] == "missed"]
+    on_break = [{"date": r["date"], "session_id": r["session_id"], "title": r["title"], "break_id": r["break_id"]}
+                for r in rows if r["tier"] == "core" and r["status"] == stats.ON_BREAK]
     found = {
         "layoff_days": card["days_since_last"],
         "summary": summary(inst, window, rows, covered, workouts, card["sessions"]["external"]),
-        "missed": [{"date": r["date"], "session_id": r["session_id"], "title": r["title"], "tag": r["tag"]}
-                   for r in rows if r["tier"] == "core" and r["status"] == "missed"],
-        "questions": questions(rotation_text(inst, end), food),
+        "missed": missed,
+        "on_break": on_break,
+        "questions": questions(rotation_text(inst, end), food, any(m["tag"] == "untagged" for m in missed),
+                               bool(on_break)),
         "return_week": None, "return_week_problem": None, "write_line": None,
     }
     if live:
@@ -331,12 +347,15 @@ def summary_table(card):
     catch_up = card["catch_up"]
     external = bool(card["sessions"]["external"])
     optional = any(row["optional_trained"] for row in catch_up["summary"])
-    head = ["Week of", "Core trained", "Missed"] + (["Optional"] if optional else []) \
-        + (["Coach-led done"] if external else []) + ["Workouts"]
+    any_on_break = any(row["on_break"] for row in catch_up["summary"])
+    head = ["Week of", "Core trained", "Missed"] + (["Planned break"] if any_on_break else []) \
+        + (["Optional"] if optional else []) + (["Coach-led done"] if external else []) + ["Workouts"]
     lines = ["| " + " | ".join(head) + " |", "| " + " | ".join("---" for _ in head) + " |"]
     for row in catch_up["summary"]:
         missed = ", ".join(f"{tag} {n}" for tag, n in row["missed_by_tag"].items()) or "none"
         cells = [render.short_date(row["start"]), f"{row['trained_core']} of {row['planned_core']}", missed]
+        if any_on_break:
+            cells.append(row["on_break"])
         if optional:
             cells.append(row["optional_trained"])
         if external:

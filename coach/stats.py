@@ -11,7 +11,7 @@ from decimal import ROUND_HALF_UP, Decimal
 
 from coach import config as config_module
 from coach import bodyweight as bodyweight_module
-from coach import capacity, dates, flags, history, overlay, program, state, units
+from coach import capacity, dates, flags, history, overlay, program, state, statusdays, units
 from coach.config_tables.sessions import cap_minutes
 from coach.errors import ConfigError
 from coach.library import Library, e1rm_supported
@@ -365,6 +365,9 @@ def _nearest(items, day, key):
     return min(items, key=lambda item: (abs((dates.parse_date(key(item)) - day).days), key(item)), default=None)
 
 
+ON_BREAK = "on_break"
+
+
 def adherence(root, overlay_id=None, span=None, include_unsynced=False, today=None, now=None, as_of=None):
     """Planned sessions against logged workouts, per session and exercise (C18 adherence per overlay).
 
@@ -380,6 +383,7 @@ def adherence_of(root, planned, window, include_unsynced=False, today=None, now=
     """`adherence` over given (overlay, session) pairs; a pair's overlay supplies the span its workouts match in.
 
     A session the schedule rule planned with no overlay in force comes paired with a stand-in overlay whose id is None.
+    A session not trained on a planned-break day (C50) is listed under `on_break`, not as missed or upcoming.
     """
     config = config_module.load(root)
     today = _as_date(today) or _today(config, now)
@@ -411,6 +415,8 @@ def adherence_of(root, planned, window, include_unsynced=False, today=None, now=
 
     unlogged_notes = history.annotations(root, "trained_unlogged", as_of)
     misses = history.annotations(root, "miss", as_of)
+    session_days = [dates.parse_date(session["date"]) for _, session in planned]
+    off = statusdays.break_days(root, dates.Span(min(session_days), max(session_days))) if session_days else {}
     sessions, used_notes, miss_pairs = [], set(), []
     for position, (doc, session) in enumerate(planned):
         day = dates.parse_date(session["date"])
@@ -443,6 +449,8 @@ def adherence_of(root, planned, window, include_unsynced=False, today=None, now=
                 row["exercises"] = [{"exercise_id": line["exercise_id"], "status": "unknown",
                                      "sets_prescribed": sum(1 for s in line["sets"] if overlay.is_working(s)),
                                      "sets_logged": None, "rpe_delta": None} for line in session["exercises"]]
+        elif day in off:
+            row.update(status=ON_BREAK, break_id=off[day])
         elif day > today:
             row["status"] = "upcoming"
         else:
@@ -458,6 +466,9 @@ def adherence_of(root, planned, window, include_unsynced=False, today=None, now=
             sessions[position]["tag"] = miss.get("tag") or "untagged"
             tagged.add(position)
             used_misses.add(miss_id)
+    on_break = [{key: row[key] for key in ("session_id", "date", "title", "overlay_id", "break_id")}
+                for row in sessions if row["status"] == ON_BREAK]
+    sessions = [row for row in sessions if row["status"] != ON_BREAK]
 
     extra = [{"workout_id": w["workout_id"], "date": w["date"], "title": w["title"], "session_id": w["session_id"],
               "unsynced": w["unsynced"]}
@@ -467,6 +478,7 @@ def adherence_of(root, planned, window, include_unsynced=False, today=None, now=
         "trained": sum(1 for s in sessions if s["status"] == "trained"),
         "missed": {}, "missed_total": sum(1 for s in sessions if s["status"] == "missed"),
         "upcoming": sum(1 for s in sessions if s["status"] == "upcoming"),
+        "on_break": len(on_break),
         "exercises": {status: 0 for status in ("hit", "under", "over", "missing", "unknown")},
     }
     for row in sessions:
@@ -475,7 +487,8 @@ def adherence_of(root, planned, window, include_unsynced=False, today=None, now=
         for line in row["exercises"]:
             summary["exercises"][line["status"]] += 1
     return {"overlay_id": None, "span": window.to_json(), "today": today.isoformat(), "sessions": sessions,
-            "extra": sorted(extra, key=lambda w: (w["date"], w["workout_id"])), "summary": summary}
+            "on_break": on_break, "extra": sorted(extra, key=lambda w: (w["date"], w["workout_id"])),
+            "summary": summary}
 
 
 def _week_label(span):

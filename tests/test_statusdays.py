@@ -68,6 +68,14 @@ class CommandsTest(CardioCase):
         results = self.data("check", "--only", "status_days_valid")["results"]
         self.assertEqual([r["status"] for r in results], ["pass"])
 
+    def test_check_fails_on_an_ill_row_marked_as_a_planned_break(self):
+        doc = json.loads(self.path().read_text(encoding="utf-8"))
+        doc["days"][0]["no_training"] = True
+        self.path().write_text(json.dumps(doc), encoding="utf-8")
+        envelope = self.coach("check", "--only", "status_days_valid", expect=1)
+        self.assertIn("$.days[0].no_training: ill rows cannot be planned breaks",
+                      " ".join(r["message"] for r in envelope["data"]["results"]))
+
 
 class ReadersTest(CardioCase):
     def test_active_and_ill_in(self):
