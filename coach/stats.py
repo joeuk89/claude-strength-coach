@@ -10,7 +10,7 @@ from datetime import date, datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
 
 from coach import config as config_module
-from coach import dates, flags, history, overlay, program, state, units
+from coach import capacity, dates, flags, history, overlay, program, state, units
 from coach.config_tables.sessions import cap_minutes
 from coach.errors import ConfigError
 from coach.hevy.cache import HevyCache
@@ -120,48 +120,115 @@ def _formula_load(exposure, logged, readings):
     return bodyweight - load["hevy_total"]
 
 
-def e1rm_series(root, exercise_id=None, since=None, include_unsynced=False, now=None, as_of=None):
-    """{series, best, delta} per exercise: the best set of each usable exposure, oldest first.
+def _estimate_set(exposure, logged, readings):
+    number = _formula_load(exposure, logged, readings)
+    reps, rpe = logged["reps"], logged["rpe"]
+    n = reps_to_failure(reps, rpe) if reps is not None else None
+    reason = None
+    if exposure["excluded"] or logged["discounted"] or logged["convention_unknown"]:
+        reason = "excluded"
+    elif exposure["suspect"]:
+        reason = "suspect_convention"
+    elif exposure["load_mode"] not in SERIES_MODES + BODYWEIGHT_MODES:
+        reason = "unsupported_load_mode"
+    elif reps is not None and reps >= 1 and logged["load"] is not None and number is None:
+        reason = "no_bodyweight_reading"
+    elif number is None or reps is None or reps < 1:
+        reason = "missing_load_or_reps"
+    elif n > MAX_REPS_TO_FAILURE:
+        reason = "over_rep_cap"
+    value = e1rm(number, reps, rpe) if reason is None else None
+    return {"set_index": logged["index"], "load": _round(number) if number is not None else None,
+            "reps": reps, "rpe": rpe, "reps_to_failure": n,
+            "e1rm": _round(value) if value is not None else None, "eligible": value is not None,
+            "reason": reason, "method": "epley_rir" if rpe is not None else "epley"}
 
-    With `as_of`, only workouts started, annotations created and body weights dated by then count.
+
+def e1rm_series(root, exercise_id=None, since=None, include_unsynced=False, now=None, as_of=None):
+    """Comparable capacity series plus every exposure's estimate eligibility and context.
+
+    `as_of` bounds workouts, annotations, recovery context and body weights.
     """
     config = config_module.load(root)
     until = _today(config, as_of).isoformat() if as_of else None
     readings = _bodyweights(root, config.athlete.units, until)
     since = str(since) if since else None
-    series = {}
+    series, observations = {}, {}
+    recovery = capacity.Context(root, as_of)
     for exposure in history.all_exposures(root, include_unsynced, now, as_of):
         if exercise_id and exposure["exercise_id"] != exercise_id:
             continue
         if since and exposure["date"] < since:
             continue
-        if exposure["excluded"] or exposure["suspect"]:
-            continue
-        if exposure["load_mode"] not in SERIES_MODES + BODYWEIGHT_MODES:
-            continue
-        best = None
-        for logged in exposure["sets"]:
-            if logged["discounted"] or logged["convention_unknown"]:
-                continue
-            number = _formula_load(exposure, logged, readings)
-            value = e1rm(number, logged["reps"], logged["rpe"]) if number is not None else None
-            if value is not None and (best is None or value > best[0]):
-                best = (value, number, logged)
-        if best is None:
-            continue
-        value, number, logged = best
-        series.setdefault(exposure["exercise_id"], []).append({
-            "date": exposure["date"], "e1rm": _round(value),
-            "method": "epley_rir" if logged["rpe"] is not None else "epley",
-            "workout_id": exposure["workout_id"], "set_index": logged["index"], "load": _round(number),
-            "reps": logged["reps"], "rpe": logged["rpe"],
-        })
+        sets = [_estimate_set(exposure, logged, readings) for logged in exposure["sets"]]
+        usable = [s for s in sets if s["eligible"]]
+        best_set = max(usable, key=lambda s: s["e1rm"]) if usable else None
+        context = recovery.for_exposure(exposure)
+        comparable = best_set is not None and context["kind"] == "normal"
+        reason = (None if comparable else "recovery_context" if context["kind"] != "normal"
+                  else "over_rep_cap" if any(s["reason"] == "over_rep_cap" for s in sets)
+                  else sets[0]["reason"])
+        observation = {"date": exposure["date"], "workout_id": exposure["workout_id"],
+                       "session_id": exposure["session_id"], "load_mode": exposure["load_mode"],
+                       "eligible": best_set is not None, "comparable": comparable, "reason": reason,
+                       "context": context, "e1rm": best_set["e1rm"] if best_set else None, "sets": sets}
+        observations.setdefault(exposure["exercise_id"], []).append(observation)
+        if comparable:
+            point = {key: best_set[key] for key in ("e1rm", "method", "set_index", "load", "reps", "rpe")}
+            point.update(date=exposure["date"], workout_id=exposure["workout_id"])
+            series.setdefault(exposure["exercise_id"], []).append(point)
     best, delta = {}, {}
     for key, points in series.items():
         top = max(points, key=lambda p: (p["e1rm"], p["date"]))
         best[key] = {"e1rm": top["e1rm"], "date": top["date"]}
         delta[key] = _round(points[-1]["e1rm"] - points[-2]["e1rm"]) if len(points) > 1 else None
-    return {"series": series, "best": best, "delta": delta}
+    return {"series": series, "best": best, "delta": delta, "observations": observations}
+
+
+RECOVERY_NOTES = {"deload": "deload (light week)", "light": "light week", "return": "return week",
+                  "reduced": "reduced by an override"}
+
+
+def capacity_note(observation):
+    """Why an exposure that could carry an e1RM is left out of comparisons; None when nothing to say.
+
+    Lifts no e1RM can come from, and exposures missing a load, reps or bodyweight reading, get no note.
+    """
+    if observation["comparable"] or observation["load_mode"] not in SERIES_MODES + BODYWEIGHT_MODES:
+        return None
+    kind = observation["context"]["kind"]
+    if kind != "normal":
+        return f"{RECOVERY_NOTES[kind]}, kept in the log and left out of e1RM changes"
+    if observation["reason"] == "over_rep_cap":
+        return f"more than {MAX_REPS_TO_FAILURE} reps from failure, too far for an e1RM"
+    return None
+
+
+def capacity_evidence(data, exercise_id, before, window_days):
+    """The e1RM that may limit a prescription.
+
+    Newer over-cap progression work at or above the load behind that e1RM makes it unavailable.
+    """
+    end = _as_date(before)
+    start = (end - timedelta(days=window_days)).isoformat()
+    points = [p for p in data["series"].get(exercise_id, []) if start <= p["date"] < end.isoformat()]
+    best = max(points, key=lambda p: (p["e1rm"], p["date"])) if points else None
+    newer = [o for o in data["observations"].get(exercise_id, [])
+             if start <= o["date"] < end.isoformat() and o["date"] > (points[-1]["date"] if points else "")]
+    # Return-week logs are the next week's progression baseline; deload, light and reduced work is not.
+    outgrown = [o for o in newer if not o["eligible"] and o["context"]["kind"] in ("normal", "return")
+                and any(s["reason"] == "over_rep_cap" and (best is None or s["load"] >= best["load"])
+                        for s in o["sets"])]
+    if outgrown:
+        latest = outgrown[-1]
+        return {"estimate": None, "reason": "over_rep_cap", "date": latest["date"],
+                "message": f"e1RM unavailable: the {latest['date']} exposure was more than "
+                           f"{MAX_REPS_TO_FAILURE} reps from failure, so older e1RMs no longer limit the load. "
+                           "Load-step, equipment and return checks still apply."}
+    return {"estimate": best, "reason": None if best else "no_comparable_estimate",
+            "date": best["date"] if best else None,
+            "message": (f"e1RM {units.json_number(best['e1rm'])} from {best['date']}." if best
+                        else f"e1RM unavailable: no comparable e1RM in the last {window_days} days.")}
 
 
 def _half(increment):

@@ -62,8 +62,9 @@ class EvidencePipelineTest(ProposeCase):
         before = date(2026, 10, 12)
         self.assertEqual(runner.exposures_of(a.exercise_id, before, "session-a", "total"), (a,))
         self.assertEqual(len(runner.exposures_of(a.exercise_id, before)), 4)
-        runner._series = {a.exercise_id: [{"date": "2026-10-05", "e1rm": 90},
-                                        {"date": "2026-10-08", "e1rm": 110}]}
+        runner._series = {"series": {a.exercise_id: [{"date": "2026-10-05", "e1rm": 90},
+                                                   {"date": "2026-10-08", "e1rm": 110}]},
+                          "observations": {}}
         self.assertEqual(runner.e1rm(a.exercise_id, before), 110)
 
     def test_unknown_three_set_history_is_not_judged_as_missing_a_redesigned_fourth_set(self):

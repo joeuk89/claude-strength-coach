@@ -311,8 +311,12 @@ class _View:
         return doc, session
 
     @cached_property
+    def capacity(self):
+        return stats.e1rm_series(self.root, as_of=self.as_of)
+
+    @cached_property
     def series(self):
-        return stats.e1rm_series(self.root, as_of=self.as_of)["series"]
+        return self.capacity["series"]
 
     @cached_property
     def weeks(self):
@@ -630,9 +634,13 @@ def render_progress(root, as_of, view=None):
 
 
 def _lifts_table(view):
-    if not view.series:
-        return ["No e1RM yet: it comes from logged working sets of barbell, dumbbell and machine lifts."]
     cutoff = (view.today - timedelta(days=CHANGE_DAYS)).isoformat()
+    notes = [f"- {view.name(exercise_id)} ({observed[-1]['date']}): {note}"
+             for exercise_id, observed in view.capacity["observations"].items()
+             if observed[-1]["date"] > cutoff and (note := stats.capacity_note(observed[-1]))]
+    notes = ["", "e1RM notes:"] + notes if notes else []
+    if not view.series:
+        return ["No e1RM yet: it comes from logged working sets of barbell, dumbbell and machine lifts."] + notes
     rows = [_row(["Lift", f"Best e1RM ({view.unit})", "Date", "Latest", f"{CHANGE_DAYS}-day change"]),
             "|---|---|---|---|---|"]
     for exercise_id, points in sorted(view.series.items(), key=lambda pair: view.name(pair[0])):
@@ -643,7 +651,7 @@ def _lifts_table(view):
         suffix = view.per_hand(exercise_id)
         rows.append(_row([view.name(exercise_id), _num(best["e1rm"]) + suffix, _long_date(best["date"]),
                           _num(latest["e1rm"]) + suffix, _signed(change)]))
-    return rows
+    return rows + notes
 
 
 def _bodyweight(view):

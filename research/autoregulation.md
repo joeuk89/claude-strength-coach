@@ -230,6 +230,15 @@ e1RM came from longer sets than the prescription. `unearned_load` or
 - With a lifter new to RPE, have them practise rating sets near failure
   before leaning on RPE targets (claim 7). Expect ratings to run low (more
   reps left than they think) at any experience level.
+- Keep claim 5's low-confidence cap at 12 reps to failure. Preserve
+  over-cap observations with an explicit unavailable-estimate reason.
+  Compare e1RMs from ordinary exposures only; light-week, return-week and
+  reduced work stays visible without becoming a strength loss. A newer
+  over-cap exposure of ordinary or return-week work, at or above the load
+  behind an older estimate, makes that estimate unavailable as a
+  progression veto, while the other
+  prescription guards remain active. These are model-use policies, not
+  physiological thresholds established by Reynolds or Halperin.
 - Before lowering a deadlift or other hinge load for `unearned_load` or
   `rpe_infeasible`, check the athlete's recent logged sets of that lift:
   the flag may come from Epley's low estimate rather than the load.

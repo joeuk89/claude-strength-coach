@@ -1591,13 +1591,17 @@ references into the program. `program validate` reports all of them;
 `state show` refuses an invalid state the same way.
 `coach.program.warnings(doc)` lists what a valid program may keep but
 should not, each warning starting with its code. `program validate`
-puts them in the envelope's `warnings` and still exits 0. One code so
-far: `fixed_reps_no_e1rm`, for a `fixed_reps_rpe` slot with a working
+puts them in the envelope's `warnings` and still exits 0. Codes include
+`fixed_reps_no_e1rm`, for a `fixed_reps_rpe` slot with a working
 group past `stats.MAX_REPS_TO_FAILURE` reps to failure (its reps, or
 its range's start, plus 10 − RPE). Its sets give no e1RM, so its load
 holds unless another line of the exercise supplies one. The warning
 names the exercise, the session and the reps to failure, and suggests
-`double_progression`.
+`double_progression`. `priority_no_e1rm` names a priority lift whose
+`e1rm` KPI has no working set in any of its slots within the cap, using
+the start of a rep range plus the prescribed reps in reserve. It suggests
+a `top_load` or `top_reps` KPI, or a working set within the cap; it does
+not block adoption.
 
 **A corrected load mode** (`program reconcile-mode ID --basis
 old|confirmed [--input FILE] [--dry-run]`). A line whose `load_mode`
@@ -1890,9 +1894,9 @@ workout with at least one non-warm-up set left after annotations.
 ```python
 coach.history.workouts(root, since=None, until=None, include_unsynced=False) -> list[ResolvedWorkout]   # annotations applied
 coach.history.exposures(root, exercise_id, before=None) -> list[Exposure]       # newest first
-# Exposure: date, workout_id, session_id, exercise_id, load_mode, sets (working sets only),
+# Exposure: date, start_time, workout_id, session_id, exercise_id, load_mode, sets (working sets only),
 #           suspect (open convention_slip candidate), excluded (discount / unknown_convention),
-#           discounted, convention_unknown (which of the two)
+#           discounted, convention_unknown (which of the two), overlay_id
 # Read workouts and their sets carry discounted, convention_unknown and repaired (the fields a
 # repair replaced); each workout carries unsynced and conditioning (C17 conditioning rule).
 coach.history.last_lifting_date(root, before) -> date | None                    # any workout with a lifting exercise
@@ -1943,6 +1947,62 @@ minus previous point, null with one point). `e1rm` and `load` are
 rounded half up to 2 decimals; `load` is the number the formula used
 (bodyweight plus added load for `bodyweight`). Body-measurement weights
 come from the Hevy cache.
+
+`data.observations[exercise_id]` retains every resolved working exposure,
+including unsupported estimates and recovery work. Each row carries
+`date`, `workout_id`, `session_id`, `load_mode`, `eligible` (at least one
+set supports an estimate), `comparable` (eligible normal work), `reason`,
+`context`, `e1rm` (best eligible set, or null), and `sets`. Each set records
+`set_index`, formula `load`, `reps`, `rpe`, `reps_to_failure`, nullable
+`e1rm`, `eligible`, `reason` and `method`. Exclusion reasons include
+`over_rep_cap`, `excluded`, `suspect_convention`, `unsupported_load_mode`,
+`no_bodyweight_reading` (a `bodyweight` or `assisted` set with load and
+reps but no reading within the window), `missing_load_or_reps`, and
+exposure-level `recovery_context`.
+
+Only comparable normal exposures enter `series`, `best`, `delta`,
+check-in capacity changes, progress tables and priority e1RM KPIs.
+Recovery observations can have an eligible estimate without representing
+capacity loss. `coach.stats.capacity_note(observation)` words why an
+observation is left out, or returns None: only for `SERIES_MODES` and
+`BODYWEIGHT_MODES` exposures left out by recovery context or the rep cap.
+Check-in `e1rm_notes` and the progress page's "e1RM notes:" use it; the
+progress page notes each lift's newest exposure only when it falls in the
+last `CHANGE_DAYS` days. The raw values remain inspectable through `stats e1rm` and history. No
+lower-bound estimate is invented above the cap.
+
+`coach.stats.capacity_evidence(data, exercise_id, before, window_days)`
+picks the e1RM that may limit a prescription from `e1rm_series` data:
+the best comparable point in the window before `before`, unless an
+exposure newer than every comparable point has no eligible set and an
+over-cap set at or above the load behind that best point. Only `normal`
+and `return` work counts (return-week logs are the next week's baseline);
+deload, light and reduced work neither supplies nor removes the e1RM.
+Lighter over-cap work leaves the older e1RM in force.
+
+`e1rm_series` reads config, adopted decisions and approved overlays to
+build each observation's `context`, so it, and every command built on it,
+needs valid `data/decisions.json` and overlays; C17 exposure readers do
+not.
+
+C17 exposures also carry their workout's `start_time` (null when the
+source has none) and their stored `overlay_id`. An observation's
+`context = {kind, overlay_id, decision_id}` uses the
+stored overlay when known, otherwise the approved overlay in force:
+`deload` kind, adopted `light_week` decisions (`deload`, `light`, `return`),
+actual return reductions in line `provenance.decay`, or an explicit
+matching adopted override that reduces working-set count, load, reps or
+RPE without increasing another of those measures (`reduced`; increased
+assistance is a load reduction; a lower rep range alone is not compared). A matching override is one recorded for
+that overlay, or a C25 standing override the approved overlay carried
+(its line has an `override`) and that was made by the overlay's approval.
+It never infers recovery from a `one_off` name or free text. Unknown
+context is `normal`. Decisions withdrawn before the workout started do
+not apply; a later withdrawal, even on the same day, does not erase the
+exposure's historical recovery context. Without a workout start time,
+only a withdrawal on an earlier local day counts as before the workout.
+Neither this context nor capacity eligibility excludes an exposure from
+progression: return-week logs remain the next week's baseline.
 
 **Adherence per overlay.** `stats adherence (--overlay ID | --span A..B)`:
 
@@ -2232,7 +2292,14 @@ coach.validity.estimate_minutes(root, session) -> int
   that session.
   R-24 reads `coach.statusdays` only once R-43 has added it.
 - **Feasibility** uses C18's `implied_rpe` with the best e1RM point in
-  the 42 days before the session date (none older): implied RPE above
+  the 42 days before the session date (none older), using comparable
+  normal work, chosen by `coach.stats.capacity_evidence` (C18): newer
+  over-cap normal or return work at or above the load behind the older
+  estimate makes it unavailable for
+  feasibility and scheme model inputs. Every returned prescription-check
+  line exposes `model_evidence` with `estimate`, `reason`, `date` and a
+  plain `message`. The existing no-e1RM load-step guard, equipment checks,
+  return rules and progression rules still apply. Implied RPE above
   10.5 is `unearned_load`; otherwise an RPE target more than 1 from the
   implied RPE is `rpe_infeasible` (rn:autoregulation.6). Only working
   sets of `total`, `per_hand_x2` and `single_implement` lines are judged
@@ -3976,7 +4043,7 @@ record gives the same card:
 
 ```json
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "date": "2026-10-11",
   "window": {"start": "2026-10-05", "end": "2026-10-11"},
   "mode": "weekly", "tier_reasons": [], "deep_deferred": false,
@@ -3994,6 +4061,7 @@ record gives the same card:
                  "logged": "5, 5, 5 @ 97.5 @ RPE 7.5", "status": "hit", "rpe_delta": 0}],
   "e1rm": [{"exercise_id": "bb_back_squat", "name": "Back Squat (Barbell)", "load_mode": "total",
             "date": "2026-10-05", "e1rm": 121.88, "delta": 1.55, "method": "epley_rir"}],
+  "e1rm_notes": ["Bench Press (Dumbbell) (2026-10-06): deload (light week), kept in the log and left out of e1RM changes"],
   "hevy": [{"routine_id": "…0002", "title": "Session B", "session_id": "session-b",
             "overlay_id": "2026-10-05-weekly", "state": "edited_in_app",
             "changes": [{"class": "structural", "path": "…", "before": null, "after": "…"}],
@@ -4018,6 +4086,12 @@ record gives the same card:
   (latest minus previous rounded point, counting only points up to the
   window end). Compounds first (`coach.patterns.COMPOUND_PATTERNS` once
   R-23a exists; library order before), at most eight rows (a heuristic).
+- `e1rm_notes`: one line per exercise, at most eight, for the newest
+  exposure in the window that `coach.stats.capacity_note` explains: an
+  exercise that can carry an e1RM, left out of comparisons by a light
+  week, return week or reducing override, or by the rep cap. Unsupported
+  load modes and missing loads, reps or bodyweight readings get no line.
+  `card_text` and the record region list them under "e1RM notes:".
 - `hevy`: per routine of an active session (`state.hevy.routines`),
   comparing the cache with the newest approved overlay whose span starts
   on or before the window end and whose session carries that routine,
@@ -4588,7 +4662,10 @@ which must be of the same `root` and `now`.
 `as_of` (an aware datetime, default None = no bound): workouts started at
 or before it (a workout with no start time: dated on or before its local
 date), annotations created at or before it, and body weights dated on or
-before its local date. Withdrawals created later do not apply.
+before its local date. Withdrawals created later do not apply. Capacity
+context only reads overlays created and approved by `as_of`, and
+recovery decisions made by then; later decision withdrawals cannot
+change that snapshot.
 
 **Publishing** (roadmap decision 1). `pages publish --overlay ID [--record D]`:
 
