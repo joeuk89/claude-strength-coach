@@ -8,11 +8,10 @@ import unittest
 from pathlib import Path
 
 from coach.commands import discover
-from coach.hevy.cache import HevyCache
-from coach.library import Library
 from tests.support import FIXTURES, REPO_ROOT, run_cli, run_module
 from tests.support.config_edit import apply
 from tests.support.skills import skill_text, step_text
+from tests.support.templates import cache_catalogue_templates
 
 EXAMPLE = REPO_ROOT / "config.example.toml"
 TRANSCRIPT = FIXTURES / "onboarding" / "starter-path.json"
@@ -162,7 +161,7 @@ class WorkedExampleTest(unittest.TestCase):
             text = apply(text, reply["config"])
             (root / "config.toml").write_text(text, encoding="utf-8")
             if "hevy pull" in reply["coach_also"]:
-                self.pull_templates(root, transcript["now"])
+                cache_catalogue_templates(root, transcript["now"])
             for argv in reply["commands"]:
                 if argv == "confirm load modes":
                     self.confirm_load_modes(root, env, outputs["program adopt"])
@@ -172,12 +171,6 @@ class WorkedExampleTest(unittest.TestCase):
                 self.assertEqual(code, 0, (argv, envelope, stderr))
                 outputs[" ".join(argv[:2])] = envelope["data"]
         return tomllib.loads(text), outputs
-
-    def pull_templates(self, root, now):
-        """What `hevy pull` caches with no key here: a Hevy template for each catalogue title."""
-        templates = [{"id": f"TEMPLATE-{index}", "title": entry["hevy_titles"][0]}
-                     for index, entry in enumerate(Library().entries()) if entry["hevy_titles"]]
-        HevyCache(root).write_collection("exercise_templates", templates, now)
 
     def confirm_load_modes(self, root, env, adopted):
         self.assertTrue(adopted["unconfirmed"])

@@ -9,6 +9,7 @@ from pathlib import Path
 from coach import units
 from tests.support import INSTANCES, VALID, run_cli
 from tests.support.skills import flat, step_text
+from tests.support.templates import cache_catalogue_templates
 
 EMPTY = INSTANCES / "empty"
 NOW = "2026-10-11T18:00:00Z"
@@ -21,6 +22,7 @@ def instance(test, source):
     test.addCleanup(tmp.cleanup)
     root = Path(tmp.name) / "instance"
     shutil.copytree(source, root)
+    cache_catalogue_templates(root, NOW)
     return root
 
 
