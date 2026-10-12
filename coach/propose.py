@@ -1578,7 +1578,10 @@ def _build_week(root, config, today, now, span, kind, transform_name, plan_file=
 
 
 def _on_date(flag, session_id, day):
-    """The flag with its message naming the session's date, so a session planned twice raises two conditions."""
+    """The flag with its message naming the session's date, so a session planned twice raises two conditions; a
+    first-load flag's message names its date already."""
+    if first_loads.is_first_load(flag):
+        return flag
     return dict(flag, message=f"{session_id} on {day.isoformat()}: {flag['message']}")
 
 

@@ -159,8 +159,8 @@ class StillOpenTest(FirstLoadCase):
         self.assertTrue(self.open_squat(self.override("--sets", "3x8 rpe7")["flags"]))
 
     def test_a_resolution_the_coach_wrote_stays(self):
-        [index] = [i for i, f in enumerate(self.draft()["flags"]) if f["code"] == "no_data"]
-        self.run_coach("propose", "resolve", "--proposal", WEEKLY, "--flag", str(index), "--resolution",
+        [ref] = [f["ref"] for f in self.run_coach("propose", "show", WEEKLY)["flags"] if f["code"] == "no_data"]
+        self.run_coach("propose", "resolve", "--proposal", WEEKLY, "--flag", ref, "--resolution",
                        "the athlete works up to a top set on the day")
         found = self.first_loads(self.override("--load", "20", exercise=("--session", "session-a", "--exercise",
                                                                           "db_bench_press"))["flags"])

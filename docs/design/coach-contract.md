@@ -3356,8 +3356,9 @@ id follows C10. `data.lines_digest` (R-21b) is the C7 canonical hash of
   resolution. A flag keeps its ref through saves, reordering and
   revalidation while its condition stands; a changed or new condition
   gets another. Stored flags carry no `ref`. A proposed line's flags name
-  its session and date in the message (`session-a on 2026-10-14: ...`),
-  so a session planned on two dates raises two conditions.
+  its session and date in the message (`session-a on 2026-10-14: ...`;
+  a first-load warning names its exercise and date instead, below), so a
+  session planned on two dates raises two conditions.
 - `propose resolve --proposal ID --flag REF --resolution TEXT` resolves
   the flag that ref names on the draft, and any identical copy of it.
   Like `show`, `override` and `finalize`, it checks the flags again
