@@ -13,7 +13,7 @@ from tests.test_manual_log import NoHevyCase
 from tests.test_starters import WEEK as STARTER_WEEK
 from tests.test_starters import Case as StarterCase
 from tests.test_starters import lines, set_athlete
-from tests.test_week_rebuild import SUNDAY, WEEKLY as W43, RebuildCase, line
+from tests.test_week_rebuild import MONDAY_EVENING, SUNDAY, WEEKLY as W43, RebuildCase, line, workout
 
 WEEKLY = "2026-10-12-weekly"
 SHEETS = "this-week-sheets.md"
@@ -269,6 +269,115 @@ class WeekFocusTest(RebuildCase):
         self.assertIsNone(draft["sessions"][0]["exercises"][0]["target_note"])
 
 
+MIDWEEK = "2026-10-20-midweek"
+CAP, HANG = "stop at RPE 9", "pause with the chin over the bar"
+
+
+class MidweekGuidanceTest(RebuildCase):
+    """W43 agreed with a week focus, notes on Thursday's row (overridden) and pull-up, and Monday trained."""
+
+    def agree(self, *slots):
+        self.run_coach("propose", "week", "--week", "2026-W43")
+        self.run_coach("propose", "note", "--proposal", W43, "--week-focus", FOCUS)
+        for exercise_id, note in slots:
+            self.run_coach("propose", "note", "--proposal", W43, "--session", "session-b", "--exercise", exercise_id,
+                           "--target-note", note)
+        self.override(W43, "session-b", "db_single_arm_row", "--load", "30", reason="hold at 30")
+        self.run_coach("propose", "finalize", "--proposal", W43)
+        self.run_coach("overlay", "approve", W43)
+        self.log(workout("2026-10-19", "session-a", [("bb_back_squat", "total", [(102.5, 5, 7)] * 3),
+                                                     ("db_bench_press", "per_hand_x2", [(25, 9, 8)] * 3)],
+                         overlay_id=W43), now=MONDAY_EVENING)
+
+    def midweek(self, *argv):
+        return self.run_coach("propose", "week", "--kind", "midweek", "--week", "2026-W43", *argv,
+                              now=MONDAY_EVENING)
+
+    def test_the_agreed_guidance_and_focus_stay_on_the_days_left(self):
+        self.agree(("db_single_arm_row", CAP), ("pull_up", HANG))
+        data = self.midweek()
+        doc = data["overlay"]
+        self.assertEqual(doc["focus"], FOCUS)
+        row = line(doc, "db_single_arm_row")
+        self.assertEqual((row["target_note"], row["override"]["reason"]), (CAP, "hold at 30"))
+        self.assertEqual(line(doc, "pull_up")["target_note"], HANG)
+        self.assertEqual(data["approved_guidance"], {
+            "kept": [{"session_id": "session-b", "date": "2026-10-22", "exercise_id": ex, "fields": ["target_note"],
+                      "overlay_id": W43} for ex in ("db_single_arm_row", "pull_up")],
+            "review": [], "focus": {"overlay_id": W43, "text": FOCUS, "kept": True}})
+        self.assertEqual(self.run_coach("propose", "show", MIDWEEK, now=MONDAY_EVENING)["unexplained"], [])
+        self.run_coach("propose", "finalize", "--proposal", MIDWEEK, now=MONDAY_EVENING)
+        self.run_coach("overlay", "approve", MIDWEEK, now=MONDAY_EVENING)
+        self.run_coach("sheets", "render", "--overlay", MIDWEEK, now=MONDAY_EVENING)
+        sheet = (self.root / SHEETS).read_text(encoding="utf-8")
+        self.assertIn(f"**Week focus:** {FOCUS}", sheet)
+        self.assertIn(f"Note: {CAP}", bullet(sheet, "Single Arm Row (Dumbbell)"))
+        self.assertIn(f"Note: {HANG}", bullet(sheet, "Pull Up"))
+
+    def test_a_rebuild_of_the_midweek_draft_keeps_the_carried_guidance(self):
+        self.agree(("pull_up", HANG))
+        self.midweek()
+        rebuilt = self.run_coach("propose", "rebuild", "--proposal", MIDWEEK, now=MONDAY_EVENING)
+        self.assertEqual((rebuilt["overlay"]["focus"], line(rebuilt["overlay"], "pull_up")["target_note"]),
+                         (FOCUS, HANG))
+
+    def test_without_coach_guidance_nothing_is_copied(self):
+        self.run_coach("propose", "week", "--week", "2026-W43")
+        self.run_coach("propose", "finalize", "--proposal", W43)
+        self.run_coach("overlay", "approve", W43)
+        data = self.midweek("--dry-run")
+        self.assertEqual(data["approved_guidance"], {"kept": [], "review": [], "focus": None})
+        self.assertIn("re-proposed", data["overlay"]["focus"])
+        self.assertIsNone(line(data["overlay"], "pull_up")["target_note"])
+
+    def test_guidance_it_cannot_place_is_listed_for_the_coach_not_copied(self):
+        self.agree(("pull_up", HANG))
+        light = self.midweek("--transform", "light", "--dry-run")
+        self.assertIsNone(line(light["overlay"], "pull_up")["target_note"])
+        review = {"session_id": "session-b", "date": "2026-10-22", "exercise_id": "pull_up", "overlay_id": W43,
+                  "approved": {"target_note": HANG}}
+        self.assertEqual(light["approved_guidance"]["review"], [review])
+        self.assertEqual(light["approved_guidance"]["focus"], {"overlay_id": W43, "text": FOCUS, "kept": False})
+        for path in (self.root / ".coach" / "proposals").glob(f"{W43}*"):
+            path.unlink()
+        unknown = self.midweek("--dry-run")
+        found = unknown["approved_guidance"]
+        self.assertEqual((found["kept"], found["review"]), ([], [review]))
+        self.assertIn("re-proposed", unknown["overlay"]["focus"])
+        self.assertFalse(unknown["approved_guidance"]["focus"]["kept"])
+
+
+    def test_calibration_wording_follows_the_line_and_is_not_copied(self):
+        add_romanian(self, session_index=1)
+        self.run_coach("propose", "week", "--week", "2026-W43")
+        self.override(W43, "session-b", "db_romanian_deadlift", "--load", "20", reason="agreed first load")
+        self.run_coach("propose", "finalize", "--proposal", W43)
+        self.run_coach("overlay", "approve", W43)
+        data = self.midweek("--dry-run")
+        romanian = line(data["overlay"], "db_romanian_deadlift")
+        self.assertEqual((romanian["override"]["reason"], romanian["target_note"]),
+                         ("agreed first load", propose.CALIBRATION_SET_NOTE))
+        self.assertEqual(data["approved_guidance"], {"kept": [], "review": [], "focus": None})
+
+    def test_only_text_the_coach_changed_counts_as_the_coachs(self):
+        loaded = {"load_mode": "per_hand_x2", "focus": None, "cues": None,
+                  "sets": [{"type": "normal", "reps": 8, "rpe": 7,
+                            "load": {"mode": "per_hand_x2", "per_hand": 20, "hevy_total": 40}}]}
+        scheme = dict(loaded, target_note=propose.CALIBRATION_NOTE)
+        self.assertEqual(propose._coach_guidance(dict(loaded, target_note=propose.CALIBRATION_SET_NOTE), scheme), {})
+        self.assertEqual(propose._coach_guidance(dict(loaded, target_note=CAP, cues=HANG), scheme),
+                         {"target_note": CAP, "cues": HANG})
+
+
+def add_romanian(case, session_index=0):
+    case.edit_json("data/exercises.json", lambda doc: doc["exercises"].update(db_romanian_deadlift={
+        "hevy_template_id": "F0000006", "load_mode": "per_hand_x2", "load_mode_proposed": "per_hand_x2",
+        "confidence": "high", "avoid": None}))
+    case.edit_json("data/program.json",
+                   lambda doc: doc["sessions"][session_index]["exercises"].append(dict(ROMANIAN)))
+    case.run_coach("program", "validate")
+
+
 ROMANIAN = {"exercise_id": "db_romanian_deadlift", "load_mode": "per_hand_x2",
             "sets": [{"count": 3, "type": "normal", "rep_range": {"start": 8, "end": 10}, "rpe": 7}],
             "rest_seconds": 120, "superset_id": None, "cues": None, "constraints": [],
@@ -280,11 +389,7 @@ class DesignCalibrationTest(RebuildCase):
 
     def setUp(self):
         super().setUp()
-        self.edit_json("data/exercises.json", lambda doc: doc["exercises"].update(db_romanian_deadlift={
-            "hevy_template_id": "F0000006", "load_mode": "per_hand_x2", "load_mode_proposed": "per_hand_x2",
-            "confidence": "high", "avoid": None}))
-        self.edit_json("data/program.json", lambda doc: doc["sessions"][0]["exercises"].append(dict(ROMANIAN)))
-        self.run_coach("program", "validate")
+        add_romanian(self)
 
     def test_an_unknown_first_load_carries_calibration_guidance_to_the_sheet(self):
         proposed = self.run_coach("propose", "week", "--week", "2026-W43")
@@ -311,6 +416,17 @@ class DesignCalibrationTest(RebuildCase):
         self.override(W43, "session-a", "db_romanian_deadlift", "--load", "20", reason="agreed first load")
         draft, _, _ = propose.load_proposal(self.root, W43)
         self.assertEqual(line(draft, "db_romanian_deadlift")["target_note"], ADJUST)
+
+    def test_a_kept_standing_first_load_keeps_its_calibration_note_until_the_lift_is_tried(self):
+        self.run_coach("propose", "week", "--week", "2026-W43")
+        self.override(W43, "session-a", "db_romanian_deadlift", "--load", "20", "--standing",
+                      reason="agreed first load")
+        self.run_coach("propose", "finalize", "--proposal", W43)
+        self.run_coach("overlay", "approve", W43)
+        week = self.run_coach("propose", "week", "--week", "2026-W44", "--dry-run", now="2026-10-25T19:00:00Z")
+        romanian = line(week["overlay"], "db_romanian_deadlift")
+        self.assertEqual((romanian["override"]["reason"], romanian["target_note"]),
+                         ("agreed first load", propose.CALIBRATION_SET_NOTE))
 
 
 class StarterGuidanceTest(StarterCase):
@@ -410,6 +526,11 @@ class GuidanceWorkflowTest(unittest.TestCase):
             self.assertIn(flag, compute)
         self.assertIn("The reason stays your audit, off the athlete's pages; **athlete guidance** (brief.md step 1) "
                       "needs none", compute)
+
+    def test_a_midweek_pass_reapplies_the_guidance_it_could_not_carry(self):
+        midweek = flat(step_text("program-week", "midweek.md"))
+        self.assertIn("for each `approved_guidance.review` row, and a `focus` with `kept: false`", midweek)
+        self.assertIn("set what does as athlete guidance (compute.md step 3) before finalizing", midweek)
 
     def test_calibration_and_beginner_warm_ups_name_no_invented_numbers(self):
         brief = flat(step_text("program-week", "brief.md"))

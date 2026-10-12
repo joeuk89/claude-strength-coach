@@ -996,6 +996,9 @@ def propose_line(run, session, day, exercise, ctx_extra):
     target_note = final_note(ctx, proposal, sets) if final_note is not None else proposal.target_note
     if _awaits_first_load(sets, mode):
         target_note = _joined_note(target_note, CALIBRATION_NOTE)
+    elif kept_from is not None and mode in units.LOADED_MODES and not run.exposures_of(exercise_id, day,
+                                                                                     load_mode=mode):
+        target_note = _joined_note(target_note, CALIBRATION_SET_NOTE)
     previous = ctx.last_prescription
     draft_line = {
         "exercise_id": exercise_id,
@@ -1599,11 +1602,18 @@ def _build_week(root, config, today, now, span, kind, transform_name, plan_file=
     }
     if proposal_id is not None:
         draft["id"] = proposal_id
+    proposed = draft
+    approved_guidance = None
+    # A rebuild gets this guidance through _carry_guidance instead, so a note the coach cleared stays cleared.
+    if kind == "midweek" and proposal_id is None:
+        draft = copy.deepcopy(draft)
+        approved_guidance = _carry_approved_guidance(run, draft, transform)
     doc = overlay.build(draft, config, root=root, now=now)
     doc["flags"] = _checked_flags(root, config, doc)
     doc["flags"] += _week_flags(root, config, today, span, doc) + drop_flags
     doc["flags"] += external.requirement_flags(root, doc, config.hevy.enabled)
     draft = dict(draft, id=doc["id"], flags=doc["flags"])
+    proposed = dict(proposed, id=doc["id"], flags=doc["flags"])
     meta = {
         "id": doc["id"], "kind": kind, "span": span.to_json(), "transform": transform[0].name if transform else None,
         "created_at": doc["created_at"], "rotation": found.rotation,
@@ -1612,8 +1622,9 @@ def _build_week(root, config, today, now, span, kind, transform_name, plan_file=
             "sessions": [{"date": day.isoformat(), "session_id": sid} for day, sid in found.sessions],
             "flags": list(found.flags)},
     }
-    return {"run": run, "settled_state": settled_state, "settled": settled, "draft": draft, "proposed": draft,
-            "doc": doc, "meta": meta, "span": span, "kind": kind, "rotation": found.rotation, "dropped": dropped}
+    return {"run": run, "settled_state": settled_state, "settled": settled, "draft": draft, "proposed": proposed,
+            "doc": doc, "meta": meta, "span": span, "kind": kind, "rotation": found.rotation, "dropped": dropped,
+            "approved_guidance": approved_guidance}
 
 
 def _on_date(flag, session_id, day):
@@ -1639,7 +1650,8 @@ def _week_result(root, config, built, dry_run):
         "proposed": _relative(root, proposed_path), "overlay": doc, "flags": flags.with_refs(doc["flags"]),
         "lines": lines,
         "lines_digest": jsonio.canonical_hash(lines), "settled": built["settled"], "rotation": built["rotation"],
-        "dropped": [_dropped_row(entry) for entry in built["dropped"]], "written": not dry_run,
+        "dropped": [_dropped_row(entry) for entry in built["dropped"]],
+        "approved_guidance": built.get("approved_guidance"), "written": not dry_run,
     }
 
 
@@ -2155,6 +2167,95 @@ def _carry_guidance(draft, proposed, new_draft):
             targets[key].update({field: line[field] for field in edited})
             kept.append(row)
     return kept, lost
+
+
+def _carry_approved_guidance(run, draft, transform):
+    """Copy the guidance the coach set in the approved overlay in force onto the same session, date and exercise
+    of a midweek `draft`, and its edited week focus (C25).
+
+    A field counts as the coach's when it differs from that overlay's untouched proposal, so scheme, calibration
+    and ramp text is never copied. Guidance whose proposal is gone, or under a transform that may contradict it,
+    is listed in `review` for the coach to re-apply with `propose note`, never copied.
+    """
+    approved = [doc for doc in run.overlays if overlay.is_approved(doc)]
+    originals = {}
+
+    def original_of(doc):
+        if doc["id"] not in originals:
+            try:
+                originals[doc["id"]] = json.loads(proposal_paths(run.root, doc["id"])[1].read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                originals[doc["id"]] = None
+        return originals[doc["id"]]
+
+    kept, review = [], []
+    for session in draft["sessions"]:
+        found = overlay.pick_in_force(approved, session["date"])
+        if found is None:
+            continue
+        doc = found[0]
+        agreed = {_line_key(s, line): line for s in doc["sessions"] for line in s["exercises"]
+                  if not line.get("fold")}
+        schemes = _lines_by_key(original_of(doc) or {})
+        for line in session["exercises"]:
+            key = _line_key(session, line)
+            if key not in agreed:
+                continue
+            known = key in schemes
+            coach = (_coach_guidance(agreed[key], schemes[key]) if known
+                     else {field: agreed[key].get(field) for field in GUIDANCE_FIELDS})
+            fields = {field: text for field, text in coach.items() if line.get(field) != text}
+            if not fields:
+                continue
+            row = {"session_id": key[0], "date": key[1], "exercise_id": key[2], "overlay_id": doc["id"]}
+            if known and transform is None:
+                line.update(fields)
+                kept.append(dict(row, fields=list(fields)))
+            else:
+                review.append(dict(row, approved=fields))
+    return {"kept": kept, "review": review, "focus": _carry_approved_focus(approved, draft, transform, original_of)}
+
+
+def _coach_guidance(approved_line, scheme_line):
+    """The guidance fields of an approved line that differ from its scheme's proposal; an override's calibration
+    rewording (C24) is the scheme's own text."""
+    found = {}
+    for field in GUIDANCE_FIELDS:
+        scheme_text = scheme_line.get(field)
+        if field == "target_note":
+            sets = tuple(base.SetSpec.from_dict(s, load=history.coaching_number(s.get("load")))
+                         for s in approved_line["sets"])
+            scheme_text = _calibration_note(scheme_text, sets, approved_line["load_mode"])
+        if approved_line.get(field) != scheme_text:
+            found[field] = approved_line.get(field)
+    return found
+
+
+def _carry_approved_focus(approved, draft, transform, original_of):
+    """The week focus of the approved overlay in force on the draft's first day, when the coach set it: carried
+    onto `draft` (`kept`) or, as for line guidance, left for the coach to review."""
+    found = overlay.pick_in_force(approved, draft["sessions"][0]["date"]) if draft["sessions"] else None
+    if found is None:
+        return None
+    doc = found[0]
+    original = original_of(doc)
+    set_by_coach = doc["focus"] != original.get("focus") if original else not _generated_focus(doc["focus"])
+    if not set_by_coach or doc["focus"] == draft["focus"]:
+        return None
+    kept = original is not None and transform is None
+    if kept:
+        draft["focus"] = doc["focus"]
+    return {"overlay_id": doc["id"], "text": doc["focus"], "kept": kept}
+
+
+def _generated_focus(text):
+    """True when `text` is a week focus `_focus` writes."""
+    day = re.search(r"\d{4}-\d{2}-\d{2}", text or "")
+    if day is None:
+        return False
+    span = dates.Span(dates.parse_date(day.group()), dates.parse_date(day.group()))
+    return (text in (_focus("weekly", span, None), _focus("midweek", span, None))
+            or text.startswith((f"Deload week of {day.group()}: ", f"Return week of {day.group()}: ")))
 
 
 def discard(root, proposal_id, today, dry_run):

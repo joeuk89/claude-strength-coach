@@ -3312,7 +3312,9 @@ propose week  ──►  .coach/proposals/<id>.json (+ .proposed.json)  ──�
    set on a loaded mode with a null load, the `no_data` case) adds
    `propose.CALIBRATION_NOTE` after any scheme note, joined by ` · `: pick
    a load expected to fit the target reps within the RPE shown, then
-   adjust after the first working set. It names no number. For an athlete
+   adjust after the first working set. It names no number. A line that
+   keeps an override (C25) for a lift with no logged exposure in its load
+   mode adds `propose.CALIBRATION_SET_NOTE` the same way. For an athlete
    whose `[athlete] experience` is `beginner`, each session's first line
    in `total`, `per_hand_x2` or `single_implement` mode that has no
    warm-up sets adds `propose.RAMP_NOTE`, a qualitative ramp with no
@@ -3353,7 +3355,12 @@ flags}` with `text` from `units.format_load` for the coach's brief and
 `flags` the codes of the line's open flags (a first-load flag only on its
 own date). The overlay
 id follows C10. `data.lines_digest` (R-21b) is the C7 canonical hash of
-`data.lines`; `propose show` returns it too.
+`data.lines`; `propose show` returns it too. `data.approved_guidance` is
+null except for a `--kind midweek` run, where it reports the guidance
+carried from the approved overlay in force (C25): `kept` rows
+(`session_id`, `date`, `exercise_id`, `overlay_id`, `fields`), `review`
+rows (the same ids and `approved`, each field with the overlay's text)
+and `focus` (`overlay_id`, `text`, `kept`, or null).
 
 - `propose override --proposal ID --session S --exercise E (--sets SPEC | --load N) --reason TEXT [--date D | --standing [--until D]]`
   changes the slot's line on every date, or with `--date` only that
@@ -3367,9 +3374,11 @@ id follows C10. `data.lines_digest` (R-21b) is the C7 canonical hash of
   `CALIBRATION_NOTE`, that part of its `target_note` becomes
   `CALIBRATION_SET_NOTE` (adjust after the first working set; still no
   number), and back if a load is null again; other note text stays.
-- `propose note --proposal ID (--week-focus TEXT | --session S --exercise E [--target-note TEXT] [--focus TEXT] [--cues TEXT]) [--dry-run]`
-  sets the draft's week `focus`, or athlete guidance on every line of
-  one slot; an empty line field clears it to null. Text is one line; on a
+- `propose note --proposal ID [--week-focus TEXT] [--session S --exercise E [--target-note TEXT] [--focus TEXT] [--cues TEXT]] [--dry-run]`
+  sets the draft's week `focus`, athlete guidance on every line of one
+  slot, or both in one call (exit 2 with neither, or unless a line
+  field, `--session` and `--exercise` come together); an empty line
+  field clears it to null. Text is one line; on a
   `per_hand_x2` line it passes C13 load-statement validation (exit 1).
   Output: `id`, `focus`, `lines` (`session_id`, `date`, `exercise_id`,
   `target_note`, `focus`, `cues`) and `written`. Guidance is not a
@@ -3616,7 +3625,17 @@ constrained mode) stay coach-built through `overlay build`.
   steps they have not had: decay when the approved line had none, and a
   run's transform unless the approved overlay was a `deload`; a deload
   overlay's override is kept only by a run with a transform. The line
-  raises `override_kept`.
+  raises `override_kept`. The same run keeps the coach's athlete
+  guidance from that overlay, with or without an override: each guidance
+  field of the line that differs from the overlay's untouched proposal
+  (`.proposed.json`, C24; an override's calibration rewording counts as
+  the proposal's text), and the week focus when the coach changed it. It
+  goes onto the same session, date and exercise of the draft only, so
+  a rebuild carries it as an edit and a note the coach cleared stays
+  cleared. Without that proposal file, or under a transform, nothing is
+  copied: guidance that differs from the new line, and a focus that is
+  not one `propose week` writes, go to `approved_guidance.review` for
+  the coach to re-apply with `propose note`.
 - Standing overrides need an `until` date, default four weeks after
   `made_at`, at most eight. Renewing one is another `propose override
   --standing`: the newest active decision for a scope wins.

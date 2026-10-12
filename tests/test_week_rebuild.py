@@ -429,7 +429,7 @@ class GuidanceTest(unittest.TestCase):
     def test_program_week_rebuilds_after_a_structural_edit_and_discards_stale_drafts(self):
         compute = flat(step_text("program-week", "compute.md"))
         for phrase in ("python3 -m coach propose rebuild --proposal <id>", "python3 -m coach propose discard",
-                       "less any session trained today", "keeping each override approved for them"):
+                       "less any session trained today", "with their approved overrides and guidance"):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, compute)
         write = flat(step_text("program-week", "write.md"))

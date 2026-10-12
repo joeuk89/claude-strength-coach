@@ -9,7 +9,7 @@ Run `python3 -m coach history sync`, then the proposal for the mode:
 
 - **normal:** `python3 -m coach propose week --week <label>`.
 - **midweek:** the same with `--kind midweek`: only the days left, less any session trained
-  today, keeping each override approved for them; settle a missed session first (midweek.md).
+  today, with their approved overrides and guidance; settle a missed session first (midweek.md).
 - **light:** the `command` that `block decide` printed for the light week
   the check-in agreed. Standalone, with no light week agreed in `state
   show`, run the command it would print: `python3 -m coach propose week
