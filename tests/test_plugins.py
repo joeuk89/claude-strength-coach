@@ -20,9 +20,9 @@ SHIPPED = {
     "conditioning": ["circuit_rounds", "emom_density"],
 }
 R23A_CODES = {"prescription_unknown": ("warn",), "linear_below_start": ("info",), "no_data": ("warn",),
-              "stalled": ("warn",), "rpe_drift": ("warn",), "return_week": ("info",),
-              "return_after_illness": ("warn",), "constraint_applied": ("info",), "override_standing": ("info",),
-              "scheme_reset": ("warn",), "rotation_unconfirmed": ("warn",)}
+              "stalled": ("warn",), "rpe_drift": ("warn",), "range_effort_mismatch": ("warn",),
+              "return_week": ("info",), "return_after_illness": ("warn",), "constraint_applied": ("info",),
+              "override_standing": ("info",), "scheme_reset": ("warn",), "rotation_unconfirmed": ("warn",)}
 
 FIXED_LOAD_PLUGIN = '''
 """A synthetic scheme that proposes one load from its params."""

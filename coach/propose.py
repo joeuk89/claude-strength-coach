@@ -29,7 +29,7 @@ from coach.plugins import base
 KINDS = ("weekly", "midweek", "deload")
 DECAY_AFTER_DAYS = validity.RETURN_BANDS[0].upper
 STALL_EXPOSURES = 3
-_SET_SPEC = re.compile(r"^\s*(\d+)\s*[x×]\s*(\d+)(?:\s*-\s*(\d+))?\s*(?:@\s*(\d+(?:\.\d+)?))?\s*"
+_SET_SPEC = re.compile(r"^\s*(\d+)\s*[x×]\s*(\d+)(?:\s*-\s*(\d+))?\s*(s)?\s*(?:@\s*(\d+(?:\.\d+)?))?\s*"
                        r"(?:rpe\s*(\d+(?:\.\d+)?))?\s*$", re.IGNORECASE)
 
 
@@ -108,20 +108,42 @@ def sets_text(sets, mode, unit):
 
 
 def parse_sets(spec):
-    """Working sets from a SPEC like "3x5@100 rpe7, 1x5@90" (a range: "3x8-10@25 rpe8")."""
-    found = []
+    """Working sets from a SPEC like "3x5@100 rpe7, 1x5@90", a range "3x8-10@25 rpe8", or seconds "2x35s rpe7"."""
+    found, timed = [], set()
     for part in spec.split(","):
         match = _SET_SPEC.fullmatch(part)
         if not match:
-            raise UsageError(f"--sets: {part.strip()!r} is not COUNTxREPS[-REPS][@LOAD][ rpeN], e.g. 3x5@100 rpe7")
-        count, reps, top, load, rpe = match.groups()
+            raise UsageError(f"--sets: {part.strip()!r} is not COUNTxREPS[-REPS][@LOAD][ rpeN] or COUNTxSECONDSs"
+                             f"[ rpeN], e.g. 3x5@100 rpe7 or 2x35s rpe7")
+        count, reps, top, seconds, load, rpe = match.groups()
         rep_range = (int(reps), int(top)) if top else None
+        if seconds and (rep_range or load):
+            raise UsageError(f"--sets: {part.strip()!r} gives a timed set a {'range' if rep_range else 'load'}; "
+                             f"a timed set takes one duration and no load, e.g. 2x35s rpe7")
         if rep_range and rep_range[0] > rep_range[1]:
             raise UsageError(f"--sets: {part.strip()!r} has a range that ends below its start")
-        found += [base.SetSpec(type="normal", reps=None if rep_range else int(reps), rep_range=rep_range,
-                               rpe=units.json_number(float(rpe)) if rpe else None,
+        timed.add(bool(seconds))
+        rpe = units.json_number(float(rpe)) if rpe else None
+        if seconds:
+            found += [base.SetSpec(type="normal", duration_seconds=int(reps), rpe=rpe)] * int(count)
+            continue
+        found += [base.SetSpec(type="normal", reps=None if rep_range else int(reps), rep_range=rep_range, rpe=rpe,
                                load=units.json_number(float(load)) if load else None)] * int(count)
+    if len(timed) > 1:
+        raise UsageError(f"--sets: {spec.strip()!r} mixes reps and seconds; give one or the other")
     return tuple(found)
+
+
+def _metric_problem(exercise_id, mode, sets):
+    """Why `sets` do not fit a line of `mode`: seconds go on a duration line only, and nothing on a distance line."""
+    if mode == "distance":
+        return f"{exercise_id} is a distance line, and --sets takes reps or seconds, not a distance"
+    timed = any(s.duration_seconds is not None for s in sets if s.working)
+    if mode == "duration" and not timed:
+        return f'{exercise_id} is a duration line, so --sets takes seconds, e.g. "2x35s rpe7"'
+    if mode != "duration" and timed:
+        return f"{exercise_id} is {mode}, not a duration line, so --sets takes reps, not seconds"
+    return None
 
 
 def _on_grid(value, increment, direction, anchor):
@@ -606,6 +628,7 @@ def _exercise_info(run, session, exercise):
         muscles=entry.get("muscles", {}), equipment=entry.get("equipment"), load_mode=mode,
         increment=run.increment(exercise_id, session["location"]), is_compound=patterns.is_compound(entry),
         load_direction=-1 if mode == "assisted" else 1, e1rm_supported=e1rm_supported(exercise_id),
+        is_isolation=patterns.is_isolation(entry),
     )
 
 
@@ -1080,6 +1103,9 @@ def override(root, config, proposal_id, session_id, exercise_id, new_sets, load,
         before = (line.get("override") or {}).get("proposed_sets") or (original or line)["sets"]
         current = tuple(base.SetSpec.from_dict(s) for s in line["sets"])
         if new_sets is not None:
+            problem = _metric_problem(exercise_id, line["load_mode"], new_sets)
+            if problem:
+                raise ValidationError(problem)
             sets = tuple(s for s in current if not s.working) + new_sets
         else:
             sets = base.with_load(current, load)

@@ -39,15 +39,17 @@ Run `python3 -m coach history sync`, then the proposal for the mode:
 `propose week` plans the span's dated sessions with the program's
 schedule rule and asks each exercise's progression scheme for its line,
 in the athlete's units and the load mode's own number. Each scheme reads
-the log: top of the rep range at or under target RPE adds the
-increment, missed reps hold, and loads never derive from an open
-convention slip. The core then decays a lift past its validity window
-to its return band, caps every set of the first session after illness
-at RPE 7, applies the slot's load constraints and the caps and kit at
-the session's location, and rounds each load to the kit. It writes an
-editable draft (`.coach/proposals/<id>.json`) and prints `data.lines`:
-per line its sets (loads through `units format`), the `change`, a
-one-sentence `rationale` and its flags.
+the log: double progression keeps the program's rep range and target
+RPE and adds the increment once every set reaches the top of the range
+(at or under target RPE, except uncapped isolation work), missed reps
+hold, and loads never derive from an open convention slip. The core
+then decays a lift past its validity window to its return band, caps
+every set of the first session after illness at RPE 7, applies the
+slot's load constraints and the caps and kit at the session's location,
+and rounds each load to the kit. It writes an editable draft
+(`.coach/proposals/<id>.json`) and prints `data.lines`: per line its
+sets (loads through `units format`), the `change`, a one-sentence
+`rationale` and its flags.
 
 ## 2. Read every line against the check-in
 
@@ -59,6 +61,11 @@ and the rotation position, and settle its flags:
   back off. RPE drift alone never holds back isolation work: it
   progresses on reps as the scheme says, unless the athlete's notes
   report pain or form breakdown.
+- `range_effort_mismatch` (a held double-progression line whose last
+  exposure fell below the rep range or 2 or more RPE over target):
+  agree a lighter load or a different rep range with the athlete and
+  override the line, or resolve the flag with the reason the load
+  stands (step 4).
 - `convention_slip`: an exact 2× jump at unchanged reps and RPE is a
   convention slip, not progress. Raise it with the athlete.
 - `return_week`, `return_after_illness`: in a return week the matching
@@ -93,12 +100,13 @@ and the rotation position, and settle its flags:
 
 Run `python3 -m coach propose override --proposal <id> --session
 <session> --exercise <exercise> (--sets "3x5@95 rpe7" | --load <n>)
---reason "<why>"`. Add `--standing` (and `--until <date>`, eight weeks
-at most; four by default) when the change should hold in later weeks —
-a niggle, an agreed hold — so the scheme stops proposing it away. A
-per-exercise **focus** drawn from check-in findings ("slow the
-eccentric") may go into the draft line, with an `override` reason
-saying why; any line changed without a reason is refused.
+--reason "<why>"`; a timed hold takes seconds, `--sets "2x35s rpe7"`.
+Add `--standing` (and `--until <date>`, eight weeks at most; four by
+default) when the change should hold in later weeks — a niggle, an
+agreed hold — so the scheme stops proposing it away. A per-exercise
+**focus** drawn from check-in findings ("slow the eccentric") may go
+into the draft line, with an `override` reason saying why; any line
+changed without a reason is refused.
 
 Niggle limits are already in the proposal: `propose week` applies each
 active niggle's constraints to every matching line and names the niggle

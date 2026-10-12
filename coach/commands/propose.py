@@ -43,7 +43,8 @@ def show(args, ctx):
     args=(_PROPOSAL,
           arg("--session", required=True, metavar="S", help="program session id"),
           arg("--exercise", required=True, metavar="E", help="library exercise id"),
-          arg("--sets", metavar="SPEC", help='working sets, e.g. "3x5@100 rpe7" or "1x5@100 rpe8, 3x5@90 rpe7"'),
+          arg("--sets", metavar="SPEC", help='working sets, e.g. "3x5@100 rpe7" or "1x5@100 rpe8, 3x5@90 rpe7"; '
+                                             'seconds for a duration line, e.g. "2x35s rpe7"'),
           arg("--load", type=float, metavar="N", help="one load for every working set (athlete units, per hand for "
                                                       "per-hand modes)"),
           arg("--reason", required=True, metavar="TEXT", help="why the line changes"),

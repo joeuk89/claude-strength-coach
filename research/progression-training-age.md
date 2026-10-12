@@ -3,8 +3,8 @@ schema_version = 1
 id = "progression-training-age"
 topic = "Progression by training age"
 question = "How fast can load rise for beginner, intermediate and advanced lifters, and which progression scheme suits each?"
-written = 2026-10-11
-review_by = 2027-10-11
+written = 2026-10-12
+review_by = 2027-10-12
 confidence = "low"
 applies_to = ["progression", "autoregulation"]
 tags = ["training-age"]
@@ -68,8 +68,8 @@ status = "current"
 
 [[claims]]
 n = 2
-text = "Raise the load once the lifter beats the current load with reps to spare: double progression adds the program's increment when every working set reaches the top of the rep range at or under the target RPE."
-basis = "consensus"
+text = "Raise the load once the lifter beats the current load: double progression holds the load at the program's rep range and target RPE, and adds the program's increment when every working set reaches the top of the range, at or under the target RPE for all but isolation work without a recovery cap."
+basis = "heuristic"
 sources = ["acsm-2009"]
 status = "current"
 
@@ -124,12 +124,12 @@ status = "current"
 -->
 <!-- coach:begin research progression-training-age -->
 
-**Template note** · written 2026-10-11 · review by 2027-10-11 · confidence low · areas progression, autoregulation · tags training-age
+**Template note** · written 2026-10-12 · review by 2027-10-12 · confidence low · areas progression, autoregulation · tags training-age
 
 | # | Claim | Basis | Sources | Status |
 | --- | --- | --- | --- | --- |
 | 1 | Strength comes fastest to untrained lifters and slows as training age rises, and trained lifters need heavier loads to keep progressing. | evidence | rhea-2003, acsm-2009 | current |
-| 2 | Raise the load once the lifter beats the current load with reps to spare: double progression adds the program's increment when every working set reaches the top of the rep range at or under the target RPE. | consensus | acsm-2009 | current |
+| 2 | Raise the load once the lifter beats the current load: double progression holds the load at the program's rep range and target RPE, and adds the program's increment when every working set reaches the top of the range, at or under the target RPE for all but isolation work without a recovery cap. | heuristic | acsm-2009 | current |
 | 3 | Beginners, with under about 6 months of consistent training, can add load from one session to the next or week to week, so their main lifts suit the linear scheme or double progression. | heuristic | acsm-2009, rhea-2003 | current |
 | 4 | Intermediate lifters, with about 6 months to a few years of consistent training, progress week to week or across a 3-week wave, so their main lifts suit double progression, the 3-week wave or the RPE-anchored scheme. | heuristic | acsm-2009 | current |
 | 5 | Advanced lifters, with years of consistent training, progress over blocks of several weeks rather than week to week, so their main lifts suit the RPE-anchored scheme. | heuristic | acsm-2009 | current |
@@ -171,9 +171,16 @@ advance.
 
 **Claim 2.** The 2009 ACSM position stand recommends "that 2-10% increase
 in load be applied when the individual can perform the current workload
-for one to two repetitions over the desired number". Double progression
-is that rule in scheme form: reps rise within a range, and reaching the
-top at or under the target RPE triggers the smallest available load step.
+for one to two repetitions over the desired number". That supports
+earned progression in general: reps rise within a range, and reaching
+the top triggers the smallest available load step. The rest of the claim
+is coaching policy, so the claim is a heuristic. No evidence sets an
+exact rule mapping logged RPE to the next rep target or load, so the
+scheme does not demand a fixed extra rep: it restates the range and
+target RPE and flags work below the range or 2 or more RPE over target
+for the coach to review. Requiring every set at or under the target RPE
+before a load step, and dropping that requirement for isolation work
+without a recovery cap, are framework choices, not research findings.
 The ACSM figure is a consensus recommendation, not a trial result.
 
 **Claims 3–5.** No trial compares how fast load can rise at each training

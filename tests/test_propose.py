@@ -131,7 +131,7 @@ class ValidWeekTest(ProposeCase):
     def test_lines_quote_loads_through_units(self):
         data = self.propose("--dry-run")
         bench = next(row for row in data["lines"] if row["exercise_id"] == "db_bench_press")
-        self.assertEqual(bench["text"], "3×8 @ 24.5/hand (Hevy: 49) RPE 8")
+        self.assertEqual(bench["text"], "3×8–10 @ 24.5/hand (Hevy: 49) RPE 8")
         self.assertEqual(bench["change"], "25/hand (Hevy: 50) → 24.5/hand (Hevy: 49)")
         self.assertEqual(set(bench), {"session_id", "date", "exercise_id", "text", "change", "rationale", "flags"})
 
@@ -172,11 +172,11 @@ class ValidWeekTest(ProposeCase):
 class DoubleProgressionTest(ProposeCase):
     workouts = staticmethod(edit_sets(BENCH, lambda wid, i, s: s.update(weight_kg=48.0)))
 
-    def test_top_of_the_range_adds_the_increment_and_drops_to_the_bottom(self):
+    def test_top_of_the_range_adds_the_increment_and_keeps_the_program_range_and_rpe(self):
         line = find_line(self.propose("--dry-run")["overlay"], "db_bench_press")
         for set_ in working(line):
-            self.assertEqual(set_["reps"], 8)
-            self.assertIsNone(set_.get("rep_range"))
+            self.assertIsNone(set_.get("reps"))
+            self.assertEqual((set_["rep_range"], set_["rpe"]), ({"start": 8, "end": 10}, 8))
             self.assertEqual(set_["load"], units.make_load(26, "per_hand_x2", "kg"))
 
 
@@ -189,9 +189,10 @@ class DoubleProgressionShortTest(ProposeCase):
                 set_["reps"] = 9
         edit_sets(BENCH, change)(found)
 
-    def test_one_set_short_holds_the_load_and_adds_a_rep(self):
+    def test_one_set_short_holds_the_load_at_the_program_range(self):
         line = find_line(self.propose("--dry-run")["overlay"], "db_bench_press")
-        self.assertEqual({(s["reps"], coaching(s["load"])) for s in working(line)}, {(10, 24)})
+        self.assertEqual({(s["rep_range"]["start"], s["rep_range"]["end"], s["rpe"], coaching(s["load"]))
+                          for s in working(line)}, {(8, 10, 8, 24)})
 
 
 class DoubleProgressionAfterOwnOverlayTest(ProposeCase):
@@ -214,10 +215,57 @@ class DoubleProgressionAfterOwnOverlayTest(ProposeCase):
         self.cache(edit=edit_sets(BENCH, lambda wid, i, s: s.update(weight_kg=48.0, reps=8), workout_ids=(W[3],)))
         self.sync()
 
-    def test_the_bottom_of_the_range_holds_the_load_and_adds_a_rep(self):
-        line = find_line(self.propose("--dry-run")["overlay"], "db_bench_press")
-        self.assertEqual({(s["reps"], coaching(s["load"])) for s in working(line)}, {(9, 24)})
+    def test_the_bottom_of_the_range_holds_the_load_at_the_program_range(self):
+        doc = self.propose("--dry-run")["overlay"]
+        line = find_line(doc, "db_bench_press")
+        self.assertEqual({(s["rep_range"]["start"], s["rep_range"]["end"], coaching(s["load"])) for s in working(line)},
+                         {(8, 10, 24)})
         self.assertIn("short of the top of the range", line["provenance"]["rationale"])
+        self.assertNotIn("range_effort_mismatch", codes(doc, "db_bench_press"))
+
+
+class DoubleProgressionEffortCase(ProposeCase):
+    """The 8–10 @8 bench slot as `exercise_id`, last logged 3×10 at 24/hand and RPE 8, 9 and 9.5.
+
+    `db_curl` matches `db_bench_press` in load mode and increment, so only
+    the library pattern separates the two outcomes.
+    """
+
+    synced = False
+    exercise_id = "db_bench_press"
+
+    def setUp(self):
+        super().setUp()
+        for path in (self.root / "data").rglob("*.json"):
+            text = path.read_text(encoding="utf-8")
+            path.write_text(text.replace('"db_bench_press"', f'"{self.exercise_id}"'), encoding="utf-8")
+        rpes = (8, 9, 9.5)
+        self.cache(edit=edit_sets(BENCH, lambda wid, i, s: s.update(weight_kg=48.0, rpe=rpes[i]), workout_ids=(W[3],)))
+        self.sync()
+
+    def proposed(self):
+        doc = self.propose("--dry-run")["overlay"]
+        line = find_line(doc, self.exercise_id)
+        return line, {coaching(s["load"]) for s in working(line)}, codes(doc, self.exercise_id)
+
+
+class DoubleProgressionCompoundEffortTest(DoubleProgressionEffortCase):
+    def test_rpe_over_target_holds_a_compound_line(self):
+        line, loads, flags = self.proposed()
+        self.assertEqual(loads, {24})
+        self.assertIn("over the target RPE 8", line["provenance"]["rationale"])
+        self.assertNotIn("range_effort_mismatch", flags)
+
+
+class DoubleProgressionIsolationEffortTest(DoubleProgressionEffortCase):
+    exercise_id = "db_curl"
+
+    def test_rpe_over_target_adds_the_increment_to_a_library_isolation_line(self):
+        line, loads, _ = self.proposed()
+        self.assertEqual(loads, {26})
+        self.assertIn("RPE 9.5 over the target RPE 8 does not hold isolation work", line["provenance"]["rationale"])
+        self.assertEqual({(s["rep_range"]["start"], s["rep_range"]["end"], s["rpe"]) for s in working(line)},
+                         {(8, 10, 8)})
 
 
 class LinearTest(ProposeCase):
