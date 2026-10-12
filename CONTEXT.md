@@ -435,14 +435,14 @@ _Avoid_: dashboard, summary, this-week doc
 
 **Dashboard**:
 The instance's `README.md`, rendered: where the instance stands this
-week (the brief's header line, the block, the last check-in, open flags),
-the week's sessions, a progress summary and links. The page GitHub shows
-first on a phone.
+week (the brief's header line, the block, the last check-in, consistency),
+the week's sessions, what to watch, a progress summary and links. The page
+GitHub shows first on a phone.
 _Avoid_: home page, status page, session-start status (what the coach sees)
 
 **Progress page**:
-`progress.md`, rendered: the best e1RM of each lift with its date, the
-core-complete streak, and bodyweight by week.
+`progress.md`, rendered: the best e1RM of each lift with its date,
+consistency week by week, the core-complete streak, and bodyweight by week.
 _Avoid_: stats page, PR list
 
 **Session sheets**:
@@ -460,6 +460,13 @@ in chat, one line each, written by the coach with `log add`. Append-only;
 a correction is a void line plus a new entry. History reads it like the
 Hevy log.
 _Avoid_: training diary, journal, log entry (a workout is the thing logged)
+
+**Consistency**:
+What the dashboard leads with: planned sessions trained of those
+planned over the last four completed ordinary weeks, the adherence
+count, with the weeks it left out and why. Fewer ordinary weeks show as
+a shorter count, never as misses.
+_Avoid_: adherence score, success rate, streak
 
 **Core-complete week**:
 A week in which every planned core session was trained, logged or not,

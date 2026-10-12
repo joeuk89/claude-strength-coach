@@ -11,7 +11,18 @@ e1RM is an estimated one-rep max worked out from logged working sets, to the nea
 | Bench Press (Dumbbell) | 35/hand | 12 Oct 2026 | 35/hand | — |
 | Single Arm Row (Dumbbell) | 42 | 1 Oct 2026 | 42 | — |
 
+## Consistency
+
+4 of 4 planned sessions trained in 2 completed ordinary weeks (28 Sep – 11 Oct); a full count takes 4. Coach-led sessions count; optional sessions, sessions on a planned break and sessions the trainer cancelled do not.
+
+| Week of | Trained | Counted |
+|---|---|---|
+| 28 Sep 2026 | 2 of 2 | yes |
+| 5 Oct 2026 | 2 of 2 | yes |
+
 ## Core-complete weeks
+
+A stricter count than consistency: a week counts only when every core session was trained and no coach-led session was missed.
 
 Current streak: 0 weeks · longest: 0 weeks
 

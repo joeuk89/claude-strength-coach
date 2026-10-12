@@ -4,7 +4,7 @@
 - **Week of 12 Oct** · Check-in due Sun 18 Oct (deep)
 - Block 1 · 2 of 6 hard weeks · triggers 0 of 4 · light week: not due
 - Last check-in: [Sun 11 Oct (weekly)](check-ins/2026-10-11.md)
-- Open flags: none
+- Consistency: 4 of 4 planned sessions trained in 2 completed ordinary weeks (28 Sep – 11 Oct); a full count takes 4
 - Updated Wed 14 Oct 18:00 (UTC)
 
 | Day | Session | Tier | Key | Done |
@@ -12,12 +12,16 @@
 | Mon 12 | Session A | core | Back Squat 3×5 @ 100 kg | ✔ |
 | Thu 15 | Session B | core | Single Arm Row 3×10 @ 30 |  |
 
+## Watch
+
+- Nothing flagged.
+
 ## Progress
 
 - Best e1RM (estimated one-rep max): Back Squat 127 kg (12 Oct 2026)
 - Best e1RM: Bench Press 35 kg/hand (12 Oct 2026)
 - Best e1RM: Single Arm Row 42 kg (1 Oct 2026)
-- Core-complete streak: 0 weeks (longest 0 weeks)
+- Core-complete streak (weeks with every core session trained): none counted yet
 
 ## Links
 

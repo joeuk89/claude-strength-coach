@@ -153,7 +153,7 @@ class WatchTest(WeekCase):
         self.set_light_week(status="not_due")
         self.assertEqual(section(self.brief(MONDAY), "Watch"), ["- Nothing flagged."])
         dashboard = self.coach("pages", "show", "dashboard", now=MONDAY)["data"]["text"]
-        self.assertIn("- Open flags: none", dashboard)
+        self.assertEqual(section(dashboard, "Watch"), ["- Nothing flagged."])
         history = read_json(self.root / "data" / "niggles.json")["niggles"][0]["history"]
         self.assertEqual([e["status"] for e in history], ["watching", "resolved"])
         self.assertEqual((self.read("data/niggles.json"), self.read(f"data/overlays/{WEEKLY}.json")),

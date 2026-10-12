@@ -17,7 +17,7 @@ from unittest import mock
 import coach.checks
 import coach.commands
 import coach.page_parts
-from coach import history, pages, stats, status, units
+from coach import history, pages, stats, status, structure, units
 from tests.support import INSTANCES, REPO_ROOT, run_cli
 from tests.support.config_edit import apply
 from tests.support.git import GLOBAL_CONFIG
@@ -429,7 +429,7 @@ class ProgressTest(PagesCase):
         squat = next(line for line in text.splitlines() if line.startswith("| Back Squat (Barbell) |"))
         self.assertIn(f"| {units.whole(best['e1rm'])} | {pages._long_date(best['date'])} |", squat)
         self.assertIn("no bodyweight recorded yet", text.lower())
-        self.assertEqual(headings(text), ["Lifts", "Core-complete weeks", "Bodyweight"])
+        self.assertEqual(headings(text), ["Lifts", "Consistency", "Core-complete weeks", "Bodyweight"])
 
     def test_bodyweight_from_the_hevy_cache_as_weekly_means(self):
         (self.root / "data" / "nutrition" / "readings.json").unlink()
@@ -466,8 +466,11 @@ class StreakTest(PagesCase):
         return moved
 
     def streak_line(self):
+        """The streak section after the line that labels it the stricter count."""
         self.render()
-        return section(self.page("progress.md"), "Core-complete weeks")
+        lines = section(self.page("progress.md"), "Core-complete weeks")
+        self.assertTrue(lines[0].startswith("A stricter count than consistency"), lines[0])
+        return lines[1:]
 
     def test_two_complete_weeks_make_a_streak_and_a_win(self):
         lines = self.streak_line()
@@ -475,11 +478,11 @@ class StreakTest(PagesCase):
         self.assertTrue(lines[1].endswith("oldest first: ✗ ✔ ✔"), lines[1])
         wins = section(self.page("this-week.md"), "Wins")
         self.assertEqual(len(wins), 3)
-        self.assertIn("- Core-complete streak: 2 weeks", wins)
+        self.assertIn("- Core-complete streak: 2 weeks with every core session trained", wins)
         self.render("--only", "brief", env={"COACH_NOW": "2026-10-11T18:00:00Z"})
         self.assertEqual(section(self.page("this-week.md"), "Wins"), [
             "- New best e1RM (estimated one-rep max): Back Squat 122 kg (Mon 5 Oct)",
-            "- Core-complete streak: 2 weeks",
+            "- Core-complete streak: 2 weeks with every core session trained",
             "- Every core session trained last week (2 of 2)"])
 
     def test_an_unannotated_coach_led_session_does_not_break_it(self):
@@ -527,6 +530,192 @@ class StreakTest(PagesCase):
             program["sessions"].append(optional)
         self.edit_json("data/program.json", add_optional)
         self.assertEqual(self.streak_line()[0], "Current streak: 2 weeks · longest: 2 weeks")
+
+
+W44 = "2026-10-26T18:00:00Z"
+COACH_LED = [{"id": "pt-tue", "title": "PT", "weekday": "tue", "estimated_sets": {}},
+             {"id": "class-wed", "title": "Class", "weekday": "wed", "estimated_sets": {}},
+             {"id": "class-sat", "title": "Weekend class", "weekday": "sat", "estimated_sets": {}}]
+FOUR_WEEKS = ("2026-09-28", "2026-10-05", "2026-10-12", "2026-10-19")
+
+
+class ConsistencyTest(PagesCase):
+    """The dashboard leads with completed-week consistency (C38 over C41 adherence) and shows the shared Watch.
+
+    Four completed weeks from the adoption on 28 Sep, each planning Session A (Mon), Session B (Thu) and three
+    coach-led sessions: PT (Tue) and a class (Wed) done, a weekend class (Sat) not done, so 4 of 5 a week.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.edit_json("data/program.json", lambda p: p.update(external_sessions=copy.deepcopy(COACH_LED)))
+        self.notes, self.ids = [], 0
+        for start in FOUR_WEEKS:
+            monday = date.fromisoformat(start)
+            for offset, external_id, done in ((1, "pt-tue", True), (2, "class-wed", True), (5, "class-sat", False)):
+                self.note("external", monday + timedelta(days=offset), external_id=external_id, done=done)
+        for day, session_id in (("2026-10-15", "session-b"), ("2026-10-19", "session-a"),
+                                ("2026-10-22", "session-b")):
+            self.note("trained_unlogged", date.fromisoformat(day), session_id=session_id)
+
+    def note(self, kind, day, created=None, **fields):
+        self.ids += 1
+        self.notes.append(dict({"id": f"a-{self.ids:04d}", "kind": kind,
+                                "created_at": created or f"{day.isoformat()}T20:00:00Z", "source": "check-in",
+                                "reason": None, "date": day.isoformat()}, **fields))
+        write_json(self.root / "data" / "history" / "annotations.json",
+                   {"schema_version": 2, "annotations": self.notes})
+
+    def drop_note(self, day, key, value):
+        self.notes = [n for n in self.notes if not (n["date"] == day and n.get(key) == value)]
+
+    def dashboard(self, now=W44):
+        self.render(env={"COACH_NOW": now})
+        return self.page("README.md")
+
+    def status(self, text):
+        lines = text.splitlines()
+        return [line for line in lines[:lines.index("| Day | Session | Tier | Key | Done |")] if line.startswith("- ")]
+
+    def consistency(self, text):
+        return next(line for line in self.status(text) if line.startswith("- Consistency: "))
+
+    def adherence(self, now=W44):
+        """C41 adherence up to the end of the week before the brief's, which is what the dashboard reads."""
+        today = date.fromisoformat(now[:10])
+        return structure.adherence(self.root, today - timedelta(days=today.weekday() + 1), today=today)
+
+    def test_four_ordinary_weeks_of_four_in_five_lead_with_sixteen_of_twenty(self):
+        text = self.dashboard()
+        self.assertEqual(self.consistency(text), "- Consistency: 16 of 20 planned sessions trained in the last 4 "
+                                                 "completed ordinary weeks (28 Sep – 25 Oct)")
+        self.assertNotIn("Open flags", text)
+        found = self.adherence()
+        self.assertEqual((found["trained"], found["planned"], found["pct"]), (16, 20, 80))
+        self.assertIn("- Core-complete streak (weeks with every core session trained): 0 weeks (longest 0 weeks)",
+                      section(text, "Progress"))
+        self.assertNotIn("streak", "\n".join(self.status(text)).lower())
+        progress = section(self.page("progress.md"), "Consistency")
+        self.assertTrue(progress[0].startswith("16 of 20 planned sessions trained in the last 4 completed ordinary "
+                                               "weeks (28 Sep – 25 Oct)."), progress[0])
+        self.assertEqual(progress[3:], ["| 28 Sep 2026 | 4 of 5 | yes |", "| 5 Oct 2026 | 4 of 5 | yes |",
+                                        "| 12 Oct 2026 | 4 of 5 | yes |", "| 19 Oct 2026 | 4 of 5 | yes |"])
+        strict = section(self.page("progress.md"), "Core-complete weeks")
+        self.assertTrue(strict[0].startswith("A stricter count than consistency"), strict[0])
+        self.assertIn("Current streak: 0 weeks · longest: 0 weeks", strict)
+
+    def test_two_completed_weeks_show_the_actual_sample_and_this_week_apart(self):
+        text = self.dashboard(NOW)
+        self.assertEqual(self.consistency(text), "- Consistency: 8 of 10 planned sessions trained in 2 completed "
+                                                 "ordinary weeks (28 Sep – 11 Oct); a full count takes 4")
+        self.assertNotIn("%", self.consistency(text))
+        self.assertIn("| Mon 12 | Session A | core | Back Squat 3×5 @ 100 kg | ✔ |", text.splitlines())
+        self.assertIn("| Tue 13 | PT | coach-led |  | ✔ |", text.splitlines())
+
+    def test_a_week_before_the_program_was_adopted_is_not_a_miss(self):
+        self.edit_json("data/program.json", lambda p: p.update(external_sessions=[]))
+        found = self.adherence(NOW)
+        self.assertEqual([w["week"] for w in found["weeks"]], ["2026-09-28", "2026-10-05"])
+        self.assertEqual(self.consistency(self.dashboard(NOW)),
+                         "- Consistency: 4 of 4 planned sessions trained in 2 completed ordinary weeks "
+                         "(28 Sep – 11 Oct); a full count takes 4")
+
+    def test_illness_is_left_out_a_cancellation_is_not_planned_and_a_moved_session_counts_once(self):
+        self.drop_note("2026-10-15", "session_id", "session-b")
+        self.note("miss", date(2026, 10, 15), session_id="session-b", tag="ill")
+        self.drop_note("2026-10-24", "external_id", "class-sat")
+        self.note("external", date(2026, 10, 24), external_id="class-sat", done=False,
+                  cancellation={"by": "trainer", "reason": "trainer off sick"})
+        self.drop_note("2026-10-22", "session_id", "session-b")
+        self.note("trained_unlogged", date(2026, 10, 23), session_id="session-b")
+        found = self.adherence()
+        self.assertEqual((found["trained"], found["planned"]), (12, 14))
+        self.assertEqual([(s["week"], s["kind"]) for s in found["skipped"]], [("2026-10-12", "illness")])
+        text = self.dashboard()
+        self.assertEqual(self.consistency(text),
+                         "- Consistency: 12 of 14 planned sessions trained in 3 completed ordinary weeks "
+                         "(28 Sep – 25 Oct); a full count takes 4; left out: week of 12 Oct (illness)")
+        rows = section(self.page("progress.md"), "Consistency")[3:]
+        self.assertEqual(rows, ["| 28 Sep 2026 | 4 of 5 | yes |", "| 5 Oct 2026 | 4 of 5 | yes |",
+                                "| 12 Oct 2026 | 3 of 5 | left out: illness |", "| 19 Oct 2026 | 4 of 4 | yes |"])
+
+    def test_a_planned_break_week_is_left_out_with_its_reason(self):
+        for day, key, value in (("2026-10-19", "session_id", "session-a"), ("2026-10-22", "session_id", "session-b"),
+                                ("2026-10-20", "external_id", "pt-tue"), ("2026-10-21", "external_id", "class-wed"),
+                                ("2026-10-24", "external_id", "class-sat")):
+            self.drop_note(day, key, value)
+        self.coach("status-days", "add", "--kind", "travel", "--from", "2026-10-19", "--to", "2026-10-25",
+                   "--note", "Holiday, no gym", "--no-training", env={"COACH_NOW": "2026-10-18T09:00:00Z"})
+        self.assertEqual(self.consistency(self.dashboard()),
+                         "- Consistency: 12 of 15 planned sessions trained in 3 completed ordinary weeks "
+                         "(28 Sep – 18 Oct); a full count takes 4; left out: week of 19 Oct (planned break)")
+
+    def test_more_than_three_left_out_weeks_are_counted_by_kind(self):
+        self.notes = [n for n in self.notes if n["date"] >= "2026-10-19"]
+        self.drop_note("2026-10-22", "session_id", "session-b")
+        self.note("miss", date(2026, 10, 22), session_id="session-b", tag="ill")
+        self.coach("status-days", "add", "--kind", "travel", "--from", "2026-09-28", "--to", "2026-10-18",
+                   "--note", "Away, no gym", "--no-training", env={"COACH_NOW": "2026-09-27T09:00:00Z"})
+        found = self.adherence()
+        self.assertEqual([s["kind"] for s in found["skipped"]], ["break", "break", "break", "illness"])
+        self.assertEqual(self.consistency(self.dashboard()),
+                         "- Consistency: no completed ordinary week yet, so there is nothing to count; "
+                         "left out: 4 weeks (3 planned break, 1 illness)")
+
+    def test_left_out_kinds_follow_the_contract_order_not_their_counts(self):
+        skipped = [{"week": f"2026-{week}", "kind": kind}
+                   for week, kind in (("08-03", "illness"), ("08-10", "illness"), ("08-17", "layoff"),
+                                      ("08-24", "layoff"), ("08-31", "layoff"))]
+        found = {"weeks": [{"week": "2026-09-07"}], "planned": 5, "trained": 4, "skipped": skipped}
+        self.assertEqual(pages._consistency_line(found),
+                         "Consistency: 4 of 5 planned sessions trained in 1 completed ordinary week (7 Sep – 13 Sep); "
+                         "a full count takes 4; left out: 5 weeks (3 layoff, 2 illness)")
+
+    def test_ordinary_weeks_that_planned_nothing_say_so_instead_of_zero_of_zero(self):
+        found = {"weeks": [{"week": "2026-09-07"}, {"week": "2026-09-14"}], "planned": 0, "trained": 0,
+                 "skipped": []}
+        self.assertEqual(pages._consistency_line(found),
+                         "Consistency: no planned session in 2 completed ordinary weeks (7 Sep – 20 Sep); "
+                         "a full count takes 4")
+
+    def test_a_new_athlete_with_no_completed_week_sees_an_honest_empty_state(self):
+        text = self.dashboard("2026-09-30T18:00:00Z")
+        self.assertEqual(self.consistency(text),
+                         "- Consistency: no completed ordinary week yet, so there is nothing to count")
+        self.assertNotIn("%", text)
+        self.assertIn("- Core-complete streak (weeks with every core session trained): none counted yet",
+                      section(text, "Progress"))
+        self.assertNotIn("0 weeks", text)
+        self.assertEqual(section(self.page("progress.md"), "Consistency"),
+                         ["No completed ordinary week yet, so there is nothing to count."])
+
+    def test_the_dashboard_shows_the_actionable_watch_not_a_flag_count(self):
+        doc = self.overlay_doc()
+        flag = {"session_id": "session-a", "exercise_id": "bb_back_squat"}
+        doc["flags"] = [
+            dict(flag, code="no_data", severity="warn", message="no starting load", resolved=True,
+                 resolution="first load set: 60"),
+            dict(flag, code="unearned_load", severity="block", message="Back Squat 100 is above what the logs earned",
+                 resolved=False, resolution=None)]
+        self.write_overlay(doc)
+        text = self.dashboard(NOW)
+        self.assertEqual(section(text, "Watch"), ["- Back Squat 100 is above what the logs earned"])
+        self.assertEqual(section(text, "Watch"), section(self.page("this-week.md"), "Watch"))
+        self.assertNotIn("no starting load", text)
+        self.assertNotIn("Open flags", text)
+        self.assertEqual([f["code"] for f in self.overlay_doc()["flags"]], ["no_data", "unearned_load"])
+
+    def test_nothing_to_watch_says_so(self):
+        self.assertEqual(section(self.dashboard(NOW), "Watch"), ["- Nothing flagged."])
+
+    def test_the_count_reads_annotations_as_of_the_render(self):
+        before = self.dashboard()
+        self.note("external", date(2026, 10, 24), created="2026-10-27T09:00:00Z", external_id="class-sat",
+                  done=False, cancellation={"by": "trainer", "reason": "trainer off sick"})
+        self.assertEqual(self.adherence()["planned"], 19)
+        self.assertTrue(all(r["status"] == "pass"
+                            for r in self.check("pages_fresh", env={"COACH_NOW": "2026-10-27T10:00:00Z"})))
+        self.assertEqual(self.consistency(before), self.consistency(self.page("README.md")))
 
 
 class HeaderFactsTest(PagesCase):
@@ -674,7 +863,7 @@ class PagePartsTest(PagesCase):
             self.render()
         self.assertEqual(section(self.page("this-week.md"), "Sessions")[-1], "Session sheets: this-week-sheets.md")
         self.assertIn("- Light week: not due", self.page("README.md").splitlines()[:10])
-        self.assertEqual(headings(self.page("progress.md")), ["Lifts", "Ladder", "Core-complete weeks", "Bodyweight"])
+        self.assertEqual(headings(self.page("progress.md")), ["Lifts", "Ladder", "Consistency", "Core-complete weeks", "Bodyweight"])
 
     def test_two_parts_replacing_one_slot_is_an_error_naming_both(self):
         first = self.part("miss_a", "SLOTS = ('brief.if_you_miss',)\ndef contribute(ctx):\n    return None\n")
