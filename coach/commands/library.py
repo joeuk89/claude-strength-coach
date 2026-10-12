@@ -1,10 +1,13 @@
 import copy
+import json
+from pathlib import Path
 
 from coach import jsonio, library, paths, units
 from coach.commands import arg, command
 from coach.errors import ConfigError, UsageError, ValidationError
 from coach.hevy.cache import HevyCache
 from coach.library import Library
+from coach.validate import validate as validate_schema
 
 
 def _entry(lib, exercise_id):
@@ -61,6 +64,65 @@ def _write(lib, doc, args):
 def _sorted(doc):
     return {"schema_version": doc["schema_version"],
             "exercises": {key: doc["exercises"][key] for key in sorted(doc["exercises"])}}
+
+
+_SEPARATE_STEPS = {
+    "hevy_template_id": "Hevy mapping is a separate step once a real Hevy template is confirmed",
+    "hevy_template_ids": "Hevy mapping is a separate step once a real Hevy template is confirmed",
+    "load_mode_proposed": "library seed records it for imported exercises",
+    "confidence": "library seed records it for imported exercises",
+    "avoid": "record it after creation with library set-avoid",
+}
+
+
+@command(
+    "library create",
+    help="Create a custom exercise from an instance-entry JSON file; preview with --dry-run",
+    args=(arg("id", help="new custom_ library exercise id"),
+          arg("--input", required=True, metavar="FILE",
+              help="one exercise_library entry with required facts and a confirmed load_mode")),
+    writes=True,
+)
+def create(args, ctx):
+    lib = Library.load(ctx.root)
+    existing = lib.get(args.id)
+    if existing is not None and existing["source"] == "catalogue":
+        raise ValidationError(f"{args.id!r} is a catalogue id; choose a new custom_ id; creation cannot override it")
+    if not args.id.startswith(library.CUSTOM_PREFIX) or not library.ID_PATTERN.fullmatch(args.id):
+        raise ValidationError("a custom exercise id must start custom_ and contain only lowercase letters, "
+                              "digits and underscores")
+    source = Path(args.input)
+    try:
+        entry = json.loads(source.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValidationError(f"cannot read custom exercise JSON from {source}: {exc}") from None
+    if not isinstance(entry, dict):
+        raise ValidationError(f"{source} must contain one exercise_library entry object")
+    if existing is not None:
+        if lib.instance["exercises"][args.id] != entry:
+            raise ValidationError(f"{args.id!r} already exists with different metadata; creation cannot update it. "
+                                  "Use library show to review it or choose a new custom_ id")
+        return {"exercise": existing, "path": paths.EXERCISES, "unchanged": True, "written": False}
+    refused = [f"{key} ({reason})" for key, reason in _SEPARATE_STEPS.items() if key in entry]
+    if refused:
+        raise ValidationError(f"creation does not accept {'; '.join(refused)}; remove it from {source}")
+    missing = [key for key in (*library.CUSTOM_REQUIRED, "load_mode") if key not in entry]
+    if missing:
+        raise ValidationError(f"a custom exercise needs explicit values for: {', '.join(missing)}")
+    if entry["load_mode"] is None:
+        raise ValidationError("load_mode must be the athlete's confirmed mode; see library set-mode --help")
+    doc = copy.deepcopy(lib.instance)
+    doc["exercises"][args.id] = entry
+    errors = validate_schema(doc, jsonio.load_schema("exercise_library"))
+    if errors:
+        raise ValidationError("custom exercise does not match the exercise_library schema",
+                              details=[error.to_json() for error in errors])
+    try:
+        proposed = Library(doc, lib.path)
+    except ValidationError as exc:
+        raise ValidationError("custom exercise conflicts with the exercise library", details=exc.details) from None
+    written = _write(lib, doc, args)
+    return {"exercise": proposed.get(args.id), "path": paths.EXERCISES, "unchanged": False, "written": written}
 
 
 @command(
