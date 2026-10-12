@@ -671,7 +671,7 @@ def _annotation(root, session_id, day, tag, now, reason=None):
     annotation = {"id": history.next_annotation_id(doc), "kind": "miss", "date": day.isoformat(),
                   "session_id": session_id, "tag": tag, "source": RECORD_SOURCE, "reason": reason,
                   "created_at": now.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
-    errors = validate_schema({"schema_version": 1, "annotations": [annotation]},
+    errors = validate_schema({"schema_version": history.annotations_version(), "annotations": [annotation]},
                              jsonio.load_schema(history.ANNOTATIONS_SCHEMA))
     problems = [e.message for e in errors] + history.Checker(root).problems(annotation, doc["annotations"])
     if problems:

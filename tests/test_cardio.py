@@ -120,7 +120,7 @@ class WeekTest(CardioCase):
         self.assertEqual(data["conditioning"], {"count": 1, "minutes": 20})
         self.assertEqual(data["other"], {"ride": {"count": 1, "minutes": 45}})
         self.assertEqual(data["lifting"], {"workouts": 2, "working_sets": 12, "hard_sets": 12, "minutes": 118})
-        self.assertEqual(data["external"], {"done": 0})
+        self.assertEqual(data["external"], {"done": 0, "conditioning": 0})
         by_ref = {b["ref"]: b for b in data["bouts"]}
         self.assertEqual((by_ref["manual:2026-10-06-run-1"]["quality"],
                           by_ref["manual:2026-10-06-run-1"]["quality_basis"]), (True, "rpe"))
@@ -163,13 +163,14 @@ class WeekTest(CardioCase):
 
     def test_a_coach_led_session_marked_done_counts_with_the_external_default(self):
         path = self.root / "data" / "history" / "annotations.json"
-        path.write_text(json.dumps({"schema_version": 1, "annotations": [
+        path.write_text(json.dumps({"schema_version": 2, "annotations": [
             {"id": "a-0001", "kind": "external", "date": "2026-10-07", "external_id": "pt-tue", "done": True,
              "note": "upper body", "created_at": NOW, "source": "test", "reason": None}]}), encoding="utf-8")
         data = self.data("cardio", "week", "--week", "2026-W41")
-        self.assertEqual(data["external"], {"done": 1})
+        self.assertEqual(data["external"], {"done": 1, "conditioning": 0})
         external = next(b for b in data["bouts"] if b["kind"] == "external")
-        self.assertEqual(external["srpe"], {"rpe": 6, "load": 360, "method": "external_default"})
+        self.assertEqual(external["srpe"], {"rpe": 6, "load": 360, "method": "external_default",
+                                            "minutes_method": "external_default"})
 
     def test_a_sunday_week_runs_sunday_to_saturday(self):
         path = self.root / "config.toml"

@@ -114,7 +114,7 @@ class AsOfHistoryTest(PagesCase):
         self.assertEqual(len(history.workouts(self.root)), 5)
 
     def test_annotations_created_after_as_of_do_not_apply(self):
-        write_json(self.root / "data" / "history" / "annotations.json", {"schema_version": 1, "annotations": [
+        write_json(self.root / "data" / "history" / "annotations.json", {"schema_version": 2, "annotations": [
             {"id": "a-0001", "kind": "discount", "created_at": "2026-10-13T09:00:00Z", "source": "coach",
              "reason": "typo", "workout_id": W5, "exercise_id": "bb_back_squat", "set_index": None}]})
         early = datetime(2026, 10, 13, 8, 0, tzinfo=timezone.utc)
@@ -473,10 +473,21 @@ class StreakTest(PagesCase):
     def test_a_coach_led_session_marked_not_done_breaks_it(self):
         self.edit_json("data/program.json", lambda p: p.update(external_sessions=[
             {"id": "pt-tue", "title": "PT", "weekday": "tue", "estimated_sets": {}}]))
-        write_json(self.root / "data" / "history" / "annotations.json", {"schema_version": 1, "annotations": [
+        write_json(self.root / "data" / "history" / "annotations.json", {"schema_version": 2, "annotations": [
             {"id": "a-0001", "kind": "external", "created_at": "2026-10-11T18:00:00Z", "source": "check-in",
              "reason": None, "date": "2026-10-06", "external_id": "pt-tue", "done": False, "note": "cancelled"}]})
         self.assertEqual(self.streak_line()[0], "Current streak: 0 weeks · longest: 1 week")
+
+    def test_a_not_done_later_recorded_as_a_trainer_cancellation_does_not_break_it(self):
+        self.edit_json("data/program.json", lambda p: p.update(external_sessions=[
+            {"id": "pt-tue", "title": "PT", "weekday": "tue", "estimated_sets": {}}]))
+        write_json(self.root / "data" / "history" / "annotations.json", {"schema_version": 2, "annotations": [
+            {"id": "a-0001", "kind": "external", "created_at": "2026-10-11T18:00:00Z", "source": "check-in",
+             "reason": None, "date": "2026-10-06", "external_id": "pt-tue", "done": False, "note": None},
+            {"id": "a-0002", "kind": "external", "created_at": "2026-10-11T18:05:00Z", "source": "check-in",
+             "reason": None, "date": "2026-10-06", "external_id": "pt-tue", "done": False, "note": None,
+             "cancellation": {"by": "trainer", "reason": "trainer off sick"}}]})
+        self.assertEqual(self.streak_line()[0], "Current streak: 2 weeks · longest: 2 weeks")
 
     def test_a_missed_core_session_breaks_it(self):
         doc = read_json(self.root / "data" / "overlays" / "2026-10-05-weekly.json")

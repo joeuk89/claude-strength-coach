@@ -26,6 +26,8 @@ def evaluate(ctx):
     found = []
     for lift in (b for b in ctx.bouts if base.is_lift(b)):
         for activity in base.quality_activities(ctx.bouts):
+            if activity is lift:
+                continue
             flag = _judge(ctx, lift, activity)
             if flag is not None:
                 found.append(flag)

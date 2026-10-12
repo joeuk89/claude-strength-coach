@@ -2084,7 +2084,7 @@ local start date (`[athlete] timezone`):
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "annotations": [
     {"id": "a-0001", "kind": "discount", "created_at": "2026-10-11T18:00:00Z",
      "source": "check-in 2026-10-11", "reason": "logged Hevy 90 for 22.5/hand",
@@ -2115,7 +2115,7 @@ local start date (`[athlete] timezone`):
 | `unknown_convention` | loads in the span are left out of e1RM and progression; sets still count for dose | coach, audit |
 | `confirm` | closes a `convention_slip` candidate as genuine | coach, R-21a |
 | `miss` | a planned session not trained; `tag` in `time`, `sleep`, `ill`, `family`, `skipped`, `other` (R-01). No tag recorded means `untagged` | R-21a, R-21b, R-22 |
-| `external` | a coach-led session from `program.external_sessions` happened (`done` true) or not, with a one-line note of its content | R-21a; R-30a reads |
+| `external` | a coach-led session from `program.external_sessions` happened (`done` true) or not, with a one-line note of its content; optionally what happened in it, or a trainer cancellation (below) | R-21a; R-30a reads |
 | `trained_unlogged` | a planned session was trained but not logged (`date`, `session_id`, `note`). Adherence counts it `trained` with `unlogged: true`; its exercises are `unknown`; it adds no dose and no e1RM point | R-21a (from the reply to the Sunday message), coach |
 
 - Ids are `a-NNNN`, never reused. Annotations are appended; a wrong one is
@@ -2132,11 +2132,35 @@ local start date (`[athlete] timezone`):
   `external_id`, `done`, `note`; `trained_unlogged` `date`, `session_id`,
   `note`. Every annotation has `id`, `kind`, `created_at`, `source` and
   `reason` (nullable). `set_index` is the set's `index` in the month file.
+- **Coach-led detail** (annotations v2). An `external` annotation marked
+  done may add what the athlete recorded: `start` (C7 timestamp on its
+  date; `history annotate` takes `HH:MM` or ISO text, as C51 timing),
+  `duration_minutes`, `rpe` (session RPE, 0 to 10) and `modality`
+  (`lifting`, `conditioning` or `mixed`). Each is optional and absent
+  means not recorded: a note such as "brutal" sets none of them. One the
+  trainer cancelled has `done` false and `cancellation: {"by": "trainer",
+  "reason": text}`; it carries no detail. Only `external` annotations
+  carry these fields. Migration `annotations/0001_external_detail` takes
+  v1 files to v2 unchanged: a v1 `external` annotation recorded none of
+  them, so `done` true stays a session that happened with default length
+  and effort, and `done` false stays a miss.
+- **Effective occurrence.** The newest `external` annotation in force for
+  a date and session decides it (`coach.history.external_occurrences`), so
+  a repeated update is one occurrence; withdrawing it restores the one
+  before. Its status (`coach.history.external_status`) is `done`,
+  `not_done` or `cancelled`. Every reader takes it from there:
+  C41 structure, C43 blocks, C48 cardio, C51 interference, C38 pages,
+  the C36 card and the last lifting date. A cancelled occurrence is not a
+  planned session and no training: not a miss, no dose, no bout;
+  `not_done` stays a miss.
 - `history annotate` takes flags (`--kind`, `--workout`, `--exercise`,
-  `--set`, `--date`, `--session`, `--tag`, `--reason` ...) or `--input FILE`
-  for a batch. Claude Code's Bash tool has no stdin, so no prompt reads it.
+  `--set`, `--date`, `--session`, `--tag`, `--reason` ...; for `external`
+  also `--start-time`, `--minutes`, `--rpe`, `--modality` and
+  `--trainer-cancelled REASON`) or `--input FILE` for a batch. Claude Code's Bash tool has no stdin, so no prompt reads it.
 - Check `annotations_valid`: every referenced workout, exercise and
-  session exists; tags are in the enum.
+  session exists; tags are in the enum; coach-led detail sits only on a
+  session marked done, a cancellation only on one marked not done, and a
+  `start` falls on the annotation's date.
 
 **Exposure** (glossary term) in code: one exercise in one resolved
 workout with at least one non-warm-up set left after annotations.
@@ -2150,8 +2174,11 @@ coach.history.exposures(root, exercise_id, before=None) -> list[Exposure]       
 # Read workouts and their sets carry discounted, convention_unknown and repaired (the fields a
 # repair replaced); each workout carries unsynced and conditioning (C17 conditioning rule).
 coach.history.last_lifting_date(root, before) -> date | None                    # any workout with a lifting exercise, or a
-#   coach-led lifting session marked done (the newest `external` annotation for its date and id decides)
+#   coach-led lifting session marked done (the newest `external` annotation for its date and id decides; a recorded
+#   modality `lifting` or `mixed` is lifting and `conditioning` is not, else coach_led_lifting decides)
 coach.history.coach_led_lifting(root) -> set[str]   # external ids whose estimated_sets name a muscle besides cardio
+coach.history.external_occurrences(root, as_of=None) -> list[dict]   # newest `external` annotation per date and id
+coach.history.external_status(annotation) -> str   # "done" | "not_done" | "cancelled"
 coach.history.annotations(root, kind=None) -> list[dict]
 ```
 
@@ -4919,7 +4946,7 @@ earliest overlay, else at the first-review anchor, else on the end day:
 
 ```json
 {
-  "schema_version": 7,
+  "schema_version": 8,
   "date": "2026-10-11",
   "window": {"start": "2026-10-05", "end": "2026-10-11"},
   "mode": "weekly", "tier_reasons": [], "deep_deferred": false,
@@ -4929,7 +4956,8 @@ earliest overlay, else at the first-review anchor, else on the end day:
     "rows": [{"date": "2026-10-05", "session_id": "session-a", "title": "Session A", "tier": "core",
               "status": "trained", "moved": false, "unlogged": false, "tag": null,
               "workout_id": "…", "workout_date": "2026-10-05", "minutes": 58, "cap_minutes": 45}],
-    "external": [{"date": "2026-10-06", "external_id": "pt-tue", "title": "PT", "done": null, "note": null}],
+    "external": [{"date": "2026-10-06", "external_id": "pt-tue", "title": "PT", "done": null, "status": null,
+                  "cancellation": null, "note": null}],
     "extra": [],
     "on_break": []
   },
@@ -4960,7 +4988,10 @@ earliest overlay, else at the first-review anchor, else on the end day:
   core sessions C18 put on a planned break (C50); the Sessions field
   names them as not misses. `external` lists
   `program.external_sessions` dates in the window with any `external`
-  annotation, leaving out a date on a planned break with none. Durations and caps from C18/C19.
+  annotation, leaving out a date on a planned break with none; each row
+  takes its effective occurrence (C17): `status` `done`, `not_done`,
+  `cancelled` or null, with the trainer's `cancellation`. The Coach-led
+  field states a cancellation as not a miss. Durations and caps from C18/C19.
 - `exercises`: one row per prescribed exercise of a trained session.
   `prescribed` and `logged` text use `units.format_load`; status and
   `rpe_delta` from C18. `logged` groups consecutive sets of equal load and
@@ -6077,7 +6108,9 @@ coach.structure.ordinary_weeks(root, until, n=4, reach=12) -> list[str]
   the schedule's weekday; delivered when an `external` annotation for that
   date says `done: true`, using `estimated_sets` as fractional sets. No
   annotation = `unconfirmed`, left out of both sides of adherence and
-  shown as such.
+  shown as such. A trainer cancellation (C17) = `cancelled`: shown with its
+  `cancellation`, and not a planned session, so it is left out of planned,
+  trained, planned dose and the planned-break test.
 - Optional sessions: left out of planned dose and adherence; their
   delivered sets count in delivered dose ("bonus").
 - **Adherence** (R-02): sessions trained over sessions planned over the
@@ -6131,14 +6164,16 @@ coach.structure.ordinary_weeks(root, until, n=4, reach=12) -> list[str]
   a partly covered week keeps ordinary accounting for the sessions left,
   while one that also plans the days left still makes the week `one_off`.
   Session `status` from C18 adherence; external `status` `done`,
-  `not_done`, `unconfirmed`.
+  `not_done`, `cancelled`, `unconfirmed` (or `upcoming`), from the
+  effective occurrence (C17).
 - `on_break` lists the sessions a planned break takes out of the week:
   core and optional ones from C18 `on_break` (`session_id`, `date`,
   `tier`, `break_id`) and coach-led ones with no annotation on a break
   day (`external_id`, `date`, `break_id`). They count in neither
   `planned` nor `trained`, nor in planned dose; the sessions left are
   counted as usual. That is the week's accounting basis.
-- `planned` counts core and external sessions, `unconfirmed` excluded.
+- `planned` counts core and external sessions, `unconfirmed` and
+  `cancelled` excluded.
   `trained` counts core sessions with status `trained` and external
   sessions `done`. Optional sessions appear with `tier: optional` and count
   in neither.
@@ -6394,8 +6429,9 @@ Rules (R-02's prose, scripted; the prose stays the human copy):
   logged and its mean logged RPE (over sets with both values) is no more
   than 1.5 below target; sets without a logged RPE count as on target,
   and a rep-out set's cap counts as its target, here and against the
-  prescription. A coach-led session passes when its `external`
-  annotation says done.
+  prescription. A coach-led session passes when its effective `external`
+  occurrence (C17) is done; one the trainer cancelled is not planned, so
+  the lines below judge the sessions left.
   Session counts come from `coach.structure.week` (C41). The gate counts
   training stress for fatigue; it is not proof the prescription was met,
   so a session with failed reps or a grind past its target still passes.
@@ -6417,6 +6453,9 @@ Rules (R-02's prose, scripted; the prose stays the human copy):
   counts nor resets (rn:deloads.13). This is bookkeeping, separate from
   the ordinary under-50 % reset, and it never shortens the days off the
   return bands count (C22 reads the last lifting workout).
+- **Nothing left planned**: a week whose trainer cancellations (C17) leave
+  no planned session classes `partial`, so it neither counts nor resets and
+  credits no training. This is bookkeeping, not a research finding.
 - **Ceiling**: `program.blocks.hard_weeks_ceiling`, default 6, allowed 4–8.
 - **Triggers** (four): athlete-reported readiness, compound RPE drift two
   sessions running at the prescription after an earlier at-prescription
@@ -7209,12 +7248,17 @@ external_session_rpe = 6
 
 | Method | When | RPE used |
 |---|---|---|
-| `athlete` | the activity record has `rpe` | that value |
+| `athlete` | the activity record has `rpe`, or the coach-led session's annotation does (C17) | that value |
 | `planned` | matched to a planned activity | 7 if quality, else 3 |
 | `lifting_sets` | a lifting workout where ≥ half the working sets carry RPE | mean of those RPEs |
-| `external_default` | a coach-led session annotated done (C17 `external`) | `external_session_rpe`, for `external_session_minutes` |
+| `external_default` | a coach-led session done with no recorded `rpe` (C17 `external`) | `external_session_rpe` |
 | `kind_default` | otherwise | `lifting` 6, `run` 4, `ride` 4, `swim` 4, `row` 5, `walk` 2, `hike` 3, `conditioning` 7, `sport` 6, `mobility` 1, `other` 4 |
 
+- A coach-led session's minutes are its recorded `duration_minutes`, else
+  `external_session_minutes`; its `srpe` also carries `minutes_method`,
+  `athlete` or `external_default`, so each default is labelled field by
+  field and a partly recorded session defaults only what is missing
+  (rn:running-load.7).
 - The combined figure is information only (rn:running-load.3). No flag
   reads it, and no ratio of it is ever computed (rn:running-load.2).
 - `coach.cardio.CITES` holds `rn:running-load.1` to `.4`.
@@ -7234,22 +7278,27 @@ external_session_rpe = 6
 {"week": "2026-W41", "span": {"start": "2026-10-05", "end": "2026-10-11"}, "tier": "review",
  "distance_unit": "km", "activity_source": true,
  "lifting": {"workouts": 2, "working_sets": 28, "hard_sets": 26, "minutes": 115},
- "external": {"done": 0},
+ "external": {"done": 0, "conditioning": 0},
  "run": {"count": 2, "distance": 18.5, "minutes": 110, "quality": 1},
  "conditioning": {"count": 1, "minutes": 20},
  "other": {"ride": {"count": 1, "minutes": 45}},
  "srpe": {"total": 1810, "by_method": {"athlete": 3, "lifting_sets": 2, "kind_default": 1}},
  "bouts": [{"ref": "manual:2026-10-06-run-1", "date": "2026-10-06", "kind": "run", "session_id": null,
             "minutes": 40, "distance": 7, "quality": true, "quality_basis": "rpe",
-            "srpe": {"rpe": 8, "load": 320, "method": "athlete"}}]}
+            "modality": null, "srpe": {"rpe": 8, "load": 320, "method": "athlete"}}]}
 ```
 
   `hard_sets` is the week's total of C18 hard sets (not a per-muscle sum)
   over exercises the library resolved, as C18 counts them;
   `working_sets` counts every working set of those exercises, hard or not. `minutes` for
-  lifting come from C18 durations. Lifting and coach-led bouts have
-  `quality: false` and `quality_basis: null`; workouts of a conditioning
-  session (C17) are not lifting, they arrive as Activities. `srpe.rpe`
+  lifting come from C18 durations. Lifting bouts, and coach-led bouts
+  with no recorded modality or `lifting`, have `quality: false` and
+  `quality_basis: null`. A coach-led session recorded as `conditioning` or
+  `mixed` is judged as conditioning (quality by `kind`) and counts in
+  `external.conditioning`; it stays one bout with one session-RPE load and
+  one `external.done`, never a second conditioning bout. Every bout row
+  carries `modality` (null except on a coach-led bout). Workouts of a
+  conditioning session (C17) are not lifting, they arrive as Activities. `srpe.rpe`
   for `lifting_sets` is the mean of the RPEs given, to 2 decimals;
   loads are rounded to 1 decimal.
 
@@ -7271,13 +7320,16 @@ class Bout:
     distance_meters: float | None
     quality: bool
     quality_basis: str | None
+    modality: str | None = None   # a coach-led session's recorded modality (C17); None otherwise
+    estimated_minutes: bool = False   # minutes are a default, so they never time the bout
 
 coach.cardio.bouts(root, span, mode, overlay=None, today=None) -> list[Bout]
-#   mode "logged":   C17 workouts, C30 activities, C17 `external` annotations marked done
+#   mode "logged":   C17 workouts, C30 activities, C17 effective `external` occurrences done
 #   mode "proposal": the overlay's sessions (kind "conditioning" for a conditioning session, else
 #                    "lifting"; ref "<overlay id>/<session id>"; start and minutes from the session's
 #                    `start` and `duration_minutes`, C10 v6), external sessions
-#                    placed on their `weekday`, and at tier review|program the planned activities
+#                    placed on their `weekday` unless cancelled by the trainer (C17), and at tier
+#                    review|program the planned activities
 #                    no logged Activity matched (an ambiguous plan is left out unless every
 #                    candidate activity is dated before it); with `today`, only dates from today on.
 #                    No logged bouts: `evaluate` reads those itself (see Flags)
@@ -7595,9 +7647,16 @@ times are known (Built with R-44a, Timing).
 - `InterferenceContext` also carries `titles` (`{ref: name}`: the session
   title, workout title, Activity name or planned title) for messages.
   Rules call the pure helpers in `coach.plugins.base`: `is_lift` (kind
-  `lifting` or `external`), `quality_activities`, `timed`, `bout_end`
+  `lifting` or `external`, except a coach-led session recorded as
+  `conditioning`), `quality_activities`, `timed`, `bout_end`
   (`end`, else `start` plus `minutes`), `hours_between`, `hours_text`,
   `bout_text` and `session_flag(code, message, session_id, severity)`.
+- **Coach-led modality** (C17). Only an explicitly recorded modality
+  makes a coach-led session conditioning: `conditioning` is a quality
+  activity and no lift; `mixed` is a lift whose conditioning part is a
+  quality activity too, so `quality_activities` returns it and a rule
+  never pairs a bout with itself; `lifting`, or nothing recorded, is a
+  lift only, whatever its RPE or note says.
 - `bouts` also holds the quality activities of the days just before the
   span (`ceil(max hours / 24)` days, at least 1; logged ones to today and
   unmatched plans from today on, as `cardio flags` reads them), so a
@@ -7607,7 +7666,9 @@ times are known (Built with R-44a, Timing).
   or workout (Hevy, or a manual line's `start_time`, C46 v2), a planned
   activity's `start` (C30 v2) and an overlay session's `start` (C10 v6).
   Its end is its `end`, else its start plus its minutes (a plan's target
-  duration, a session's `duration_minutes`). Every gap is elapsed time:
+  duration, a session's `duration_minutes`, a coach-led session's
+  recorded `start` and `duration_minutes`, C17). A default length
+  (`estimated_minutes`) never times a bout: the gap is unknown. Every gap is elapsed time:
   both moments go to UTC before subtracting and an end is added in UTC,
   so offsets, midnight and daylight-saving changes count actual hours.
   `base.timing_gaps` names what a pair lacks.

@@ -30,6 +30,8 @@ def evaluate(ctx):
     heavy = [b for b in ctx.bouts if base.is_lift(b) and b.ref in ctx.heavy_lower]
     for lift in heavy:
         for activity in base.quality_activities(ctx.bouts):
+            if activity is lift:
+                continue
             flag = _judge(ctx, lift, activity)
             if flag is not None:
                 found.append(flag)

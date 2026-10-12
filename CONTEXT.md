@@ -153,8 +153,16 @@ trained or missed. The schedule rule plans sessions only from the day
 the program was adopted, so older workouts never count as misses; an
 earlier program's overlays keep their own weeks. A moved session is
 planned once, on its new date. A new block moves neither the adoption
-date nor the planned sessions.
+date nor the planned sessions. A coach-led session the trainer cancelled
+is not planned.
 _Avoid_: obligation, scheduled session
+
+**Trainer cancellation**:
+A coach-led session the trainer called off, recorded with the reason. It
+is not a planned session: no miss, no training, no dose, no stress. A
+coach-led session that simply did not happen stays a miss. A week left
+with no planned session neither adds to nor ends the block.
+_Avoid_: excused miss, skipped session
 
 **Block**:
 The stretch of hard training between one light week and the next,
@@ -438,8 +446,8 @@ _Avoid_: training diary, journal, log entry (a workout is the thing logged)
 **Core-complete week**:
 A week in which every planned core session was trained, logged or not,
 and no coach-led session is recorded as not having happened. Optional
-sessions never count, and a coach-led session nobody recorded neither
-counts nor breaks it. Consecutive ones make the core-complete streak.
+sessions never count, and a coach-led session nobody recorded, or one the
+trainer cancelled, neither counts nor breaks it. Consecutive ones make the core-complete streak.
 _Avoid_: perfect week, full week, completed hard week (the block's count)
 
 **Publish**:
@@ -559,7 +567,8 @@ _Avoid_: planned session (a session is a program template), planned run
 
 **Quality activity**:
 An activity hard enough to count against the weekly quality cap and to
-need an easy day either side: any conditioning; otherwise a session RPE
+need an easy day either side: any conditioning, including a coach-led
+session recorded as conditioning or mixed; otherwise a session RPE
 of 7 or more when the athlete gave one; otherwise what its matched
 planned activity says; otherwise a name saying intervals, tempo,
 threshold, hills, fartlek, track or race. The rule that decided is

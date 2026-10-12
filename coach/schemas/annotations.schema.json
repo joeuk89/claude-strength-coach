@@ -4,7 +4,7 @@
   "required": ["schema_version", "annotations"],
   "additionalProperties": false,
   "properties": {
-    "schema_version": {"const": 1},
+    "schema_version": {"const": 2},
     "annotations": {"type": "array", "items": {"$ref": "#/$defs/annotation"}}
   },
   "$defs": {
@@ -40,7 +40,17 @@
         "tag": {"enum": ["time", "sleep", "ill", "family", "skipped", "other", null]},
         "external_id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
         "done": {"type": "boolean"},
-        "note": {"type": ["string", "null"]}
+        "note": {"type": ["string", "null"]},
+        "start": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"},
+        "duration_minutes": {"type": "number", "minimum": 0},
+        "rpe": {"type": "number", "minimum": 0, "maximum": 10},
+        "modality": {"enum": ["lifting", "conditioning", "mixed"]},
+        "cancellation": {
+          "type": "object",
+          "required": ["by", "reason"],
+          "additionalProperties": false,
+          "properties": {"by": {"enum": ["trainer"]}, "reason": {"type": "string", "pattern": "\\S"}}
+        }
       }
     }
   }

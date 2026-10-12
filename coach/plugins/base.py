@@ -245,12 +245,16 @@ class InterferenceContext:
 
 
 def is_lift(bout):
-    """True for a lifting workout or session and for a coach-led session."""
-    return bout.kind in LIFT_KINDS
+    """True for a lifting workout or session and for a coach-led session not recorded as conditioning only."""
+    return bout.kind in LIFT_KINDS and bout.modality != "conditioning"
 
 
 def quality_activities(bouts):
-    return [b for b in bouts if b.quality and not is_lift(b)]
+    """Quality bouts besides lifting, plus coach-led sessions recorded as mixed: their conditioning part counts.
+
+    A mixed session is then both a lift and a quality activity, so a rule skips pairing it with itself.
+    """
+    return [b for b in bouts if b.quality and (not is_lift(b) or b.modality == "mixed")]
 
 
 def timed(bout):
@@ -258,10 +262,13 @@ def timed(bout):
 
 
 def bout_end(bout):
-    """When the bout ended: its end, else its start plus its minutes of elapsed time, else None."""
+    """When the bout ended: its end, else its start plus its recorded minutes of elapsed time, else None.
+
+    A default length (`estimated_minutes`) never times a bout.
+    """
     if bout.end is not None:
         return bout.end
-    if bout.start is not None and bout.minutes is not None:
+    if bout.start is not None and bout.minutes is not None and not bout.estimated_minutes:
         return (bout.start.astimezone(timezone.utc) + timedelta(minutes=bout.minutes)).astimezone(bout.start.tzinfo)
     return None
 
@@ -278,7 +285,8 @@ def timing_gaps(entries):
     """
     parts = []
     for bout, text, need_end in entries:
-        if bout.start is None and need_end and bout_end(bout) is None and bout.minutes is None:
+        unmeasured = bout.minutes is None or bout.estimated_minutes
+        if bout.start is None and need_end and bout_end(bout) is None and unmeasured:
             parts.append(f"no start time or duration for {text}")
         elif bout.start is None:
             parts.append(f"no start time for {text}")
@@ -295,10 +303,11 @@ def bout_text(ctx, bout):
     """A bout for a message: its title, kind when it is an activity, date and start time when known."""
     title = ctx.titles.get(bout.ref) or bout.session_id or bout.kind
     planned = "planned " if bout.source == "planned" else ""
+    kind = f"coach-led {bout.modality}" if bout.kind == "external" and bout.modality else bout.kind
     if is_lift(bout):
         what = f"{planned}{title}"
     else:
-        what = f"{planned}{bout.kind} \"{title}\"" if title != bout.kind else f"{planned}{bout.kind}"
+        what = f"{planned}{kind} \"{title}\"" if title != bout.kind else f"{planned}{kind}"
     when = bout.date.isoformat()
     if bout.start is not None:
         when += f" {bout.start.strftime('%H:%M')}"

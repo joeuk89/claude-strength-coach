@@ -32,9 +32,9 @@ fields, always in this order:
    each planned session with no logged workout and ask for one tag per
    miss: `time / sleep / ill / family / skipped / other`. Optional
    sessions need no tag. Ask for anything trained but not logged.
-2. **Coach-led** — ask what each coach-led session in the window
-   covered. State what its log shows and the inferred rotation position
-   for confirmation.
+2. **Coach-led** — ask what each coach-led session in the window covered,
+   how long and how hard it was, and whether the trainer cancelled it.
+   State what its log shows and the inferred rotation position to confirm.
 3. **Runs** — with an activity source, the card states the window's runs
    from `python3 -m coach cardio week` (count, distance, quality runs)
    and any planned activity `cardio reconcile` found missed, and asks
@@ -75,13 +75,9 @@ fields, always in this order:
 
 **Leave out a field that cannot apply** and renumber the rest from 1:
 no coach-led sessions in the window, no Coach-led field; no cardio in
-the athlete's week, no Runs field; no meal plan, no plan question. **A fact the log already answers is
-stated for confirmation, not asked.** If the athlete's opening message
-already covers the fields, don't send the template; leave out any single
-field it already answers.
-
-**Deep tier:** the same message. Any deep-only asks follow the last
-field, numbered on.
+the athlete's week, no Runs field; no meal plan, no plan question. **A
+fact the log already answers is stated for confirmation, not asked.**
+**Deep tier:** the same message, with any deep-only asks numbered on.
 
 **Body composition** (waist, body fat, progress photos) is a deep-only
 ask, never a weekly one. Ask it only when both hold:
@@ -122,7 +118,11 @@ run `python3 -m coach history annotate --input <that file>`, with
   with no results and no e1RM;
 - `{"kind": "external", "date": D, "external_id": E, "done": true|false,
   "note": N}` for each coach-led session, the note one line on what it
-  covered.
+  covered. Add only the detail the reply states: `duration_minutes`,
+  `rpe` (session RPE), `modality` (`lifting`, `conditioning` or `mixed`)
+  and `start`; a word like "brutal" stays in the note. A session the
+  trainer cancelled is `"done": false` with `"cancellation": {"by":
+  "trainer", "reason": R}`: not a miss. One that just didn't happen is.
 
 Exit 1 names each annotation that doesn't fit; fix the file and run it
 again. Days the reply says the athlete was ill, injured or away go in as
