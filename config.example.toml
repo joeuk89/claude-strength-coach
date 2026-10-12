@@ -45,6 +45,8 @@ kettlebells = []              # the bells here; [] = kettlebell loads are not ma
 # barbell_increment = 2.5     # smallest jump in total bar load
 # bar_weight = 20.0
 # smith_base_weight = 15.0   # known effective unloaded Smith mass, in athlete units; never inferred
+# ez_bar_weight = 10.0       # your EZ bar's own mass; without it EZ-bar loads are not checked
+# trap_bar_weight = 25.0     # your trap bar's own mass; without it trap-bar loads are not checked
 # plates = [25, 20, 15, 10, 5, 2.5, 1.25]  # plate sizes you have in pairs, one per side; any number of each
 # machine_increment = 5.0
 # cable_increment = 2.5

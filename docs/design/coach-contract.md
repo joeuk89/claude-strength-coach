@@ -318,7 +318,8 @@ stderr carries human-readable diagnostics and progress, each line prefixed
   `bar_weight` and `plates` have no default and must be set. Absent
   `[caps]` and `[equipment.locations]` are empty. Keys inside a location
   table have no defaults: a key left out keeps the main table's value.
-  `smith_base_weight` is optional and has no default in either unit.
+  `smith_base_weight`, `ez_bar_weight` and `trap_bar_weight` are optional
+  and have no default in either unit.
 - **Declaring a table** (R-10): each top-level table is declared in a
   module under `coach/config_tables/` that exports `TABLES = {"name":
   Table(...)}`, built from `coach.config.Key` and `Table`. An item that
@@ -375,6 +376,8 @@ dumbbell_max = 40.0       # per hand; a cap
 barbell_increment = 2.5   # smallest total jump
 bar_weight = 20.0
 # smith_base_weight = 15.0 # explicitly known effective unloaded mass; no default
+# ez_bar_weight = 10.0     # the EZ bar's own mass; no default
+# trap_bar_weight = 25.0   # the trap bar's own mass; no default
 plates = [25, 20, 15, 10, 5, 2.5, 1.25]   # per side, pairs available
 machine_increment = 5.0
 cable_increment = 2.5
@@ -2355,7 +2358,7 @@ Reserved codes:
 | `unearned_load` | block | R-24 | | Load predicted beyond failure for the prescribed reps, or, with no e1RM, more than two increments above the last exposure. |
 | `load_cap` | block | R-24 | | Load above `[caps]` or `dumbbell_max`. |
 | `load_unrepresentable` | block | R-24 | | Load cannot be built from the available increments, dumbbells, kettlebells or plates. |
-| `load_geometry_unknown` | warn | R-24 | | Physical feasibility unknown: configure the known Smith base mass. |
+| `load_geometry_unknown` | warn | R-24 | | Physical feasibility unknown: configure the known Smith, EZ-bar or trap-bar base mass. |
 | `load_mode_mismatch` | block | R-24 | | Line's load mode or load arithmetic disagrees with the library or C5. |
 | `load_mode_unconfirmed` | block | R-24 | | Line's exercise has no confirmed load mode in the library; only confirming it clears the flag. |
 | `rpe_infeasible` | warn | R-24 | | RPE target more than 1 away from the RPE implied by load, reps and current e1RM. |
@@ -2537,14 +2540,15 @@ coach.validity.estimate_minutes(root, session) -> int
   else `dumbbell_max` per hand for per-hand modes.
 - **Representable**: proposal generation and validation share
   `coach.loads.AvailableLoads`. Explicit per-hand dumbbell racks,
-  declared kettlebells and barbell/Smith plate combinations take
+  declared kettlebells and plate combinations on a bar total take
   precedence over an increment.
   Plates name sizes available in pairs, with unlimited pairs of each size
-  as in C5. Barbell totals use `bar_weight`; Smith totals require
-  `smith_base_weight`, the explicitly known effective unloaded mass in
-  athlete units. It is optional, nonnegative and inherited/overridden by
-  location. Missing Smith geometry raises `load_geometry_unknown` (warn)
-  and leaves representability unknown; an ordinary bar is never inferred.
+  as in C5. Barbell totals use `bar_weight`. Smith, EZ-bar and trap-bar
+  totals require `smith_base_weight`, `ez_bar_weight` and
+  `trap_bar_weight`: the explicitly known effective unloaded mass in
+  athlete units, each optional, nonnegative and inherited/overridden by
+  location. A missing one raises `load_geometry_unknown` (warn) and leaves
+  representability unknown; neither an ordinary bar nor zero is inferred.
   Plates filled from the unit default never override a declared
   `barbell_increment`. Without an enumerated rack or plates, the declared
   location equipment increment defines the physical grid; the library
@@ -2552,9 +2556,9 @@ coach.validity.estimate_minutes(root, session) -> int
   no longer names (a historical session's) falls back to the main table.
   Kettlebells have no grid: a declared `kettlebells` list (main table or
   location) names the bells, and without one a kettlebell load is neither
-  selected nor checked. Grids start at zero, or the known base mass
-  for a bar/Smith total. Other loaded equipment uses its corresponding
-  increment when known. Historical off-grid loads are checked too. A load
+  selected nor checked. A bar total's grid starts at its known base mass.
+  Machine, cable and other loaded equipment use their corresponding
+  increment from zero: a machine total is the load added to it. Historical off-grid loads are checked too. A load
   already over its cap is flagged `load_cap` only for representability.
   Impossible loads and explicit rungs raise `load_unrepresentable` with
   instructions to correct the load/rung or equipment configuration.

@@ -16,6 +16,12 @@ def available_loads(library, config, exercise_id, mode, location):
     return AvailableLoads(entry.get("equipment"), mode, kit, increment, plates_win)
 
 
+_BASE_MASS_KEYS = {"barbell": "bar_weight", "smith_machine": "smith_base_weight",
+                   "ez_bar": "ez_bar_weight", "trap_bar": "trap_bar_weight"}
+# Only bar_weight has a default, so these bars' masses are unknown until declared.
+_UNDEFAULTED_BARS = {"smith_machine": "Smith", "ez_bar": "EZ-bar", "trap_bar": "Trap-bar"}
+
+
 @dataclass(frozen=True)
 class AvailableLoads:
     equipment: str
@@ -26,19 +32,19 @@ class AvailableLoads:
 
     @property
     def geometry_warning(self):
-        if self.equipment == "smith_machine" and self.mode == "total" and "smith_base_weight" not in self.kit:
-            return ("Smith load feasibility is unknown: set equipment.smith_base_weight (or the session's "
-                    "location override) to the known effective unloaded mass in athlete units; "
-                    "the ordinary bar_weight cannot supply it")
-        return None
+        if self.mode != "total" or self.equipment not in _UNDEFAULTED_BARS:
+            return None
+        key = _BASE_MASS_KEYS[self.equipment]
+        if key in self.kit:
+            return None
+        return (f"{_UNDEFAULTED_BARS[self.equipment]} load feasibility is unknown: set equipment.{key} (or the "
+                "session's location override) to the known effective unloaded mass in athlete units; "
+                "the ordinary bar_weight cannot supply it")
 
     @property
     def base_weight(self):
-        if self.mode == "total":
-            if self.equipment == "barbell":
-                return self.kit["bar_weight"]
-            if self.equipment == "smith_machine":
-                return self.kit.get("smith_base_weight")
+        if self.mode == "total" and self.equipment in _BASE_MASS_KEYS:
+            return self.kit.get(_BASE_MASS_KEYS[self.equipment])
         return None
 
     @property

@@ -277,7 +277,8 @@ def _half(increment):
 def load_increment(library, config, exercise_id, location):
     """The declared location step, then the library fallback, then the equipment default.
 
-    A location the config no longer names falls back to the main table, as a historical session may.
+    A kettlebell skips the declared step: the library step, else the catalogue's. A location the config no longer
+    names falls back to the main table, as a historical session may.
     """
     entry = library.get(exercise_id)
     equipment = entry["equipment"] if entry else None

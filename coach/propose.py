@@ -25,7 +25,7 @@ from coach.checks.instance import cap_for
 from coach.errors import ConfigError, RefusedError, UsageError, ValidationError
 from coach.library import Library, e1rm_supported
 from coach.load_statements import PER_HAND_X2, bare_figures, bare_message
-from coach.loads import available_loads
+from coach.loads import AvailableLoads, available_loads
 from coach.plugins import base
 
 KINDS = ("weekly", "midweek", "deload")
@@ -756,12 +756,12 @@ def _check_proposal(plugin, proposal):
 
 
 class _Rounding(NamedTuple):
-    available: object
-    cap: object
-    floor: object
-    derived: object
+    available: AvailableLoads | None
+    cap: float | None
+    floor: float | None
+    derived: float | None
     load_direction: int
-    rungs: tuple
+    rungs: tuple[float, ...]
 
 
 def _rounded(sets, clipped, round_down, rounding):

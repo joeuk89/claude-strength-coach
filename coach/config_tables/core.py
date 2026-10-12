@@ -62,6 +62,8 @@ EQUIPMENT_KEYS = {
     "dumbbell_max": Key("number", default=ByUnit({"kg": 40.0}), positive=True),
     "barbell_increment": Key("number", default=ByUnit({"kg": 2.5}), positive=True),
     "smith_base_weight": Key("number", default=OMIT, minimum=0),
+    "ez_bar_weight": Key("number", default=OMIT, minimum=0),
+    "trap_bar_weight": Key("number", default=OMIT, minimum=0),
     "bar_weight": Key("number", default=ByUnit({"kg": 20.0}), minimum=0),
     "plates": Key("list", default=ByUnit({"kg": [25, 20, 15, 10, 5, 2.5, 1.25]}), item="number", distinct=True,
                   positive=True),

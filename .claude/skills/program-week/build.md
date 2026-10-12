@@ -29,8 +29,8 @@ from `overlay build --input <draft>`.
    - `load_cap`, `load_unrepresentable` (block): over a cap, or not a
      load the session's kit makes. Correct the load or equipment declaration;
      explicit ladder rungs need an agreed rung edit, never silent snapping.
-   - `load_geometry_unknown` (warn): confirm the effective unloaded Smith
-     mass and set `equipment.smith_base_weight` at that location, then recheck.
+   - `load_geometry_unknown` (warn): confirm the unloaded mass of the Smith,
+     EZ or trap bar and set the key the flag names at that location, then recheck.
    - `load_mode_mismatch` (block): the line's load mode or load
      arithmetic disagrees with the library. Match the line to the
      library. If the athlete corrects the mode itself, record it with

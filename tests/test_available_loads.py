@@ -28,14 +28,14 @@ class AvailableLoadsTest(unittest.TestCase):
         self.assertIsNotNone(kit.problem(15))
 
     def test_declared_location_then_main_increment_precedes_catalogue(self):
-        cfg = config.load(VALID)
         library = Library.load(VALID)
-        cfg.equipment["dumbbell_increment"] = 2.5
+        raw = {"schema_version": 1, "athlete": {"units": "kg"},
+               "equipment": {"dumbbell_increment": 2.5, "locations": {"home": {"dumbbell_increment": 5}}}}
+        cfg = config.parse(raw, "config.toml")
         self.assertEqual(stats.load_increment(library, cfg, "db_bench_press", None), 2.5)
-        cfg.equipment.locations.home["dumbbell_increment"] = 5
-        cfg.declared_equipment["locations"]["home"]["dumbbell_increment"] = 5
         self.assertEqual(stats.load_increment(library, cfg, "db_bench_press", "home"), 5)
-        cfg.declared_equipment.pop("dumbbell_increment")
+        raw["equipment"].pop("dumbbell_increment")
+        cfg = config.parse(raw, "config.toml")
         self.assertEqual(stats.load_increment(library, cfg, "db_bench_press", None), 2)
 
     def test_a_location_config_does_not_name_uses_the_main_step(self):
@@ -57,18 +57,50 @@ class AvailableLoadsTest(unittest.TestCase):
         self.assertIsNotNone(kit.problem(102.5))
         self.assertEqual(kit.select(102.5, "down"), 100)
 
-    def test_smith_base_is_optional_nonnegative_and_location_specific(self):
-        raw = {"schema_version": 1, "athlete": {"units": "kg"},
-               "equipment": {"smith_base_weight": 15, "locations": {"home": {"smith_base_weight": 7}}}}
-        cfg = config.parse(raw, "config.toml")
-        self.assertEqual(config.equipment_for(cfg)["smith_base_weight"], 15)
-        self.assertEqual(config.equipment_for(cfg, "home")["smith_base_weight"], 7)
-        raw["equipment"]["smith_base_weight"] = -1
-        with self.assertRaises(config.ConfigError):
-            config.parse(raw, "config.toml")
+    def test_base_masses_are_optional_nonnegative_and_location_specific(self):
+        for key in ("smith_base_weight", "ez_bar_weight", "trap_bar_weight"):
+            with self.subTest(key=key):
+                raw = {"schema_version": 1, "athlete": {"units": "kg"},
+                       "equipment": {key: 15, "locations": {"home": {key: 7}}}}
+                cfg = config.parse(raw, "config.toml")
+                self.assertEqual(config.equipment_for(cfg)[key], 15)
+                self.assertEqual(config.equipment_for(cfg, "home")[key], 7)
+                self.assertNotIn(key, config.equipment_for(config.parse(
+                    {"schema_version": 1, "athlete": {"units": "kg"}}, "config.toml")))
+                raw["equipment"][key] = -1
+                with self.assertRaises(config.ConfigError):
+                    config.parse(raw, "config.toml")
 
-    def test_machine_cable_and_other_bar_grids_are_checked(self):
-        for equipment in ("machine", "cable", "ez_bar", "trap_bar"):
+    def test_ez_and_trap_bar_totals_build_on_their_declared_mass(self):
+        plates = [25, 20, 15, 10, 5, 2.5, 1.25]
+        trap = loads.AvailableLoads("trap_bar", "total", {"trap_bar_weight": 27, "plates": plates}, 2.5)
+        self.assertIsNone(trap.geometry_warning)
+        self.assertIsNone(trap.problem(29.5))
+        self.assertIsNone(trap.problem(87))
+        self.assertIn("base mass 27", trap.problem(87.5))
+        self.assertEqual(trap.select(87.5, "down"), 87)
+        ez = loads.AvailableLoads("ez_bar", "total", {"ez_bar_weight": 8, "plates": plates}, 2.5)
+        self.assertIsNone(ez.problem(13))
+        self.assertEqual(ez.select(13, "down"), 13)
+        self.assertEqual(ez.select(12.5, "down"), 10.5)
+
+    def test_a_declared_bar_step_without_plates_counts_from_the_bar_mass(self):
+        trap = loads.AvailableLoads("trap_bar", "total", {"trap_bar_weight": 27, "plates": [20]}, 2.5,
+                                    plates_win=False)
+        self.assertIsNone(trap.problem(29.5))
+        self.assertEqual(trap.select(88), 87)
+        self.assertIsNotNone(trap.problem(87.5))
+
+    def test_an_unknown_ez_or_trap_bar_mass_is_disclosed_not_assumed_zero(self):
+        for equipment, key in (("ez_bar", "ez_bar_weight"), ("trap_bar", "trap_bar_weight")):
+            with self.subTest(equipment=equipment):
+                kit = loads.AvailableLoads(equipment, "total", {"bar_weight": 20, "plates": [5]}, 2.5)
+                self.assertIn(f"equipment.{key}", kit.geometry_warning)
+                self.assertIsNone(kit.problem(29.5))
+                self.assertEqual(kit.select(13, "down"), 13)
+
+    def test_machine_and_cable_grids_count_from_zero(self):
+        for equipment in ("machine", "cable"):
             with self.subTest(equipment=equipment):
                 kit = loads.AvailableLoads(equipment, "total", {}, 5)
                 self.assertIsNotNone(kit.problem(22.5))
@@ -262,6 +294,30 @@ class PhysicalKitProposalTest(ProposeCase):
         kit = loads.AvailableLoads("kettlebell", "single_implement", {}, step)
         self.assertIsNone(kit.problem(16))
         self.assertIsNone(kit.problem(24))
+
+    def test_trap_bar_generation_and_validation_use_the_declared_bar_mass(self):
+        self.edit_json("data/exercises.json", lambda doc: doc["exercises"]["bb_back_squat"].update(
+            equipment="trap_bar"))
+        self.set_config("plates = [25, 20, 15, 10, 5, 2.5, 1.25]", "plates = [20, 10, 5]")
+        self.set_config("bar_weight = 20.0", "bar_weight = 20.0\ntrap_bar_weight = 27")
+        doc = self.fixed("bb_back_squat", 87)
+        line = find_line(doc, "bb_back_squat")
+        self.assertEqual({coaching(s["load"]) for s in working(line)}, {87})
+        self.assertNotIn("load_unrepresentable", codes(doc, "bb_back_squat"))
+        self.assertNotIn("load_geometry_unknown", codes(doc, "bb_back_squat"))
+        for s in line["sets"]:
+            s["load"] = units.make_load(87.5, "total", "kg")
+        checked = validity.report(self.root, doc)
+        self.assertIn("load_unrepresentable", [f["code"] for f in checked["flags"]])
+
+    def test_unknown_trap_bar_mass_discloses_capability_and_leaves_the_load(self):
+        self.edit_json("data/exercises.json", lambda doc: doc["exercises"]["bb_back_squat"].update(
+            equipment="trap_bar"))
+        doc = self.fixed("bb_back_squat", 87)
+        self.assertEqual({coaching(s["load"]) for s in working(find_line(doc, "bb_back_squat"))}, {87})
+        self.assertNotIn("load_unrepresentable", codes(doc, "bb_back_squat"))
+        [flag] = [f for f in doc["flags"] if f["code"] == "load_geometry_unknown"]
+        self.assertIn("trap_bar_weight", flag["message"])
 
     def test_location_smith_base_overrides_main_geometry(self):
         self.smith()
