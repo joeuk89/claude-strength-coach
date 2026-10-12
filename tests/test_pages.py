@@ -20,6 +20,7 @@ import coach.page_parts
 from coach import history, pages, stats, status
 from tests.support import INSTANCES, REPO_ROOT, run_cli
 from tests.support.config_edit import apply
+from tests.support.git import GLOBAL_CONFIG
 from tests.support.history import R_A, R_B, HistoryCase, fixture_workouts, hevy_exercise, hevy_set, hevy_workout
 from tests.support.history import read_json, write_json
 
@@ -642,7 +643,7 @@ def git(root, *args, env=None, check=True):
     return result.stdout
 
 
-GIT_ENV = {"GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1", "GIT_AUTHOR_NAME": "Test",
+GIT_ENV = {"GIT_CONFIG_GLOBAL": GLOBAL_CONFIG, "GIT_CONFIG_NOSYSTEM": "1", "GIT_AUTHOR_NAME": "Test",
            "GIT_AUTHOR_EMAIL": "test@example.invalid", "GIT_COMMITTER_NAME": "Test",
            "GIT_COMMITTER_EMAIL": "test@example.invalid"}
 
@@ -661,6 +662,21 @@ def init_with_upstream(case):
     git(case.root, "commit", "-q", "-m", "baseline", env=case.git_env)
     git(case.root, "remote", "add", "origin", str(case.remote), env=case.git_env)
     git(case.root, "push", "-q", "-u", "origin", "main", env=case.git_env)
+
+
+@unittest.skipIf(shutil.which("git") is None, "needs git")
+class FixtureRepositoryTest(unittest.TestCase):
+    def test_a_commit_and_push_start_no_background_maintenance_on_either_side(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            case = types.SimpleNamespace(tmp=Path(tmp), root=Path(tmp) / "work", env={})
+            case.root.mkdir()
+            (case.root / "notes.txt").write_text("baseline\n", encoding="utf-8")
+            trace = Path(tmp) / "trace.log"
+            with mock.patch.dict(os.environ, {"GIT_TRACE": str(trace)}):
+                init_with_upstream(case)
+            logged = trace.read_text(encoding="utf-8")
+            self.assertIn("receive-pack", logged)
+            self.assertNotIn("maintenance", logged)
 
 
 @unittest.skipIf(shutil.which("git") is None, "needs git")
