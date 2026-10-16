@@ -1061,8 +1061,10 @@ for every non-GET request, success or failure, once its retries are over.
   and null for every optional line field. A draft that names an existing
   `id` rebuilds that overlay, unless it is approved (exit 3).
 - `overlay approve ID` validates first (exit 1), refuses unresolved `block`
-  flags (exit 3), and leaves an overlay whose approval still holds
-  untouched. It also refuses (exit 3) while any line's exercise has no
+  flags (exit 3), stored or found by a fresh R-24 check that the overlay
+  does not hold as an identical resolved flag (C22; the detail names
+  `prescription check --overlay ID --write`), and leaves an overlay whose
+  approval still holds untouched. It also refuses (exit 3) while any line's exercise has no
   confirmed load mode, whatever the stored flags say, listing a
   `load_mode_unconfirmed` detail per line, so an overlay is never
   approved while `load_modes_confirmed` would fail on it. A stored
@@ -2786,7 +2788,9 @@ it refuses (exit 3) on an overlay with any `approval`. Check
 `prescription_valid`: overlays in force on some day from today on have
 no R-24 `block` finding that the overlay does not hold as an identical,
 resolved flag (fail); a `load_mode_unconfirmed` finding fails even when
-held resolved.
+held resolved. The fail names `--write` for an unapproved overlay and,
+for an approved one, a new overlay for its remaining days, since an
+approved overlay is read-only; the fail clears when its span ends.
 
 ## C23. Plugin contract (R-23a; R-23b, R-30a, R-31, R-41b, R-43, R-44a, R-44b read)
 

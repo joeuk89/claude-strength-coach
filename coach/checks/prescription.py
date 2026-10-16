@@ -42,8 +42,16 @@ def prescription_valid(ctx):
         except ValidationError as exc:
             results.append(Result("skip", f"{doc['id']} cannot be checked: {exc.message}", where))
             continue
+        repair = _repair(doc)
         for flag in validity.unresolved_blocks(doc, found):
-            results.append(Result("fail", (
-                f"{flag['code']}: {flag['message']}; settle it, then run python3 -m coach prescription check "
-                f"--overlay {doc['id']} --write"), where))
+            results.append(Result("fail", f"{flag['code']}: {flag['message']}; {repair}", where))
     return results
+
+
+def _repair(doc):
+    """How a finding gets settled: a re-check stores it in an unapproved overlay; an approved one is read-only, so
+    its remaining days need a new overlay."""
+    if doc.get("approval"):
+        return (f"{doc['id']} is approved, so it cannot be re-checked or resolved in place: build a new overlay "
+                "for its remaining days (propose week, or overlay build) and settle the line there")
+    return f"settle it, then run python3 -m coach prescription check --overlay {doc['id']} --write"

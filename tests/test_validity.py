@@ -1,6 +1,7 @@
 """Prescription validity: return bands, the validity window and the overlay checks (contract C21, C22)."""
 
 import ast
+import json
 import re
 import shutil
 import tempfile
@@ -570,6 +571,45 @@ class LayoffTest(unittest.TestCase):
         self.assertEqual(code, 1)
         fails = [r for r in envelope["data"]["results"] if r["status"] == "fail"]
         self.assertTrue(any("stale_prescription" in r["message"] and "28 days off" in r["message"] for r in fails))
+
+    def test_the_fail_names_a_new_overlay_for_an_approved_one_and_write_otherwise(self):
+        approved = self.fails()
+        self.assertTrue(approved)
+        self.assertTrue(all("approved" in r["message"] and "--write" not in r["message"] for r in approved))
+        self.unapprove()
+        fresh = self.fails()
+        self.assertTrue(fresh)
+        self.assertTrue(all("prescription check --overlay 2026-10-12-weekly --write" in r["message"] for r in fresh))
+
+    def fails(self):
+        results = self.coach("check", "--only", "prescription_valid", expect=1)["data"]["results"]
+        return [r for r in results if r["status"] == "fail"]
+
+    def unapprove(self):
+        self.edit(lambda doc: doc.update(approval=None))
+
+    def edit(self, change):
+        path = self.root / OVERLAY
+        doc = read_json(path)
+        change(doc)
+        write_json(path, doc)
+
+    def test_approve_refuses_a_block_a_fresh_check_finds(self):
+        self.unapprove()
+        envelope = self.coach("overlay", "approve", "2026-10-12-weekly", expect=3)
+        self.assertIn("stale_prescription", json.dumps(envelope["error"]["details"]))
+        self.assertIn("prescription check --overlay 2026-10-12-weekly --write", json.dumps(envelope["error"]))
+        self.assertIsNone(read_json(self.root / OVERLAY)["approval"])
+
+    def test_approve_passes_once_the_stored_flag_is_resolved(self):
+        self.unapprove()
+        self.coach("prescription", "check", "--overlay", "2026-10-12-weekly", "--write")
+
+        def resolve(doc):
+            for flag in doc["flags"]:
+                flag.update(resolved=True, resolution="synthetic: the athlete tested it")
+        self.edit(resolve)
+        self.assertTrue(self.coach("overlay", "approve", "2026-10-12-weekly")["data"]["written"])
 
 
 class SlipTest(HistoryCase):

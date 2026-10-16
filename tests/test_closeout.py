@@ -252,8 +252,8 @@ class PublishRecordsTest(CloseOutCase):
         self.assertLessEqual(local, self.status())
 
     def test_a_staged_rename_is_refused_unless_both_paths_are_named(self):
-        git(self.root, "mv", "data/history/2026-10.json", "data/history/moved.json", env=self.git_env)
         self.approve()
+        git(self.root, "mv", "data/history/2026-10.json", "data/history/moved.json", env=self.git_env)
         before = self.snapshot()
         message = self.publish("--include", "data/history/moved.json", expect=3)["error"]["message"]
         self.assertIn("data/history/2026-10.json", message)

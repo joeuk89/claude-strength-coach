@@ -99,7 +99,7 @@ names a command, run that command.
 | `pages_fresh` | `this-week.md`, `README.md` or `progress.md` hand-edited or stale | `pages render` |
 | `pages_line_ceiling` | the brief over its line ceiling | `pages render` |
 | `plugins_valid` | a plugin that breaks the contract | fix what `plugins validate` lists |
-| `prescription_valid` | an overlay line past its validity window or breaking a prescription rule | settle it, then `prescription check` |
+| `prescription_valid` | an overlay line past its validity window or breaking a prescription rule | settle it, then `prescription check --write`; an approved overlay needs a new overlay for its remaining days |
 | `program_balance` | a muscle with no planned hard sets or under its dose target (warn) | review at the next check-in; `structure balance` |
 | `program_exercise_ids` | the program naming an exercise the library lacks | fix the id, or add a `custom_` entry |
 | `program_schema` | `data/program.json` failing its schema: a misspelt key, a missing `load_mode` | fix the JSONPath it names |

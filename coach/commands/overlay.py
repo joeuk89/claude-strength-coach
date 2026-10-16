@@ -205,21 +205,28 @@ def notes(args, ctx):
 
 
 def _approval_blocks(ctx, doc):
-    """The unresolved blocks, with each missing load mode judged against the library as it is now.
+    """The unresolved blocks: those stored, and those a fresh prescription check finds that the overlay does not
+    hold resolved, with each missing load mode judged against the library as it is now.
 
     A stored flag whose mode has since been confirmed still blocks: push refuses
     on stored flags, and only a prescription re-check replaces them.
     """
-    fresh = validity.unconfirmed_flags(ctx.root, doc)
+    found = validity.report(ctx.root, doc, ctx.config)["flags"]
+    fresh = [f for f in found if f["code"] == validity.UNCONFIRMED]
     fresh_lines = {(f["session_id"], f["exercise_id"]) for f in fresh}
+    recheck = f"run python3 -m coach prescription check --overlay {doc['id']} --write"
     blocks = []
     for flag in overlay.unresolved_blocks(doc):
         if flag["code"] != validity.UNCONFIRMED:
             blocks.append(flag)
         elif (flag["session_id"], flag["exercise_id"]) not in fresh_lines:
             blocks.append(dict(flag, message=(
-                f"{flag['exercise_id']} now has a confirmed load mode; run python3 -m coach prescription check "
-                f"--overlay {doc['id']} --write to re-check the overlay against it")))
+                f"{flag['exercise_id']} now has a confirmed load mode; {recheck} to re-check the overlay against it")))
+    stored = {validity.flag_key(f) for f in blocks}
+    for flag in validity.unresolved_blocks(doc, found):
+        if flag["code"] != validity.UNCONFIRMED and validity.flag_key(flag) not in stored:
+            blocks.append(dict(flag, message=f"{flag['message']} (not stored in the overlay; {recheck}, then settle "
+                                             "or resolve it)"))
     return blocks + fresh
 
 
