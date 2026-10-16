@@ -107,7 +107,9 @@ position, and settles its flags. The ones you will hear about most:
   changes only that day's line. A **standing override** (`--standing`,
   with `--until` at most eight weeks away, four by default) keeps the
   change in later weeks so the scheme stops proposing it away; a deload
-  or light week still cuts it. The reason is the coach's audit and never
+  or light week still cuts it. `--derived-from` names the logged workout
+  the new sets come from, so the prescription check judges them against
+  that exposure. The reason is the coach's audit and never
   reaches your pages.
 - **Athlete guidance**, through `python3 -m coach propose note`, needs
   no reason: the week focus, and a line's target note, focus or cues.

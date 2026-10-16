@@ -508,6 +508,54 @@ class LayoffTest(unittest.TestCase):
         message = self.decayed_without_a_source({"date": "2026-09-14", "workout_id": unknown})
         self.assertIn(f"derived_from names workout {unknown}, which the history does not hold", message)
 
+    def overridden(self, sets):
+        """The squat as a scheme line the coach overrode: decayed to its band, its scheme found no exposure."""
+        path = self.root / OVERLAY
+        doc = read_json(path)
+        line = doc["sessions"][0]["exercises"][0]
+        line["override"] = {"reason": "the 14 Sep exposure, cut to the band", "proposed_sets": line["sets"]}
+        line["sets"] = [line["sets"][0]] + sets
+        line["provenance"] = {
+            "scheme": "linear", "derived_from": None, "inferred": False, "rationale": "Linear: the start load.",
+            "decay": {"days_off": 28, "band": "22-42", "load_factor": 0.9, "set_delta": -1, "rpe_cap": None},
+        }
+        write_json(path, doc)
+
+    def test_an_overridden_line_infers_its_source_and_passes_at_the_decayed_load(self):
+        self.overridden(working(5, None, 90, count=2))
+        data = self.coach("prescription", "check", "--overlay", "2026-10-12-weekly")["data"]
+        self.assertEqual([f for f in data["flags"] if f["exercise_id"] == "bb_back_squat"], [])
+        squat = next(row for row in data["lines"] if row["exercise_id"] == "bb_back_squat")
+        self.assertEqual(squat["derived_from"], {"date": "2026-09-14", "workout_id": "10000000-0000-4000-8000-000000000025"})
+        self.assertTrue(squat["inferred"])
+
+    def test_an_overridden_line_above_the_decay_is_stale_on_its_load(self):
+        self.overridden(working(5, None, 95, count=3))
+        [flag] = self.squat_flags()
+        self.assertIn("load 95 is above 90", flag["message"])
+        self.assertNotIn("derived_from is null", flag["message"])
+
+    def test_write_stores_the_inferred_source_on_the_overridden_line(self):
+        self.overridden(working(5, None, 90, count=2))
+        path = self.root / OVERLAY
+        doc = read_json(path)
+        doc["approval"] = None
+        write_json(path, doc)
+        self.coach("prescription", "check", "--overlay", "2026-10-12-weekly", "--write")
+        provenance = read_json(path)["sessions"][0]["exercises"][0]["provenance"]
+        self.assertEqual(provenance["derived_from"]["workout_id"], "10000000-0000-4000-8000-000000000025")
+        self.assertTrue(provenance["inferred"])
+        self.assertEqual(provenance["scheme"], "linear")
+
+    def test_a_scheme_line_with_no_source_is_not_inferred(self):
+        self.overridden(working(5, None, 90, count=2))
+        path = self.root / OVERLAY
+        doc = read_json(path)
+        doc["sessions"][0]["exercises"][0]["override"] = None
+        write_json(path, doc)
+        [flag] = self.squat_flags()
+        self.assertIn("derived_from is null", flag["message"])
+
     def test_a_no_data_line_gets_no_load_flag(self):
         path = self.root / OVERLAY
         doc = read_json(path)

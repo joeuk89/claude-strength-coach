@@ -379,7 +379,7 @@ class _Checker:
 
     def derived_from(self, session_date, line):
         provenance = line.get("provenance")
-        if provenance is not None:
+        if provenance is not None and not infers_source(line):
             return provenance["derived_from"], provenance["inferred"]
         before = min(session_date, dates.parse_date(self.created) + timedelta(days=1))
         found = self.history.baselines(line["exercise_id"], before)
@@ -737,8 +737,16 @@ def unresolved_blocks(doc, found):
     return [f for f in found if f["severity"] == "block" and flag_key(f) not in resolved]
 
 
+def infers_source(line):
+    """True when the checker infers the line's source exposure: a hand-built line, or an overridden one whose
+    scheme named no exposure (the coach's sets replaced the scheme's, so its null source no longer describes them)."""
+    provenance = line.get("provenance")
+    return provenance is None or (provenance["derived_from"] is None and line.get("override") is not None)
+
+
 def fill_provenance(doc, lines):
-    """A copy of the overlay with every null provenance filled with its inferred exposure."""
+    """A copy of the overlay with every inferred source stored: a null provenance becomes one carrying the
+    exposure, and an overridden line's null `derived_from` takes it, both marked `inferred`."""
     filled = dict(doc, sessions=[dict(s, exercises=[dict(line) for line in s["exercises"]]) for s in doc["sessions"]])
     rows = iter(lines)
     for session in filled["sessions"]:
@@ -747,4 +755,6 @@ def fill_provenance(doc, lines):
             if line["provenance"] is None:
                 line["provenance"] = {"scheme": None, "derived_from": row["derived_from"], "inferred": True,
                                       "decay": None, "rationale": None}
+            elif infers_source(line) and row["derived_from"] is not None:
+                line["provenance"] = dict(line["provenance"], derived_from=row["derived_from"], inferred=True)
     return filled

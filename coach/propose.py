@@ -1813,16 +1813,30 @@ def _checked_flags(root, config, doc):
                               config.hevy.enabled)
 
 
+def _source_exposure(root, exercise_id, value):
+    """The `derived_from` ref of the one exposure of `exercise_id` that `value`, a workout id or a date, names."""
+    found = [e for e in history.all_exposures(root) if e["exercise_id"] == exercise_id
+             and value in (e["workout_id"], e["date"])]
+    if not found:
+        raise ValidationError(f"--derived-from {value}: the history holds no exposure of {exercise_id} in that "
+                              "workout or on that date")
+    if len(found) > 1:
+        raise ValidationError(f"--derived-from {value}: {len(found)} workouts that day hold {exercise_id}; name one",
+                              details=[{"path": None, "message": e["workout_id"]} for e in found])
+    return {"date": found[0]["date"], "workout_id": found[0]["workout_id"]}
+
+
 def override(root, config, proposal_id, session_id, exercise_id, new_sets, load, reason, standing, until, now,
-             today, dry_run, day=None):
+             today, dry_run, day=None, derived_from=None):
     """Change one slot's line(s) in a draft, or its line on `day` only, keeping the proposal in
-    `override.proposed_sets` (C24, C25)."""
+    `override.proposed_sets` (C24, C25). `derived_from` names the logged workout the sets come from."""
     if not reason or not reason.strip():
         raise UsageError("--reason must say why the line is overridden")
     if day is not None and standing:
         raise UsageError("--date changes one day's line; a standing override covers the slot on every date")
     draft, proposed, _ = load_proposal(root, proposal_id)
     selected = _locate(draft, session_id, exercise_id, day)
+    source = _source_exposure(root, exercise_id, derived_from) if derived_from is not None else None
     figures = bare_figures(reason)
     if figures and any(line["load_mode"] == PER_HAND_X2 for _, line in selected):
         raise ValidationError(bare_message("override", "reason", figures, exercise_id, reason, config.hevy.enabled))
@@ -1846,6 +1860,9 @@ def override(root, config, proposal_id, session_id, exercise_id, new_sets, load,
         line["sets"] = [s.to_dict() for s in sets]
         line["target_note"] = _calibration_note(line.get("target_note"), sets, line["load_mode"])
         line["override"] = {"reason": reason.strip(), "proposed_sets": before}
+        if source is not None:
+            line["provenance"] = dict(line.get("provenance") or {"scheme": None, "decay": None, "rationale": None},
+                                      derived_from=source, inferred=False)
         line["change"] = change_text(previous["sets"] if previous else None, sets, line["load_mode"], unit,
                                      config.hevy.enabled)
         changed.append({"date": session["date"], "text": sets_text(sets, line["load_mode"], unit, config.hevy.enabled)})

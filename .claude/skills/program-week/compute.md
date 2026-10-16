@@ -103,7 +103,10 @@ timed hold takes seconds, `--sets "2x35s rpe7"`, and a wave's rep-out set keeps
 its `+`, `--sets "1x5+@120"`; `--date <day>` changes only that day's line. Add
 `--standing` (and `--until <date>`, eight weeks at most; four by default) so the
 scheme keeps the change in later weeks (a niggle, an agreed hold); it covers
-sessions to that date, and a deload or light week still cuts it. An approved
+sessions to that date, and a deload or light week still cuts it. When the sets
+come from a logged workout the scheme did not use (a PT session, an exposure at
+another location), add `--derived-from <workout id or date>` so build.md's check
+judges the line against that exposure instead of inferring its newest one. An approved
 override onto a rung moves the ladder to that rung. The reason stays your audit,
 off the athlete's pages; **athlete guidance** (brief.md step 1) needs none:
 `python3 -m coach propose note --proposal <id>` with `--week-focus "<text>"`, or

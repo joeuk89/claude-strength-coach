@@ -23,7 +23,10 @@ from `overlay build --input <draft>`.
      the line to that band as a return week does (compute.md), and
      record it in the line's `provenance.decay` (`days_off`, `band`,
      `load_factor`, `set_delta`, `rpe_cap`) with `derived_from` set to
-     the exposure it came from.
+     the exposure it came from. A line you overrode infers its source
+     from the exercise's newest exposure; when the sets came from
+     another workout, name it with `--derived-from` on the override
+     (compute.md, step 3).
    - `unearned_load` (block): even the fewest reps the line allows are
      beyond failure at the recent e1RM, or, with no e1RM from RPE-rated
      sets, the load is over two increments above the last exposure.

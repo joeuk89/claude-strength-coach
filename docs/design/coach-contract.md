@@ -2573,7 +2573,11 @@ Overlay `schema_version` 2 adds one nullable object per exercise line
   date and before the line's session date); with `prescription check --write` it stores the result
   with `inferred: true`, and `scheme`, `decay` and `rationale` null.
 - `derived_from` null inside a non-null `provenance`: no exposure (first
-  time, start load).
+  time, start load). On a line carrying an `override`, the coach's sets
+  replaced the scheme's, so the validator infers the source as for a
+  hand-built line and `prescription check --write` stores it with
+  `inferred: true`; `propose override --derived-from` names it outright
+  with `inferred: false`.
 - `decay` null: no decay applied. `band` is one of the C22 band ids.
 - `scheme` and `rationale` are filled by R-23a; null in hand-built lines.
 - The draft schema (`overlay_draft`) takes `schema_version` 2 with the
@@ -2633,7 +2637,8 @@ coach.validity.estimate_minutes(root, session) -> int
   pre-layoff assistance. Anything else is `stale_prescription`. An
   exercise with no exposure (first time, start load) is never stale.
   A decayed line of an exercise that has exposures is stale when its
-  `derived_from` is null, names a workout the history doesn't hold, or
+  `derived_from` is null (after the C21 inference for a hand-built or
+  overridden line), names a workout the history doesn't hold, or
   names a `suspect` exposure (C17): its load and sets can't be checked.
 - The layoff is measured to the first session of the overlay or
   proposal (the first session back), so every session of a span shares
@@ -3368,10 +3373,14 @@ coach_led | activity, date, id, kind, title, status, moved_to, quality,
 quality_basis, minutes, rpe, distance_meters, reason}`, so the coach's
 brief names the rest of the week beside the lifting it proposes.
 
-- `propose override --proposal ID --session S --exercise E (--sets SPEC | --load N) --reason TEXT [--date D | --standing [--until D]]`
+- `propose override --proposal ID --session S --exercise E (--sets SPEC | --load N) --reason TEXT [--derived-from W] [--date D | --standing [--until D]]`
   changes the slot's line on every date, or with `--date` only that
   date's (exit 1 when the slot has no line that day; a standing override
   covers every date, so it takes no `--date`), keeps the original in the line's C10 `override.proposed_sets`,
+  with `--derived-from` sets the line's `provenance.derived_from` to the
+  exposure of the exercise that a workout id or a date names (exit 1
+  when the history holds none, or more than one that day) and
+  `inferred` false, so the R-24 check judges the sets against it (C21),
   sets its `change` against the prior agreed prescription (step 3), never
   the proposal it replaces, and records a C25 decision when standing. For a `per_hand_x2` line,
   its reason must pass C13 load-statement validation before any proposal

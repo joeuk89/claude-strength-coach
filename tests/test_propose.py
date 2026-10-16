@@ -746,6 +746,27 @@ class OverrideTest(ProposeCase):
         self.assertIn("at most 8 weeks", envelope["error"]["message"])
         self.override("--load", "95", "--reason", "knee", "--until", "2026-11-01", expect=2)
 
+    def provenance(self):
+        return find_line(read_json(self.draft_path()), "bb_back_squat")["provenance"]
+
+    def test_derived_from_names_the_exposure_the_sets_come_from(self):
+        self.assertEqual(self.provenance()["derived_from"]["workout_id"], W[3])
+        self.override("--load", "95", "--reason", "the 28 Sep session", "--derived-from", W[1])
+        self.assertEqual(self.provenance()["derived_from"], {"date": "2026-09-28", "workout_id": W[1]})
+        self.assertFalse(self.provenance()["inferred"])
+
+    def test_derived_from_takes_a_date_with_one_exposure(self):
+        self.override("--load", "95", "--reason", "the 28 Sep session", "--derived-from", "2026-09-28")
+        self.assertEqual(self.provenance()["derived_from"], {"date": "2026-09-28", "workout_id": W[1]})
+
+    def test_derived_from_refuses_a_workout_without_the_exercise(self):
+        before = self.snapshot()
+        for value in (W[2], "2026-10-01", "10000000-0000-4000-8000-000000000099"):
+            with self.subTest(value=value):
+                envelope = self.override("--load", "95", "--reason", "x", "--derived-from", value, expect=1)
+                self.assertIn("bb_back_squat", envelope["error"]["message"])
+        self.assertEqual(self.snapshot(), before)
+
     def test_an_override_that_makes_a_block_shows_it_in_the_draft_to_resolve(self):
         data = self.override("--sets", "3x5@140 rpe7", "--reason", "synthetic test")
         ref = next(f["ref"] for f in data["flags"] if f["code"] == "unearned_load")

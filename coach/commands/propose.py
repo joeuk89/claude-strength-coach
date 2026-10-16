@@ -50,6 +50,9 @@ def show(args, ctx):
                                                       "per-hand modes)"),
           arg("--reason", required=True, metavar="TEXT", help="why the line changes"),
           arg("--date", metavar="D", help="change the line on this date only (default: every date of the slot)"),
+          arg("--derived-from", metavar="W", help="the logged workout the sets come from, a workout id or a date "
+                                                   "with one exposure of the exercise, stored as the line's source "
+                                                   "for the prescription check"),
           arg("--standing", action="store_true", help="keep this choice in later weeks until --until"),
           arg("--until", metavar="D", help="end date of a standing override (default four weeks; eight at most)")),
     writes=True,
@@ -65,7 +68,8 @@ def override(args, ctx):
         raise UsageError("--until goes with --standing")
     day = _date(args.date, "--date").isoformat() if args.date else None
     return propose.override(ctx.root, ctx.config, args.proposal, args.session, args.exercise, new_sets, args.load,
-                            args.reason, args.standing, until, ctx.now(), ctx.today(), args.dry_run, day)
+                            args.reason, args.standing, until, ctx.now(), ctx.today(), args.dry_run, day,
+                            args.derived_from)
 
 
 @command(
