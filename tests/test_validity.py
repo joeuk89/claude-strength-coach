@@ -388,6 +388,29 @@ class IllnessTest(ValidityCase):
         self.assertNotIn("stale_prescription", codes(self.found()))
 
 
+class NoGapTest(ValidityCase):
+    """A lifting workout logged the day before the first session leaves no gap for an illness to fall in."""
+
+    def setUp(self):
+        super().setUp()
+
+        def add_saturday(found):
+            found.append(dict(found[3], id=W[5], start_time="2026-10-11T18:00:00Z", end_time="2026-10-11T19:00:00Z",
+                              updated_at="2026-10-11T19:00:05Z", created_at="2026-10-11T19:00:05Z"))
+        self.cache(edit=add_saturday)
+        self.sync()
+
+    def test_the_check_runs_and_finds_every_line_in_the_first_band(self):
+        data = self.run_check()["data"]
+        self.assertEqual({row["band"] for row in data["lines"]}, {"0-10"})
+        self.assertNotIn("stale_prescription", codes(data["flags"]))
+
+    def test_an_ill_miss_before_that_workout_caps_nothing(self):
+        self.coach("history", "annotate", "--kind", "miss", "--date", "2026-10-10", "--session", "session-a",
+                   "--tag", "ill")
+        self.assertNotIn("stale_prescription", codes(self.found()))
+
+
 class BiweeklyTest(HistoryCase):
     """A lift trained every 14 days next to a weekly one."""
 

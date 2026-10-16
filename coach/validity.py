@@ -367,9 +367,10 @@ class _Checker:
         last = self.history.last_lifting(first)
         if last is None:
             return None
-        gap = dates.Span(last + timedelta(days=1), first - timedelta(days=1))
-        if gap.end < gap.start:
+        start, end = last + timedelta(days=1), first - timedelta(days=1)
+        if end < start:
             return None
+        gap = dates.Span(start, end)
         reasons = [f"an ill miss on {a['date']}" for a in history.annotations(self.root, "miss")
                    if a.get("tag") == "ill" and gap.start.isoformat() <= a["date"] <= gap.end.isoformat()]
         if not reasons and _ill_status_day(self.root, gap):
