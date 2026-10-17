@@ -44,7 +44,12 @@ def prescription_valid(ctx):
             continue
         repair = _repair(doc)
         for flag in validity.unresolved_blocks(doc, found):
-            results.append(Result("fail", f"{flag['code']}: {flag['message']}; {repair}", where))
+            earlier = validity.earlier_wording(doc, flag)
+            if earlier is None:
+                results.append(Result("fail", f"{flag['code']}: {flag['message']}; {repair}", where))
+            else:
+                results.append(Result("warn", f"{flag['code']}: {flag['message']}; resolved under an earlier wording: "
+                                              f"{earlier}", where))
     return results
 
 

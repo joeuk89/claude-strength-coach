@@ -738,6 +738,14 @@ def unresolved_blocks(doc, found):
     return [f for f in found if f["severity"] == "block" and flag_key(f) not in resolved]
 
 
+def earlier_wording(doc, flag):
+    """The message of a resolved flag an approved overlay holds on `flag`'s code, severity, session and exercise, or
+    None. An approved overlay cannot be re-checked, so its resolution stands when the history rewords the flag."""
+    if not doc.get("approval") or flag["code"] == UNCONFIRMED:
+        return None
+    return next((f["message"] for f in doc["flags"] if f["resolved"] and flag_key(f)[:4] == flag_key(flag)[:4]), None)
+
+
 def infers_source(line):
     """True when the checker infers the line's source exposure: a hand-built line, or an overridden one whose
     scheme named no exposure (the coach's sets replaced the scheme's, so its null source no longer describes them)."""

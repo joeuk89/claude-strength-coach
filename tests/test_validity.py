@@ -622,6 +622,31 @@ class LayoffTest(unittest.TestCase):
         month["workouts"].append(added)
         write_json(path, month)
 
+    def hold_resolved_under_an_earlier_wording(self, exercise_ids):
+        """The overlay holds each finding on these exercises resolved, under a message the check no longer writes."""
+        found = self.coach("prescription", "check", "--overlay", "2026-10-12-weekly")["data"]["flags"]
+        held = [dict(f, message=f"{f['message']} (an earlier wording)", resolved=True, resolution="agreed: tested")
+                for f in found if f["exercise_id"] in exercise_ids]
+        self.edit(lambda doc: doc.update(flags=held))
+
+    def test_an_approved_overlay_warns_on_a_resolution_under_an_earlier_wording(self):
+        self.hold_resolved_under_an_earlier_wording({"bb_back_squat"})
+        results = self.coach("check", "--only", "prescription_valid", expect=1)["data"]["results"]
+        [squat] = [r for r in results if "bb_back_squat" in r["message"]]
+        self.assertEqual(squat["status"], "warn")
+        self.assertIn("resolved under an earlier wording", squat["message"])
+        self.assertIn("(an earlier wording)", squat["message"])
+        others = [r for r in results if "bb_back_squat" not in r["message"]]
+        self.assertTrue(others)
+        self.assertEqual({r["status"] for r in others}, {"fail"})
+
+    def test_an_unapproved_overlay_still_fails_on_an_earlier_wording(self):
+        self.hold_resolved_under_an_earlier_wording({"bb_back_squat"})
+        self.unapprove()
+        results = self.coach("check", "--only", "prescription_valid", expect=1)["data"]["results"]
+        [squat] = [r for r in results if "bb_back_squat" in r["message"]]
+        self.assertEqual(squat["status"], "fail")
+
     def test_approve_passes_once_the_stored_flag_is_resolved(self):
         self.write_and_resolve()
         self.assertTrue(self.coach("overlay", "approve", "2026-10-12-weekly")["data"]["written"])

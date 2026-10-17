@@ -2620,7 +2620,8 @@ coach.validity.days_off(root, exercise_id, session_date, first_back=None) -> int
 coach.validity.window_ok(exposure_age, interval) -> bool   # exposure_age ≤ interval_days + GRACE_DAYS
 coach.validity.check_overlay(root, doc) -> list[flag]
 coach.validity.report(root, doc, config=None) -> {"flags": [...], "lines": [...]}   # what the command prints
-coach.validity.merge_flags(doc, flags), unresolved_blocks(doc, flags), fill_provenance(doc, lines)
+coach.validity.merge_flags(doc, flags), unresolved_blocks(doc, flags), earlier_wording(doc, flag),
+  fill_provenance(doc, lines)
 coach.validity.estimate_minutes(root, session) -> int
 ```
 
@@ -2792,9 +2793,13 @@ it refuses (exit 3) on an overlay with any `approval`. Check
 `prescription_valid`: overlays in force on some day from today on have
 no R-24 `block` finding that the overlay does not hold as an identical,
 resolved flag (fail); a `load_mode_unconfirmed` finding fails even when
-held resolved. The fail names `--write` for an unapproved overlay and,
-for an approved one, a new overlay for its remaining days, since an
-approved overlay is read-only; the fail clears when its span ends.
+held resolved. On an approved overlay, a finding held resolved on the
+same code, severity, session and exercise under another message warns
+instead, naming the stored message (`earlier_wording(doc, flag)`), since
+an approved overlay cannot be re-checked. The fail names `--write` for
+an unapproved overlay and, for an approved one, a new overlay for its
+remaining days, since an approved overlay is read-only; the fail clears
+when its span ends.
 
 ## C23. Plugin contract (R-23a; R-23b, R-30a, R-31, R-41b, R-43, R-44a, R-44b read)
 
