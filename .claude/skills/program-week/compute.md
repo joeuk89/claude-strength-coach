@@ -1,7 +1,6 @@
 # Compute the week (normal, midweek, light and minimum modes)
 
-The scripts compute each line; you coach it. Reason per lift: a formula
-applied blindly is not coaching.
+The scripts compute each line; you coach it. Reason per lift: a formula applied blindly is not coaching.
 
 ## 1. Propose
 
@@ -103,10 +102,9 @@ timed hold takes seconds, `--sets "2x35s rpe7"`, and a wave's rep-out set keeps
 its `+`, `--sets "1x5+@120"`; `--date <day>` changes only that day's line. Add
 `--standing` (and `--until <date>`, eight weeks at most; four by default) so the
 scheme keeps the change in later weeks (a niggle, an agreed hold); it covers
-sessions to that date, and a deload or light week still cuts it. When the sets
-come from a logged workout the scheme did not use (a PT session, an exposure at
-another location), add `--derived-from <workout id or date>` so build.md's check
-judges the line against that exposure instead of inferring its newest one. An approved
+sessions to that date, and a deload or light week still cuts it. Sets taken from a
+logged workout the scheme did not use (a PT session) get `--derived-from <workout
+id or date>`, so build.md's check judges them against that exposure. An approved
 override onto a rung moves the ladder to that rung. The reason stays your audit,
 off the athlete's pages; **athlete guidance** (brief.md step 1) needs none:
 `python3 -m coach propose note --proposal <id>` with `--week-focus "<text>"`, or
@@ -128,12 +126,11 @@ flag cannot be kept: ask how the athlete loads it, then run what its message nam
 ## 5. Structural changes (normal and midweek)
 
 Swaps or additions agreed at the check-in, or proposed now with rationale, are
-plan changes: mark them separately in the brief; they land in
-`data/program.json` too. Under 80 % adherence (as `/check-in` step 4 defines
-it), propose no new recurring session — no new session or weekly slot,
-conditioning and optional ones included — and push back if the athlete asks;
-exercise swaps within a session are fine. An override goes in the next
-check-in's adherence decision line.
+plan changes: mark them separately in the brief; they land in `data/program.json`
+too. Under 80 % adherence (as `/check-in` step 4 defines it), propose no new
+recurring session — no new session or weekly slot, conditioning and optional ones
+included — and push back if the athlete asks; exercise swaps within a session are
+fine. An override goes in the next check-in's adherence decision line.
 
 After "go", once write.md step 1 has edited `data/program.json`, run `python3 -m coach
 propose rebuild --proposal <id>`: the same id and days (a midweek draft less any session
