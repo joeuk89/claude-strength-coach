@@ -2642,6 +2642,10 @@ coach.validity.estimate_minutes(root, session) -> int
   `derived_from` is null (after the C21 inference for a hand-built or
   overridden line), names a workout the history doesn't hold, or
   names a `suspect` exposure (C17): its load and sets can't be checked.
+  Each problem on a line is its own `stale_prescription` flag, and its
+  message names the band but neither the days off nor the newest
+  exposure (`data.lines` carries both), so a stored resolution keeps
+  matching while the history moves within the band.
 - The layoff is measured to the first session of the overlay or
   proposal (the first session back), so every session of a span shares
   it; the exposure age is measured to the line's own session date, so a

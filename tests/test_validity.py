@@ -452,11 +452,12 @@ class LayoffTest(unittest.TestCase):
         found = self.coach("prescription", "check", "--overlay", "2026-10-12-weekly")["data"]["flags"]
         return [f for f in found if f["exercise_id"] == "bb_back_squat"]
 
-    def test_a_stale_squat_names_its_days_off_and_band(self):
+    def test_a_stale_squat_names_its_band_but_not_its_days_off(self):
         [flag] = [f for f in self.squat_flags() if f["code"] == "stale_prescription"]
         self.assertEqual(flag["severity"], "block")
-        self.assertIn("28 days off", flag["message"])
-        self.assertIn("22-42", flag["message"])
+        self.assertIn("return band 22-42", flag["message"])
+        self.assertNotIn("28 days", flag["message"])
+        self.assertNotIn("2026-09-14", flag["message"])
 
     def test_decayed_to_its_band_it_passes(self):
         path = self.root / OVERLAY
@@ -482,9 +483,10 @@ class LayoffTest(unittest.TestCase):
             "decay": {"days_off": 28, "band": "22-42", "load_factor": 0.9, "set_delta": -1, "rpe_cap": None},
         }
         write_json(path, doc)
-        [flag] = self.squat_flags()
-        self.assertIn("load 95 is above 90, the kit's nearest load to 100 × 0.9 (90)", flag["message"])
-        self.assertIn("3 working sets, at most 2", flag["message"])
+        load, sets = sorted((f["message"] for f in self.squat_flags()), key=lambda m: "working sets" in m)
+        self.assertIn("load 95 is above 90, the kit's nearest load to 100 × 0.9 (90)", load)
+        self.assertNotIn("working sets", load)
+        self.assertIn("3 working sets, at most 2", sets)
 
     def decayed_without_a_source(self, derived_from):
         path = self.root / OVERLAY
@@ -532,9 +534,9 @@ class LayoffTest(unittest.TestCase):
 
     def test_an_overridden_line_above_the_decay_is_stale_on_its_load(self):
         self.overridden(working(5, None, 95, count=3))
-        [flag] = self.squat_flags()
-        self.assertIn("load 95 is above 90", flag["message"])
-        self.assertNotIn("derived_from is null", flag["message"])
+        messages = [f["message"] for f in self.squat_flags()]
+        self.assertTrue(any("load 95 is above 90" in m for m in messages), messages)
+        self.assertFalse(any("derived_from is null" in m for m in messages), messages)
 
     def test_write_stores_the_inferred_source_on_the_overridden_line(self):
         self.overridden(working(5, None, 90, count=2))
@@ -570,7 +572,8 @@ class LayoffTest(unittest.TestCase):
         code, envelope, _ = run_cli(["--root", str(LAYOFF), "check", "--only", "prescription_valid"], env=NOW)
         self.assertEqual(code, 1)
         fails = [r for r in envelope["data"]["results"] if r["status"] == "fail"]
-        self.assertTrue(any("stale_prescription" in r["message"] and "28 days off" in r["message"] for r in fails))
+        self.assertTrue(any("stale_prescription" in r["message"] and "return band 22-42" in r["message"]
+                            for r in fails))
 
     def test_the_fail_names_a_new_overlay_for_an_approved_one_and_write_otherwise(self):
         approved = self.fails()
@@ -601,7 +604,7 @@ class LayoffTest(unittest.TestCase):
         self.assertIn("prescription check --overlay 2026-10-12-weekly --write", json.dumps(envelope["error"]))
         self.assertIsNone(read_json(self.root / OVERLAY)["approval"])
 
-    def test_approve_passes_once_the_stored_flag_is_resolved(self):
+    def write_and_resolve(self):
         self.unapprove()
         self.coach("prescription", "check", "--overlay", "2026-10-12-weekly", "--write")
 
@@ -609,6 +612,27 @@ class LayoffTest(unittest.TestCase):
             for flag in doc["flags"]:
                 flag.update(resolved=True, resolution="synthetic: the athlete tested it")
         self.edit(resolve)
+
+    def shorten_the_layoff(self):
+        """A row and pull-up workout on 17 Sep: every lift's days off fall from 28 to 25, still in band 22-42."""
+        path = self.root / "data/history/2026-09.json"
+        month = read_json(path)
+        added = json.loads(json.dumps(month["workouts"][2]).replace("2026-09-10", "2026-09-17"))
+        added["workout_id"] = "10000000-0000-4000-8000-000000000026"
+        month["workouts"].append(added)
+        write_json(path, month)
+
+    def test_approve_passes_once_the_stored_flag_is_resolved(self):
+        self.write_and_resolve()
+        self.assertTrue(self.coach("overlay", "approve", "2026-10-12-weekly")["data"]["written"])
+
+    def test_a_resolution_holds_while_the_days_off_move_within_the_band(self):
+        self.write_and_resolve()
+        self.shorten_the_layoff()
+        lines = self.coach("prescription", "check", "--overlay", "2026-10-12-weekly")["data"]["lines"]
+        self.assertEqual({row["days_off"] for row in lines}, {25})
+        results = self.coach("check", "--only", "prescription_valid")["data"]["results"]
+        self.assertEqual({r["status"] for r in results}, {"pass"}, results)
         self.assertTrue(self.coach("overlay", "approve", "2026-10-12-weekly")["data"]["written"])
 
 

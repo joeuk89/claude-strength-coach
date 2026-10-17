@@ -238,7 +238,7 @@ old load is `stale_prescription`, a blocking flag. From a test workspace
 after 28 days off:
 
 ```text
-stale_prescription: bb_back_squat in session-a on 2026-10-12: 28 days off (newest exposure 2026-09-14) fall in return band 22-42, and the line is not decayed to it
+stale_prescription: bb_back_squat in session-a on 2026-10-12: its days off fall in return band 22-42, and the line is not decayed to it
 ```
 
 The coach decays the line to that band and records where it came from.

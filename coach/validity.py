@@ -432,8 +432,8 @@ class _Checker:
         return why
 
     def stale(self, session, line, working, facts, band, derived, illness, coach_set=False):
-        """R-24's stale-prescription problems. A `coach_set` first load derives from no exposure, so the
-        return-band decay has nothing to check it against."""
+        """R-24's stale-prescription problems, one flag each. A `coach_set` first load derives from no exposure, so
+        the return-band decay has nothing to check it against."""
         problems = []
         if facts["newest"] is not None and band.id != RETURN_BANDS[0].id and not coach_set:
             problems += self.decay_problems(session, line, working, facts, band, derived)
@@ -442,12 +442,13 @@ class _Checker:
             if over:
                 problems.append(f"{illness[1]} falls in the gap before this first session back, so every working "
                                 f"set needs RPE {ILLNESS_RPE_CAP} or below ({len(over)} set(s) are not)")
-        if problems:
-            self.flag("stale_prescription", session, line, f"{self.where(session, line)}: {'; '.join(problems)}")
+        for problem in problems:
+            self.flag("stale_prescription", session, line, f"{self.where(session, line)}: {problem}")
 
     def decay_problems(self, session, line, working, facts, band, derived):
-        lead = (f"{facts['days_off']} days off (newest exposure {facts['newest']['date']}) fall in return band "
-                f"{band.id}")
+        """The decay problems, worded without the days off or the newest exposure, which move with the history and
+        would part a stored resolution from its flag (C22)."""
+        lead = f"its days off fall in return band {band.id}"
         provenance = line.get("provenance") or {}
         decay = provenance.get("decay")
         if decay is None:
