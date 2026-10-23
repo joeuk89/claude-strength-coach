@@ -546,7 +546,7 @@ class _Checker:
                     None)
         if slot is None:
             return None
-        return sum(group.get("count", 1) for group in slot.get("sets", []) if overlay.is_working(group)) or None
+        return sum(group.get("count", 1) for group in slot.get("sets", []) if overlay.is_working(group))
 
     def increment(self, line, session):
         if self.library is None:

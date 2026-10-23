@@ -550,6 +550,14 @@ class LayoffTest(unittest.TestCase):
         [message] = self.pull_up_without_a_source(working(8, 8, 0, count=3, mode="bodyweight"))
         self.assertIn("3 working sets, at most 2 after the band's -1 from the program's 3", message)
 
+    def test_a_warm_up_only_bodyweight_line_with_no_source_passes(self):
+        path = self.root / "data" / "program.json"
+        doc = read_json(path)
+        doc["sessions"][1]["exercises"][1]["sets"] = [{"count": 2, "type": "warmup", "reps": 8, "rpe": 5}]
+        write_json(path, doc)
+        warm_ups = [{"type": "warmup", "reps": 8, "rpe": 5, "load": None} for _ in range(2)]
+        self.assertEqual(self.pull_up_without_a_source(warm_ups), [])
+
     def test_a_weighted_bodyweight_line_with_no_source_is_still_stale(self):
         [message] = self.pull_up_without_a_source(working(8, 8, 10, count=2, mode="bodyweight"))
         self.assertIn("names no logged workout of this lift to measure the cut from", message)
