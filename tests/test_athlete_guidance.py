@@ -526,18 +526,20 @@ class BeginnerWarmupTest(RebuildCase):
         self.edit_json("data/program.json", warm_up)
         self.run_coach("program", "validate")
 
-    def test_warm_up_sets_stand_in_for_the_ramp_and_stay_off_the_working_sets(self):
+    def test_warm_up_sets_stand_in_for_the_ramp_and_carry_loads_off_the_working_sets(self):
         proposed = self.run_coach("propose", "week", "--week", "2026-W43")["overlay"]
         squat, row = line(proposed, "bb_back_squat"), line(proposed, "db_single_arm_row")
         self.assertNotIn(propose.RAMP_NOTE, squat["target_note"] or "")
         self.assertEqual(row["target_note"], propose.RAMP_NOTE)
         self.assertEqual([s["type"] for s in squat["sets"]][:2], ["warmup", "warmup"])
         self.assertEqual(len([s for s in squat["sets"] if overlay.is_working(s)]), 3)
-        self.assertTrue(all(s.get("load") is None for s in squat["sets"] if s["type"] == "warmup"))
+        # The ramp derives from the first working set (50 % and 75 %, on 2.5 kg plates), never from a guess.
+        self.assertEqual([s["load"]["hevy_total"] for s in squat["sets"] if s["type"] == "warmup"], [50, 75])
         doc = self.run_coach("propose", "finalize", "--proposal", W43)["overlay"]
         self.run_coach("overlay", "approve", W43)
         text = sheets.render_sheets(self.root, doc["id"])
-        self.assertIn("| Back Squat (Barbell) | 2×5 warm-up |", text)
+        self.assertIn("| Back Squat (Barbell) | 1×5 warm-up | 50 |", text)
+        self.assertIn("|  | 1×5 warm-up | 75 |", text)
         self.assertEqual(render.target_line(line(doc, "bb_back_squat")).split(" @ ")[0], "Target: 3×5")
 
 
@@ -564,7 +566,9 @@ class GuidanceWorkflowTest(unittest.TestCase):
         brief = flat(step_text("program-week", "brief.md"))
         self.assertIn("never swap in an unexplained number", brief)
         self.assertIn("the program's warm-up sets, or the qualitative ramp note", brief)
-        self.assertIn("no warm-up loads or percentages the coach has not agreed", brief)
+        self.assertIn("Warm-up loads come from the proposal, ramped from the line's first working set", brief)
+        self.assertIn("a `warmup_load` or `warmup_percent` pin on the set group", brief)
+        self.assertIn("never a number typed into a line", brief)
         self.assertIn("Guess no number for them", flat(step_text("new-program", "starter.md")))
         self.assertIn("calibration note in place of a guessed number", flat(step_text("new-program", "design.md")))
 

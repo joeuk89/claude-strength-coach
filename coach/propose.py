@@ -22,7 +22,7 @@ from coach import dates, decisions, flags, followups, history, jsonio, niggles, 
 from coach import capacity, cardio, conditioning, external, first_loads, interference, program, research, statusdays
 from coach import timing, week_view, weekflags
 from coach import state as state_module
-from coach import stats, units, validity
+from coach import stats, units, validity, warmups
 from coach.activity.records import utc_text
 from coach.checks.instance import cap_for
 from coach.errors import ConfigError, RefusedError, UsageError, ValidationError
@@ -40,7 +40,7 @@ CALIBRATION_SET_NOTE = ("First time at this load: adjust it after the first work
                         "RPE shown.")
 RAMP_NOTE = ("Warm up first: a few lighter sets, with fewer reps as the load rises toward the first working set; "
              "they are not working sets.")
-RAMP_MODES = ("total", "per_hand_x2", "single_implement")
+RAMP_MODES = warmups.MODES
 DECAY_AFTER_DAYS = validity.RETURN_BANDS[0].upper
 STALL_EXPOSURES = 3
 _SET_SPEC = re.compile(r"^\s*(\d+)\s*[x×]\s*(\d+)(?:\s*-\s*(\d+))?\s*(\+)?\s*(s)?\s*(?:@\s*(\d+(?:\.\d+)?))?\s*"
@@ -874,6 +874,10 @@ def propose_line(run, session, day, exercise, ctx_extra):
         rungs)
     week_ceiling = _week_ceiling(ctx_extra["kind"], decay)
     ceiling = _ceiling_for(mode, evidence, source)
+    warmup_pins = warmups.pins(exercise["sets"])
+
+    def ramped(sets):
+        return warmups.with_loads(sets, mode, rounding.available, warmup_pins)
 
     def limited(sets, round_down, load_cut, cut_from):
         """Constraints, the illness cap, caps, RPE ceilings and rounding: what every load passes after its scheme.
@@ -965,7 +969,7 @@ def propose_line(run, session, day, exercise, ctx_extra):
         if first_after_illness:
             kept_adjusted.append(f"an RPE {validity.ILLNESS_RPE_CAP} cap on the first session after illness")
         kept_adjusted += kept_words
-        override = {"reason": kept_from["reason"], "proposed_sets": [s.to_dict() for s in sets]}
+        override = {"reason": kept_from["reason"], "proposed_sets": [s.to_dict() for s in ramped(sets)]}
         scheme_text = sets_text(sets, mode, run.unit, run.show_hevy)
         kept_text = sets_text(chosen_sets, mode, run.unit, run.show_hevy)
         if kept_adjusted:
@@ -989,6 +993,12 @@ def propose_line(run, session, day, exercise, ctx_extra):
     if unchecked:
         clauses.append(unchecked)
         line_flags.append(line_flag("rpe_ceiling_unchecked", f"{info.name}: {unchecked}"))
+
+    sets = ramped(sets)
+    warmup_words = warmups.words(sets, mode, rounding.available, warmup_pins,
+                                 lambda v: _load_text(v, mode, run.unit, run.show_hevy))
+    if warmup_words:
+        clauses.append(warmup_words)
 
     rep_out_words = _rep_out_words(sets)
     if rep_out_words:
@@ -1907,6 +1917,7 @@ def override(root, config, proposal_id, session_id, exercise_id, new_sets, load,
             sets = base.with_load(current, load)
         if line["load_mode"] not in units.LOADED_MODES and any(s.load is not None for s in sets):
             raise ValidationError(f"{exercise_id} is {line['load_mode']}, which carries no load")
+        sets = _ramped_override(root, config, session, line, sets)
         line["sets"] = [s.to_dict() for s in sets]
         line["target_note"] = _calibration_note(line.get("target_note"), sets, line["load_mode"])
         line["override"] = {"reason": reason.strip(), "proposed_sets": before}
@@ -1931,6 +1942,18 @@ def override(root, config, proposal_id, session_id, exercise_id, new_sets, load,
         _write_proposal(root, proposal_id, draft, None, None)
     return {"id": proposal_id, "session_id": session_id, "exercise_id": exercise_id, "lines": changed,
             "decision": decision, "flags": flags.with_refs(draft["flags"]), "written": not dry_run}
+
+
+def _ramped_override(root, config, session, line, sets):
+    """The overridden sets with their warm-ups ramped again from the new first working load (C24)."""
+    mode = line["load_mode"]
+    if mode not in warmups.MODES:
+        return sets
+    program_doc = program.load(root)
+    slot = next((e for s in program_doc["sessions"] if s["id"] == session["session_id"] for e in s["exercises"]
+                 if e["exercise_id"] == line["exercise_id"]), None)
+    available = available_loads(Library.load(root), config, line["exercise_id"], mode, session.get("location"))
+    return warmups.with_loads(sets, mode, available, warmups.pins(slot["sets"]) if slot else ())
 
 
 def note(root, config, proposal_id, week_focus, session_id, exercise_id, fields, dry_run):

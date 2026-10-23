@@ -159,6 +159,11 @@ Cues: narrow grip · elbows tucked · feet planted
   `notes` field in the standard format (see "Routine note format"
   above) whenever a routine is written to Hevy.
 - **Set `type`** is one of `normal`, `warmup`, `dropset`, `failure`.
+- **Warm-up sets carry `weight_kg` too.** A routine set written without a
+  weight shows the app's placeholder from the last logged workout, however
+  old, so the push sends each warm-up's load from the approved overlay
+  (the ramp the proposal derives from the first working set). Only a
+  warm-up whose overlay load is null goes without one.
 - **PUT replaces the entire routine** — to change one exercise, GET the routine,
   edit the JSON, PUT the whole thing back. Write only with the athlete's
   approval: "go" to a coach's brief whose closing line named the routine, a

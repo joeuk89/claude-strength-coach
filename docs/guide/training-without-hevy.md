@@ -114,11 +114,16 @@ coach works through it. From the test workspace above, for Session A:
 
 | Exercise | The coach asks | Why |
 |---|---|---|
-| Back Squat (Barbell), sets 1 to 3 | Did you do the reps and load as written? | Fixed reps and a set load are prefilled, but kept only when you confirm them |
-| Back Squat (Barbell), sets 1 to 3 | How hard did each set feel? The target was RPE 7 | An RPE target is never a logged RPE |
-| Bench Press (Dumbbell), sets 1 to 3 | How many reps in each set? The plan was 8 to 10 | A range is not a count, so reps stay empty until you give them |
-| Bench Press (Dumbbell), sets 1 to 3 | Was the load as written? | As for the squat |
-| Bench Press (Dumbbell), sets 1 to 3 | How hard did each set feel? The target was RPE 8 | As for the squat |
+| Back Squat (Barbell), sets 1 to 4 | Did you do the reps and load as written? | The warm-up and the fixed reps and loads are prefilled, but kept only when you confirm them |
+| Back Squat (Barbell), sets 2 to 4 | How hard did each set feel? The target was RPE 7 | An RPE target is never a logged RPE; a warm-up gets no RPE question |
+| Bench Press (Dumbbell), set 1 | Did you warm up as written? | The warm-up's reps and load are prefilled |
+| Bench Press (Dumbbell), sets 2 to 4 | How many reps in each set? The plan was 8 to 10 | A range is not a count, so reps stay empty until you give them |
+| Bench Press (Dumbbell), sets 2 to 4 | Was the load as written? | As for the squat |
+| Bench Press (Dumbbell), sets 2 to 4 | How hard did each set feel? The target was RPE 8 | As for the squat |
+
+Set numbers count the draft's sets, warm-ups included. A warm-up with a
+load on the sheet comes into the draft as prescribed; one without a load
+is left out and never asked about.
 
 The rules behind the list:
 

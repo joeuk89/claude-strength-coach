@@ -188,6 +188,22 @@ library search "<name>"` finds an id.
 and back-offs are two groups on one exercise. A `duration` exercise
 needs `duration_seconds`; a `distance` exercise needs `distance_meters`.
 
+**Warm-up loads** are not written in the program: each week the coach
+scripts derive them from the line's first working load, after any
+return cut or deload, and round them to your kit. One warm-up is 60 %
+of it; two are 50 % and 75 %; three are 40 %, 60 % and 80 %; more
+spread evenly from 40 % to 80 %. A barbell warm-up never drops below
+`bar_weight`, a dumbbell warm-up lands on your rack, and no warm-up is
+as heavy as the first working set (when nothing lighter exists, the
+warm-up has no load). On a coarse rack or a heavy bar two warm-ups can
+land on the same load; then only the first keeps it. A bar whose own
+mass config does not declare (`smith_base_weight`, `ez_bar_weight`,
+`trap_bar_weight`) rounds to its increment instead. Bodyweight, assisted
+and banded exercises keep load-less warm-ups. To fix a warm-up instead, pin it on its group:
+`"warmup_load": 40` (your units, per hand for dumbbells) or
+`"warmup_percent": 70`. A pinned load that a cut week brings level with
+the working sets falls back to the ramp for that position.
+
 A **rep-out set**, written `5+` on your pages, is at least those reps
 and then as many more as you can before its RPE stop (9 by default). It
 is not a set to failure. The program file holds no rep-out marker: the

@@ -3,7 +3,7 @@
   "source": "hevy_import",
   "created_at": "2026-10-11T18:00:00Z",
   "program": {
-    "schema_version": 9,
+    "schema_version": 10,
     "name": "Program (imported from Hevy)",
     "sessions": [
       {

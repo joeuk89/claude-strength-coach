@@ -206,6 +206,12 @@ Cues: elbows tucked · feet planted
   relative wording goes stale the moment the week ends.
 - **Focus** appears only when the line has a weekly emphasis.
 - **Cues** come from the exercise's `cues` in `data/program.json`.
+- **Warm-up sets carry their weight** in the routine, like working sets:
+  the ramp the proposal derives from the first working set (see
+  [Programming the week](programming-the-week.md)), so the app shows
+  this week's warm-ups, not the loads from the last time you logged the
+  exercise. A warm-up with no load (a bodyweight line, or nothing lighter
+  than the work sets on your kit) is sent without one.
 
 **What it never writes.** Hevy routines cannot store an RPE target, so
 RPE reaches you only through the note. Nothing writes routine-level

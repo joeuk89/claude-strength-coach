@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 
 from coach import config as config_module
-from coach import jsonio, paths, plugins, summaries, units
+from coach import jsonio, paths, plugins, summaries, units, warmups
 from coach.errors import ConfigError, ValidationError
 from coach.library import MUSCLES, Library, e1rm_supported
 from coach.validate import Error
@@ -478,11 +478,27 @@ def _exercise_errors(exercise, path):
             errors.append(Error(group_path, "a duration set group needs duration_seconds"))
         if mode == "distance" and group.get("distance_meters") is None:
             errors.append(Error(group_path, "a distance set group needs distance_meters"))
+        errors += _warmup_pin_errors(group, mode, group_path)
     if mode not in units.LOADED_MODES and exercise["start_load"] is not None:
         errors.append(Error(f"{path}.start_load", f"load mode {mode} carries no load; leave start_load null"))
     for index, constraint in enumerate(exercise["constraints"]):
         errors += _constraint_errors(constraint, f"{path}.constraints[{index}]")
     return errors
+
+
+def _warmup_pin_errors(group, mode, path):
+    """A pinned warm-up load (`warmup_load`, or `warmup_percent` of the first working load) sits on a warm-up group
+    of a line that ramps: total, per-hand or single-implement."""
+    pinned = [key for key in ("warmup_load", "warmup_percent") if group.get(key) is not None]
+    if not pinned:
+        return []
+    if group["type"] != "warmup":
+        return [Error(f"{path}.{pinned[0]}", f"{pinned[0]} goes on a warmup set group, not a {group['type']} one")]
+    if mode not in warmups.MODES:
+        return [Error(f"{path}.{pinned[0]}", f"load mode {mode} keeps load-less warm-ups; leave {pinned[0]} null")]
+    if len(pinned) == 2:
+        return [Error(f"{path}.warmup_percent", "give warmup_load or warmup_percent, not both")]
+    return []
 
 
 def _constraint_errors(constraint, path):
@@ -665,6 +681,16 @@ def _start_load(exercise, unit, show_hevy=True):
     return units.format_load(units.make_load(exercise["start_load"], exercise["load_mode"], unit), show_hevy=show_hevy)
 
 
+def _pinned_warmup(group, exercise, unit):
+    """What a warm-up group's Start load cell says: its pinned load or percent, else nothing (the ramp is derived)."""
+    if group.get("warmup_load") is not None:
+        load = units.make_load(group["warmup_load"], exercise["load_mode"], unit)
+        return f"{units.format_load(load, show_hevy=False)} pinned"
+    if group.get("warmup_percent") is not None:
+        return f"{units.format_number(group['warmup_percent'])} % pinned"
+    return ""
+
+
 def _exercise_rows(exercise, library, unit, show_hevy, names):
     entry = library.get(exercise["exercise_id"])
     name = entry["name"] if entry else exercise["exercise_id"]
@@ -675,7 +701,7 @@ def _exercise_rows(exercise, library, unit, show_hevy, names):
     rows = []
     for index, group in enumerate(groups):
         rpe = _number(group["rpe"]) if group.get("rpe") is not None else ""
-        load = _start_load(exercise, unit, show_hevy) if index == load_row else ""
+        load = _start_load(exercise, unit, show_hevy) if index == load_row else _pinned_warmup(group, exercise, unit)
         if index == 0:
             rest = f"{exercise['rest_seconds']} s" if exercise["rest_seconds"] is not None else ""
             scheme = summaries.scheme_text(exercise["scheme"], names, exercise["load_mode"])

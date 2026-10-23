@@ -264,7 +264,7 @@ class DoseIntentTest(StructureCase):
         self.edit("data/program.json", lambda doc: doc.update(schema_version=step.from_version))
         self.data("migrate", "run")
         migrated = read_json(self.root / "data" / "program.json")
-        self.assertEqual(migrated["schema_version"], step.to_version)
+        self.assertEqual(migrated["schema_version"], jsonio.current_version(jsonio.load_schema("program")))
         self.assertNotIn("dose_intent", migrated)
         self.assertIsNone(program.load(self.root)["dose_intent"])
 

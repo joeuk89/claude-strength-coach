@@ -92,6 +92,10 @@ class NoHevyCase(unittest.TestCase):
     def bench(self, draft):
         return next(e for e in draft["exercises"] if e["exercise_id"] == "db_bench_press")
 
+    @staticmethod
+    def working(exercise):
+        return [s for s in exercise["sets"] if s["type"] != "warmup"]
+
 
 class PrefillTest(NoHevyCase):
     def test_db_bench_comes_back_in_the_athletes_number(self):
@@ -99,17 +103,33 @@ class PrefillTest(NoHevyCase):
         bench = self.bench(draft)
         self.assertEqual(bench["load_mode"], "per_hand_x2")
         self.assertEqual(bench["unit"], "kg")
-        self.assertEqual(len(bench["sets"]), 3)
-        for set_ in bench["sets"]:
+        self.assertEqual(len(bench["sets"]), 4)
+        self.assertEqual(bench["sets"][0], {"type": "warmup", "reps": 10, "rpe": None, "value": 12.5,
+                                            "duration_seconds": None, "distance_meters": None})
+        for set_ in bench["sets"][1:]:
             self.assertEqual(set_["value"], 25)
             self.assertIsNone(set_["reps"])
             self.assertIsNone(set_["rpe"])
             self.assertEqual(set_["type"], "normal")
 
-    def test_fixed_reps_and_loads_are_filled_and_warm_ups_left_out(self):
+    def test_fixed_reps_and_loads_are_filled_and_a_loaded_warm_up_comes_with_them(self):
         draft = self.prefill()
         squat = next(e for e in draft["exercises"] if e["exercise_id"] == "bb_back_squat")
-        self.assertEqual([(s["reps"], s["value"]) for s in squat["sets"]], [(5, 100)] * 3)
+        self.assertEqual([(s["type"], s["reps"], s["value"]) for s in squat["sets"]],
+                         [("warmup", 5, 60)] + [("normal", 5, 100)] * 3)
+
+    def test_a_warm_up_without_a_load_stays_out_of_the_draft_and_is_never_asked_for(self):
+        path = self.root / "data" / "overlays" / f"{WEEKLY}.json"
+        doc = read_json(path)
+        session = next(s for s in doc["sessions"] if s["session_id"] == "session-a")
+        squat = next(e for e in session["exercises"] if e["exercise_id"] == "bb_back_squat")
+        squat["sets"][0]["load"] = None
+        write_json(path, doc)
+        data = self.coach("log", "prefill", "--session", "session-a", "--date", "2026-10-12")["data"]
+        squat = next(e for e in data["draft"]["exercises"] if e["exercise_id"] == "bb_back_squat")
+        self.assertEqual([(s["type"], s["reps"], s["value"]) for s in squat["sets"]], [("normal", 5, 100)] * 3)
+        self.assertEqual([a for a in data["ask"] if a["field"] == "value"], [])
+        self.assertEqual({tuple(a["sets"]) for a in data["ask"] if a["exercise_id"] == "bb_back_squat"}, {(1, 2, 3)})
 
     def test_the_draft_is_a_line_without_id_and_logged_at(self):
         draft = self.prefill()
@@ -375,20 +395,22 @@ class ObservedNotPrescribedTest(NoHevyCase):
     def test_prefill_keeps_the_prescription_beside_a_draft_that_invents_nothing(self):
         data = self.prefill_data()
         draft = data["draft"]
-        self.assertEqual([(s["reps"], s["rpe"]) for s in self.bench(draft)["sets"]], [(None, None)] * 3)
-        self.assertEqual([(s["reps"], s["value"], s["rpe"]) for s in self.squat(draft)["sets"]], [(5, 100, None)] * 3)
+        self.assertEqual([(s["reps"], s["rpe"]) for s in self.bench(draft)["sets"]],
+                         [(10, None)] + [(None, None)] * 3)
+        self.assertEqual([(s["reps"], s["value"], s["rpe"]) for s in self.squat(draft)["sets"]],
+                         [(5, 60, None)] + [(5, 100, None)] * 3)
         [reps] = self.asks(data, "db_bench_press", "reps")
-        self.assertEqual((reps["sets"], reps["prescribed"]), ([1, 2, 3], {"start": 8, "end": 10}))
+        self.assertEqual((reps["sets"], reps["prescribed"]), ([2, 3, 4], {"start": 8, "end": 10}))
         self.assertIn("8–10", reps["message"])
         [effort] = self.asks(data, "db_bench_press", "rpe")
-        self.assertEqual((effort["sets"], effort["prescribed"]), ([1, 2, 3], 8))
+        self.assertEqual((effort["sets"], effort["prescribed"]), ([2, 3, 4], 8))
         [squat_effort] = self.asks(data, "bb_back_squat", "rpe")
-        self.assertEqual(squat_effort["prescribed"], 7)
+        self.assertEqual((squat_effort["sets"], squat_effort["prescribed"]), ([2, 3, 4], 7))
         self.assertIn("never the target", squat_effort["message"])
         [as_written] = self.asks(data, "bb_back_squat", "as_written")
-        self.assertEqual((as_written["sets"], as_written["prescribed"]), ([1, 2, 3], ["reps", "load"]))
-        [bench_load] = self.asks(data, "db_bench_press", "as_written")
-        self.assertEqual((bench_load["sets"], bench_load["prescribed"]), ([1, 2, 3], ["load"]))
+        self.assertEqual((as_written["sets"], as_written["prescribed"]), ([1, 2, 3, 4], ["reps", "load"]))
+        bench_written = {tuple(a["sets"]): a["prescribed"] for a in self.asks(data, "db_bench_press", "as_written")}
+        self.assertEqual(bench_written, {(1,): ["reps", "load"], (2, 3, 4): ["load"]})
         self.assertEqual(self.asks(data, "bb_back_squat", "reps"), [])
         self.assertEqual([a for a in data["ask"] if a["field"] == "value"], [])
 
@@ -405,11 +427,12 @@ class ObservedNotPrescribedTest(NoHevyCase):
     def test_a_choose_the_load_set_asks_for_the_load_instead_of_claiming_it_is_prefilled(self):
         self.choose_the_squat_load()
         data = self.prefill_data()
-        self.assertEqual([(s["reps"], s["value"]) for s in self.squat(data["draft"])["sets"]], [(5, None)] * 3)
+        self.assertEqual([(s["reps"], s["value"]) for s in self.squat(data["draft"])["sets"]],
+                         [(5, 60)] + [(5, None)] * 3)
         [load] = self.asks(data, "bb_back_squat", "value")
-        self.assertEqual((load["sets"], load["prescribed"]), ([1, 2, 3], None))
+        self.assertEqual((load["sets"], load["prescribed"]), ([2, 3, 4], None))
         self.assertIn("choose the load", load["message"])
-        [as_written] = self.asks(data, "bb_back_squat", "as_written")
+        as_written = next(a for a in self.asks(data, "bb_back_squat", "as_written") if a["sets"] == [2, 3, 4])
         self.assertEqual(as_written["prescribed"], ["reps"])
         self.assertNotIn("load", as_written["message"])
 
@@ -431,9 +454,9 @@ class ObservedNotPrescribedTest(NoHevyCase):
         self.assertTrue(envelope["data"]["written"])
         [warning] = [w for w in envelope["warnings"] if w.startswith("load_unknown")]
         self.assertIn("Back Squat", warning)
-        self.assertIn("sets 1–3", warning)
+        self.assertIn("sets 2–4", warning)
         filled = self.filled()
-        for set_ in self.squat(filled)["sets"]:
+        for set_ in self.working(self.squat(filled)):
             set_["value"] = 90
         envelope = self.add(filled, "--again")
         self.assertEqual([w for w in envelope["warnings"] if w.startswith("load_unknown")], [])
@@ -450,13 +473,13 @@ class ObservedNotPrescribedTest(NoHevyCase):
         self.make_the_last_squat_set_a_rep_out()
         data = self.prefill_data()
         self.assertEqual([(s["reps"], s["value"]) for s in self.squat(data["draft"])["sets"]],
-                         [(5, 100), (5, 100), (None, 100)])
+                         [(5, 60), (5, 100), (5, 100), (None, 100)])
         [reps] = self.asks(data, "bb_back_squat", "reps")
-        self.assertEqual((reps["sets"], reps["prescribed"]), ([3], {"at_least": 5}))
+        self.assertEqual((reps["sets"], reps["prescribed"]), ([4], {"at_least": 5}))
         self.assertIn("at least 5", reps["message"])
         as_written = {tuple(a["sets"]): a["prescribed"] for a in self.asks(data, "bb_back_squat", "as_written")}
-        self.assertEqual(as_written, {(1, 2): ["reps", "load"], (3,): ["load"]})
-        stop = next(a for a in self.asks(data, "bb_back_squat", "rpe") if a["sets"] == [3])
+        self.assertEqual(as_written, {(1, 2, 3): ["reps", "load"], (4,): ["load"]})
+        stop = next(a for a in self.asks(data, "bb_back_squat", "rpe") if a["sets"] == [4])
         self.assertEqual(stop["prescribed"], 9)
         self.assertIn("stop at 9", stop["message"])
         self.assertNotIn("target", stop["message"])
@@ -464,9 +487,9 @@ class ObservedNotPrescribedTest(NoHevyCase):
         envelope = self.add(data["draft"], expect=1)
         self.assertIn("at least 5", envelope["error"]["message"])
         filled = self.filled()
-        self.squat(filled)["sets"][2]["reps"] = 7
+        self.squat(filled)["sets"][3]["reps"] = 7
         self.add(filled)
-        self.assertEqual([s["reps"] for s in self.squat(self.log_lines()[-1])["sets"]], [5, 5, 7])
+        self.assertEqual([s["reps"] for s in self.squat(self.log_lines()[-1])["sets"]], [5, 5, 5, 7])
 
     def test_an_unchanged_ranged_draft_cannot_be_recorded(self):
         before = (self.root / LOG).read_bytes()
@@ -477,7 +500,7 @@ class ObservedNotPrescribedTest(NoHevyCase):
 
     def test_squat_as_written_with_unknown_effort_stays_null_and_warns(self):
         def bench_reported(draft):
-            for set_, reps, rpe in zip(self.bench(draft)["sets"], (10, 9, 8), (8, 8.5, 9)):
+            for set_, reps, rpe in zip(self.working(self.bench(draft)), (10, 9, 8), (8, 8.5, 9)):
                 set_.update(reps=reps, rpe=rpe)
 
         draft = self.prefill()
@@ -485,17 +508,18 @@ class ObservedNotPrescribedTest(NoHevyCase):
         envelope = self.add(draft)
         line = self.log_lines()[-1]
         squat, bench = self.squat(line), self.bench(line)
-        self.assertEqual([(s["reps"], s["value"], s["rpe"]) for s in squat["sets"]], [(5, 100, None)] * 3)
+        self.assertEqual([(s["reps"], s["value"], s["rpe"]) for s in squat["sets"]],
+                         [(5, 60, None)] + [(5, 100, None)] * 3)
         self.assertEqual([(s["reps"], s["value"], s["rpe"]) for s in bench["sets"]],
-                         [(10, 25, 8), (9, 25, 8.5), (8, 25, 9)])
+                         [(10, 12.5, None), (10, 25, 8), (9, 25, 8.5), (8, 25, 9)])
         [warning] = [w for w in envelope["warnings"] if w.startswith("rpe_unknown")]
         self.assertIn("Back Squat", warning)
-        self.assertIn("sets 1–3", warning)
+        self.assertIn("sets 2–4", warning)
         self.assertNotIn("Bench", warning)
 
     def test_valid_reps_and_loads_without_any_effort_are_accepted_with_a_warning(self):
         draft = self.prefill()
-        for set_, reps in zip(self.bench(draft)["sets"], (10, 9, 8)):
+        for set_, reps in zip(self.working(self.bench(draft)), (10, 9, 8)):
             set_["reps"] = reps
         envelope = self.add(draft)
         self.assertTrue(envelope["data"]["written"])

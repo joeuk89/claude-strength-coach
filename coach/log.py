@@ -170,18 +170,26 @@ def _prefilled(mode, set_, open_reps):
     return tuple(fields)
 
 
-def _asks(name, line, working):
-    """What the athlete must tell the coach about one prefilled exercise before `log add` (C46 `ask`)."""
+def _draft_sets(line):
+    """The prescribed sets the draft records: the working sets, and the warm-ups that carry a load."""
+    return [s for s in line["sets"] if s.get("type") != "warmup" or s.get("load") is not None]
+
+
+def _asks(name, line, sets):
+    """What the athlete must tell the coach about one prefilled exercise before `log add` (C46 `ask`).
+
+    Set numbers count the draft's sets; a warm-up is confirmed as written and asked nothing else.
+    """
     found = []
     mode = line["load_mode"]
+    working = [(n, s) for n, s in enumerate(sets, 1) if s.get("type") != "warmup"]
 
     def ask(field, numbers, prescribed, message):
         found.append({"exercise_id": line["exercise_id"], "field": field, "sets": numbers,
                       "prescribed": prescribed, "message": f"{name} {_set_numbers(numbers)}: {message}"})
 
-    ranged = {n: s["rep_range"] for n, s in enumerate(working, 1)
-              if mode not in NO_REPS_MODES and s.get("rep_range") is not None}
-    rep_outs = {n: s["reps"] for n, s in enumerate(working, 1)
+    ranged = {n: s["rep_range"] for n, s in working if mode not in NO_REPS_MODES and s.get("rep_range") is not None}
+    rep_outs = {n: s["reps"] for n, s in working
                 if mode not in NO_REPS_MODES and s.get("rep_out") and s.get("reps") is not None}
     for (start, end), numbers in _grouped(((r["start"], r["end"]), n) for n, r in ranged.items()):
         rep_range = {"start": start, "end": end}
@@ -192,21 +200,20 @@ def _asks(name, line, working):
         ask("reps", numbers, {"at_least": minimum},
             f"ask for the reps done; the plan is a + set (at least {units.json_number(minimum)}, then more up to "
             "the RPE stop), which is not a count, so reps stay null until the athlete gives them")
-    unloaded = [n for n, s in enumerate(working, 1) if mode in units.LOADED_MODES and s.get("load") is None]
+    unloaded = [n for n, s in working if mode in units.LOADED_MODES and s.get("load") is None]
     if unloaded:
         used = "the added load they used (0 for bodyweight alone)" if mode == "bodyweight" else "what they used"
         ask("value", unloaded, None,
             f"no load was prescribed ({render.CHOOSE_THE_LOAD}), so value stays null until the athlete says "
             f"{used}; ask for it")
     for fields, numbers in _grouped((_prefilled(mode, s, n in ranged or n in rep_outs), n)
-                                    for n, s in enumerate(working, 1)):
+                                    for n, s in enumerate(sets, 1)):
         if fields:
             ask("as_written", numbers, list(fields),
                 f"{' and '.join(fields)} {'is' if len(fields) == 1 else 'are'} prefilled as written; keep "
                 f"{'it' if len(fields) == 1 else 'them'} only when the athlete confirms they did exactly that, "
                 "otherwise ask what they did")
-    for (target, stop), numbers in _grouped(((s.get("rpe"), bool(s.get("rep_out"))), n)
-                                            for n, s in enumerate(working, 1)):
+    for (target, stop), numbers in _grouped(((s.get("rpe"), bool(s.get("rep_out"))), n) for n, s in working):
         word = "stop" if stop else "target"
         if target is None:
             aim = "no RPE target was set"
@@ -236,11 +243,11 @@ def prefill(root, config, session_id, day, library):
     session = _nearest(sessions, day)
     exercises, asks = [], []
     for line in session["exercises"]:
-        working = [s for s in line["sets"] if s.get("type") != "warmup"]
-        if working:
+        sets = _draft_sets(line)
+        if any(s.get("type") != "warmup" for s in sets):
             exercises.append({"exercise_id": line["exercise_id"], "load_mode": line["load_mode"],
-                              "unit": config.athlete.units, "notes": "", "sets": [_draft_set(s) for s in working]})
-            asks += _asks(_name(library, line["exercise_id"]), line, working)
+                              "unit": config.athlete.units, "notes": "", "sets": [_draft_set(s) for s in sets]})
+            asks += _asks(_name(library, line["exercise_id"]), line, sets)
     draft = {"schema_version": WORKOUT_VERSION, "kind": "workout", "date": day, "start_time": None,
              "session_id": session_id, "overlay_id": doc["id"], "duration_minutes": None, "notes": "",
              "exercises": exercises}

@@ -117,8 +117,17 @@ position, and settles its flags. The ones you will hear about most:
   leg", "stop at RPE 9"). A line with no logged load carries a
   calibration note: pick a load you expect to fit the target reps within
   the RPE shown, then adjust after the first working set. Beginners get
-  a qualitative warm-up ramp note on each session's first loaded lift,
-  with no loads or percentages the coach has not agreed.
+  a qualitative warm-up ramp note on each session's first loaded lift
+  when the program has no warm-up sets there.
+- **Warm-up loads** come from the proposal, not the coach's memory: each
+  warm-up set ramps into the line's first working set (one warm-up at
+  60 %; two at 50 % and 75 %; three at 40 %, 60 % and 80 %), rounded to
+  your kit, never below the bar and never as heavy as the work sets, and
+  recomputed from the cut load in a return, deload or light week. They
+  reach the Hevy routine sets, the sheets and the check-in tables, so
+  the app never shows an old placeholder above this week's work sets.
+  A pinned warm-up (`warmup_load` or `warmup_percent` in the program)
+  holds its position; see [Programs](programs.md).
 - **Resolving a flag**, through `python3 -m coach propose resolve`,
   keeps a flag you and the coach decide to accept, with the reason it
   stands. A `load_mode_unconfirmed` flag cannot be resolved: only

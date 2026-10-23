@@ -306,6 +306,14 @@ lower cap that applies wins). It is not a set to failure, and it
 counts toward a wave only when its minimum reps were met within the cap.
 _Avoid_: AMRAP set to failure, plus set as failure, last set (another set may follow it)
 
+**Warm-up ramp**:
+The loads a line's warm-up sets take, derived each week from its first
+working load after any cut and rounded to the kit: one warm-up at 60 %,
+two at 50 % and 75 %, three at 40 %, 60 % and 80 %. A program may pin
+one warm-up's load or percent instead. Bodyweight, assisted and banded
+lines keep load-less warm-ups.
+_Avoid_: warm-up placeholder (the app's stale value), feeder set, ramp note (the beginner's qualitative note)
+
 **Standing override**:
 A coach's change to one exercise's proposed prescription that holds in
 later weeks until a set end date (four weeks by default, eight at most),

@@ -16,7 +16,9 @@ and `config.toml` (units, equipment and its increments).
    policy — a hard-week ceiling and the fatigue triggers from
    `CLAUDE.md` "Coaching principles", the ceiling set for this athlete
    within the allowed range; warm-up protocol: warm-up set groups where
-   agreed, else a beginner's week carries a qualitative ramp note), then each session, every
+   agreed, their loads ramped each week from the first working set unless
+   a group pins one with `warmup_load` or `warmup_percent`, else a
+   beginner's week carries a qualitative ramp note), then each session, every
    exercise picked from the exercise library (`python3 -m coach library
    search <name>`). If no entry fits, follow
    [custom exercise creation](../../../reference/custom-exercises.md)

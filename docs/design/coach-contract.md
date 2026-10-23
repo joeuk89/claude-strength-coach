@@ -1021,8 +1021,11 @@ for every non-GET request, success or failure, once its retries are over.
   `assisted` may carry `load: null` only when its line has a `no_data`
   flag (R-23a) or is a calibration line (R-41b week one). R-13's validator
   accepts it only with that flag on the line; otherwise it is a validation
-  error. A warm-up set may leave its load null without a flag. R-14's
-  writer omits `weight_kg` for such a set.
+  error. A warm-up set carries the load the C24 ramp gives it, and leaves
+  it null without a flag when the line ramps nothing: a bodyweight,
+  assisted, banded or timed line, a line still waiting for its first
+  working load, or a kit that makes nothing lighter than the first
+  working load. R-14's writer omits `weight_kg` for a null-load set.
 - Session `location`: null or a `[equipment.locations.*]` name (C54),
   defaulting to the program session's location. A constrained one-off week
   (hotel, home) sets it so caps, representable loads and substitution use
@@ -1733,7 +1736,12 @@ version bump (below).
   `duration_seconds`, `distance_meters`. A plain 3×5 is one group. As in
   C10, a `duration` group needs `duration_seconds`, a `distance` group
   needs `distance_meters`, and for those two modes `reps` and `rep_range`
-  are optional.
+  are optional. A `warmup` group on a `total`, `per_hand_x2` or
+  `single_implement` line may pin its load with `warmup_load` (athlete
+  units, per hand for per-hand modes) or `warmup_percent` (1–99, of the
+  line's first working load), never both; without a pin the C24 ramp
+  sets it. A pin on a working group, or on a line of any other load
+  mode, fails `program validate` at the key's JSONPath.
 - `start_load` is in athlete units and per hand for per-hand modes, like
   every load a human writes; code builds load objects from it (C5). Null
   on a loaded mode means the coach picks the first load; it must be null
@@ -3376,6 +3384,33 @@ propose week  ──►  .coach/proposals/<id>.json (+ .proposed.json)  ──�
    warm-up sets adds `propose.RAMP_NOTE`, a qualitative ramp with no
    loads, reps or percentages; warm-up sets in the program stand in for
    it and stay out of the working sets.
+   **Warm-up loads** (`coach/warmups.py`) are derived last, after the
+   decay, the transform, the constraints, the caps and the rounding,
+   from the line's final first working load, so a return, deload or
+   light week ramps into its cut work sets. On a `total`, `per_hand_x2`
+   or `single_implement` line each warm-up's target is its C16 pin, else
+   a percent of the first working load by position and count: one
+   warm-up 60 %; two 50 % and 75 %; three 40 %, 60 % and 80 %; four or
+   more spread evenly from 40 % to 80 %. The load is the kit's heaviest
+   no heavier than the target (`AvailableLoads.select` down, so a barbell
+   line never drops below `bar_weight` and a dumbbell line lands on the
+   rack), else the lightest the kit makes, and null when even that is not
+   lighter than the first working load. A kit `select` cannot enumerate
+   (a bar with no declared base mass, `geometry_warning`; equipment with
+   no rack, belt plates or plate-built bar) rounds down to its load
+   increment instead, and gives null with no increment, so no raw percent
+   reaches the athlete. A warm-up that would repeat an earlier warm-up's
+   load (a coarse rack, a bar that is most of the working load) is null
+   too: the lighter one keeps the load. A pinned load at or above the
+   first working load gives way to its position's percent. Bodyweight,
+   assisted, banded and timed lines, and a line whose first working load
+   is null, keep their warm-ups as they are. The rationale ends with the
+   loads and their percents or pins ("warm-ups 50 (50 %) and 75 (75 %),
+   percents of the first working set"; an open one reads "none lighter
+   than the first working set", "none (a repeat of 45)" or "none (no load
+   step is set for this kit)"). The loads reach the Hevy routine
+   sets as `weight_kg` (C12), the sheets and the week-ahead tables (C11,
+   C46) and the manual log draft (C46).
    A `model_hold` proposal with no decay, transform or cut whose
    rounded load C22's `judge_set` puts beyond failure at the line's
    model evidence holds the heaviest lighter load the derived-from
@@ -3583,7 +3618,8 @@ constrained mode) stay coach-built through `overlay build`.
 - `propose override` takes `--sets SPEC`, comma-separated groups
   `COUNTxREPS[-REPS][+][@LOAD][ rpeN]` (`"3x5@95 rpe7"`) or, for a
   `duration` line, `COUNTxSECONDSs[ rpeN]` (`"2x35s rpe7"`), which
-  replace the line's working sets and keep its warm-ups, or `--load N`.
+  replace the line's working sets and keep its warm-ups, ramped again
+  from the new first working load, or `--load N`.
   A `+` after fixed reps makes a rep-out set (`"1x5+@145"`), capped at
   its `rpe`, else at `base.REP_OUT_RPE_CAP`, then at any lower `rpe_cap`
   constraint active for the slot or the line's return band cap; `--load`
@@ -7322,15 +7358,17 @@ corrections are a `void` line plus a new entry:
   overlay, or none with S, exits 1).
   Fixed reps and loads are filled as prescribed; a `rep_range` or a
   rep-out set (C10) leaves `reps` null; `rpe`, `start_time` and
-  `duration_minutes` are null. Warm-up sets are left out. The draft records observations only:
+  `duration_minutes` are null. A warm-up set with a load (the C24 ramp)
+  comes in as prescribed; a warm-up without one is left out. The draft records observations only:
   an RPE target or stop is never a logged RPE, and a range or a rep-out
   minimum is never a count.
   `data.ask` keeps the prescription beside the draft, one item per
   exercise, field and prescribed value: `{"exercise_id", "field",
-  "sets", "prescribed", "message"}`, `sets` one-based over working sets.
+  "sets", "prescribed", "message"}`, `sets` one-based over the draft's
+  sets. A warm-up is asked nothing but `as_written`.
   `field` is `reps` for ranged sets (`prescribed` the `rep_range`) and
   rep-out sets (`prescribed` `{"at_least": <the set's reps>}`), both
-  asking for the reps done; `value` for sets on a loaded mode (C10) with no
+  asking for the reps done; `value` for working sets on a loaded mode (C10) with no
   prescribed load, "choose the load" (`prescribed` null: ask for the load
   used), `as_written` for sets with prefilled fields (`prescribed` the
   list of them, out of `reps`, `load`, `duration` and `distance`: keep

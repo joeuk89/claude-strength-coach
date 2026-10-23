@@ -20,8 +20,11 @@ first, tables second. Every mode uses the same brief.
    unexplained number. For a
    beginner, agree each session's first loaded lift's warm-up: the
    program's warm-up sets, or the qualitative ramp note the proposal
-   adds (reword it with the athlete if they want); no warm-up loads or
-   percentages the coach has not agreed, and never a test to failure.
+   adds (reword it with the athlete if they want). Warm-up loads come
+   from the proposal, ramped from the line's first working set and on
+   the kit; a different ramp is a `warmup_load` or `warmup_percent`
+   pin on the set group in `data/program.json`, never a number typed
+   into a line, and never a test to failure.
    Their sheets end with a short RPE and rep-range key. Then name the
    rest of the week from the proposal's `other_work`: each coach-led
    session and planned run by day, quality ones named as quality, and
