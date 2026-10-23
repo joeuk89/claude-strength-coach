@@ -300,6 +300,13 @@ def _least_load(sets):
     return min(numbers) if numbers else None
 
 
+def _carries_no_load(line, sound):
+    """True for a line the band's load factor has nothing to cut on: band, duration and distance work, bodyweight
+    work with no added load, and assisted work, whose assistance the band never cuts."""
+    return line["load_mode"] == "assisted" or (line["load_mode"] in ("bodyweight", "band", "duration", "distance")
+                                               and not _top_load(sound))
+
+
 class _Checker:
     def __init__(self, root, doc, config, arithmetic):
         self.root = root
@@ -313,6 +320,7 @@ class _Checker:
             self.library = Library.load(root)
         except ValidationError:
             self.library = None
+        self.program = None
         self.flags = []
         self.lines = []
         self.no_data = {(f["session_id"], f["exercise_id"]) for f in doc["flags"] if f["code"] == overlay.NO_DATA}
@@ -456,10 +464,19 @@ class _Checker:
         if decay["band"] != band.id:
             return [f"{lead}, but the line is decayed to band {decay['band']}"]
         problems = []
+        sound = [s for s in working if self.sound(line, s.get("load"))]
         source, unchecked = self.decay_source(line["exercise_id"], derived)
+        if not derived and _carries_no_load(line, sound):
+            unchecked = None
+            planned = self.program_working_sets(session, line)
+            if planned is None:
+                problems.append(f"{lead}, but its sets cannot be checked against the decay: no logged workout or "
+                                "program slot gives the set count to cut from")
+            elif band.set_delta and len(working) > (most := max(1, planned + band.set_delta)):
+                problems.append(f"{lead}: {len(working)} working sets, at most {most} after the band's "
+                                f"{band.set_delta} from the program's {planned}")
         if unchecked:
             problems.append(f"{lead}, but its load and sets cannot be checked against the decay: {unchecked}")
-        sound = [s for s in working if self.sound(line, s.get("load"))]
         if source is not None and line["load_mode"] == "assisted":
             least, before = _least_load(sound), _least_load(source["sets"])
             if least is not None and before is not None:
@@ -506,7 +523,7 @@ class _Checker:
     def decay_source(self, exercise_id, derived):
         """The exposure a decayed line derives from, or None and why it can't serve as the baseline."""
         if not derived:
-            return None, "provenance.derived_from is null"
+            return None, "the line names no logged workout of this lift to measure the cut from"
         source = next((e for e in self.history.exposures.get(exercise_id, [])
                        if e["workout_id"] == derived["workout_id"]), None)
         if source is None:
@@ -515,6 +532,21 @@ class _Checker:
             return None, (f"derived_from names workout {derived['workout_id']}, an open convention-slip "
                           "candidate")
         return source, None
+
+    def program_working_sets(self, session, line):
+        """The working sets the program gives this line's slot, or None when the program holds no such slot."""
+        from coach import program
+        if self.program is None:
+            try:
+                self.program = program.load(self.root)
+            except ValidationError:
+                self.program = {}
+        slot = next((exercise for _, _, s, exercise in program.slots(self.program)
+                     if s.get("id") == session["session_id"] and exercise.get("exercise_id") == line["exercise_id"]),
+                    None)
+        if slot is None:
+            return None
+        return sum(group.get("count", 1) for group in slot.get("sets", []) if overlay.is_working(group)) or None
 
     def increment(self, line, session):
         if self.library is None:

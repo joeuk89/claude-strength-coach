@@ -521,13 +521,38 @@ class LayoffTest(unittest.TestCase):
         return flag["message"]
 
     def test_a_decayed_line_with_no_derived_from_is_stale(self):
-        self.assertIn("cannot be checked against the decay: provenance.derived_from is null",
-                      self.decayed_without_a_source(None))
+        self.assertIn("cannot be checked against the decay: the line names no logged workout of this lift to "
+                      "measure the cut from", self.decayed_without_a_source(None))
 
     def test_a_decayed_line_derived_from_an_unknown_workout_is_stale(self):
         unknown = "10000000-0000-4000-8000-000000000099"
         message = self.decayed_without_a_source({"date": "2026-09-14", "workout_id": unknown})
         self.assertIn(f"derived_from names workout {unknown}, which the history does not hold", message)
+
+    def pull_up_without_a_source(self, sets):
+        """The pull-up as a decayed line with no derived-from exposure; its stale_prescription messages."""
+        path = self.root / OVERLAY
+        doc = read_json(path)
+        line = doc["sessions"][1]["exercises"][1]
+        line["sets"] = sets
+        line["provenance"] = {
+            "scheme": "linear", "derived_from": None, "inferred": False, "rationale": None,
+            "decay": {"days_off": 28, "band": "22-42", "load_factor": 0.9, "set_delta": -1, "rpe_cap": None},
+        }
+        write_json(path, doc)
+        found = self.coach("prescription", "check", "--overlay", "2026-10-12-weekly")["data"]["flags"]
+        return [f["message"] for f in found if f["exercise_id"] == "pull_up" and f["code"] == "stale_prescription"]
+
+    def test_a_bodyweight_line_with_no_source_passes_on_the_programs_set_count(self):
+        self.assertEqual(self.pull_up_without_a_source(working(8, 8, 0, count=2, mode="bodyweight")), [])
+
+    def test_a_bodyweight_line_with_no_source_is_stale_above_the_programs_set_count_less_the_band(self):
+        [message] = self.pull_up_without_a_source(working(8, 8, 0, count=3, mode="bodyweight"))
+        self.assertIn("3 working sets, at most 2 after the band's -1 from the program's 3", message)
+
+    def test_a_weighted_bodyweight_line_with_no_source_is_still_stale(self):
+        [message] = self.pull_up_without_a_source(working(8, 8, 10, count=2, mode="bodyweight"))
+        self.assertIn("names no logged workout of this lift to measure the cut from", message)
 
     def overridden(self, sets):
         """The squat as a scheme line the coach overrode: decayed to its band, its scheme found no exposure."""
@@ -554,7 +579,7 @@ class LayoffTest(unittest.TestCase):
         self.overridden(working(5, None, 95, count=3))
         messages = [f["message"] for f in self.squat_flags()]
         self.assertTrue(any("load 95 is above 90" in m for m in messages), messages)
-        self.assertFalse(any("derived_from is null" in m for m in messages), messages)
+        self.assertFalse(any("names no logged workout" in m for m in messages), messages)
 
     def test_write_stores_the_inferred_source_on_the_overridden_line(self):
         self.overridden(working(5, None, 90, count=2))
@@ -575,7 +600,7 @@ class LayoffTest(unittest.TestCase):
         doc["sessions"][0]["exercises"][0]["override"] = None
         write_json(path, doc)
         [flag] = self.squat_flags()
-        self.assertIn("derived_from is null", flag["message"])
+        self.assertIn("names no logged workout", flag["message"])
 
     def test_a_no_data_line_gets_no_load_flag(self):
         path = self.root / OVERLAY

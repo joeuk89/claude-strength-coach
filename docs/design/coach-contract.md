@@ -2651,6 +2651,12 @@ coach.validity.estimate_minutes(root, session) -> int
   `derived_from` is null (after the C21 inference for a hand-built or
   overridden line), names a workout the history doesn't hold, or
   names a `suspect` exposure (C17): its load and sets can't be checked.
+  A line the band's load factor has nothing to cut on (`band`,
+  `duration` and `distance` lines, a `bodyweight` line with no added
+  load, an `assisted` line) and a null `derived_from` is judged on its
+  sets instead: at most `max(1, n + set_delta)` working sets, `n` being
+  its program slot's working sets, plus the RPE cap below; with no
+  program slot either, it is stale.
   The proposal pipeline (C24) therefore gives a decayed line whose slot
   has no usable exposure of its own the exercise's newest usable
   exposure in its load mode, from any slot, as its `derived_from`, so
