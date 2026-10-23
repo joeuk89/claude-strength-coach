@@ -496,9 +496,16 @@ def prescription_sets(last_prescription):
 
 
 def start_load(ctx):
-    """Where a slot starts with no usable exposure: the last approved load, else the program's start load."""
-    if ctx.last_prescription:
-        found = top_load(prescription_sets(ctx.last_prescription))
+    """Where a slot starts with no usable exposure: the last approved load, else the program's start load.
+
+    Once the slot's days off reach a return band, the last approved *ordinary* load: a deload, light or return
+    line's loads are already cut, so a return cut measured from them would compound on every re-proposal. With no
+    cut to apply, the last approved line, recovery work included, is the best hold.
+    """
+    cutting = ctx.days_off > return_band(0).upper
+    last = ctx.last_ordinary_prescription if cutting else ctx.last_prescription
+    if last:
+        found = top_load(prescription_sets(last))
         if found is not None:
             return found
     return ctx.slot.start_load
@@ -590,13 +597,22 @@ def bands_back(days_off):
     return _validity.RETURN_BANDS.index(_validity.band_for(days_off))
 
 
-def return_set_count(proposal, set_delta):
-    """The working sets a return week keeps: `max(1, min(proposal, derived-from) + set_delta)` (C23)."""
+def return_set_count(proposal, set_delta, own=True):
+    """The working sets a return week keeps: `max(1, min(proposal, derived-from) + set_delta)` (C23).
+
+    `own` is False for a derived-from exposure borrowed from another slot (C24): it is a load base only, so the
+    count is `max(1, proposal + set_delta)`.
+    """
     count = len(working(proposal.sets))
     source = proposal.derived_from
-    if source is not None and working(source.sets):
+    if own and source is not None and working(source.sets):
         count = min(count, len(working(source.sets)))
     return max(1, count + set_delta)
+
+
+def own_exposure(ctx, exposure):
+    """True when the exposure is the slot's own (its session), not one borrowed from another slot."""
+    return exposure is None or exposure.session_id == ctx.slot.session_id
 
 
 def default_decay(ctx, proposal, days_off):
@@ -612,7 +628,8 @@ def default_decay(ctx, proposal, days_off):
     if band.load_factor != 1 or direction < 0:
         sets = lightened(sets, band.load_factor, proposal.derived_from, direction)
     if band.set_delta:
-        sets = keep_working(sets, return_set_count(proposal, band.set_delta))
+        own = own_exposure(ctx, proposal.derived_from)
+        sets = keep_working(sets, return_set_count(proposal, band.set_delta, own))
     if band.rpe_cap is not None:
         sets = rpe_capped(sets, band.rpe_cap)
     return replace(proposal, sets=sets, load_cut=True)

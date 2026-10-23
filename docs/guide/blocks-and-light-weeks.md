@@ -202,6 +202,15 @@ coach names the band in the week focus. A catch-up check-in (more than
 10 days since the last one) carries the proposed return week in its card
 and one "ok" accepts it.
 
+The cut is measured once, from the pre-layoff working load: the lift's
+newest logged exposure before the layoff, in any session (a workout
+matched to no session counts), else the program's start load. Planning
+the same week again, midweek or with `propose rebuild`, gives the same
+loads: a return-week line is never cut from again, and `prescription
+check` judges every line against the same exposure the proposal cut
+from. A lift the program has never logged, with no start load, still
+gets its first load from you.
+
 **Illness adds a rule of its own.** After a mild illness with symptoms
 above the neck only, no training until 48 hours symptom-free, and every
 exercise in the first session back capped at RPE 7, whatever the gap

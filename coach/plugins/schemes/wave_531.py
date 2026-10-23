@@ -347,7 +347,8 @@ def decay(ctx, proposal, days_off):
     week = proposal.state["completed_weeks"] + 1
     sets = _sets(ctx, lowered, WEEKS[week], None, backoff_factor=band.load_factor)
     if band.set_delta:
-        sets = base.keep_working(sets, base.return_set_count(replace(proposal, sets=sets), band.set_delta))
+        own = base.own_exposure(ctx, proposal.derived_from)
+        sets = base.keep_working(sets, base.return_set_count(replace(proposal, sets=sets), band.set_delta, own))
     source = proposal.derived_from
     if source is not None and source.top_load is not None:
         ceiling = round(source.top_load * band.load_factor, 4)

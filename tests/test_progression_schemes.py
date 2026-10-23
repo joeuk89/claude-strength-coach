@@ -92,7 +92,8 @@ class MaintenanceTest(unittest.TestCase):
 
 
 class HoldAfterOnlyRecoveryWorkTest(unittest.TestCase):
-    """The only approved line is return work: the program's sets come back, at the load the return week set."""
+    """The only approved line is return work: the program's sets come back, at the load the return week logged, else
+    the start load; the return line's own cut load is never the base, or a re-proposed week would cut it again."""
 
     def recovery_ctx(self, exposures=()):
         last = {"overlay_id": "o-0001", "session_id": "session-a", "date": "2026-10-05",
@@ -107,10 +108,15 @@ class HoldAfterOnlyRecoveryWorkTest(unittest.TestCase):
         self.assertIn("in o-0001, is return work", proposal.rationale)
         self.assertIn("the load logged on 2026-10-05", proposal.rationale)
 
-    def test_with_nothing_logged_the_program_sets_at_the_approved_load(self):
+    def test_with_nothing_logged_and_no_cut_to_apply_the_program_sets_at_the_approved_load(self):
         proposal = run(self.recovery_ctx())
         self.assertEqual(loads_and_reps(proposal), [(90, 5)] * 3)
         self.assertIn("at its load", proposal.rationale)
+
+    def test_with_nothing_logged_a_new_cut_measures_from_the_start_load_not_the_cut_load(self):
+        proposal = run(replace(self.recovery_ctx(), days_off=28))
+        self.assertEqual(loads_and_reps(proposal), [(100, 5)] * 3)
+        self.assertIn("at the program's start load", proposal.rationale)
 
 
 class AssistedReturnAndDeloadTest(unittest.TestCase):

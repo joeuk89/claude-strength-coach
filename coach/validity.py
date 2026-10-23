@@ -473,7 +473,8 @@ class _Checker:
                 allowed, words = self.decay_ceiling(line, session, before, band.load_factor)
                 if top > allowed + 1e-9:
                     problems.append(f"{lead}: load {_number(top)} is above {words}")
-        if source is not None and band.set_delta:
+        # An exposure borrowed from another slot (C24) is a load base only, so its set count binds nothing.
+        if source is not None and band.set_delta and source["session_id"] == session["session_id"]:
             most = max(1, len(source["sets"]) + band.set_delta)
             if len(working) > most:
                 problems.append(f"{lead}: {len(working)} working sets, at most {most} after the band's "

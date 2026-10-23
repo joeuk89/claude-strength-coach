@@ -29,8 +29,14 @@ def propose(ctx):
     if last and ordinary:
         return _after_recovery(ctx, last, ordinary, source)
     if last:
-        sets = base.with_load(base.expand(ctx.slot.sets), source.top_load if source else base.start_load(ctx))
-        where = f"the load logged on {source.date.isoformat()}" if source else "its load"
+        load = source.top_load if source else base.start_load(ctx)
+        sets = base.with_load(base.expand(ctx.slot.sets), load)
+        if source:
+            where = f"the load logged on {source.date.isoformat()}"
+        elif load is not None and load == base.top_load(base.prescription_sets(last)):
+            where = "its load"
+        else:
+            where = "the program's start load"
         return base.Proposal(
             sets=sets, derived_from=source, state={},
             rationale=(f"Hold: the only approved line, in {last['overlay_id']}, is {last['recovery']} work, so the "

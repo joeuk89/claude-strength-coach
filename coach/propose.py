@@ -798,10 +798,24 @@ def propose_line(run, session, day, exercise, ctx_extra):
     )
     proposal = plugin.module.propose(ctx)
     _check_proposal(plugin, proposal)
+    pre_layoff, held_return = None, None
+    if proposal.derived_from is None and base.top_load(proposal.sets) is not None:
+        pre_layoff = _pre_layoff(run, exposures, exercise_id, day, mode, days_off, ctx_extra["layoff_from"])
+        held_return = _held_return(ctx, days_off, ctx_extra["layoff_from"])
+    if pre_layoff is not None:
+        proposal = replace(proposal, derived_from=pre_layoff)
+    elif held_return is not None:
+        proposal = replace(proposal, sets=base.prescription_sets(held_return))
     scheme_sets = proposal.sets
     cut_from = _cut_from(proposal)
     clauses = [proposal.rationale.rstrip(". ")]
     scheme_clause = clauses[0]
+    if pre_layoff is not None:
+        clauses.append(_pre_layoff_words(pre_layoff, base.top_load(scheme_sets), mode, run.unit, run.show_hevy))
+    elif held_return is not None:
+        clauses.append(f"the return line approved in {held_return['overlay_id']} stands, "
+                       f"{sets_text(scheme_sets, mode, run.unit, run.show_hevy)}: the slot has no exposure of its "
+                       f"own and no new cut applies")
     scheme_rep_out = any(s.rep_out for s in proposal.sets)
     evidence = run.model_evidence(exercise_id, day)
     if evidence["reason"] == "over_rep_cap":
@@ -1313,6 +1327,42 @@ def _model_hold(proposal, sets, estimate, limited):
     return None
 
 
+def _pre_layoff(run, exposures, exercise_id, day, mode, days_off, layoff_from):
+    """The exposure a slot with no usable exposure of its own measures its return cut from: the lift's newest usable
+    exposure in this load mode in any slot, dated on or before `layoff_from` (the last lifting before the span), once
+    the slot's days off reach a return band (C22's layoff evidence is exercise-wide); else None.
+
+    An exposure after `layoff_from` is this layoff's own return work, already cut, so it is never the base.
+    """
+    if days_off <= DECAY_AFTER_DAYS or base.baseline(exposures) is not None:
+        return None
+    before = [e for e in run.exposures_of(exercise_id, day, load_mode=mode)
+              if layoff_from is None or e.date <= layoff_from]
+    found = base.baseline(before)
+    return found if found is not None and found.top_load is not None else None
+
+
+def _held_return(ctx, days_off, layoff_from):
+    """The approved return line a slot with no exposure of its own repeats when no cut applies: the slot's last
+    prescription, when it is return work dated after `layoff_from` (this layoff's return week); else None."""
+    last = ctx.last_prescription
+    if days_off > DECAY_AFTER_DAYS or not last or last.get("recovery") != "return":
+        return None
+    if layoff_from is not None and dates.parse_date(last["date"]) <= layoff_from:
+        return None
+    return last
+
+
+def _pre_layoff_words(exposure, own_load, mode, unit, show_hevy=True):
+    """Why a slot with no exposure of its own cuts from the lower of its load and the lift's newest exposure."""
+    where = f"in {exposure.session_id}" if exposure.session_id else "in a workout matched to no session"
+    theirs = f"{_load_text(exposure.top_load, mode, unit, show_hevy)} logged on {exposure.date.isoformat()} {where}"
+    lower = _load_text(min(own_load, exposure.top_load), mode, unit, show_hevy)
+    return (f"the slot has no exposure of its own, so the return band cuts from the lower of its "
+            f"{_load_text(own_load, mode, unit, show_hevy)} and the lift's newest, {theirs}: {lower}, keeping the "
+            f"slot's own set count")
+
+
 def _cut_from(proposal):
     """The top load a cut of this proposal is measured from: the derived-from load for a cut the scheme made itself
     (a linear reset), else the lower of the scheme's top load and the derived-from load, which `lightened` cuts."""
@@ -1562,7 +1612,7 @@ def _build_week(root, config, today, now, span, kind, transform_name, plan_file=
     transform = _transform(run, kind, transform_name)
     first_day = found.sessions[0][0]
     ctx_extra = {"kind": kind, "transform": transform, "first_day": first_day, "illness": _illness(run, first_day),
-                 "states": dict(settled_state["scheme_state"])}
+                 "layoff_from": history.last_lifting_date(root, first_day), "states": dict(settled_state["scheme_state"])}
 
     draft_sessions, all_flags, scheme_state, session_keys = [], list(found.flags) + ill_flags, {}, []
     label = _week_label(kind, transform)

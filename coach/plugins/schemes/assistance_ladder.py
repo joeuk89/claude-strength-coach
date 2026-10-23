@@ -172,7 +172,8 @@ def decay(ctx, proposal, days_off):
     rung = max(0, min(stored, proposal.state["rung"]) - base.bands_back(days_off))
     sets = _at(ctx, proposal.sets, rung)
     if band.set_delta:
-        sets = base.keep_working(sets, base.return_set_count(proposal, band.set_delta))
+        own = base.own_exposure(ctx, proposal.derived_from)
+        sets = base.keep_working(sets, base.return_set_count(proposal, band.set_delta, own))
     if band.rpe_cap is not None:
         sets = base.rpe_capped(sets, band.rpe_cap)
     return replace(proposal, sets=sets, state=dict(proposal.state, rung=rung), target_note=_note(ctx, rung))

@@ -472,7 +472,7 @@ class LayoffTest(unittest.TestCase):
         write_json(path, doc)
         self.assertEqual(self.squat_flags(), [])
 
-    def test_decayed_too_little_is_still_stale(self):
+    def decayed_too_little(self):
         path = self.root / OVERLAY
         doc = read_json(path)
         line = doc["sessions"][0]["exercises"][0]
@@ -483,10 +483,28 @@ class LayoffTest(unittest.TestCase):
             "decay": {"days_off": 28, "band": "22-42", "load_factor": 0.9, "set_delta": -1, "rpe_cap": None},
         }
         write_json(path, doc)
+
+    def map_source_to_session_a(self):
+        path = self.root / "data" / "history" / "2026-09.json"
+        doc = read_json(path)
+        for workout in doc["workouts"]:
+            if workout["workout_id"] == "10000000-0000-4000-8000-000000000025":
+                workout["session_id"] = "session-a"
+        write_json(path, doc)
+
+    def test_decayed_too_little_is_still_stale(self):
+        self.map_source_to_session_a()
+        self.decayed_too_little()
         load, sets = sorted((f["message"] for f in self.squat_flags()), key=lambda m: "working sets" in m)
         self.assertIn("load 95 is above 90, the kit's nearest load to 100 × 0.9 (90)", load)
         self.assertNotIn("working sets", load)
         self.assertIn("3 working sets, at most 2", sets)
+
+    def test_a_source_borrowed_from_another_slot_binds_the_load_but_not_the_sets(self):
+        self.decayed_too_little()
+        [load] = [f["message"] for f in self.squat_flags()]
+        self.assertIn("load 95 is above 90", load)
+        self.assertNotIn("working sets", load)
 
     def decayed_without_a_source(self, derived_from):
         path = self.root / OVERLAY

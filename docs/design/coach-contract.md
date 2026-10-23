@@ -2643,6 +2643,11 @@ coach.validity.estimate_minutes(root, session) -> int
   `derived_from` is null (after the C21 inference for a hand-built or
   overridden line), names a workout the history doesn't hold, or
   names a `suspect` exposure (C17): its load and sets can't be checked.
+  The proposal pipeline (C24) therefore gives a decayed line whose slot
+  has no usable exposure of its own the exercise's newest usable
+  exposure in its load mode, from any slot, as its `derived_from`, so
+  the proposal and the check measure the cut from the same pre-layoff
+  load; a line with no load (a first load) stays the coach's.
   Each problem on a line is its own `stale_prescription` flag, and its
   message names the band but neither the days off nor the newest
   exposure (`data.lines` carries both), so a stored resolution keeps
@@ -2653,8 +2658,10 @@ coach.validity.estimate_minutes(root, session) -> int
   lift overdue past its usual gap still decays. The band's set and
   RPE parts are checked as well as the load: at most `max(1, n +
   set_delta)` working sets, `n` being the derived-from exposure's
-  working sets, and every working set at or under `rpe_cap` when the
-  band has one. Loads compared are the coaching number (C18), the top
+  working sets, but only when that exposure is the slot's own (its
+  `session_id` equals the line's session: one borrowed from another
+  slot or an unmapped workout is a load base only, C24); and every
+  working set at or under `rpe_cap` when the band has one. Loads compared are the coaching number (C18), the top
   working load on each side (the least assistance for `assisted`).
 - A line with a `no_data` flag (C10) and a working set still without a
   load gets no R-24 flag but `load_mode_mismatch` and
@@ -3122,7 +3129,28 @@ and `plugins test` runs them. Loaded with
   `base.lightened(sets, factor, source, load_direction=1)`, which the
   `standard`, `light` and `return` transforms use too: for `assisted`
   it raises each working set to at least the derived-from least
-  assistance and applies no factor.
+  assistance and applies no factor. A slot with no usable exposure of
+  its own starts from `base.start_load(ctx)`: the last approved line's
+  top load, else the program's start load; once `ctx.days_off` is past
+  the first band (a cut is about to apply) the last approved *ordinary*
+  line's top load instead, since a deload, light or return line's loads
+  are already cut and a return cut measured from them would compound on
+  every re-proposal (`propose week`, `--kind midweek`, `propose
+  rebuild`). When such a slot's days off reach a return band and the
+  exercise has a usable exposure in its load mode in any slot dated on
+  or before the layoff start (the last lifting before the span's first
+  session; later exposures are this layoff's own return work), the core
+  makes that exposure the proposal's `derived_from` before `decay` (C24
+  step 3), so the cut is measured from the lower of the slot's load and
+  the lift's pre-layoff load, and `prescription check` (C22) judges the
+  same base. With no cut to apply and no exposure of its own, a slot
+  whose last approved line is return work dated after the layoff start
+  repeats that line's sets (C24 step 3). A borrowed exposure
+  is a load base only: `return_set_count(proposal, set_delta, own)`
+  takes the `min()` with the derived-from set count only for the slot's
+  own exposure (`base.own_exposure`, same session), and keeps `max(1,
+  proposal + set_delta)` for a borrowed one, so a light session logged
+  elsewhere never thins the slot's sets.
   `base.standard_deload(proposal, set_factor, load_factor, rpe,
   load_direction=1)` takes the line's direction the same way.
 - **Rounding** (step 3 of C24): a scheme's increment requests a step;
@@ -3321,7 +3349,16 @@ propose week  ──►  .coach/proposals/<id>.json (+ .proposed.json)  ──�
 3. Per exercise line: build `SchemeContext`; `propose`; then decay
    (when `days_off` > 10), the deload transform (kind `deload`: the
    program's `blocks.deload_rule`, or `--transform NAME` for this run),
-   constraints, caps, RPE ceilings (C26), rounding. A standing override (C25) active on the
+   constraints, caps, RPE ceilings (C26), rounding. Before the decay, a
+   proposal with a load but no `derived_from`, on a slot whose days off
+   exceed 10, takes the exercise's newest usable exposure in its load
+   mode from any slot, dated on or before the layoff start, as its
+   `derived_from` (C22, C23), and the rationale says the return band
+   cuts from the lower of the slot's load and that exposure, keeping the
+   slot's own set count; with days off of 10 or fewer, such a proposal
+   whose slot's last approved line is return work dated after the layoff
+   start repeats that line's sets, and the rationale says it stands. The
+   scheme's own rationale comes first either way. A standing override (C25) active on the
    session's date replaces the scheme's sets before decay and runs the
    same steps, so the transform applies once to the sets the line
    delivers. Without one, an override on the session's line in the
