@@ -40,18 +40,18 @@ class RampTest(unittest.TestCase):
     def test_three_warm_ups_take_40_60_and_80_percent_rounded_down(self):
         self.assertEqual(warmup_loads(warmups.with_loads(sets(3, 102.5), "total", BAR)), [40, 60, 80])
 
-    def test_a_barbell_warm_up_never_drops_below_the_bar_and_a_repeat_of_it_is_dropped(self):
-        self.assertEqual(warmup_loads(warmups.with_loads(sets(3, 30), "total", BAR)), [20, None, 22.5])
+    def test_a_barbell_warm_up_never_drops_below_the_bar_and_a_repeat_of_it_holds_the_bar(self):
+        self.assertEqual(warmup_loads(warmups.with_loads(sets(3, 30), "total", BAR)), [20, 20, 22.5])
 
-    def test_a_coarse_kit_never_prescribes_the_same_warm_up_twice(self):
+    def test_a_coarse_kit_repeats_a_warm_up_load_rather_than_leave_one_open(self):
         bells = AvailableLoads("kettlebell", "single_implement", {"kettlebells": [12, 16, 20, 24, 28]}, 4)
-        self.assertEqual(warmup_loads(warmups.with_loads(sets(2, 16), "single_implement", bells)), [12, None])
+        self.assertEqual(warmup_loads(warmups.with_loads(sets(2, 16), "single_implement", bells)), [12, 12])
         lb_rack = AvailableLoads("dumbbell", "per_hand_x2", {"dumbbells": [10, 15, 20]}, 5)
-        self.assertEqual(warmup_loads(warmups.with_loads(sets(2, 15), "per_hand_x2", lb_rack)), [10, None])
+        self.assertEqual(warmup_loads(warmups.with_loads(sets(2, 15), "per_hand_x2", lb_rack)), [10, 10])
         lb_bar = AvailableLoads("barbell", "total", {"bar_weight": 45, "plates": [45, 35, 25, 10, 5, 2.5]}, 5)
-        self.assertEqual(warmup_loads(warmups.with_loads(sets(2, 55), "total", lb_bar)), [45, None])
+        self.assertEqual(warmup_loads(warmups.with_loads(sets(2, 55), "total", lb_bar)), [45, 45])
         self.assertEqual(warmups.words(warmups.with_loads(sets(2, 55), "total", lb_bar), "total", lb_bar, [], str),
-                         "warm-ups 45 (50 %) and none (a repeat of 45), percents of the first working set")
+                         "warm-ups 45 (50 %) and 45 again, percents of the first working set")
 
     def test_a_kit_that_cannot_be_enumerated_rounds_to_its_step_or_gives_no_load(self):
         no_step = AvailableLoads("machine", "total", {}, 0)
@@ -66,9 +66,9 @@ class RampTest(unittest.TestCase):
         ez = AvailableLoads("ez_bar", "total", {"plates": PLATES}, 2.5)
         self.assertEqual(warmup_loads(warmups.with_loads(sets(1, 27.5), "total", ez)), [15])
 
-    def test_nothing_lighter_than_the_first_working_load_leaves_the_warm_up_open(self):
-        self.assertEqual(warmup_loads(warmups.with_loads(sets(2, 20), "total", BAR)), [None, None])
-        self.assertEqual(warmup_loads(warmups.with_loads(sets(1, 5), "per_hand_x2", RACK)), [None])
+    def test_nothing_lighter_than_the_first_working_load_gives_the_bar_or_the_lightest_dumbbell(self):
+        self.assertEqual(warmup_loads(warmups.with_loads(sets(2, 20), "total", BAR)), [20, 20])
+        self.assertEqual(warmup_loads(warmups.with_loads(sets(1, 5), "per_hand_x2", RACK)), [5])
 
     def test_per_hand_warm_ups_land_on_the_rack_or_the_dumbbell_grid(self):
         self.assertEqual(warmup_loads(warmups.with_loads(sets(2, 20), "per_hand_x2", RACK)), [10, 15])
@@ -108,8 +108,31 @@ class RampTest(unittest.TestCase):
                          "warm-ups 60 (pinned) and 75 (75 %), percents of the first working set")
         found = warmups.with_loads(sets(1, 20), "total", BAR)
         self.assertEqual(warmups.words(found, "total", BAR, [], text),
-                         "warm-ups none lighter than the first working set")
+                         "warm-ups 20 (nothing lighter than the first working set)")
         self.assertIsNone(warmups.words(sets(1, None), "total", BAR, [], text))
+
+
+class OpenWarmupTextTest(unittest.TestCase):
+    """A warm-up with no load never asks the athlete to choose the load: only a working set does."""
+
+    def line(self, mode, working_load=None):
+        load = None if working_load is None else {"mode": mode, "unit": "kg", "per_hand": None,
+                                                  "hevy_total": working_load, "hevy_kg": working_load}
+        return {"exercise_id": "pull_up", "load_mode": mode, "rest_seconds": 90,
+                "sets": [{"type": "warmup", "reps": 6, "rpe": None, "load": None},
+                         {"type": "normal", "reps": 8, "rpe": 8, "load": load}]}
+
+    def test_a_bodyweight_warm_up_reads_bw_on_sheets_and_routine_pages(self):
+        line = self.line("bodyweight", 0)
+        self.assertEqual(sheets._rows(line, "Pull Up")[0], "| Pull Up | 1×6 warm-up | BW |  |  |  |")
+        self.assertIn("| 1×6 warm-up | BW |", render._exercise_rows(line)[0])
+
+    def test_any_other_open_warm_up_reads_a_dash_and_an_open_working_set_still_reads_choose_the_load(self):
+        line = self.line("assisted")
+        rows = sheets._rows(line, "Pull Up")
+        self.assertEqual(rows[0], "| Pull Up | 1×6 warm-up | — |  |  |  |")
+        self.assertIn(render.CHOOSE_THE_LOAD, rows[1])
+        self.assertIn("| 1×6 warm-up | — |", render._exercise_rows(line)[0])
 
 
 class PinValidationTest(unittest.TestCase):

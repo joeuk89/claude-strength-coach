@@ -64,13 +64,22 @@ def rpe_cell(set_):
 
 
 def _needs_load(exercise, set_):
-    return exercise["load_mode"] in units.LOADED_MODES and set_.get("load") is None
+    return (exercise["load_mode"] in units.LOADED_MODES and set_.get("load") is None
+            and set_.get("type") != "warmup")
+
+
+def open_load_text(exercise, set_):
+    """What a set with no load reads: `BW` for a bodyweight warm-up, `choose the load` for a loaded working set the
+    program leaves to the athlete, else None."""
+    if set_.get("type") == "warmup" and exercise["load_mode"] == "bodyweight":
+        return "BW"
+    return CHOOSE_THE_LOAD if _needs_load(exercise, set_) else None
 
 
 def _load_text(exercise, set_, with_unit, show_hevy=True):
     load = set_.get("load")
     if load is None:
-        return CHOOSE_THE_LOAD if _needs_load(exercise, set_) else None
+        return open_load_text(exercise, set_)
     text = format_load(load, show_hevy=show_hevy)
     if with_unit and exercise["load_mode"] == "total":
         text = f"{text} {load['unit']}"

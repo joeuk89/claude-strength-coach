@@ -3400,21 +3400,21 @@ propose week  ──►  .coach/proposals/<id>.json (+ .proposed.json)  ──�
    more spread evenly from 40 % to 80 %. The load is the kit's heaviest
    no heavier than the target (`AvailableLoads.select` down, so a barbell
    line never drops below `bar_weight` and a dumbbell line lands on the
-   rack), else the lightest the kit makes, and null when even that is not
-   lighter than the first working load. A kit `select` cannot enumerate
+   rack), else the lightest the kit makes (the bare bar, the first
+   dumbbell), even when that is the first working load: a warm-up with no
+   load lets Hevy grey in whatever the exercise last logged. A kit `select` cannot enumerate
    (a bar with no declared base mass, `geometry_warning`; equipment with
    no rack, belt plates or plate-built bar) rounds down to its load
    increment instead, and gives null with no increment, so no raw percent
-   reaches the athlete. A warm-up that would repeat an earlier warm-up's
-   load (a coarse rack, a bar that is most of the working load) is null
-   too: the lighter one keeps the load. A pinned load at or above the
+   reaches the athlete. A warm-up that lands on an earlier warm-up's load
+   (a coarse rack, a bar that is most of the working load) repeats it. A pinned load at or above the
    first working load gives way to its position's percent. Bodyweight,
    assisted, banded and timed lines, and a line whose first working load
    is null, keep their warm-ups as they are. The rationale ends with the
    loads and their percents or pins ("warm-ups 50 (50 %) and 75 (75 %),
-   percents of the first working set"; an open one reads "none lighter
-   than the first working set", "none (a repeat of 45)" or "none (no load
-   step is set for this kit)"). The loads reach the Hevy routine
+   percents of the first working set"; the lightest load reads "20
+   (nothing lighter than the first working set)", a repeat "45 again",
+   and an open one "none (no load step is set for this kit)"). The loads reach the Hevy routine
    sets as `weight_kg` (C12), the sheets and the week-ahead tables (C11,
    C46) and the manual log draft (C46).
    A `model_hold` proposal with no decay, transform or cut whose
@@ -7454,8 +7454,10 @@ focus, then one row per run of equal sets
 their own row and the exercise name on its first row, then one bullet
 per exercise with its guidance: `Focus: …`, `Note: <target_note>`,
 `Cues: …`, joined by ` · `, a note equal to the focus or cues left out. Loads print with
-`format_load(load, show_hevy=False)`; a null load on a loaded mode
-prints "choose the load". An unapproved overlay renders with a "Not
+`format_load(load, show_hevy=False)`; a working set with a null load on
+a loaded mode prints "choose the load", a bodyweight warm-up with a null
+load prints `BW` (as it does on the C12 page tables), and any other
+warm-up with a null load prints `—`. An unapproved overlay renders with a "Not
 approved yet" line and a warning. A rep-out set prints `N×5+` with
 `stop at 9` in its RPE cell (C12), and the footer then first explains
 the `+` set: at least those reps, more until the next would pass its

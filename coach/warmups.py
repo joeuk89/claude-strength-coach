@@ -63,8 +63,9 @@ def with_loads(sets, mode, available, pins=()):
     Bodyweight, assisted, banded and timed lines keep their warm-ups as they are, as does a line whose first
     working load is not set yet. A warm-up's target is its pin, else its ramp percent of the first working load;
     its load is the kit's heaviest no heavier than that target, else the lightest the kit makes (the bare bar,
-    the first dumbbell), and None when even that is not lighter than the first working load or when it repeats
-    an earlier warm-up's load (a coarse rack, a bar that is most of the working load).
+    the first dumbbell), even when that is the first working load or an earlier warm-up's load: a warm-up left
+    without a load lets Hevy fill in whatever the exercise last logged. It is None only when the kit lists no
+    loads or has no load step.
     """
     if not applies(sets, mode, available):
         return tuple(sets)
@@ -75,15 +76,15 @@ def with_loads(sets, mode, available, pins=()):
 
 
 def _derived(sets, pins, available):
-    """(index, pinned load, percent, load, why open) per warm-up; `why` is None for a loaded warm-up, else
-    `repeat` of an earlier warm-up or `none` lighter than the first working set."""
+    """(index, pinned load, percent, load, why off the ramp) per warm-up; `why` is None for a warm-up on its ramp,
+    `repeat` of an earlier warm-up's load, `none` lighter than the first working set, or `no_step`."""
     first = next(s.load for s in sets if s.working)
     found, seen = [], []
     for index, pinned, percent in _targets(sets, pins, first):
         target = pinned if pinned is not None else first * percent / 100
         load, why = _snapped(target, first, available)
-        if load is not None and any(abs(load - earlier) < 1e-9 for earlier in seen):
-            load, why = None, "repeat"
+        if why is None and any(abs(load - earlier) < 1e-9 for earlier in seen):
+            why = "repeat"
         if load is not None:
             seen.append(load)
         found.append((index, pinned, percent, load, why))
@@ -93,7 +94,8 @@ def _derived(sets, pins, available):
 def _snapped(target, first, available):
     """(load, why open) for `target`: an enumerated kit (rack, belt plates, plate-built bar) through `select`;
     otherwise the increment grid, and no load at all (`no_step`) without an increment, so no raw percent ever
-    reaches the athlete. `none` when nothing the kit makes is lighter than the first working load."""
+    reaches the athlete. `none` when nothing the kit makes is lighter than the first working load: the load is
+    then the lightest the kit makes (the bare bar, the first dumbbell), or None when the kit lists none."""
     chosen = available.select(target, "down", first)
     if chosen is None:
         chosen = available.select(target, "up", first)
@@ -103,7 +105,8 @@ def _snapped(target, first, available):
             return None, "no_step"
         chosen = units.round_to_increment(chosen, available.increment, "down")
     if chosen is None or chosen >= first - 1e-9:
-        return None, "none"
+        lightest = available.select(0, "up", first)
+        return (units.json_number(lightest) if lightest else None), "none"
     return units.json_number(chosen), None
 
 
@@ -111,25 +114,25 @@ def words(sets, mode, available, pins, load_text):
     """A rationale clause for the warm-up loads, or None when the line has none to explain.
 
     "warm-ups 50 (50 %) and 75 (75 %), percents of the first working set"; a pinned load reads "60 (pinned)", a
-    warm-up the kit cannot make lighter than the first working set reads "none lighter than the first working set",
-    and one that would repeat an earlier warm-up reads "none (a repeat of 20)".
+    warm-up the kit cannot make lighter than the first working set reads "20 (nothing lighter than the first
+    working set)", and one that repeats an earlier warm-up's load reads "20 again".
     """
     if not applies(sets, mode, available):
         return None
-    parts, ramped, loaded = [], False, []
+    parts, ramped = [], False
     for _, pinned, percent, load, why in _derived(sets, pins, available):
-        if why == "none":
+        if why == "none" and load is None:
             parts.append("none lighter than the first working set")
+        elif why == "none":
+            parts.append(f"{load_text(load)} (nothing lighter than the first working set)")
         elif why == "no_step":
             parts.append("none (no load step is set for this kit)")
         elif why == "repeat":
-            parts.append(f"none (a repeat of {load_text(loaded[-1])})")
+            parts.append(f"{load_text(load)} again")
         elif pinned is not None:
             parts.append(f"{load_text(load)} (pinned)")
         else:
             parts.append(f"{load_text(load)} ({units.format_number(percent)} %)")
             ramped = True
-        if load is not None:
-            loaded.append(load)
     joined = parts[0] if len(parts) == 1 else ", ".join(parts[:-1]) + f" and {parts[-1]}"
     return f"warm-ups {joined}" + (", percents of the first working set" if ramped else "")

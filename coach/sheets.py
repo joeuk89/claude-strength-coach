@@ -96,7 +96,7 @@ def _load(line, set_):
     load = set_.get("load")
     if load is not None:
         return units.format_load(load, show_hevy=False)
-    return render.CHOOSE_THE_LOAD if line["load_mode"] in units.LOADED_MODES else "—"
+    return render.open_load_text(line, set_) or "—"
 
 
 def _cell(value):
